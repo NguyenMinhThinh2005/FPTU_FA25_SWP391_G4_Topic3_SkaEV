@@ -28,7 +28,6 @@ import {
   LocationOn,
   ElectricCar,
   Speed,
-  Euro,
   FilterList,
   Star,
   Navigation,
@@ -352,9 +351,15 @@ const FindStations = () => {
                                   gap: "2px",
                                 }}
                               >
-                                <Euro
-                                  sx={{ fontSize: 16, color: "success.main" }}
-                                />
+                                <span
+                                  style={{
+                                    fontSize: 16,
+                                    color: "#4caf50",
+                                    fontWeight: "bold",
+                                  }}
+                                >
+                                  ₫
+                                </span>
                                 <span style={{ fontSize: "0.875rem" }}>
                                   From{" "}
                                   {formatCurrency(
