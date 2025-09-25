@@ -28,7 +28,6 @@ import {
   LocationOn,
   ElectricCar,
   Speed,
-  Euro,
   FilterList,
   Star,
   Navigation,
@@ -218,31 +217,6 @@ const FindStations = () => {
               </Button>
             </Grid>
           </Grid>
-
-          {/* Amenities Filter */}
-          <Box sx={{ mt: 2 }}>
-            <Typography variant="body2" gutterBottom>
-              Amenities:
-            </Typography>
-            <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-              {Object.values(AMENITIES).map((amenity) => (
-                <Chip
-                  key={amenity}
-                  label={amenity}
-                  variant={
-                    filters.amenities.includes(amenity) ? "filled" : "outlined"
-                  }
-                  onClick={() => {
-                    const newAmenities = filters.amenities.includes(amenity)
-                      ? filters.amenities.filter((a) => a !== amenity)
-                      : [...filters.amenities, amenity];
-                    updateFilters({ amenities: newAmenities });
-                  }}
-                  size="small"
-                />
-              ))}
-            </Box>
-          </Box>
         </CardContent>
       </Card>
 
@@ -352,9 +326,6 @@ const FindStations = () => {
                                   gap: "2px",
                                 }}
                               >
-                                <Euro
-                                  sx={{ fontSize: 16, color: "success.main" }}
-                                />
                                 <span style={{ fontSize: "0.875rem" }}>
                                   From{" "}
                                   {formatCurrency(
