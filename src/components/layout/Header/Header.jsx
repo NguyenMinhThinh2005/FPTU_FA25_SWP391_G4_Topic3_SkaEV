@@ -11,15 +11,9 @@ import {
   Badge,
   Box,
 } from "@mui/material";
-import {
-  Notifications as NotificationsIcon,
-  AccountCircle,
-  Logout,
-  Dashboard,
-} from "@mui/icons-material";
+import { AccountCircle, Logout, Dashboard } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import useAuthStore from "../../../store/authStore";
-import NotificationCenter from "../../NotificationCenter";
 
 const Header = () => {
   const navigate = useNavigate();
@@ -120,9 +114,6 @@ const Header = () => {
             >
               {user.role}
             </Box>
-
-            {/* Notifications */}
-            <NotificationCenter />
 
             {/* User Menu */}
             <Box sx={{ display: "flex", alignItems: "center" }}>

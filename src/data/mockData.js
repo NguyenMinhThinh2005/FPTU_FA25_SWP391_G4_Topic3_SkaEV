@@ -104,7 +104,6 @@ export const mockUsers = [
     preferences: {
       maxDistance: 15, // km
       preferredPayment: "credit-card",
-      notifications: true,
       priceRange: [5000, 15000], // VND per kWh
     },
   },
@@ -132,7 +131,6 @@ export const mockUsers = [
     preferences: {
       maxDistance: 20,
       preferredPayment: "e-wallet",
-      notifications: true,
       priceRange: [6000, 12000],
     },
   },
@@ -355,44 +353,6 @@ export const mockAnalytics = {
 };
 
 // =================================
-// NOTIFICATIONS
-// =================================
-
-export const mockNotifications = [
-  {
-    id: "notif-001",
-    userId: "customer-001",
-    type: "booking-reminder",
-    title: "Charging Session Reminder",
-    message:
-      "Your charging session at Green Mall Charging Hub starts in 30 minutes.",
-    timestamp: "2024-03-15T15:30:00Z",
-    read: false,
-    priority: "medium",
-  },
-  {
-    id: "notif-002",
-    userId: "admin-001",
-    type: "station-alert",
-    title: "Station Maintenance Required",
-    message: "Port #3 at Tech Park SuperCharger requires maintenance check.",
-    timestamp: "2024-03-15T14:15:00Z",
-    read: false,
-    priority: "high",
-  },
-  {
-    id: "notif-003",
-    userId: "admin-001",
-    type: "system-update",
-    title: "Monthly Revenue Report Ready",
-    message: "System revenue report for February 2024 is now available.",
-    timestamp: "2024-03-15T12:00:00Z",
-    read: true,
-    priority: "low",
-  },
-];
-
-// =================================
 // PAYMENT METHODS
 // =================================
 
@@ -428,7 +388,6 @@ export const mockData = {
   stations: mockStations,
   bookings: mockBookings,
   analytics: mockAnalytics,
-  notifications: mockNotifications,
   paymentMethods: mockPaymentMethods,
 };
 

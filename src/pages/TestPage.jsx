@@ -34,15 +34,7 @@ const TestPage = () => {
               />
               Station Management System
             </Typography>
-            <Typography
-              variant="body2"
-              sx={{ display: "flex", alignItems: "center", mb: 1 }}
-            >
-              <CheckCircle
-                sx={{ color: "success.main", mr: 1, fontSize: 18 }}
-              />
-              Notification Dashboard
-            </Typography>
+
             <Typography
               variant="body2"
               sx={{ display: "flex", alignItems: "center", mb: 1 }}

@@ -27,7 +27,6 @@ import {
   Save,
   Cancel,
   Security,
-  Notifications,
   Work,
   Badge,
   Phone,
@@ -50,14 +49,6 @@ const StaffProfile = () => {
     joinDate: "2024-01-15",
     location: "Hà Nội",
     avatar: "/api/placeholder/150/150",
-  });
-
-  const [notifications, setNotifications] = useState({
-    emailAlerts: true,
-    smsAlerts: false,
-    maintenanceReminders: true,
-    systemUpdates: true,
-    emergencyAlerts: true,
   });
 
   const [workStats] = useState({
@@ -119,10 +110,6 @@ const StaffProfile = () => {
 
   const handleProfileChange = (field, value) => {
     setProfileData({ ...profileData, [field]: value });
-  };
-
-  const handleNotificationChange = (field) => {
-    setNotifications({ ...notifications, [field]: !notifications[field] });
   };
 
   const handleSaveProfile = () => {
@@ -272,7 +259,6 @@ const StaffProfile = () => {
         <Tabs value={tabValue} onChange={handleTabChange}>
           <Tab label="Personal Info" />
           <Tab label="Work Details" />
-          <Tab label="Notifications" />
           <Tab label="Activity Log" />
         </Tabs>
       </Box>
@@ -444,125 +430,6 @@ const StaffProfile = () => {
       )}
 
       {tabValue === 2 && (
-        <Card>
-          <CardContent>
-            <Typography variant="h6" fontWeight="bold" gutterBottom>
-              Notification Preferences
-            </Typography>
-            <Grid container spacing={3}>
-              <Grid item xs={12} sm={6}>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={notifications.emailAlerts}
-                      onChange={() => handleNotificationChange("emailAlerts")}
-                    />
-                  }
-                  label="Email Alerts"
-                />
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{ ml: 4 }}
-                >
-                  Receive system alerts and updates via email
-                </Typography>
-              </Grid>
-
-              <Grid item xs={12} sm={6}>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={notifications.smsAlerts}
-                      onChange={() => handleNotificationChange("smsAlerts")}
-                    />
-                  }
-                  label="SMS Alerts"
-                />
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{ ml: 4 }}
-                >
-                  Receive urgent alerts via SMS
-                </Typography>
-              </Grid>
-
-              <Grid item xs={12} sm={6}>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={notifications.maintenanceReminders}
-                      onChange={() =>
-                        handleNotificationChange("maintenanceReminders")
-                      }
-                    />
-                  }
-                  label="Maintenance Reminders"
-                />
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{ ml: 4 }}
-                >
-                  Get reminders for scheduled maintenance
-                </Typography>
-              </Grid>
-
-              <Grid item xs={12} sm={6}>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={notifications.systemUpdates}
-                      onChange={() => handleNotificationChange("systemUpdates")}
-                    />
-                  }
-                  label="System Updates"
-                />
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{ ml: 4 }}
-                >
-                  Notifications about system updates and new features
-                </Typography>
-              </Grid>
-
-              <Grid item xs={12}>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={notifications.emergencyAlerts}
-                      onChange={() =>
-                        handleNotificationChange("emergencyAlerts")
-                      }
-                    />
-                  }
-                  label="Emergency Alerts"
-                />
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{ ml: 4 }}
-                >
-                  Critical system alerts and emergency notifications
-                </Typography>
-              </Grid>
-            </Grid>
-
-            <Divider sx={{ my: 3 }} />
-
-            <Alert severity="info">
-              <Typography variant="body2">
-                Emergency alerts cannot be disabled for safety and compliance
-                reasons.
-              </Typography>
-            </Alert>
-          </CardContent>
-        </Card>
-      )}
-
-      {tabValue === 3 && (
         <Card>
           <CardContent>
             <Typography variant="h6" fontWeight="bold" gutterBottom>
