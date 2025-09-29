@@ -30,6 +30,8 @@ import {
   InputLabel,
   Select,
   Tooltip,
+  Snackbar,
+  Divider,
 } from "@mui/material";
 import {
   Dashboard as DashboardIcon,
@@ -72,6 +74,14 @@ const AdminDashboard = () => {
   const [anchorEl, setAnchorEl] = useState(null);
   const [openStationDialog, setOpenStationDialog] = useState(false);
   const [selectedStation, setSelectedStation] = useState(null);
+  
+  // New states for driver-like flow
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [selectedStationForDetail, setSelectedStationForDetail] = useState(null);
+  const [actionDialog, setActionDialog] = useState({ open: false, type: '', station: null });
+  const [successMessage, setSuccessMessage] = useState("");
+  const [showSuccess, setShowSuccess] = useState(false);
 
   // System Overview Stats
   const totalStations = stations.length;
@@ -119,6 +129,35 @@ const AdminDashboard = () => {
     })
     .sort((a, b) => b.revenue - a.revenue);
 
+  // Filter stations based on search and status like driver flow
+  const filteredStations = stationPerformance.filter(station => {
+    const matchesSearch = station.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         station.location.address.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesStatus = statusFilter === "all" || station.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
+  // Handle station actions like driver flow
+  const handleStationAction = (action, station) => {
+    console.log(`${action} station:`, station.name);
+    if (action === "view") {
+      setSelectedStationForDetail(station);
+    } else if (action === "edit" || action === "maintenance" || action === "delete") {
+      setActionDialog({ open: true, type: action, station });
+    }
+  };
+
+  const handleActionComplete = (actionType, stationName) => {
+    setSuccessMessage(`${actionType} completed successfully for ${stationName}!`);
+    setShowSuccess(true);
+    setActionDialog({ open: false, type: '', station: null });
+  };
+
+  const getDistanceToStation = (station) => {
+    // Mock distance calculation for admin view
+    return (Math.random() * 10 + 1).toFixed(1);
+  };
+
   // Recent Activities với chargingPosts context
   const recentActivities = [
     {
@@ -164,14 +203,6 @@ const AdminDashboard = () => {
       severity: "success",
     },
   ];
-
-  const handleStationAction = (action, station) => {
-    console.log(`${action} station:`, station.name);
-    if (action === "view") {
-      setSelectedStation(station);
-      setOpenStationDialog(true);
-    }
-  };
 
   const getStatusChip = (status) => {
     const configs = {
@@ -244,6 +275,52 @@ const AdminDashboard = () => {
           </Button>
         </Typography>
       </Alert>
+
+      {/* Search & Filters - Driver-like flow */}
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <Grid container spacing={3} alignItems="center">
+            {/* Search Bar */}
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                placeholder="Search stations by name or location..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <Search sx={{ mr: 1, color: "text.secondary" }} />
+                  ),
+                }}
+              />
+            </Grid>
+
+            {/* Status Filter */}
+            <Grid item xs={12} md={3}>
+              <FormControl fullWidth>
+                <InputLabel>Station Status</InputLabel>
+                <Select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                >
+                  <MenuItem value="all">All Status</MenuItem>
+                  <MenuItem value="active">Active</MenuItem>
+                  <MenuItem value="inactive">Inactive</MenuItem>
+                  <MenuItem value="maintenance">Maintenance</MenuItem>
+                  <MenuItem value="construction">Construction</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+
+            {/* Results Count */}
+            <Grid item xs={12} md={3}>
+              <Typography variant="body2" color="text.secondary">
+                {filteredStations.length} stations found
+              </Typography>
+            </Grid>
+          </Grid>
+        </CardContent>
+      </Card>
 
       {/* Key Metrics */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
@@ -361,215 +438,218 @@ const AdminDashboard = () => {
       </Grid>
 
       <Grid container spacing={3}>
-        {/* Station Performance Table */}
+        {/* Station List - Driver-like flow */}
         <Grid item xs={12} md={8}>
           <Card>
             <CardContent>
-              <Box
-                sx={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  mb: 2,
-                }}
-              >
-                <Typography variant="h6" fontWeight="bold">
-                  Station Performance
-                </Typography>
-                <Box sx={{ display: "flex", gap: 1 }}>
-                  <IconButton size="small">
-                    <FilterList />
-                  </IconButton>
-                  <IconButton size="small">
-                    <Search />
-                  </IconButton>
-                </Box>
-              </Box>
+              <Typography variant="h6" gutterBottom>
+                {filteredStations.length} Stations Found
+              </Typography>
 
-              <TableContainer>
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Station</TableCell>
-                      <TableCell align="center">Status</TableCell>
-                      <TableCell align="center">Charging Posts</TableCell>
-                      <TableCell align="center">Utilization</TableCell>
-                      <TableCell align="center">Sessions</TableCell>
-                      <TableCell align="center">Revenue</TableCell>
-                      <TableCell align="center">Actions</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {stationPerformance.slice(0, 6).map((station) => (
-                      <TableRow key={station.id} hover>
-                        <TableCell>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 2,
-                            }}
-                          >
-                            <Avatar
-                              sx={{
-                                bgcolor: "primary.main",
-                                width: 40,
-                                height: 40,
-                              }}
-                            >
-                              <ElectricCar />
-                            </Avatar>
-                            <Box>
-                              <Typography
-                                variant="subtitle2"
-                                fontWeight="medium"
-                              >
-                                {station.name}
+              <Box sx={{ maxHeight: 600, overflowY: "auto" }}>
+                {filteredStations.map((station, index) => (
+                  <Box key={station.id}>
+                    <Paper
+                      sx={{
+                        p: 2,
+                        mb: 2,
+                        border: selectedStationForDetail?.id === station.id ? 2 : 1,
+                        borderColor: selectedStationForDetail?.id === station.id ? "primary.main" : "divider",
+                        "&:hover": {
+                          backgroundColor: "grey.50",
+                          cursor: "pointer",
+                        },
+                      }}
+                      onClick={() => setSelectedStationForDetail(station)}
+                    >
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2 }}>
+                        <Avatar
+                          sx={{ bgcolor: "primary.main", width: 60, height: 60 }}
+                        >
+                          <LocationOn />
+                        </Avatar>
+                        
+                        <Box sx={{ flexGrow: 1 }}>
+                          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "start", mb: 1 }}>
+                            <Typography variant="h6" fontWeight="bold">
+                              {station.name}
+                            </Typography>
+                            {getStatusChip(station.status)}
+                          </Box>
+                          
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
+                            <LocationOn sx={{ fontSize: 16, color: "text.secondary" }} />
+                            <Typography variant="body2" color="text.secondary">
+                              {station.location.address} • {getDistanceToStation(station)}km from center
+                            </Typography>
+                          </Box>
+                          
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 3, mb: 1 }}>
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                              <ElectricCar sx={{ fontSize: 16, color: "primary.main" }} />
+                              <Typography variant="body2">
+                                {station.chargingPostsCount} posts, {station.totalSlots} slots
                               </Typography>
-                              <Typography
-                                variant="caption"
-                                color="text.secondary"
-                              >
-                                {station.location.address}
+                            </Box>
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                              <MonetizationOn sx={{ fontSize: 16, color: "success.main" }} />
+                              <Typography variant="body2">
+                                {formatCurrency(station.revenue)} revenue
                               </Typography>
                             </Box>
                           </Box>
-                        </TableCell>
-                        <TableCell align="center">
-                          {getStatusChip(station.status)}
-                        </TableCell>
-                        <TableCell align="center">
-                          <Box>
-                            <Typography variant="body2" fontWeight="medium">
-                              {station.chargingPostsCount} Posts
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              {station.occupiedSlots}/{station.totalSlots} slots
-                            </Typography>
-                          </Box>
-                        </TableCell>
-                        <TableCell align="center">
-                          <Box sx={{ minWidth: 60 }}>
-                            <LinearProgress
-                              variant="determinate"
-                              value={station.utilization}
-                              sx={{ mb: 0.5 }}
+                          
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                              <Typography variant="caption" color="text.secondary">
+                                Utilization: {station.utilization.toFixed(0)}%
+                              </Typography>
+                              <LinearProgress
+                                variant="determinate"
+                                value={station.utilization}
+                                sx={{ width: 60, height: 4 }}
+                              />
+                            </Box>
+                            <Chip
+                              label={`${station.bookingsCount} sessions`}
+                              size="small"
+                              variant="outlined"
                             />
-                            <Typography variant="caption">
-                              {station.utilization.toFixed(0)}%
-                            </Typography>
+                            <Chip
+                              label={`${station.totalSlots - station.occupiedSlots} available`}
+                              color="success"
+                              size="small"
+                            />
                           </Box>
-                        </TableCell>
-                        <TableCell align="center">
-                          <Typography variant="body2" fontWeight="medium">
-                            {station.bookingsCount}
-                          </Typography>
-                        </TableCell>
-                        <TableCell align="center">
-                          <Typography variant="body2" fontWeight="medium">
-                            {formatCurrency(station.revenue)}
-                          </Typography>
-                        </TableCell>
-                        <TableCell align="center">
-                          <IconButton
+                        </Box>
+                        
+                        <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                          <Button
+                            variant="contained"
                             size="small"
                             onClick={(e) => {
-                              setAnchorEl(e.currentTarget);
-                              setSelectedStation(station);
+                              e.stopPropagation();
+                              handleStationAction("edit", station);
                             }}
+                            startIcon={<Edit />}
                           >
-                            <MoreVert />
-                          </IconButton>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-
-              <Menu
-                anchorEl={anchorEl}
-                open={Boolean(anchorEl)}
-                onClose={() => setAnchorEl(null)}
-              >
-                <MenuItem
-                  onClick={() => {
-                    handleStationAction("view", selectedStation);
-                    setAnchorEl(null);
-                  }}
-                >
-                  <Visibility sx={{ mr: 1 }} />
-                  View Details
-                </MenuItem>
-                <MenuItem
-                  onClick={() => {
-                    handleStationAction("edit", selectedStation);
-                    setAnchorEl(null);
-                  }}
-                >
-                  <Edit sx={{ mr: 1 }} />
-                  Edit Station
-                </MenuItem>
-                <MenuItem
-                  onClick={() => {
-                    handleStationAction("maintenance", selectedStation);
-                    setAnchorEl(null);
-                  }}
-                >
-                  <Settings sx={{ mr: 1 }} />
-                  Schedule Maintenance
-                </MenuItem>
-                <MenuItem
-                  onClick={() => {
-                    handleStationAction("delete", selectedStation);
-                    setAnchorEl(null);
-                  }}
-                  sx={{ color: "error.main" }}
-                >
-                  <Delete sx={{ mr: 1 }} />
-                  Delete Station
-                </MenuItem>
-              </Menu>
+                            Manage
+                          </Button>
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleStationAction("maintenance", station);
+                            }}
+                            startIcon={<Settings />}
+                          >
+                            Maintenance
+                          </Button>
+                        </Box>
+                      </Box>
+                    </Paper>
+                  </Box>
+                ))}
+              </Box>
             </CardContent>
           </Card>
         </Grid>
 
-        {/* Recent Activities */}
+        {/* Station Details Panel - Driver-like flow */}
         <Grid item xs={12} md={4}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6" fontWeight="bold" gutterBottom>
-                Recent Activities
-              </Typography>
+          {selectedStationForDetail ? (
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  {selectedStationForDetail.name}
+                </Typography>
 
-              <Box sx={{ maxHeight: 400, overflowY: "auto" }}>
-                {recentActivities.map((activity) => (
-                  <Paper
-                    key={activity.id}
+                <Box sx={{ mb: 2 }}>
+                  <Avatar
                     sx={{
-                      p: 2,
-                      mb: 2,
-                      border: "1px solid",
-                      borderColor: "divider",
-                      borderLeft: 4,
-                      borderLeftColor: getSeverityColor(activity.severity),
+                      width: "100%",
+                      height: 150,
+                      borderRadius: 2,
+                      bgcolor: "primary.main"
                     }}
                   >
-                    <Typography variant="body2" gutterBottom>
-                      {activity.message}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {activity.time}
-                    </Typography>
-                  </Paper>
-                ))}
-              </Box>
+                    <LocationOn sx={{ fontSize: 40 }} />
+                  </Avatar>
+                </Box>
 
-              <Button variant="outlined" fullWidth sx={{ mt: 2 }}>
-                View All Activities
-              </Button>
-            </CardContent>
-          </Card>
+                <Box sx={{ display: "flex", alignItems: "center", color: "text.secondary", fontSize: "0.875rem", mb: 1 }}>
+                  <LocationOn sx={{ fontSize: 16, mr: 0.5 }} />
+                  {selectedStationForDetail.location.address}
+                </Box>
+
+                <Typography variant="body2" color="text.secondary" gutterBottom>
+                  Distance: {getDistanceToStation(selectedStationForDetail)}km from center
+                </Typography>
+
+                <Divider sx={{ my: 2 }} />
+
+                <Typography variant="subtitle2" gutterBottom>
+                  Station Information
+                </Typography>
+                <Box sx={{ fontSize: "0.875rem", mb: 1 }}>
+                  • Status: {selectedStationForDetail.status}
+                </Box>
+                <Box sx={{ fontSize: "0.875rem", mb: 1 }}>
+                  • Charging Posts: {selectedStationForDetail.chargingPostsCount}
+                </Box>
+                <Box sx={{ fontSize: "0.875rem", mb: 1 }}>
+                  • Total Slots: {selectedStationForDetail.totalSlots}
+                </Box>
+                <Box sx={{ fontSize: "0.875rem", mb: 1 }}>
+                  • Available Slots: {selectedStationForDetail.totalSlots - selectedStationForDetail.occupiedSlots}
+                </Box>
+
+                <Divider sx={{ my: 2 }} />
+
+                <Typography variant="subtitle2" gutterBottom>
+                  Performance
+                </Typography>
+                <Box sx={{ fontSize: "0.875rem", mb: 1 }}>
+                  • Utilization: {selectedStationForDetail.utilization.toFixed(1)}%
+                </Box>
+                <Box sx={{ fontSize: "0.875rem", mb: 1 }}>
+                  • Sessions: {selectedStationForDetail.bookingsCount}
+                </Box>
+                <Box sx={{ fontSize: "0.875rem", mb: 1 }}>
+                  • Revenue: {formatCurrency(selectedStationForDetail.revenue)}
+                </Box>
+
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 1, mt: 2 }}>
+                  <Button
+                    fullWidth
+                    variant="contained"
+                    onClick={() => handleStationAction("edit", selectedStationForDetail)}
+                  >
+                    Manage Station
+                  </Button>
+                  <Button
+                    fullWidth
+                    variant="outlined"
+                    onClick={() => handleStationAction("maintenance", selectedStationForDetail)}
+                  >
+                    Schedule Maintenance
+                  </Button>
+                </Box>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  Select a Station
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Choose a station from the list to see detailed information and management options.
+                </Typography>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Quick Actions */}
           <Card sx={{ mt: 3 }}>
@@ -617,77 +697,133 @@ const AdminDashboard = () => {
         </Grid>
       </Grid>
 
-      {/* Station Detail Dialog */}
+      {/* Action Dialogs - Driver-like flow */}
       <Dialog
-        open={openStationDialog}
-        onClose={() => setOpenStationDialog(false)}
-        maxWidth="md"
+        open={actionDialog.open && actionDialog.type === 'edit'}
+        onClose={() => setActionDialog({ open: false, type: '', station: null })}
+        maxWidth="sm"
         fullWidth
       >
-        <DialogTitle>Station Details: {selectedStation?.name}</DialogTitle>
+        <DialogTitle>Edit Station: {actionDialog.station?.name}</DialogTitle>
         <DialogContent>
-          {selectedStation && (
-            <Box sx={{ pt: 2 }}>
-              <Grid container spacing={2}>
-                <Grid item xs={12} sm={6}>
-                  <Typography variant="subtitle2" gutterBottom>
-                    Location
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {selectedStation.location.address}
-                  </Typography>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <Typography variant="subtitle2" gutterBottom>
-                    Status
-                  </Typography>
-                  {getStatusChip(selectedStation.status)}
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <Typography variant="subtitle2" gutterBottom>
-                    Charging Posts
-                  </Typography>
-                  <Typography variant="body2">
-                    {selectedStation.chargingPostsCount} posts, {selectedStation.totalSlots} total slots
-                  </Typography>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <Typography variant="subtitle2" gutterBottom>
-                    Available Slots
-                  </Typography>
-                  <Typography variant="body2">
-                    {selectedStation.totalSlots - selectedStation.occupiedSlots} available
-                  </Typography>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <Typography variant="subtitle2" gutterBottom>
-                    Max Power (per post)
-                  </Typography>
-                  <Typography variant="body2">
-                    {selectedStation.charging?.chargingPosts?.[0]?.power || 'N/A'}kW
-                  </Typography>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <Typography variant="subtitle2" gutterBottom>
-                    Revenue (Month)
-                  </Typography>
-                  <Typography variant="body2">
-                    {formatCurrency(
-                      stationPerformance.find(
-                        (s) => s.id === selectedStation.id
-                      )?.revenue || 0
-                    )}
-                  </Typography>
-                </Grid>
-              </Grid>
-            </Box>
-          )}
+          <Typography variant="body2" sx={{ mb: 2 }}>
+            Manage station settings, charging posts, and operational parameters.
+          </Typography>
+          <TextField
+            fullWidth
+            label="Station Name"
+            defaultValue={actionDialog.station?.name}
+            sx={{ mb: 2 }}
+          />
+          <FormControl fullWidth sx={{ mb: 2 }}>
+            <InputLabel>Status</InputLabel>
+            <Select defaultValue={actionDialog.station?.status}>
+              <MenuItem value="active">Active</MenuItem>
+              <MenuItem value="inactive">Inactive</MenuItem>
+              <MenuItem value="maintenance">Maintenance</MenuItem>
+            </Select>
+          </FormControl>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenStationDialog(false)}>Close</Button>
-          <Button variant="contained">Edit Station</Button>
+          <Button onClick={() => setActionDialog({ open: false, type: '', station: null })}>
+            Cancel
+          </Button>
+          <Button 
+            variant="contained" 
+            onClick={() => handleActionComplete('Station management', actionDialog.station?.name)}
+          >
+            Save Changes
+          </Button>
         </DialogActions>
       </Dialog>
+
+      <Dialog
+        open={actionDialog.open && actionDialog.type === 'maintenance'}
+        onClose={() => setActionDialog({ open: false, type: '', station: null })}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Schedule Maintenance: {actionDialog.station?.name}</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ mb: 2 }}>
+            Schedule maintenance for charging posts and equipment.
+          </Typography>
+          <FormControl fullWidth sx={{ mb: 2 }}>
+            <InputLabel>Charging Post</InputLabel>
+            <Select>
+              {actionDialog.station?.charging?.chargingPosts?.map((post) => (
+                <MenuItem key={post.id} value={post.id}>
+                  {post.name} ({post.type} - {post.power}kW)
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <TextField
+            fullWidth
+            label="Issue Description"
+            multiline
+            rows={3}
+            sx={{ mb: 2 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setActionDialog({ open: false, type: '', station: null })}>
+            Cancel
+          </Button>
+          <Button 
+            variant="contained" 
+            onClick={() => handleActionComplete('Maintenance scheduling', actionDialog.station?.name)}
+          >
+            Schedule Maintenance
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={actionDialog.open && actionDialog.type === 'delete'}
+        onClose={() => setActionDialog({ open: false, type: '', station: null })}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Delete Station</DialogTitle>
+        <DialogContent>
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            This action cannot be undone!
+          </Alert>
+          <Typography variant="body2">
+            Are you sure you want to delete <strong>{actionDialog.station?.name}</strong>?
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setActionDialog({ open: false, type: '', station: null })}>
+            Cancel
+          </Button>
+          <Button 
+            variant="contained" 
+            color="error"
+            onClick={() => handleActionComplete('Station deletion', actionDialog.station?.name)}
+          >
+            Delete Station
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Success Snackbar - Driver-like flow */}
+      <Snackbar
+        open={showSuccess}
+        autoHideDuration={4000}
+        onClose={() => setShowSuccess(false)}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setShowSuccess(false)}
+          severity="success"
+          variant="filled"
+          sx={{ width: "100%" }}
+        >
+          {successMessage}
+        </Alert>
+      </Snackbar>
 
       {/* Floating Action Button */}
       <Fab
