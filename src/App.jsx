@@ -18,7 +18,7 @@ import RegisterPage from "./pages/auth/Register";
 import HomePage from "./pages/public/Home";
 // Test and Demo Pages
 import TestPage from "./pages/TestPage";
-import QRScannerDemo from "./pages/QRScannerDemo";
+import ChargingFlow from "./pages/customer/ChargingFlow";
 import DateTimePickerDemo from "./pages/DateTimePickerDemo";
 import MockAPIDemo from "./pages/MockAPIDemo";
 
@@ -82,7 +82,7 @@ const PublicRoute = ({ children }) => {
       case "staff":
         return <Navigate to="/staff/dashboard" replace />;
       case "customer":
-        return <Navigate to="/customer/dashboard" replace />;
+        return <Navigate to="/customer/profile" replace />;
       default:
         return <Navigate to="/" replace />;
     }
@@ -101,7 +101,6 @@ function App() {
             {/* Public Routes */}
             <Route path="/" element={<HomePage />} />
             <Route path="/test" element={<TestPage />} />
-            <Route path="/qr-demo" element={<QRScannerDemo />} />
             <Route path="/datetime-demo" element={<DateTimePickerDemo />} />
             <Route path="/api-demo" element={<MockAPIDemo />} />
             <Route
@@ -130,15 +129,9 @@ function App() {
                 </ProtectedRoute>
               }
             >
-              <Route path="dashboard" element={<CustomerDashboard />} />
-              <Route path="find-stations" element={<FindStations />} />
-              <Route path="history" element={<BookingHistory />} />
-              <Route path="payment" element={<PaymentMethods />} />
+              <Route index element={<Navigate to="profile" replace />} />
               <Route path="profile" element={<CustomerProfile />} />
-              <Route path="vehicles" element={<VehicleManagement />} />
-              <Route path="analytics" element={<CustomerAnalytics />} />
-              <Route path="reports" element={<MonthlyCostReports />} />
-              <Route index element={<Navigate to="dashboard" replace />} />
+              <Route path="charging" element={<ChargingFlow />} />
             </Route>
 
             {/* Staff Routes */}

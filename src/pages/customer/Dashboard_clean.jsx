@@ -99,7 +99,7 @@ const CustomerDashboard = () => {
                     title: "Bản đồ trạm sạc",
                     description: "Tìm trạm theo vị trí, công suất, giá cả",
                     icon: <LocationOn />,
-                    action: () => navigate("/customer/find-stations"),
+                    action: () => navigate("/customer/charging"),
                 },
                 {
                     title: "Đặt trước điểm sạc",

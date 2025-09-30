@@ -12,7 +12,6 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Slider,
   List,
   ListItem,
   ListItemText,
@@ -48,6 +47,8 @@ const FindStations = () => {
     updateFilters,
     getFilteredStations,
     fetchNearbyStations,
+    initializeData,
+    loading,
   } = useStationStore();
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -61,26 +62,66 @@ const FindStations = () => {
   const [bookingSuccess, setBookingSuccess] = useState(false);
   const [bookingMessage, setBookingMessage] = useState("");
 
-  const filteredStations = getFilteredStations();
+  // Apply search query filter on top of store filtered stations
+  const filteredStations = React.useMemo(() => {
+    try {
+      const storeFiltered = getFilteredStations();
+
+      if (!searchQuery.trim()) return storeFiltered;
+
+      const query = searchQuery.toLowerCase();
+      return storeFiltered.filter((station) => {
+        if (!station || !station.name || !station.location) return false;
+
+        return (
+          station.name.toLowerCase().includes(query) ||
+          (station.location.address && station.location.address.toLowerCase().includes(query)) ||
+          (station.location.city && station.location.city.toLowerCase().includes(query)) ||
+          (station.location.district && station.location.district.toLowerCase().includes(query))
+        );
+      });
+    } catch (error) {
+      console.error("Error filtering stations:", error);
+      return [];
+    }
+  }, [getFilteredStations, searchQuery]); useEffect(() => {
+    // Initialize data first
+    initializeData();
+  }, [initializeData]);
 
   useEffect(() => {
+    let isMounted = true;
+
     // Get user location
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          const newLocation = {
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          };
-          setUserLocation(newLocation);
-          fetchNearbyStations(position.coords, filters.maxDistance);
+          if (isMounted) {
+            const newLocation = {
+              lat: position.coords.latitude,
+              lng: position.coords.longitude,
+            };
+            setUserLocation(newLocation);
+            fetchNearbyStations(newLocation, filters.maxDistance);
+          }
         },
         () => {
-          console.warn("Location access denied, using default location");
-          fetchNearbyStations(userLocation, filters.maxDistance);
+          if (isMounted) {
+            console.warn("Location access denied, using default location");
+            fetchNearbyStations(userLocation, filters.maxDistance);
+          }
         }
       );
+    } else {
+      // Fallback: load stations with default location
+      if (isMounted) {
+        fetchNearbyStations(userLocation, filters.maxDistance);
+      }
     }
+
+    return () => {
+      isMounted = false;
+    };
   }, [fetchNearbyStations, filters.maxDistance, userLocation]);
 
   const handleSearch = () => {
@@ -178,11 +219,13 @@ const FindStations = () => {
               <FormControl fullWidth>
                 <InputLabel>{getText("stations.connectorType")}</InputLabel>
                 <Select
-                  value={filters.connectorTypes}
+                  value={filters.connectorTypes || []}
                   multiple
-                  onChange={(e) =>
-                    updateFilters({ connectorTypes: e.target.value })
-                  }
+                  onChange={(e) => {
+                    console.log("Selected connectors:", e.target.value);
+                    updateFilters({ connectorTypes: e.target.value });
+                  }}
+                  renderValue={(selected) => selected.join(', ')}
                 >
                   {Object.values(CONNECTOR_TYPES).map((type) => (
                     <MenuItem key={type} value={type}>
@@ -193,20 +236,7 @@ const FindStations = () => {
               </FormControl>
             </Grid>
 
-            {/* Distance Filter */}
-            <Grid item xs={12} md={3}>
-              <Typography variant="body2" gutterBottom>
-                {getText("stations.maxDistance")}: {filters.maxDistance}{getText("units.km")}
-              </Typography>
-              <Slider
-                value={filters.maxDistance}
-                onChange={(e, value) => updateFilters({ maxDistance: value })}
-                min={1}
-                max={50}
-                valueLabelDisplay="auto"
-                valueLabelFormat={(value) => `${value}km`}
-              />
-            </Grid>
+
 
             {/* Search Button */}
             <Grid item xs={12} md={2}>
@@ -229,96 +259,78 @@ const FindStations = () => {
           <Card>
             <CardContent>
               <Typography variant="h6" gutterBottom>
-                {filteredStations.length} {getText("stations.stationsFound")}
+                {loading ? "Đang tải..." : `${filteredStations.length} ${getText("stations.stationsFound")}`}
               </Typography>
 
-              <List>
-                {filteredStations.map((station, index) => (
-                  <React.Fragment key={station.id}>
-                    <ListItem
-                      onClick={() => setSelectedStation(station)}
-                      sx={{
-                        borderRadius: 2,
-                        mb: 1,
-                        border: selectedStation?.id === station.id ? 2 : 1,
-                        borderColor:
-                          selectedStation?.id === station.id
-                            ? "primary.main"
-                            : "divider",
-                        "&:hover": {
-                          backgroundColor: "grey.50",
-                        },
-                        cursor: "pointer",
-                      }}
-                    >
-                      <ListItemIcon>
-                        <Avatar
-                          src={getStationImage(station)}
-                          sx={{ width: 60, height: 60 }}
-                        >
-                          <ElectricCar />
-                        </Avatar>
-                      </ListItemIcon>
-
-                      <ListItemText
-                        primary={
-                          <Box
-                            sx={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "start",
-                            }}
+              {loading ? (
+                <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+                  <Typography>Đang tìm trạm sạc gần bạn...</Typography>
+                </Box>
+              ) : (
+                <List>
+                  {filteredStations.map((station, index) => (
+                    <React.Fragment key={station.id}>
+                      <ListItem
+                        onClick={() => setSelectedStation(station)}
+                        sx={{
+                          borderRadius: 2,
+                          mb: 1,
+                          border: selectedStation?.id === station.id ? 2 : 1,
+                          borderColor:
+                            selectedStation?.id === station.id
+                              ? "primary.main"
+                              : "divider",
+                          "&:hover": {
+                            backgroundColor: "grey.50",
+                          },
+                          cursor: "pointer",
+                        }}
+                      >
+                        <ListItemIcon>
+                          <Avatar
+                            src={getStationImage(station)}
+                            sx={{ width: 60, height: 60 }}
                           >
-                            <Typography variant="h6" fontWeight="bold">
-                              {station.name}
-                            </Typography>
-                            {getStatusChip(station)}
-                          </Box>
-                        }
-                        secondary={
-                          <span>
-                            <span
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "4px",
-                                marginBottom: "4px",
-                              }}
-                            >
-                              <LocationOn
-                                sx={{ fontSize: 16, color: "text.secondary" }}
-                              />
-                              <span
-                                style={{
-                                  fontSize: "0.875rem",
-                                  color: "rgba(0, 0, 0, 0.6)",
-                                }}
-                              >
-                                {station.location.address} •{" "}
-                                {getDistanceToStation(station)}{getText("units.km")} {getText("stations.away")}
-                              </span>
-                            </span>
+                            <ElectricCar />
+                          </Avatar>
+                        </ListItemIcon>
 
-                            <span
-                              style={{
+                        <ListItemText
+                          primary={
+                            <Box
+                              sx={{
                                 display: "flex",
-                                alignItems: "center",
-                                gap: "8px",
-                                marginBottom: "4px",
+                                justifyContent: "space-between",
+                                alignItems: "start",
                               }}
                             >
+                              <Typography variant="h6" fontWeight="bold">
+                                {station.name}
+                              </Typography>
+                              {getStatusChip(station)}
+                            </Box>
+                          }
+                          secondary={
+                            <span>
                               <span
                                 style={{
                                   display: "flex",
                                   alignItems: "center",
-                                  gap: "2px",
+                                  gap: "4px",
+                                  marginBottom: "4px",
                                 }}
                               >
-                                <Speed
-                                  sx={{ fontSize: 16, color: "primary.main" }}
+                                <LocationOn
+                                  sx={{ fontSize: 16, color: "text.secondary" }}
                                 />
-                                <span style={{ fontSize: "0.875rem" }}>
-                                  {getText("stations.upTo")} {station.charging.maxPower}{getText("units.kw")}
+                                <span
+                                  style={{
+                                    fontSize: "0.875rem",
+                                    color: "rgba(0, 0, 0, 0.6)",
+                                  }}
+                                >
+                                  {station.location.address} •{" "}
+                                  {getDistanceToStation(station)}{getText("units.km")} {getText("stations.away")}
                                 </span>
                               </span>
 
@@ -326,71 +338,95 @@ const FindStations = () => {
                                 style={{
                                   display: "flex",
                                   alignItems: "center",
-                                  gap: "2px",
+                                  gap: "8px",
+                                  marginBottom: "4px",
                                 }}
                               >
                                 <span
                                   style={{
-                                    fontSize: 16,
-                                    color: "#4caf50",
-                                    fontWeight: "bold",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "2px",
                                   }}
                                 >
-                                  {getText("units.vnd")}
+                                  <Speed
+                                    sx={{ fontSize: 16, color: "primary.main" }}
+                                  />
+                                  <span style={{ fontSize: "0.875rem" }}>
+                                    {getText("stations.upTo")} {station.charging.maxPower}{getText("units.kw")}
+                                  </span>
                                 </span>
-                                <span style={{ fontSize: "0.875rem" }}>
-                                  {getText("stations.from")}{" "}
-                                  {formatCurrency(
-                                    station.charging.pricing.acRate
-                                  )}
-                                  {getText("units.perKwh")}
+
+                                <span
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "2px",
+                                  }}
+                                >
+                                  <span
+                                    style={{
+                                      fontSize: 16,
+                                      color: "#4caf50",
+                                      fontWeight: "bold",
+                                    }}
+                                  >
+                                    {getText("units.vnd")}
+                                  </span>
+                                  <span style={{ fontSize: "0.875rem" }}>
+                                    {getText("stations.from")}{" "}
+                                    {formatCurrency(
+                                      station.charging.pricing.acRate
+                                    )}
+                                    {getText("units.perKwh")}
+                                  </span>
                                 </span>
                               </span>
-                            </span>
 
-                            <span
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "4px",
-                              }}
-                            >
-                              <Rating
-                                value={station.ratings.overall}
-                                precision={0.1}
-                                size="small"
-                                readOnly
-                              />
                               <span
                                 style={{
-                                  fontSize: "0.75rem",
-                                  color: "rgba(0, 0, 0, 0.6)",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "4px",
                                 }}
                               >
-                                {station.ratings.overall} (
-                                {station.ratings.totalReviews} {getText("stations.reviews")})
+                                <Rating
+                                  value={station.ratings.overall}
+                                  precision={0.1}
+                                  size="small"
+                                  readOnly
+                                />
+                                <span
+                                  style={{
+                                    fontSize: "0.75rem",
+                                    color: "rgba(0, 0, 0, 0.6)",
+                                  }}
+                                >
+                                  {station.ratings.overall} (
+                                  {station.ratings.totalReviews} {getText("stations.reviews")})
+                                </span>
                               </span>
                             </span>
-                          </span>
-                        }
-                      />
+                          }
+                        />
 
-                      <Button
-                        variant="contained"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleBookStation(station);
-                        }}
-                        sx={{ ml: 2 }}
-                      >
-                        {getText("stations.bookNow")}
-                      </Button>
-                    </ListItem>
+                        <Button
+                          variant="contained"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleBookStation(station);
+                          }}
+                          sx={{ ml: 2 }}
+                        >
+                          {getText("stations.bookNow")}
+                        </Button>
+                      </ListItem>
 
-                    {index < filteredStations.length - 1 && <Divider />}
-                  </React.Fragment>
-                ))}
-              </List>
+                      {index < filteredStations.length - 1 && <Divider />}
+                    </React.Fragment>
+                  ))}
+                </List>
+              )}
             </CardContent>
           </Card>
         </Grid>

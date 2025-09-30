@@ -201,13 +201,43 @@ const LoginPage = () => {
             </Typography>
           </Box>
 
+          {/* Social Login */}
+          <Divider sx={{ my: 3 }}>
+            <Typography variant="body2" color="text.secondary">
+              Hoặc đăng nhập với
+            </Typography>
+          </Divider>
+
+          <Grid container spacing={2} sx={{ mb: 3 }}>
+            <Grid item xs={6}>
+              <Button
+                fullWidth
+                variant="outlined"
+                startIcon={<img src="/assets/google-icon.svg" alt="Google" width="20" height="20" />}
+                onClick={() => console.log("Google login")}
+                sx={{ textTransform: "none" }}
+              >
+                Google
+              </Button>
+            </Grid>
+            <Grid item xs={6}>
+              <Button
+                fullWidth
+                variant="outlined"
+                startIcon={<img src="/assets/facebook-icon.svg" alt="Facebook" width="20" height="20" />}
+                onClick={() => console.log("Facebook login")}
+                sx={{ textTransform: "none" }}
+              >
+                Facebook
+              </Button>
+            </Grid>
+          </Grid>
+
           <Divider sx={{ my: 3 }}>
             <Typography variant="body2" color="text.secondary">
               {getText("auth.demoAccounts")}
             </Typography>
-          </Divider>
-
-          {/* Demo Accounts */}
+          </Divider>          {/* Demo Accounts */}
           <Grid container spacing={2}>
             {demoAccounts.map((account, index) => (
               <Grid item xs={12} key={index}>

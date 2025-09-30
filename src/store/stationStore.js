@@ -1,9 +1,10 @@
 import { create } from "zustand";
-import { mockStations, mockBookings } from "../data/mockData";
+import { mockStations } from "../data/mockData";
+import { calculateDistance } from "../utils/helpers";
 
 const useStationStore = create((set, get) => ({
   // State
-  stations: mockStations,
+  stations: [],
   selectedStation: null,
   nearbyStations: [],
   loading: false,
@@ -12,6 +13,13 @@ const useStationStore = create((set, get) => ({
     maxDistance: 20, // km
     connectorTypes: [],
     maxPrice: null,
+  },
+
+  // Initialize mock data on store creation
+  initializeData: () => {
+    console.log("Initializing stations:", mockStations.length);
+    console.log("Sample station connectors:", mockStations[0]?.charging?.connectorTypes);
+    set({ stations: mockStations });
   },
 
   // Actions
@@ -51,16 +59,29 @@ const useStationStore = create((set, get) => ({
     set({ loading: true, error: null });
     try {
       // Simulate API delay
-      await new Promise((resolve) => setTimeout(resolve, 800));
+      await new Promise((resolve) => setTimeout(resolve, 300));
 
-      // Mock: filter stations by distance (simplified)
-      const nearby = mockStations.filter((station) => {
-        // Simple distance calculation (in real app, use proper geo calculation)
-        const distance = Math.random() * 25; // Mock distance
-        return distance <= radius;
+      // Calculate distance for each station
+      const stationsWithDistance = mockStations.map((station) => {
+        const distance = calculateDistance(
+          userLocation.lat,
+          userLocation.lng,
+          station.location.coordinates.lat,
+          station.location.coordinates.lng
+        );
+        return { ...station, distance };
       });
 
-      set({ nearbyStations: nearby, loading: false });
+      // Filter by radius and sort by distance
+      const nearby = stationsWithDistance
+        .filter((station) => station.distance <= radius)
+        .sort((a, b) => a.distance - b.distance);
+
+      set({
+        nearbyStations: nearby,
+        stations: mockStations, // Ensure stations are also set
+        loading: false
+      });
     } catch (error) {
       set({ error: error.message, loading: false });
     }
@@ -69,12 +90,19 @@ const useStationStore = create((set, get) => ({
   getFilteredStations: () => {
     const { stations, filters } = get();
 
+    console.log("Filtering stations:", {
+      totalStations: stations.length,
+      selectedConnectorTypes: filters.connectorTypes
+    });
+
     return stations.filter((station) => {
       // Filter by connector types
       if (filters.connectorTypes.length > 0) {
+        console.log("Station connectors:", station.name, station.charging.connectorTypes);
         const hasMatchingConnector = filters.connectorTypes.some((type) =>
           station.charging.connectorTypes.includes(type)
         );
+        console.log("Has matching connector:", hasMatchingConnector);
         if (!hasMatchingConnector) return false;
       }
 
@@ -114,7 +142,7 @@ const useStationStore = create((set, get) => ({
   getMockQRCodes: () => {
     return {
       'station-001': 'SKAEV:STATION:station-001:A01',
-      'station-002': 'SKAEV:STATION:station-002:B02', 
+      'station-002': 'SKAEV:STATION:station-002:B02',
       'station-003': 'SKAEV:STATION:station-003:C01',
     };
   },

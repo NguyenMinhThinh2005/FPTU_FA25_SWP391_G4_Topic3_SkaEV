@@ -52,12 +52,11 @@ export const BOOKING_STATUS = {
   FAILED: "failed",
 };
 
-// Connector Types
+// Connector Types - Must match mockData.js
 export const CONNECTOR_TYPES = {
-  AC_TYPE2: "AC Type 2",
-  DC_CCS: "DC CCS",
-  DC_CHADEMO: "CHAdeMO",
-  AC_SCHUKO: "AC Schuko",
+  TYPE2: "Type 2",
+  CCS2: "CCS2",
+  CHADEMO: "CHAdeMO",
 };
 
 // Power Levels

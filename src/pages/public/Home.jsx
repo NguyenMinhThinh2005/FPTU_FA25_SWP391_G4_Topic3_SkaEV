@@ -59,7 +59,7 @@ const HomePage = () => {
       const redirectPath = {
         admin: "/admin/dashboard",
         staff: "/staff/dashboard",
-        customer: "/customer/find-stations", // Customer goes to find stations instead of dashboard
+        customer: "/customer/charging", // Customer goes to charging flow
       }[user?.role];
       if (redirectPath) navigate(redirectPath);
     } else {

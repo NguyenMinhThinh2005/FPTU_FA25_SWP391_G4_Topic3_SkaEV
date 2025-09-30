@@ -39,7 +39,7 @@ const Header = () => {
     const dashboardPath = {
       admin: "/admin/dashboard",
       staff: "/staff/dashboard",
-      customer: "/customer/find-stations",
+      customer: "/customer/charging",
     }[user?.role];
 
     if (dashboardPath) {

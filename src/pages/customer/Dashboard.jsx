@@ -25,10 +25,20 @@ import {
 import { useNavigate } from "react-router-dom";
 import { formatCurrency } from "../../utils/helpers";
 import useAuthStore from "../../store/authStore";
+import useBookingStore from "../../store/bookingStore";
 
 const CustomerDashboard = () => {
+
     const navigate = useNavigate();
     const { user } = useAuthStore();
+    const { bookingHistory, initializeMockData, getBookingStats } = useBookingStore();
+
+    // Khởi tạo mock data nếu cần
+    React.useEffect(() => {
+        if (bookingHistory.length === 0) {
+            initializeMockData();
+        }
+    }, [bookingHistory.length, initializeMockData]);
 
     // Phiên sạc hiện tại (nếu có)
     const [activeCharging] = useState(null); // Chỉ hiển thị khi đang có phiên sạc
@@ -40,7 +50,7 @@ const CustomerDashboard = () => {
             description: "Tìm trạm gần nhất",
             icon: <LocationOn />,
             color: "primary",
-            path: "/customer/find-stations"
+            path: "/customer/charging"
         },
         {
             title: "Quét QR",
@@ -65,12 +75,13 @@ const CustomerDashboard = () => {
         }
     ];
 
-    // Thống kê thực tế tháng 9/2024 (dữ liệu đồng bộ)
+    // Thống kê thực tế từ booking store
+    const bookingStats = getBookingStats();
     const monthlyStats = {
-        chargingSessions: 12,
-        totalCost: 1680000,
-        totalEnergy: 245,
-        averageCost: Math.round(1680000 / 245) // = 6857 VNĐ/kWh (tính toán chính xác)
+        chargingSessions: bookingStats.total,
+        totalCost: parseFloat(bookingStats.totalAmount) || 1680000,
+        totalEnergy: parseFloat(bookingStats.totalEnergyCharged) || 245,
+        averageCost: Math.round((parseFloat(bookingStats.totalAmount) || 1680000) / (parseFloat(bookingStats.totalEnergyCharged) || 245))
     };
 
 
@@ -211,71 +222,40 @@ const CustomerDashboard = () => {
                     </Box>
 
                     <Stack spacing={2}>
-                        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", p: 2, border: 1, borderColor: "divider", borderRadius: 2 }}>
-                            <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                                <Avatar sx={{ bgcolor: "primary.light" }}>
-                                    <ElectricCar />
-                                </Avatar>
-                                <Box>
-                                    <Typography variant="subtitle2" fontWeight="medium">
-                                        Vincom Landmark 81
+                        {bookingHistory.slice(0, 3).map((booking) => (
+                            <Box key={booking.id} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", p: 2, border: 1, borderColor: "divider", borderRadius: 2 }}>
+                                <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                                    <Avatar sx={{ bgcolor: "primary.light" }}>
+                                        <ElectricCar />
+                                    </Avatar>
+                                    <Box>
+                                        <Typography variant="subtitle2" fontWeight="medium">
+                                            {booking.stationName}
+                                        </Typography>
+                                        <Typography variant="caption" color="text.secondary">
+                                            {new Date(booking.createdAt).toLocaleDateString('vi-VN')} • {booking.energyDelivered || 0} kWh • {booking.chargingDuration || 0} phút
+                                        </Typography>
+                                    </Box>
+                                </Box>
+                                <Box sx={{ textAlign: "right" }}>
+                                    <Typography variant="subtitle2" fontWeight="bold">
+                                        {formatCurrency(booking.totalAmount || booking.cost || 0)}
                                     </Typography>
-                                    <Typography variant="caption" color="text.secondary">
-                                        28/09/2024 • 22.5 kWh • 45 phút
-                                    </Typography>
+                                    <Chip
+                                        label={booking.status === "completed" ? "Hoàn thành" : booking.status === "cancelled" ? "Đã hủy" : "Đang xử lý"}
+                                        size="small"
+                                        color={booking.status === "completed" ? "success" : booking.status === "cancelled" ? "error" : "warning"}
+                                    />
                                 </Box>
                             </Box>
-                            <Box sx={{ textAlign: "right" }}>
-                                <Typography variant="subtitle2" fontWeight="bold">
-                                    {formatCurrency(154350)}
+                        ))}
+                        {bookingHistory.length === 0 && (
+                            <Box sx={{ textAlign: "center", py: 4 }}>
+                                <Typography variant="body2" color="text.secondary">
+                                    Chưa có lịch sử sạc nào
                                 </Typography>
-                                <Chip label="Hoàn thành" size="small" color="success" />
                             </Box>
-                        </Box>
-
-                        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", p: 2, border: 1, borderColor: "divider", borderRadius: 2 }}>
-                            <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                                <Avatar sx={{ bgcolor: "primary.light" }}>
-                                    <ElectricCar />
-                                </Avatar>
-                                <Box>
-                                    <Typography variant="subtitle2" fontWeight="medium">
-                                        AEON Mall Tân Phú
-                                    </Typography>
-                                    <Typography variant="caption" color="text.secondary">
-                                        26/09/2024 • 18.2 kWh • 38 phút
-                                    </Typography>
-                                </Box>
-                            </Box>
-                            <Box sx={{ textAlign: "right" }}>
-                                <Typography variant="subtitle2" fontWeight="bold">
-                                    {formatCurrency(124794)}
-                                </Typography>
-                                <Chip label="Hoàn thành" size="small" color="success" />
-                            </Box>
-                        </Box>
-
-                        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", p: 2, border: 1, borderColor: "divider", borderRadius: 2 }}>
-                            <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                                <Avatar sx={{ bgcolor: "primary.light" }}>
-                                    <ElectricCar />
-                                </Avatar>
-                                <Box>
-                                    <Typography variant="subtitle2" fontWeight="medium">
-                                        Saigon Centre Q1
-                                    </Typography>
-                                    <Typography variant="caption" color="text.secondary">
-                                        24/09/2024 • 31.8 kWh • 68 phút
-                                    </Typography>
-                                </Box>
-                            </Box>
-                            <Box sx={{ textAlign: "right" }}>
-                                <Typography variant="subtitle2" fontWeight="bold">
-                                    {formatCurrency(218046)}
-                                </Typography>
-                                <Chip label="Hoàn thành" size="small" color="success" />
-                            </Box>
-                        </Box>
+                        )}
                     </Stack>
                 </CardContent>
             </Card>

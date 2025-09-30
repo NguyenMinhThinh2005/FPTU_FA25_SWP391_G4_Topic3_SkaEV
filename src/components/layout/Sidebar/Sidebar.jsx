@@ -76,56 +76,19 @@ const Sidebar = ({ open, onClose }) => {
 
       case "customer":
         return [
-          {
-            text: "Trang chủ",
-            icon: <Dashboard />,
-            path: "/customer/dashboard",
-          },
-          // a. Quản lý tài khoản
+          // 1. Quản lý hồ sơ & dữ liệu cá nhân (tích hợp thanh toán)
           {
             text: "Hồ sơ cá nhân",
             icon: <Person />,
             path: "/customer/profile",
             category: "account"
           },
+          // 2. Sạc xe điện (luồng chính)
           {
-            text: "Quản lý xe",
-            icon: <ElectricCar />,
-            path: "/customer/vehicles",
-            category: "account"
-          },
-          // b. Đặt chỗ & sạc
-          {
-            text: "Tìm trạm sạc",
+            text: "Sạc xe điện",
             icon: <LocationOn />,
-            path: "/customer/find-stations",
+            path: "/customer/charging",
             category: "charging"
-          },
-          {
-            text: "Quét QR sạc",
-            icon: <Business />,
-            path: "/qr-demo",
-            category: "charging"
-          },
-          // c. Thanh toán
-          {
-            text: "Thanh toán",
-            icon: <Payment />,
-            path: "/customer/payment",
-            category: "payment"
-          },
-          // d. Lịch sử & báo cáo
-          {
-            text: "Lịch sử sạc",
-            icon: <History />,
-            path: "/customer/history",
-            category: "history"
-          },
-          {
-            text: "Thống kê & Báo cáo Chi phí",
-            icon: <Analytics />,
-            path: "/customer/analytics",
-            category: "history"
           },
         ];
 
@@ -274,73 +237,9 @@ const Sidebar = ({ open, onClose }) => {
               </ListItem>
             ))}
 
-            {/* Thanh toán */}
-            {navigationItems.filter(item => item.category === "payment").map((item) => (
-              <ListItem key={item.text} disablePadding sx={{ mb: 0.5 }}>
-                <ListItemButton
-                  onClick={() => handleNavigation(item.path)}
-                  selected={isActivePath(item.path)}
-                  sx={{
-                    borderRadius: 2,
-                    "&.Mui-selected": {
-                      backgroundColor: "primary.main",
-                      color: "white",
-                      "& .MuiListItemIcon-root": {
-                        color: "white",
-                      },
-                      "&:hover": {
-                        backgroundColor: "primary.dark",
-                      },
-                    },
-                  }}
-                >
-                  <ListItemIcon sx={{ minWidth: 40 }}>{item.icon}</ListItemIcon>
-                  <ListItemText
-                    primary={item.text}
-                    primaryTypographyProps={{
-                      fontSize: "0.9rem",
-                      fontWeight: isActivePath(item.path) ? 600 : 400,
-                    }}
-                  />
-                </ListItemButton>
-              </ListItem>
-            ))}
 
-            {/* Lịch sử & báo cáo */}
-            <Typography variant="overline" sx={{ px: 2, py: 1, mt: 2, color: "text.secondary", fontWeight: 600 }}>
-              Báo cáo
-            </Typography>
-            {navigationItems.filter(item => item.category === "history").map((item) => (
-              <ListItem key={item.text} disablePadding sx={{ mb: 0.5 }}>
-                <ListItemButton
-                  onClick={() => handleNavigation(item.path)}
-                  selected={isActivePath(item.path)}
-                  sx={{
-                    borderRadius: 2,
-                    pl: 2,
-                    "&.Mui-selected": {
-                      backgroundColor: "primary.main",
-                      color: "white",
-                      "& .MuiListItemIcon-root": {
-                        color: "white",
-                      },
-                      "&:hover": {
-                        backgroundColor: "primary.dark",
-                      },
-                    },
-                  }}
-                >
-                  <ListItemIcon sx={{ minWidth: 35 }}>{item.icon}</ListItemIcon>
-                  <ListItemText
-                    primary={item.text}
-                    primaryTypographyProps={{
-                      fontSize: "0.9rem",
-                      fontWeight: isActivePath(item.path) ? 600 : 400,
-                    }}
-                  />
-                </ListItemButton>
-              </ListItem>
-            ))}
+
+
           </>
         ) : (
           // For other roles (admin, staff)
