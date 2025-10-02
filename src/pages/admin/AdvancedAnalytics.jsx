@@ -169,6 +169,8 @@ const AdvancedAnalytics = () => {
     })
     .sort((a, b) => b.revenue - a.revenue);
 
+  
+
   // Chart colors
   const colors = {
     primary: "#1379FF",
@@ -481,6 +483,8 @@ const AdvancedAnalytics = () => {
           </Card>
         </Grid>
       </Grid>
+
+      
 
       {/* Charts Row 2 */}
       <Grid container spacing={3} sx={{ mb: 4 }}>

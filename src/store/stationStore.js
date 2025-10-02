@@ -182,6 +182,25 @@ const useStationStore = create((set, get) => ({
       'station-003': 'SKAEV:STATION:station-003:C01',
     };
   },
+
+  // Remote control (minimal)
+  setStationStatus: (stationId, status) => {
+    set((state) => ({
+      stations: state.stations.map((s) => (s.id === stationId ? { ...s, status } : s)),
+    }));
+  },
+
+  remoteDisableStation: async (stationId) => {
+    await new Promise((r) => setTimeout(r, 300));
+    get().setStationStatus(stationId, 'offline');
+    return { success: true };
+  },
+
+  remoteEnableStation: async (stationId) => {
+    await new Promise((r) => setTimeout(r, 300));
+    get().setStationStatus(stationId, 'active');
+    return { success: true };
+  },
 }));
 
 export default useStationStore;
