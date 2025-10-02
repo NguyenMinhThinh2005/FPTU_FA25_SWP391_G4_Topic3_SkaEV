@@ -48,6 +48,7 @@ import {
   MapOutlined,
   Speed,
   Battery80,
+  PowerSettingsNew,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import useAuthStore from "../../store/authStore";
@@ -58,7 +59,7 @@ import { formatCurrency, formatDate } from "../../utils/helpers";
 const StationManagement = () => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
-  const { stations, addStation, updateStation, deleteStation } =
+  const { stations, addStation, updateStation, deleteStation, remoteDisableStation, remoteEnableStation } =
     useStationStore();
   const [selectedStation, setSelectedStation] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -486,6 +487,15 @@ const StationManagement = () => {
                         >
                           <Edit />
                         </IconButton>
+                        {station.status !== 'offline' ? (
+                          <IconButton size="small" color="warning" onClick={() => remoteDisableStation(station.id)}>
+                            <PowerSettingsNew />
+                          </IconButton>
+                        ) : (
+                          <IconButton size="small" color="success" onClick={() => remoteEnableStation(station.id)}>
+                            <PowerSettingsNew />
+                          </IconButton>
+                        )}
                         <IconButton size="small">
                           <Visibility />
                         </IconButton>

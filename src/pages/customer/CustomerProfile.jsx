@@ -37,6 +37,7 @@ import useBookingStore from "../../store/bookingStore";
 import useVehicleStore from "../../store/vehicleStore";
 import { formatCurrency } from "../../utils/helpers";
 import { mockUsers } from "../../data/mockData";
+import VehicleEditModal from "../../components/customer/VehicleEditModal";
 
 function TabPanel({ children, value, index, ...other }) {
   return (
@@ -55,9 +56,13 @@ function TabPanel({ children, value, index, ...other }) {
 const CustomerProfile = () => {
   const { user, updateProfile } = useAuthStore();
   const { bookingHistory, initializeMockData, getBookingStats } = useBookingStore();
-  const { vehicles, initializeWithUserData } = useVehicleStore();
+  const { vehicles, initializeWithUserData, updateVehicle } = useVehicleStore();
   const [tabValue, setTabValue] = useState(0);
   const [editMode, setEditMode] = useState(false);
+  const [vehicleEditModal, setVehicleEditModal] = useState({
+    open: false,
+    vehicle: null
+  });
   const [profileData, setProfileData] = useState({
     name: user?.profile ? `${user.profile.firstName} ${user.profile.lastName}` : "Nguyễn Văn An",
     email: user?.email || "customer@skaev.com",
@@ -107,6 +112,24 @@ const CustomerProfile = () => {
 
     updateProfile(updatedProfile);
     setEditMode(false);
+  };
+
+  const handleEditVehicle = (vehicle) => {
+    setVehicleEditModal({
+      open: true,
+      vehicle: vehicle
+    });
+  };
+
+  const handleSaveVehicle = (updatedVehicleData) => {
+    if (vehicleEditModal.vehicle) {
+      updateVehicle(vehicleEditModal.vehicle.id, updatedVehicleData);
+    }
+    setVehicleEditModal({ open: false, vehicle: null });
+  };
+
+  const handleCloseVehicleModal = () => {
+    setVehicleEditModal({ open: false, vehicle: null });
   };
 
   return (
@@ -254,7 +277,15 @@ const CustomerProfile = () => {
                     </Box>
                   </Box>
 
-                  <Button variant="outlined" fullWidth sx={{ mt: 2 }}>Chỉnh sửa thông tin</Button>
+                  <Button 
+                    variant="outlined" 
+                    fullWidth 
+                    sx={{ mt: 2 }}
+                    onClick={() => handleEditVehicle(vehicle)}
+                    startIcon={<Edit />}
+                  >
+                    Chỉnh sửa thông tin
+                  </Button>
                 </CardContent>
               </Card>
             </Grid>
@@ -324,6 +355,14 @@ const CustomerProfile = () => {
           </Grid>
         </Grid>
       </TabPanel>
+
+      {/* Vehicle Edit Modal */}
+      <VehicleEditModal
+        open={vehicleEditModal.open}
+        onClose={handleCloseVehicleModal}
+        vehicle={vehicleEditModal.vehicle}
+        onSave={handleSaveVehicle}
+      />
     </Container>
   );
 };
