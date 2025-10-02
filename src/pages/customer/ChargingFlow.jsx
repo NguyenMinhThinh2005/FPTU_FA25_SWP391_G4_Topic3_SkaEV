@@ -55,6 +55,7 @@ const ChargingFlow = () => {
         socTracking,
         scanQRCode,
         clearCurrentBooking,
+        resetFlowState,
         stopCharging
     } = useBookingStore();
     const {
@@ -111,29 +112,36 @@ const ChargingFlow = () => {
         }
     }, [getFilteredStations, searchQuery, filters]);
 
+    // Initialize stations và reset flow state khi component mount
     useEffect(() => {
         initializeData();
-    }, [initializeData]);
+        
+        // Reset flow state về trạng thái ban đầu để đảm bảo luôn bắt đầu từ bước 1
+        resetFlowState();
+        setFlowStep(0);
+        setUserManualReset(false);
+        
+        console.log('ChargingFlow mounted - Reset to step 0');
+    }, [initializeData, resetFlowState]);
 
     // Check if we have an active booking to determine flow step (only for certain conditions)
     useEffect(() => {
         console.log('ChargingFlow useEffect:', { currentBooking, chargingSession, flowStep, userManualReset });
 
-        // Don't auto-advance if user manually reset
-        if (userManualReset) {
-            console.log('Skipping auto-advance due to manual reset');
+        // Don't auto-advance if user manually reset hoặc không có booking
+        if (userManualReset || !currentBooking) {
+            console.log('Skipping auto-advance: manual reset or no booking');
             return;
         }
 
-        // Only auto-advance for confirmed booking (after QR scan)
-        if (currentBooking && currentBooking.status === "confirmed" && !currentBooking.chargingStarted && flowStep < 3) {
+        // Chỉ auto-advance khi có booking hợp lệ và đúng điều kiện
+        if (currentBooking.status === "confirmed" && !currentBooking.chargingStarted && flowStep < 3) {
             console.log('Auto-advancing to connection step (3)');
             setFlowStep(3); // Go to connection step
-        } else if (chargingSession && currentBooking?.qrScanned && currentBooking?.chargingStarted && flowStep < 4) {
+        } else if (chargingSession && currentBooking.qrScanned && currentBooking.chargingStarted && flowStep < 4) {
             console.log('Auto-advancing to charging step (4)');
             setFlowStep(4); // Go to charging step only if QR scanned and charging started
         }
-        // Don't auto-set step 2 for pending - let handleBookingComplete handle it
     }, [currentBooking, chargingSession, flowStep, userManualReset]);
 
     const handleStationSelect = (station) => {

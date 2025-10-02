@@ -340,6 +340,16 @@ const useBookingStore = create(
         set({ currentBooking: null });
       },
 
+      // Reset toàn bộ flow state về trạng thái ban đầu
+      resetFlowState: () => {
+        set({ 
+          currentBooking: null,
+          chargingSession: null,
+          error: null,
+          loading: false
+        });
+      },
+
       setLoading: (loading) => {
         set({ loading });
       },
@@ -576,11 +586,9 @@ const useBookingStore = create(
     {
       name: "booking-store",
       partialize: (state) => ({
-        bookings: state.bookings,
         bookingHistory: state.bookingHistory,
-        currentBooking: state.currentBooking,
-        socTracking: state.socTracking,
-        chargingSession: state.chargingSession,
+        // Không persist currentBooking và chargingSession để tránh lỗi flow
+        // Chỉ lưu history để xem lịch sử booking
       }),
     }
   )

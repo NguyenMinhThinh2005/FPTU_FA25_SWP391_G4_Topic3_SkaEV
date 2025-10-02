@@ -150,7 +150,7 @@ function App() {
                 </ProtectedRoute>
               }
             >
-              <Route index element={<Navigate to="profile" replace />} />
+              <Route index element={<Navigate to="charging" replace />} />
               <Route path="profile" element={<CustomerProfile />} />
               <Route path="charging" element={<ChargingFlow />} />
               <Route path="payment" element={<PaymentPage />} />
