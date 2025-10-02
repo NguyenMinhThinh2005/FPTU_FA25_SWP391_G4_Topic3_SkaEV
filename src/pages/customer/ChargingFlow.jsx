@@ -292,11 +292,12 @@ const ChargingFlow = () => {
                                         <FormControl fullWidth>
                                             <InputLabel>Loại cổng sạc</InputLabel>
                                             <Select
-                                                value={filters.connectorTypes || []}
-                                                multiple
-                                                onChange={(e) => updateFilters({ connectorTypes: e.target.value })}
-                                                renderValue={(selected) => selected.join(', ')}
+                                                value={filters.connectorTypes?.[0] || ''}
+                                                onChange={(e) => updateFilters({ connectorTypes: e.target.value ? [e.target.value] : [] })}
                                             >
+                                                <MenuItem value="">
+                                                    <em>Tất cả</em>
+                                                </MenuItem>
                                                 {Object.values(CONNECTOR_TYPES).map((type) => (
                                                     <MenuItem key={type} value={type}>
                                                         {type}
