@@ -308,9 +308,6 @@ const ChargingFlow = () => {
                     <Grid item xs={12}>
                         <Card>
                             <CardContent>
-                                <Typography variant="h6" gutterBottom>
-                                    {filteredStations.length} trạm được tìm thấy
-                                </Typography>
                                 {loading ? (
                                     <Box sx={{ textAlign: "center", py: 4 }}>
                                         <Typography>Đang tải...</Typography>
@@ -342,7 +339,7 @@ const ChargingFlow = () => {
                                                                 {station.name}
                                                             </span>
                                                             <Chip
-                                                                label={`${station.charging.availablePorts}/${station.charging.totalPorts} Có sẵn`}
+                                                                label={`${station.charging.availablePorts}/${station.charging.totalPorts} Cổng Có sẵn`}
                                                                 size="small"
                                                                 color="success"
                                                             />

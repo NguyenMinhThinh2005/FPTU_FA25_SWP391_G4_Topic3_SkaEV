@@ -123,21 +123,13 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
       const booking = createBooking(bookingData);
       setBookingResult('success');
 
-      // Different messages based on scheduling type
-      if (bookingData.schedulingType === 'scheduled') {
-        setResultMessage(
-          `Đặt lịch thành công!\n` +
-          `Mã đặt chỗ: ${booking.id}\n` +
-          `Thời gian: ${new Date(bookingData.scheduledDateTime).toLocaleString('vi-VN')}\n\n` +
-          `📱 Hãy đến trạm vào đúng giờ và quét mã QR để bắt đầu sạc!`
-        );
-      } else {
-        setResultMessage(
-          `Đặt chỗ thành công!\n` +
-          `Mã đặt chỗ: ${booking.id}\n\n` +
-          `📱 Hãy đến trạm trong 15 phút và quét mã QR để bắt đầu sạc!`
-        );
-      }
+      // Success message for scheduled booking
+      setResultMessage(
+        `Đặt lịch thành công!\n` +
+        `Mã đặt chỗ: ${booking.id}\n` +
+        `Thời gian: ${new Date(bookingData.scheduledDateTime).toLocaleString('vi-VN')}\n\n` +
+        `📱 Hãy đến trạm vào đúng giờ và quét mã QR để bắt đầu sạc!`
+      );
 
       // Call onSuccess callback immediately after successful booking
       if (onSuccess) {
@@ -387,10 +379,7 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
                     <Grid item xs={6}>
                       <Typography variant="body2" color="text.secondary">Thời gian:</Typography>
                       <Typography variant="body1" fontWeight="medium">
-                        {selectedDateTime?.schedulingType === 'immediate'
-                          ? "Sạc ngay"
-                          : selectedDateTime?.scheduledDateTime?.toLocaleString('vi-VN') || 'Chưa chọn'
-                        }
+                        {selectedDateTime?.scheduledDateTime?.toLocaleString('vi-VN') || 'Chưa chọn'}
                       </Typography>
                     </Grid>
                     <Grid item xs={6}>
@@ -428,10 +417,7 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
     switch (step) {
       case 0: return selectedChargingPost !== null;
       case 1: return selectedSlot !== null;
-      case 2: return selectedDateTime !== null && (
-        selectedDateTime.schedulingType === 'immediate' ||
-        (selectedDateTime.isValid && selectedDateTime.scheduledDateTime)
-      );
+      case 2: return selectedDateTime !== null && selectedDateTime.isValid && selectedDateTime.scheduledDateTime;
       case 3: return agreeTerms;
       default: return false;
     }
