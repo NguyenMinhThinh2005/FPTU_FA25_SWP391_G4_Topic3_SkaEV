@@ -9,6 +9,7 @@ import useAuthStore from "./store/authStore";
 
 // Layout Components
 import AppLayout from "./components/layout/AppLayout/AppLayout";
+import ErrorBoundary from "./components/ui/ErrorBoundary/ErrorBoundary";
 
 // Auth Pages
 import LoginPage from "./pages/auth/Login";
@@ -99,113 +100,123 @@ const PublicRoute = ({ children }) => {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider theme={skaevTheme}>
-        <CssBaseline />
-        <BrowserRouter>
-          <Routes>
-            {/* Public Routes */}
-            <Route path="/" element={<HomePage />} />
-            <Route path="/test" element={<TestPage />} />
-            <Route path="/datetime-demo" element={<DateTimePickerDemo />} />
-            <Route path="/api-demo" element={<MockAPIDemo />} />
-            <Route
-              path="/login"
-              element={
-                <PublicRoute>
-                  <LoginPage />
-                </PublicRoute>
-              }
-            />
-            <Route
-              path="/register"
-              element={
-                <PublicRoute>
-                  <RegisterPage />
-                </PublicRoute>
-              }
-            />
-            <Route
-              path="/verify-email"
-              element={
-                <PublicRoute>
-                  <EmailVerification />
-                </PublicRoute>
-              }
-            />
-            <Route
-              path="/forgot-password"
-              element={
-                <PublicRoute>
-                  <ForgotPassword />
-                </PublicRoute>
-              }
-            />
+    <ErrorBoundary fallbackMessage="Đã xảy ra lỗi không mong muốn. Chúng tôi sẽ đưa bạn về trang chủ.">
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider theme={skaevTheme}>
+          <CssBaseline />
+          <BrowserRouter>
+            <Routes>
+              {/* Public Routes */}
+              <Route path="/" element={<HomePage />} />
+              <Route path="/test" element={<TestPage />} />
+              <Route path="/datetime-demo" element={<DateTimePickerDemo />} />
+              <Route path="/api-demo" element={<MockAPIDemo />} />
+              <Route
+                path="/login"
+                element={
+                  <PublicRoute>
+                    <LoginPage />
+                  </PublicRoute>
+                }
+              />
+              <Route
+                path="/register"
+                element={
+                  <PublicRoute>
+                    <RegisterPage />
+                  </PublicRoute>
+                }
+              />
+              <Route
+                path="/verify-email"
+                element={
+                  <PublicRoute>
+                    <EmailVerification />
+                  </PublicRoute>
+                }
+              />
+              <Route
+                path="/forgot-password"
+                element={
+                  <PublicRoute>
+                    <ForgotPassword />
+                  </PublicRoute>
+                }
+              />
 
-            {/* Customer Routes */}
-            <Route
-              path="/customer"
-              element={
-                <ProtectedRoute allowedRoles={["customer"]}>
-                  <AppLayout />
-                </ProtectedRoute>
-              }
-            >
-              <Route index element={<Navigate to="charging" replace />} />
-              <Route path="profile" element={<CustomerProfile />} />
-              <Route path="charging" element={<ChargingFlow />} />
-              <Route path="payment" element={<PaymentPage />} />
-              <Route path="analytics" element={<AnalyticsPage />} />
-              <Route path="payment-history" element={<PaymentHistory />} />
-              <Route path="monthly-reports" element={<MonthlyCostReports />} />
-              <Route path="charging-habits" element={<ChargingHabitsAnalysis />} />
+              {/* Customer Routes */}
+              <Route
+                path="/customer"
+                element={
+                  <ProtectedRoute allowedRoles={["customer"]}>
+                    <AppLayout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route index element={<Navigate to="charging" replace />} />
+                <Route path="profile" element={<CustomerProfile />} />
+                <Route path="charging" element={<ChargingFlow />} />
+                <Route path="payment" element={<PaymentPage />} />
+                <Route path="analytics" element={<AnalyticsPage />} />
+                <Route path="payment-history" element={<PaymentHistory />} />
+                <Route
+                  path="monthly-reports"
+                  element={<MonthlyCostReports />}
+                />
+                <Route
+                  path="charging-habits"
+                  element={<ChargingHabitsAnalysis />}
+                />
+              </Route>
 
-            </Route>
+              {/* Staff Routes */}
+              <Route
+                path="/staff"
+                element={
+                  <ProtectedRoute allowedRoles={["staff"]}>
+                    <AppLayout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route path="dashboard" element={<StaffDashboard />} />
+                <Route path="stations" element={<StaffStationManagement />} />
+                <Route path="profile" element={<StaffProfile />} />
+                <Route index element={<Navigate to="dashboard" replace />} />
+              </Route>
 
-            {/* Staff Routes */}
-            <Route
-              path="/staff"
-              element={
-                <ProtectedRoute allowedRoles={["staff"]}>
-                  <AppLayout />
-                </ProtectedRoute>
-              }
-            >
-              <Route path="dashboard" element={<StaffDashboard />} />
-              <Route path="stations" element={<StaffStationManagement />} />
-              <Route path="profile" element={<StaffProfile />} />
-              <Route index element={<Navigate to="dashboard" replace />} />
-            </Route>
+              {/* Admin Routes */}
+              <Route
+                path="/admin"
+                element={
+                  <ProtectedRoute allowedRoles={["admin"]}>
+                    <AppLayout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route path="dashboard" element={<AdminDashboard />} />
+                <Route path="analytics" element={<AdvancedAnalytics />} />
+                <Route path="stations" element={<AdminStationManagement />} />
+                <Route
+                  path="notifications"
+                  element={<NotificationDashboard />}
+                />
+                <Route path="users" element={<UserManagement />} />
+                <Route path="reports" element={<AdminSystemReports />} />
+                <Route path="settings" element={<AdminSettings />} />
+                <Route index element={<Navigate to="dashboard" replace />} />
+              </Route>
 
-            {/* Admin Routes */}
-            <Route
-              path="/admin"
-              element={
-                <ProtectedRoute allowedRoles={["admin"]}>
-                  <AppLayout />
-                </ProtectedRoute>
-              }
-            >
-              <Route path="dashboard" element={<AdminDashboard />} />
-              <Route path="analytics" element={<AdvancedAnalytics />} />
-              <Route path="stations" element={<AdminStationManagement />} />
-              <Route path="notifications" element={<NotificationDashboard />} />
-              <Route path="users" element={<UserManagement />} />
-              <Route path="reports" element={<AdminSystemReports />} />
-              <Route path="settings" element={<AdminSettings />} />
-              <Route index element={<Navigate to="dashboard" replace />} />
-            </Route>
-
-            {/* Fallback Routes */}
-            <Route
-              path="/unauthorized"
-              element={<div>Bạn không có quyền truy cập trang này</div>}
-            />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </BrowserRouter>
-      </ThemeProvider>
-    </QueryClientProvider>
+              {/* Fallback Routes */}
+              <Route
+                path="/unauthorized"
+                element={<div>Bạn không có quyền truy cập trang này</div>}
+              />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </BrowserRouter>
+        </ThemeProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 

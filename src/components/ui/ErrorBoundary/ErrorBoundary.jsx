@@ -92,8 +92,11 @@ class ErrorBoundary extends React.Component {
               Thử lại
             </Button>
 
-            <Button variant="outlined" onClick={() => window.location.reload()}>
-              Tải lại trang
+            <Button
+              variant="outlined"
+              onClick={() => (window.location.href = "/")}
+            >
+              Về trang chủ
             </Button>
           </Box>
         </Box>

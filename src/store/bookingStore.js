@@ -21,31 +21,31 @@ const useBookingStore = create(
           stationName: bookingData.stationName,
           chargerType: bookingData.chargerType
             ? {
-              id: bookingData.chargerType.id,
-              name: bookingData.chargerType.name,
-              power: bookingData.chargerType.power,
-              price: bookingData.chargerType.price,
-            }
+                id: bookingData.chargerType.id,
+                name: bookingData.chargerType.name,
+                power: bookingData.chargerType.power,
+                price: bookingData.chargerType.price,
+              }
             : null,
           connector: bookingData.connector
             ? {
-              id: bookingData.connector.id,
-              name: bookingData.connector.name,
-              compatible: bookingData.connector.compatible,
-            }
+                id: bookingData.connector.id,
+                name: bookingData.connector.name,
+                compatible: bookingData.connector.compatible,
+              }
             : null,
           slot: bookingData.slot
             ? {
-              id: bookingData.slot.id,
-              location: bookingData.slot.location,
-            }
+                id: bookingData.slot.id,
+                location: bookingData.slot.location,
+              }
             : null,
           bookingTime: bookingData.bookingTime,
           scannedAt: bookingData.scannedAt,
           autoStart: bookingData.autoStart,
-          bookingDate: new Date().toISOString().split('T')[0], // Add booking date
+          bookingDate: new Date().toISOString().split("T")[0], // Add booking date
           // Scheduling information
-          schedulingType: bookingData.schedulingType || 'immediate',
+          schedulingType: bookingData.schedulingType || "immediate",
           scheduledDateTime: bookingData.scheduledDateTime,
           scheduledDate: bookingData.scheduledDate,
           scheduledTime: bookingData.scheduledTime,
@@ -54,11 +54,13 @@ const useBookingStore = create(
         const booking = {
           ...cleanData,
           id: `BOOK${Date.now()}`,
-          status: cleanData.schedulingType === 'scheduled' ? "scheduled" : "pending", // pending = waiting for QR scan
+          status:
+            cleanData.schedulingType === "scheduled" ? "scheduled" : "pending", // pending = waiting for QR scan
           createdAt: new Date().toISOString(),
-          estimatedArrival: cleanData.schedulingType === 'scheduled'
-            ? cleanData.scheduledDateTime
-            : new Date(Date.now() + 15 * 60 * 1000).toISOString(), // 15 minutes from now for immediate
+          estimatedArrival:
+            cleanData.schedulingType === "scheduled"
+              ? cleanData.scheduledDateTime
+              : new Date(Date.now() + 15 * 60 * 1000).toISOString(), // 15 minutes from now for immediate
           qrScanned: false, // Add QR scan tracking
           chargingStarted: false, // Add charging start tracking
         };
@@ -77,8 +79,8 @@ const useBookingStore = create(
               lastUpdated: null,
               chargingRate: null,
               estimatedTimeToTarget: null,
-            }
-          }
+            },
+          },
         }));
 
         return booking;
@@ -89,31 +91,31 @@ const useBookingStore = create(
           bookings: state.bookings.map((booking) =>
             booking.id === bookingId
               ? {
-                ...booking,
-                status,
-                ...data,
-                updatedAt: new Date().toISOString(),
-              }
+                  ...booking,
+                  status,
+                  ...data,
+                  updatedAt: new Date().toISOString(),
+                }
               : booking
           ),
           bookingHistory: state.bookingHistory.map((booking) =>
             booking.id === bookingId
               ? {
-                ...booking,
-                status,
-                ...data,
-                updatedAt: new Date().toISOString(),
-              }
+                  ...booking,
+                  status,
+                  ...data,
+                  updatedAt: new Date().toISOString(),
+                }
               : booking
           ),
           currentBooking:
             state.currentBooking?.id === bookingId
               ? {
-                ...state.currentBooking,
-                status,
-                ...data,
-                updatedAt: new Date().toISOString(),
-              }
+                  ...state.currentBooking,
+                  status,
+                  ...data,
+                  updatedAt: new Date().toISOString(),
+                }
               : state.currentBooking,
         }));
       },
@@ -138,21 +140,21 @@ const useBookingStore = create(
       // New method for QR code scanning
       scanQRCode: (bookingId, qrData) => {
         const state = get();
-        const booking = state.bookings.find(b => b.id === bookingId);
+        const booking = state.bookings.find((b) => b.id === bookingId);
 
         if (!booking) {
-          throw new Error('Booking not found');
+          throw new Error("Booking not found");
         }
 
-        if (booking.status !== 'pending' && booking.status !== 'scheduled') {
-          throw new Error('Booking is not in valid state for QR scanning');
+        if (booking.status !== "pending" && booking.status !== "scheduled") {
+          throw new Error("Booking is not in valid state for QR scanning");
         }
 
         // Update booking status to confirmed after QR scan
         get().updateBookingStatus(bookingId, "confirmed", {
           qrScannedAt: new Date().toISOString(),
           qrScanned: true,
-          qrData: qrData
+          qrData: qrData,
         });
 
         return booking;
@@ -160,10 +162,10 @@ const useBookingStore = create(
 
       startCharging: (bookingId) => {
         const state = get();
-        const booking = state.bookings.find(b => b.id === bookingId);
+        const booking = state.bookings.find((b) => b.id === bookingId);
 
         if (!booking || !booking.qrScanned) {
-          throw new Error('Must scan QR code before starting charging');
+          throw new Error("Must scan QR code before starting charging");
         }
 
         const chargingSession = {
@@ -194,8 +196,8 @@ const useBookingStore = create(
               ...state.socTracking[bookingId],
               ...socData,
               lastUpdated: new Date().toISOString(),
-            }
-          }
+            },
+          },
         }));
       },
 
@@ -210,8 +212,8 @@ const useBookingStore = create(
               lastUpdated: new Date().toISOString(),
               chargingRate: null,
               estimatedTimeToTarget: null,
-            }
-          }
+            },
+          },
         }));
       },
 
@@ -223,7 +225,7 @@ const useBookingStore = create(
           energyDelivered,
           voltage,
           current,
-          temperature
+          temperature,
         } = progressData;
 
         const socData = get().socTracking[bookingId];
@@ -231,7 +233,10 @@ const useBookingStore = create(
 
         if (socData && chargingRate && socData.targetSOC) {
           const remainingSOC = socData.targetSOC - currentSOC;
-          estimatedTimeToTarget = Math.max(0, Math.round((remainingSOC / chargingRate) * 60)); // minutes
+          estimatedTimeToTarget = Math.max(
+            0,
+            Math.round((remainingSOC / chargingRate) * 60)
+          ); // minutes
         }
 
         set((state) => ({
@@ -243,18 +248,21 @@ const useBookingStore = create(
               chargingRate,
               estimatedTimeToTarget,
               lastUpdated: new Date().toISOString(),
-            }
+            },
           },
-          chargingSession: state.chargingSession?.bookingId === bookingId ? {
-            ...state.chargingSession,
-            currentSOC,
-            powerDelivered,
-            energyDelivered,
-            voltage,
-            current,
-            temperature,
-            lastUpdated: new Date().toISOString(),
-          } : state.chargingSession
+          chargingSession:
+            state.chargingSession?.bookingId === bookingId
+              ? {
+                  ...state.chargingSession,
+                  currentSOC,
+                  powerDelivered,
+                  energyDelivered,
+                  voltage,
+                  current,
+                  temperature,
+                  lastUpdated: new Date().toISOString(),
+                }
+              : state.chargingSession,
         }));
 
         // Update booking with latest charging data
@@ -312,18 +320,23 @@ const useBookingStore = create(
         return bookings
           .filter(
             (booking) =>
-              (booking.status === "confirmed" || booking.status === "scheduled") &&
-              new Date(booking.scheduledDateTime || booking.estimatedArrival) > now
+              (booking.status === "confirmed" ||
+                booking.status === "scheduled") &&
+              new Date(booking.scheduledDateTime || booking.estimatedArrival) >
+                now
           )
           .sort(
             (a, b) =>
-              new Date(a.scheduledDateTime || a.estimatedArrival) - new Date(b.scheduledDateTime || b.estimatedArrival)
+              new Date(a.scheduledDateTime || a.estimatedArrival) -
+              new Date(b.scheduledDateTime || b.estimatedArrival)
           );
       },
 
       getScheduledBookings: () => {
         const { bookings } = get();
-        return bookings.filter(booking => booking.schedulingType === 'scheduled');
+        return bookings.filter(
+          (booking) => booking.schedulingType === "scheduled"
+        );
       },
 
       getPastBookings: () => {
@@ -342,11 +355,11 @@ const useBookingStore = create(
 
       // Reset toàn bộ flow state về trạng thái ban đầu
       resetFlowState: () => {
-        set({ 
+        set({
           currentBooking: null,
           chargingSession: null,
           error: null,
-          loading: false
+          loading: false,
         });
       },
 
@@ -567,19 +580,19 @@ const useBookingStore = create(
 
         // Initialize SOC tracking for mock data
         const mockSOCTracking = {
-          "BOOK1732457890123": {
+          BOOK1732457890123: {
             initialSOC: 15,
             currentSOC: 85,
             targetSOC: 80,
             lastUpdated: "2024-11-24T10:15:00.000Z",
             chargingRate: 35.2, // %/hour
             estimatedTimeToTarget: 0,
-          }
+          },
         };
 
         set({
           bookingHistory: mockBookings,
-          socTracking: mockSOCTracking
+          socTracking: mockSOCTracking,
         });
       },
     }),
