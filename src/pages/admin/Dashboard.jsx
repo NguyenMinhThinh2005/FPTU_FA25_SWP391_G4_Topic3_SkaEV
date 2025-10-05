@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Typography,
@@ -62,17 +62,50 @@ import {
   formatCurrency,
 } from "../../utils/helpers";
 import { STATION_STATUS, USER_ROLES } from "../../utils/constants";
+import EditStationModal from "../../components/admin/EditStationModal";
+import ScheduleMaintenanceModal from "../../components/admin/ScheduleMaintenanceModal";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
   useAuthStore();
-  const { stations } = useStationStore();
+  const { stations, updateStation, addStation, deleteStation } = useStationStore();
   useState("today");
   const [anchorEl, setAnchorEl] = useState(null);
   const [openStationDialog, setOpenStationDialog] = useState(false);
   const [selectedStation, setSelectedStation] = useState(null);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [inlineEdit, setInlineEdit] = useState(false);
+  const [inlineForm, setInlineForm] = useState({ name: "", address: "", totalPorts: 0, fastChargePorts: 0, standardPorts: 0, pricePerKwh: 0, status: "active" });
+  const [maintenanceModalOpen, setMaintenanceModalOpen] = useState(false);
+  const [maintenanceSchedules, setMaintenanceSchedules] = useState([]);
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [refreshTick, setRefreshTick] = useState(0);
+  const [addForm, setAddForm] = useState({
+    name: "",
+    address: "",
+    totalPorts: 4,
+    fastChargePorts: 2,
+    standardPorts: 2,
+    pricePerKwh: 3500,
+    operatingHours: "24/7",
+    status: "active",
+  });
+  const [addErrors, setAddErrors] = useState({});
 
-  // System Overview Stats
+  // Debug: Log when stations change
+  useEffect(() => {
+    console.log('🔄 Stations updated in Dashboard:', stations.length);
+    stations.forEach(station => {
+      console.log(`Station ${station.name}:`, {
+        id: station.id,
+        status: station.status,
+        totalPorts: station.charging?.totalPorts,
+        lastUpdated: station.lastUpdated
+      });
+    });
+  }, [stations]);
+
+  // System Overview Stats (recalculated when stations change)
   const totalStations = stations.length;
   const activeStations = stations.filter((s) => s.status === "active").length;
   const totalUsers = mockData.users.length;
@@ -93,15 +126,31 @@ const AdminDashboard = () => {
       );
       const revenue = stationBookings.reduce((sum, b) => sum + b.cost, 0);
 
-      // Tính utilization từ chargingPosts
+      // Tính utilization từ chargingPosts hoặc totalPorts
       let totalSlots = 0;
       let occupiedSlots = 0;
+      let chargingPostsCount = 0;
 
-      if (station.charging?.chargingPosts) {
+      if (station.charging?.totalPorts) {
+        // Ưu tiên totalPorts nếu đã được cập nhật từ UI
+        totalSlots = station.charging.totalPorts;
+        if (station.charging?.availablePorts != null) {
+          occupiedSlots = Math.max(0, totalSlots - station.charging.availablePorts);
+        } else if (station.charging?.chargingPosts) {
+          station.charging.chargingPosts.forEach(post => {
+            occupiedSlots += (post.totalSlots - post.availableSlots);
+          });
+        } else {
+          occupiedSlots = 0;
+        }
+        chargingPostsCount = station.charging?.chargingPosts?.length || Math.ceil(totalSlots / 2);
+      } else if (station.charging?.chargingPosts) {
+        // Backward-compatible: tính từ chargingPosts nếu không có totalPorts
         station.charging.chargingPosts.forEach(post => {
           totalSlots += post.totalSlots;
           occupiedSlots += (post.totalSlots - post.availableSlots);
         });
+        chargingPostsCount = station.charging.chargingPosts.length;
       }
 
       const utilization = totalSlots > 0 ? (occupiedSlots / totalSlots) * 100 : 0;
@@ -113,7 +162,7 @@ const AdminDashboard = () => {
         utilization,
         totalSlots,
         occupiedSlots,
-        chargingPostsCount: station.charging?.chargingPosts?.length || 0,
+        chargingPostsCount,
       };
     })
     .sort((a, b) => b.revenue - a.revenue);
@@ -166,9 +215,83 @@ const AdminDashboard = () => {
 
   const handleStationAction = (action, station) => {
     console.log(`${action} station:`, station.name);
-    if (action === "view") {
-      setSelectedStation(station);
-      setOpenStationDialog(true);
+    setSelectedStation(station);
+    
+    switch (action) {
+      case "view":
+        setOpenStationDialog(true);
+        break;
+      case "edit":
+        // Open inline edit inside details dialog
+        setOpenStationDialog(true);
+        setInlineEdit(true);
+        setInlineForm({
+          name: station.name || "",
+          address: station.location?.address || "",
+          totalPorts: station.charging?.totalPorts || 0,
+          fastChargePorts: station.charging?.fastChargePorts || 0,
+          standardPorts: station.charging?.standardPorts || 0,
+          pricePerKwh: station.charging?.pricePerKwh || 0,
+          status: station.status || "active",
+        });
+        break;
+      case "maintenance":
+        setMaintenanceModalOpen(true);
+        break;
+      case "delete":
+        if (window.confirm(`Bạn có chắc chắn muốn xóa trạm sạc "${station.name}"?`)) {
+          deleteStation(station.id).then((res) => {
+            if (res?.success) {
+              setSelectedStation(null);
+              setOpenStationDialog(false);
+            } else {
+              alert("Xóa trạm thất bại. Vui lòng thử lại.");
+            }
+          });
+        }
+        break;
+      default:
+        break;
+    }
+  };
+
+  const handleSaveStation = async (stationId, updatedData) => {
+    try {
+      const result = await updateStation(stationId, updatedData);
+      if (result.success) {
+        alert("Cập nhật trạm sạc thành công!");
+        // Force component re-render by updating selectedStation if it's the same station
+        if (selectedStation && selectedStation.id === stationId) {
+          const updatedStation = stations.find(s => s.id === stationId);
+          setSelectedStation(updatedStation);
+        }
+      } else {
+        throw new Error(result.error || "Update failed");
+      }
+    } catch (error) {
+      console.error("Error updating station:", error);
+      alert("Có lỗi xảy ra khi cập nhật trạm sạc.");
+    }
+  };
+
+  const handleScheduleMaintenance = async (maintenanceData) => {
+    try {
+      // Add to maintenance schedules
+      setMaintenanceSchedules(prev => [...prev, {
+        id: `maintenance-${Date.now()}`,
+        ...maintenanceData
+      }]);
+      
+      // Update station status if needed
+      if (maintenanceData.type === "emergency" || maintenanceData.priority === "critical") {
+        await updateStation(maintenanceData.stationId, { status: "maintenance" });
+      }
+      
+      alert("Lên lịch bảo trì thành công!");
+      console.log("Maintenance scheduled:", maintenanceData);
+    } catch (error) {
+      console.error("Error scheduling maintenance:", error);
+      alert("Có lỗi xảy ra khi lên lịch bảo trì.");
     }
   };
 
@@ -227,7 +350,7 @@ const AdminDashboard = () => {
           <Button
             variant="contained"
             startIcon={<Add />}
-            onClick={() => navigate("/admin/stations/new")}
+            onClick={() => setAddDialogOpen(true)}
           >
             Thêm trạm sạc
           </Button>
@@ -400,7 +523,7 @@ const AdminDashboard = () => {
                   </TableHead>
                   <TableBody>
                     {stationPerformance.slice(0, 6).map((station) => (
-                      <TableRow key={station.id} hover>
+                      <TableRow key={`${station.id}-${station.lastUpdated}`} hover>
                         <TableCell>
                           <Box
                             sx={{
@@ -443,7 +566,7 @@ const AdminDashboard = () => {
                               {station.chargingPostsCount} Posts
                             </Typography>
                             <Typography variant="caption" color="text.secondary">
-                              {station.occupiedSlots}/{station.totalSlots} slots
+                              {Math.max(0, station.totalSlots - station.occupiedSlots)}/{station.totalSlots} slots
                             </Typography>
                           </Box>
                         </TableCell>
@@ -500,15 +623,7 @@ const AdminDashboard = () => {
                   <Visibility sx={{ mr: 1 }} />
                   Xem chi tiết
                 </MenuItem>
-                <MenuItem
-                  onClick={() => {
-                    handleStationAction("edit", selectedStation);
-                    setAnchorEl(null);
-                  }}
-                >
-                  <Edit sx={{ mr: 1 }} />
-                  Edit Station
-                </MenuItem>
+              {/* Removed separate Edit Station to encourage inline editing inside details */}
                 <MenuItem
                   onClick={() => {
                     handleStationAction("maintenance", selectedStation);
@@ -619,72 +734,274 @@ const AdminDashboard = () => {
       {/* Station Detail Dialog */}
       <Dialog
         open={openStationDialog}
-        onClose={() => setOpenStationDialog(false)}
+        onClose={() => { setOpenStationDialog(false); setInlineEdit(false); }}
         maxWidth="md"
         fullWidth
       >
-        <DialogTitle>Station Details: {selectedStation?.name}</DialogTitle>
+        <DialogTitle>
+          {inlineEdit ? `Chỉnh sửa: ${selectedStation?.name}` : `Station Details: ${selectedStation?.name || ''}`}
+        </DialogTitle>
         <DialogContent>
-          {selectedStation && (
+          {selectedStation && !inlineEdit && (
             <Box sx={{ pt: 2 }}>
               <Grid container spacing={2}>
                 <Grid item xs={12} sm={6}>
-                  <Typography variant="subtitle2" gutterBottom>
-                    Location
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {selectedStation.location.address}
-                  </Typography>
+                  <Typography variant="subtitle2" gutterBottom>Location</Typography>
+                  <Typography variant="body2" color="text.secondary">{selectedStation.location.address}</Typography>
                 </Grid>
                 <Grid item xs={12} sm={6}>
-                  <Typography variant="subtitle2" gutterBottom>
-                    Status
-                  </Typography>
+                  <Typography variant="subtitle2" gutterBottom>Status</Typography>
                   {getStatusChip(selectedStation.status)}
                 </Grid>
                 <Grid item xs={12} sm={6}>
-                  <Typography variant="subtitle2" gutterBottom>
-                    Charging Posts
-                  </Typography>
+                  <Typography variant="subtitle2" gutterBottom>Charging Posts</Typography>
                   <Typography variant="body2">
-                    {selectedStation.chargingPostsCount} posts, {selectedStation.totalSlots} total slots
+                    {(selectedStation.charging?.chargingPosts?.length) || Math.ceil((selectedStation.charging?.totalPorts || 0)/2)} posts, {(selectedStation.charging?.totalPorts || 0)} total slots
                   </Typography>
                 </Grid>
                 <Grid item xs={12} sm={6}>
-                  <Typography variant="subtitle2" gutterBottom>
-                    Slot có sẵn
-                  </Typography>
-                  <Typography variant="body2">
-                    {selectedStation.totalSlots - selectedStation.occupiedSlots} có sẵn
-                  </Typography>
+                  <Typography variant="subtitle2" gutterBottom>Slot có sẵn</Typography>
+                  <Typography variant="body2">{selectedStation.charging?.availablePorts ?? 0} có sẵn</Typography>
                 </Grid>
                 <Grid item xs={12} sm={6}>
-                  <Typography variant="subtitle2" gutterBottom>
-                    Max Power (per post)
-                  </Typography>
-                  <Typography variant="body2">
-                    {selectedStation.charging?.chargingPosts?.[0]?.power || 'Không có'}kW
-                  </Typography>
+                  <Typography variant="subtitle2" gutterBottom>Max Power (per post)</Typography>
+                  <Typography variant="body2">{selectedStation.charging?.chargingPosts?.[0]?.power || 'Không có'}kW</Typography>
                 </Grid>
                 <Grid item xs={12} sm={6}>
-                  <Typography variant="subtitle2" gutterBottom>
-                    Revenue (Month)
-                  </Typography>
-                  <Typography variant="body2">
-                    {formatCurrency(
-                      stationPerformance.find(
-                        (s) => s.id === selectedStation.id
-                      )?.revenue || 0
-                    )}
-                  </Typography>
+                  <Typography variant="subtitle2" gutterBottom>Revenue (Month)</Typography>
+                  <Typography variant="body2">{formatCurrency(stationPerformance.find((s) => s.id === selectedStation.id)?.revenue || 0)}</Typography>
+                </Grid>
+              </Grid>
+              <Box sx={{ mt: 2 }}>
+                <Button variant="contained" onClick={() => {
+                  setInlineEdit(true);
+                  setInlineForm({
+                    name: selectedStation.name || '',
+                    address: selectedStation.location?.address || '',
+                    totalPorts: selectedStation.charging?.totalPorts || 0,
+                    fastChargePorts: selectedStation.charging?.fastChargePorts || 0,
+                    standardPorts: selectedStation.charging?.standardPorts || 0,
+                    pricePerKwh: selectedStation.charging?.pricePerKwh || 0,
+                    status: selectedStation.status || 'active',
+                  });
+                }}>Chỉnh sửa tại đây</Button>
+              </Box>
+            </Box>
+          )}
+
+          {selectedStation && inlineEdit && (
+            <Box sx={{ pt: 2 }}>
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={6}>
+                  <TextField fullWidth label="Tên trạm sạc" value={inlineForm.name} onChange={(e)=>setInlineForm({...inlineForm, name:e.target.value})} />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <FormControl fullWidth>
+                    <InputLabel>Trạng thái</InputLabel>
+                    <Select label="Trạng thái" value={inlineForm.status} onChange={(e)=>setInlineForm({...inlineForm, status:e.target.value})}>
+                      <MenuItem value="active">Hoạt động</MenuItem>
+                      <MenuItem value="maintenance">Bảo trì</MenuItem>
+                      <MenuItem value="offline">Tạm ngưng</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField fullWidth label="Địa chỉ" value={inlineForm.address} onChange={(e)=>setInlineForm({...inlineForm, address:e.target.value})} />
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                  <TextField fullWidth type="number" label="Tổng cổng" value={inlineForm.totalPorts} onChange={(e)=>setInlineForm({...inlineForm, totalPorts: parseInt(e.target.value)||0})} />
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                  <TextField fullWidth type="number" label="Sạc nhanh (DC)" value={inlineForm.fastChargePorts} onChange={(e)=>setInlineForm({...inlineForm, fastChargePorts: parseInt(e.target.value)||0})} />
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                  <TextField fullWidth type="number" label="Sạc tiêu chuẩn (AC)" value={inlineForm.standardPorts} onChange={(e)=>setInlineForm({...inlineForm, standardPorts: parseInt(e.target.value)||0})} />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField fullWidth type="number" label="Giá (VND/kWh)" value={inlineForm.pricePerKwh} onChange={(e)=>setInlineForm({...inlineForm, pricePerKwh: parseFloat(e.target.value)||0})} />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField fullWidth type="number" label="Slot có sẵn" value={selectedStation?.charging?.availablePorts ?? 0}
+                    onChange={(e)=> setSelectedStation(prev => prev ? ({...prev, charging: { ...(prev.charging||{}), availablePorts: Math.max(0, Math.min(inlineForm.totalPorts, parseInt(e.target.value)||0)) }}) : prev)} />
                 </Grid>
               </Grid>
             </Box>
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenStationDialog(false)}>Close</Button>
-          <Button variant="contained">Edit Station</Button>
+          <Button onClick={() => { setOpenStationDialog(false); setInlineEdit(false); }}>Đóng</Button>
+          {inlineEdit && (
+            <Button variant="contained" onClick={async () => {
+              if (!selectedStation) return;
+              // Preserve available slots as much as possible
+              const prevAvail = (selectedStation?.charging?.availablePorts != null)
+                ? selectedStation.charging.availablePorts
+                : Math.max(0, (selectedStation?.totalSlots || inlineForm.totalPorts) - (selectedStation?.occupiedSlots || 0));
+              const newAvailablePorts = Math.min(inlineForm.totalPorts, prevAvail);
+
+              const updated = {
+                name: inlineForm.name,
+                location: { ...(selectedStation.location||{}), address: inlineForm.address },
+                charging: {
+                  ...(selectedStation.charging||{}),
+                  totalPorts: inlineForm.totalPorts,
+                  availablePorts: newAvailablePorts,
+                  fastChargePorts: inlineForm.fastChargePorts,
+                  standardPorts: inlineForm.standardPorts,
+                  pricePerKwh: inlineForm.pricePerKwh,
+                },
+                status: inlineForm.status,
+              };
+              await handleSaveStation(selectedStation.id, updated);
+              // Optimistically update detail view immediately
+              setSelectedStation(prev => prev ? ({
+                ...prev,
+                ...updated,
+                location: { ...(prev.location||{}), ...(updated.location||{}) },
+                charging: { ...(prev.charging||{}), ...(updated.charging||{}) },
+                lastUpdated: new Date().toISOString(),
+              }) : prev);
+              setRefreshTick((t)=>t+1);
+              setInlineEdit(false);
+            }}>Lưu</Button>
+          )}
+        </DialogActions>
+      </Dialog>
+
+      {/* Edit Station Modal */}
+      <EditStationModal
+        open={editModalOpen}
+        onClose={() => setEditModalOpen(false)}
+        station={selectedStation}
+        onSave={handleSaveStation}
+      />
+
+      {/* Schedule Maintenance Modal */}
+      <ScheduleMaintenanceModal
+        open={maintenanceModalOpen}
+        onClose={() => setMaintenanceModalOpen(false)}
+        station={selectedStation}
+        onSchedule={handleScheduleMaintenance}
+      />
+
+      {/* Quick Add Station Dialog */}
+      <Dialog open={addDialogOpen} onClose={() => setAddDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Thêm trạm sạc nhanh</DialogTitle>
+        <DialogContent sx={{ pt: 2 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <TextField
+              label="Tên trạm sạc *"
+              value={addForm.name}
+              onChange={(e) => setAddForm({ ...addForm, name: e.target.value })}
+              error={!!addErrors.name}
+              helperText={addErrors.name}
+              fullWidth
+            />
+            <TextField
+              label="Địa chỉ *"
+              value={addForm.address}
+              onChange={(e) => setAddForm({ ...addForm, address: e.target.value })}
+              error={!!addErrors.address}
+              helperText={addErrors.address}
+              fullWidth
+            />
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={4}>
+                <TextField
+                  label="Tổng cổng"
+                  type="number"
+                  value={addForm.totalPorts}
+                  onChange={(e) => setAddForm({ ...addForm, totalPorts: parseInt(e.target.value) || 0 })}
+                  fullWidth
+                />
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <TextField
+                  label="Sạc nhanh (DC)"
+                  type="number"
+                  value={addForm.fastChargePorts}
+                  onChange={(e) => setAddForm({ ...addForm, fastChargePorts: parseInt(e.target.value) || 0 })}
+                  fullWidth
+                />
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <TextField
+                  label="Sạc tiêu chuẩn (AC)"
+                  type="number"
+                  value={addForm.standardPorts}
+                  onChange={(e) => setAddForm({ ...addForm, standardPorts: parseInt(e.target.value) || 0 })}
+                  fullWidth
+                />
+              </Grid>
+            </Grid>
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="Giá (VND/kWh)"
+                  type="number"
+                  value={addForm.pricePerKwh}
+                  onChange={(e) => setAddForm({ ...addForm, pricePerKwh: parseFloat(e.target.value) || 0 })}
+                  fullWidth
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <FormControl fullWidth>
+                  <InputLabel>Trạng thái</InputLabel>
+                  <Select
+                    label="Trạng thái"
+                    value={addForm.status}
+                    onChange={(e) => setAddForm({ ...addForm, status: e.target.value })}
+                  >
+                    <MenuItem value="active">Hoạt động</MenuItem>
+                    <MenuItem value="maintenance">Bảo trì</MenuItem>
+                    <MenuItem value="offline">Tạm ngưng</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+            </Grid>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setAddDialogOpen(false)}>Hủy</Button>
+          <Button
+            variant="contained"
+            onClick={async () => {
+              const errs = {};
+              if (!addForm.name.trim()) errs.name = "Tên trạm sạc là bắt buộc";
+              if (!addForm.address.trim()) errs.address = "Địa chỉ là bắt buộc";
+              setAddErrors(errs);
+              if (Object.keys(errs).length) return;
+
+              const stationData = {
+                name: addForm.name,
+                location: {
+                  address: addForm.address,
+                  city: "TP. Hồ Chí Minh",
+                  province: "TP. Hồ Chí Minh",
+                  coordinates: { lat: 10.7769, lng: 106.7009 },
+                },
+                charging: {
+                  totalPorts: addForm.totalPorts,
+                  availablePorts: addForm.totalPorts,
+                  fastChargePorts: addForm.fastChargePorts,
+                  standardPorts: addForm.standardPorts,
+                  pricePerKwh: addForm.pricePerKwh,
+                },
+                operatingHours: addForm.operatingHours,
+                amenities: [],
+                status: addForm.status,
+              };
+
+              const res = await addStation(stationData);
+              if (res?.success) {
+                setAddDialogOpen(false);
+              } else {
+                alert("Không thể thêm trạm sạc. Vui lòng thử lại.");
+              }
+            }}
+          >
+            Tạo trạm sạc
+          </Button>
         </DialogActions>
       </Dialog>
 

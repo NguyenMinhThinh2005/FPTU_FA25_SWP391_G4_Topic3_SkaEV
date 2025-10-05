@@ -201,6 +201,102 @@ const useStationStore = create((set, get) => ({
     get().setStationStatus(stationId, 'active');
     return { success: true };
   },
+
+  // Add new station
+  addStation: async (stationData) => {
+    set({ loading: true, error: null });
+    try {
+      // Simulate API delay
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      
+      const newStation = {
+        id: `station-${Date.now()}`,
+        ...stationData,
+        charging: {
+          ...stationData.charging,
+          connectorTypes: ['Type 2', 'CCS2'], // Default connector types
+        },
+        analytics: {
+          totalSessions: 0,
+          totalRevenue: 0,
+          averageSessionDuration: 0,
+          utilizationRate: 0,
+          lastActivity: null,
+        },
+        createdAt: new Date().toISOString(),
+        lastUpdated: new Date().toISOString(),
+      };
+
+      set((state) => ({
+        stations: [...state.stations, newStation],
+        loading: false,
+      }));
+
+      console.log('✅ New station added:', newStation.name);
+      return { success: true, station: newStation };
+    } catch (error) {
+      set({ error: error.message, loading: false });
+      return { success: false, error: error.message };
+    }
+  },
+
+  // Update existing station
+  updateStation: async (stationId, stationData) => {
+    set({ loading: true, error: null });
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      
+      set((state) => ({
+        stations: state.stations.map((station) =>
+          station.id === stationId
+            ? {
+                ...station,
+                ...stationData,
+                // Deep merge for nested objects
+                location: {
+                  ...station.location,
+                  ...stationData.location,
+                },
+                charging: {
+                  ...station.charging,
+                  ...stationData.charging,
+                },
+                contact: {
+                  ...station.contact,
+                  ...stationData.contact,
+                },
+                lastUpdated: new Date().toISOString(),
+              }
+            : station
+        ),
+        loading: false,
+      }));
+
+      console.log('✅ Station updated successfully:', stationId);
+      return { success: true };
+    } catch (error) {
+      set({ error: error.message, loading: false });
+      return { success: false, error: error.message };
+    }
+  },
+
+  // Delete station
+  deleteStation: async (stationId) => {
+    set({ loading: true, error: null });
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      
+      set((state) => ({
+        stations: state.stations.filter((station) => station.id !== stationId),
+        loading: false,
+      }));
+
+      return { success: true };
+    } catch (error) {
+      set({ error: error.message, loading: false });
+      return { success: false, error: error.message };
+    }
+  },
 }));
 
 export default useStationStore;
