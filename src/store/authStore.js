@@ -96,9 +96,13 @@ const useAuthStore = create(
             email: socialData.email,
             role: "customer",
             profile: {
-              firstName: socialData.firstName || socialData.name?.split(' ')[0] || '',
-              lastName: socialData.lastName || socialData.name?.split(' ').slice(1).join(' ') || '',
-              phone: socialData.phone || '',
+              firstName:
+                socialData.firstName || socialData.name?.split(" ")[0] || "",
+              lastName:
+                socialData.lastName ||
+                socialData.name?.split(" ").slice(1).join(" ") ||
+                "",
+              phone: socialData.phone || "",
               avatar: socialData.picture || socialData.avatar,
               createdAt: new Date().toISOString(),
               lastLogin: new Date().toISOString(),

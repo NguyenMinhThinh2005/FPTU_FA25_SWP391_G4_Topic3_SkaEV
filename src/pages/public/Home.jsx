@@ -27,22 +27,26 @@ const HomePage = () => {
     {
       icon: <Speed sx={{ fontSize: 40, color: "primary.main" }} />,
       title: "Sạc nhanh DC/AC",
-      description: "Hỗ trợ sạc nhanh DC lên đến 150kW và AC 22kW, rút ngắn thời gian chờ đợi",
+      description:
+        "Hỗ trợ sạc nhanh DC lên đến 150kW và AC 22kW, rút ngắn thời gian chờ đợi",
     },
     {
       icon: <LocationOn sx={{ fontSize: 40, color: "success.main" }} />,
       title: "Mạng lưới rộng khắp",
-      description: "Hơn 127 trạm sạc tại 63 tỉnh thành, phủ sóng các tuyến đường chính và khu đô thị",
+      description:
+        "Hơn 127 trạm sạc tại 63 tỉnh thành, phủ sóng các tuyến đường chính và khu đô thị",
     },
     {
       icon: <TrendingUp sx={{ fontSize: 40, color: "secondary.main" }} />,
       title: "Theo dõi thời gian thực",
-      description: "Giám sát trạng thái trạm sạc, thời gian chờ và quá trình sạc trực tiếp trên app",
+      description:
+        "Giám sát trạng thái trạm sạc, thời gian chờ và quá trình sạc trực tiếp trên app",
     },
     {
       icon: <Security sx={{ fontSize: 40, color: "info.main" }} />,
       title: "Thanh toán an toàn",
-      description: "Hỗ trợ đa dạng phương thức thanh toán: QR Code, thẻ RFID, ví điện tử",
+      description:
+        "Hỗ trợ đa dạng phương thức thanh toán: QR Code, thẻ RFID, ví điện tử",
     },
   ];
 
@@ -159,7 +163,8 @@ const HomePage = () => {
                 Hệ thống quản lý trạm sạc xe điện thông minh
               </Typography>
               <Typography variant="h6" sx={{ mb: 4, opacity: 0.9 }}>
-                Giải pháp toàn diện cho việc tìm kiếm, đặt chỗ và thanh toán tại các trạm sạc xe điện trên toàn quốc
+                Giải pháp toàn diện cho việc tìm kiếm, đặt chỗ và thanh toán tại
+                các trạm sạc xe điện trên toàn quốc
               </Typography>
 
               <Box
@@ -295,7 +300,8 @@ const HomePage = () => {
               Tại sao chọn SkaEV?
             </Typography>
             <Typography variant="h6" color="text.secondary">
-              Nền tảng quản lý trạm sạc xe điện hàng đầu Việt Nam với công nghệ tiên tiến
+              Nền tảng quản lý trạm sạc xe điện hàng đầu Việt Nam với công nghệ
+              tiên tiến
             </Typography>
           </Box>
 
@@ -336,7 +342,8 @@ const HomePage = () => {
           Sẵn sàng bắt đầu hành trình xe điện?
         </Typography>
         <Typography variant="h6" color="text.secondary" sx={{ mb: 4 }}>
-          Tham gia cùng hàng nghìn tài xế xe điện đang sử dụng mạng lưới sạc SkaEV
+          Tham gia cùng hàng nghìn tài xế xe điện đang sử dụng mạng lưới sạc
+          SkaEV
         </Typography>
 
         <Button
@@ -357,7 +364,9 @@ const HomePage = () => {
             boxShadow: "0 4px 15px rgba(19, 121, 255, 0.2)",
           }}
         >
-          {isAuthenticated ? getText("home.goToDashboard") : getText("auth.getStartedToday")}
+          {isAuthenticated
+            ? getText("home.goToDashboard")
+            : getText("auth.getStartedToday")}
         </Button>
       </Container>
 
@@ -369,7 +378,8 @@ const HomePage = () => {
               SkaEV
             </Typography>
             <Typography variant="body2" color="grey.400">
-              © 2024 SkaEV. Nền tảng quản lý sạc xe điện thông minh - Phát triển bởi FPTU SWP391
+              © 2024 SkaEV. Nền tảng quản lý sạc xe điện thông minh - Phát triển
+              bởi FPTU SWP391
             </Typography>
           </Box>
         </Container>

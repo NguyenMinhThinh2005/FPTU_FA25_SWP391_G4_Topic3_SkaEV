@@ -66,7 +66,9 @@ const BookingModal = ({ open, onClose, station, onBookingComplete }) => {
   // Get available slots from selected charging post
   const getAvailableSlots = () => {
     if (!selectedChargingPost) return [];
-    return selectedChargingPost.slots.filter(slot => slot.status === 'available');
+    return selectedChargingPost.slots.filter(
+      (slot) => slot.status === "available"
+    );
   };
 
   const handleNext = () => {
@@ -91,7 +93,12 @@ const BookingModal = ({ open, onClose, station, onBookingComplete }) => {
   };
 
   const handleConfirmBooking = async () => {
-    if (!selectedChargingPost || !selectedSlot || !selectedDateTime || !agreeTerms) {
+    if (
+      !selectedChargingPost ||
+      !selectedSlot ||
+      !selectedDateTime ||
+      !agreeTerms
+    ) {
       return;
     }
 
@@ -99,10 +106,12 @@ const BookingModal = ({ open, onClose, station, onBookingComplete }) => {
 
     try {
       // Calculate pricing
-      const baseRate = selectedChargingPost.type === 'AC'
-        ? station.charging.pricing.acRate
-        : selectedChargingPost.power >= 150
-          ? station.charging.pricing.dcUltraRate || station.charging.pricing.dcRate
+      const baseRate =
+        selectedChargingPost.type === "AC"
+          ? station.charging.pricing.acRate
+          : selectedChargingPost.power >= 150
+          ? station.charging.pricing.dcUltraRate ||
+            station.charging.pricing.dcRate
           : station.charging.pricing.dcRate;
 
       const bookingData = {
@@ -124,17 +133,19 @@ const BookingModal = ({ open, onClose, station, onBookingComplete }) => {
           parkingFee: station.charging.pricing.parkingFee || 0,
         },
         bookingTime: new Date().toISOString(),
-        schedulingType: selectedDateTime?.schedulingType || 'immediate',
+        schedulingType: selectedDateTime?.schedulingType || "immediate",
         scheduledDateTime: selectedDateTime?.scheduledDateTime || null,
-        scheduledDate: selectedDateTime?.scheduledDate ?
-          selectedDateTime.scheduledDate.toISOString().split('T')[0] : null,
-        scheduledTime: selectedDateTime?.scheduledTime ?
-          selectedDateTime.scheduledTime.toISOString() : null,
+        scheduledDate: selectedDateTime?.scheduledDate
+          ? selectedDateTime.scheduledDate.toISOString().split("T")[0]
+          : null,
+        scheduledTime: selectedDateTime?.scheduledTime
+          ? selectedDateTime.scheduledTime.toISOString()
+          : null,
       };
 
       const booking = createBooking(bookingData);
 
-      setBookingResult('success');
+      setBookingResult("success");
       setResultMessage(`Đặt chỗ thành công! Mã đặt chỗ: ${booking.id}`);
 
       setTimeout(() => {
@@ -143,11 +154,10 @@ const BookingModal = ({ open, onClose, station, onBookingComplete }) => {
         }
         handleCloseModal();
       }, 2000);
-
     } catch (error) {
-      console.error('Booking error:', error);
-      setBookingResult('error');
-      setResultMessage('Có lỗi xảy ra khi đặt chỗ. Vui lòng thử lại.');
+      console.error("Booking error:", error);
+      setBookingResult("error");
+      setResultMessage("Có lỗi xảy ra khi đặt chỗ. Vui lòng thử lại.");
     } finally {
       setLoading(false);
     }
@@ -161,7 +171,7 @@ const BookingModal = ({ open, onClose, station, onBookingComplete }) => {
     setAgreeTerms(false);
     setLoading(false);
     setBookingResult(null);
-    setResultMessage('');
+    setResultMessage("");
     onClose();
   };
 
@@ -174,7 +184,8 @@ const BookingModal = ({ open, onClose, station, onBookingComplete }) => {
               Chọn trụ sạc phù hợp
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Trạm {station?.name} có {getChargingPosts().length} trụ sạc với các công suất khác nhau
+              Trạm {station?.name} có {getChargingPosts().length} trụ sạc với
+              các công suất khác nhau
             </Typography>
 
             <Grid container spacing={2}>
@@ -199,8 +210,20 @@ const BookingModal = ({ open, onClose, station, onBookingComplete }) => {
                       }}
                     >
                       <CardContent>
-                        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                        <Box
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                          }}
+                        >
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 2,
+                            }}
+                          >
                             <Box
                               sx={{
                                 width: 48,
@@ -209,32 +232,50 @@ const BookingModal = ({ open, onClose, station, onBookingComplete }) => {
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center",
-                                bgcolor: post.type === 'AC' ? 'success.light' :
-                                  post.power >= 150 ? 'error.light' : 'warning.light',
-                                color: 'white'
+                                bgcolor:
+                                  post.type === "AC"
+                                    ? "success.light"
+                                    : post.power >= 150
+                                    ? "error.light"
+                                    : "warning.light",
+                                color: "white",
                               }}
                             >
-                              {post.type === 'AC' ? <Schedule /> :
-                                post.power >= 150 ? <ElectricCar /> : <FlashOn />}
+                              {post.type === "AC" ? (
+                                <Schedule />
+                              ) : post.power >= 150 ? (
+                                <ElectricCar />
+                              ) : (
+                                <FlashOn />
+                              )}
                             </Box>
                             <Box>
                               <Typography variant="h6" fontWeight="bold">
                                 {post.name}
                               </Typography>
-                              <Typography variant="body2" color="text.secondary">
+                              <Typography
+                                variant="body2"
+                                color="text.secondary"
+                              >
                                 {post.power} kW • {post.type} • {post.voltage}V
                               </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                Số cổng trống: {post.availableSlots}/{post.totalSlots}
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                              >
+                                Số cổng trống: {post.availableSlots}/
+                                {post.totalSlots}
                               </Typography>
                             </Box>
                           </Box>
-                          <Box sx={{ textAlign: 'right' }}>
+                          <Box sx={{ textAlign: "right" }}>
                             <Typography variant="body2">
-                              {post.type === 'AC' ?
-                                `${station?.charging?.pricing?.acRate?.toLocaleString()} VNĐ/kWh` :
-                                `${(station?.charging?.pricing?.dcRate || station?.charging?.pricing?.dcUltraRate)?.toLocaleString()} VNĐ/kWh`
-                              }
+                              {post.type === "AC"
+                                ? `${station?.charging?.pricing?.acRate?.toLocaleString()} VNĐ/kWh`
+                                : `${(
+                                    station?.charging?.pricing?.dcRate ||
+                                    station?.charging?.pricing?.dcUltraRate
+                                  )?.toLocaleString()} VNĐ/kWh`}
                             </Typography>
                           </Box>
                         </Box>
@@ -256,16 +297,18 @@ const BookingModal = ({ open, onClose, station, onBookingComplete }) => {
             {selectedChargingPost && (
               <>
                 <Alert severity="success" sx={{ mb: 2 }}>
-                  Đã chọn: {selectedChargingPost.name} - {selectedChargingPost.power}kW
+                  Đã chọn: {selectedChargingPost.name} -{" "}
+                  {selectedChargingPost.power}kW
                   <Typography variant="body2" sx={{ mt: 0.5 }}>
-                    Số cổng trống: {selectedChargingPost.availableSlots}/{selectedChargingPost.totalSlots}
+                    Số cổng trống: {selectedChargingPost.availableSlots}/
+                    {selectedChargingPost.totalSlots}
                   </Typography>
                 </Alert>
                 <Grid container spacing={2}>
                   {getAllSlots().map((slot) => {
-                    const isAvailable = slot.status === 'available';
-                    const isOccupied = slot.status === 'occupied';
-                    const isMaintenance = slot.status === 'maintenance';
+                    const isAvailable = slot.status === "available";
+                    const isOccupied = slot.status === "occupied";
+                    const isMaintenance = slot.status === "maintenance";
 
                     return (
                       <Grid item xs={12} sm={6} key={slot.id}>
@@ -279,65 +322,107 @@ const BookingModal = ({ open, onClose, station, onBookingComplete }) => {
                               width: "100%",
                               cursor: isAvailable ? "pointer" : "not-allowed",
                               border: selectedSlot?.id === slot.id ? 2 : 1,
-                              borderColor: selectedSlot?.id === slot.id
-                                ? "primary.main" : "divider",
+                              borderColor:
+                                selectedSlot?.id === slot.id
+                                  ? "primary.main"
+                                  : "divider",
                               opacity: isAvailable ? 1 : 0.6,
-                              bgcolor: !isAvailable ? 'action.disabledBackground' : 'background.paper',
+                              bgcolor: !isAvailable
+                                ? "action.disabledBackground"
+                                : "background.paper",
                               "&:hover": isAvailable ? { boxShadow: 2 } : {},
                             }}
                           >
                             <CardContent>
-                              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "space-between",
+                                }}
+                              >
                                 <Box sx={{ flex: 1 }}>
                                   <Typography variant="h6" fontWeight="bold">
                                     Cổng {slot.id}
                                   </Typography>
-                                  <Typography variant="body2" color="text.secondary">
+                                  <Typography
+                                    variant="body2"
+                                    color="text.secondary"
+                                  >
                                     Loại đầu cắm: {slot.connectorType}
                                   </Typography>
-                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
+                                  <Box
+                                    sx={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: 0.5,
+                                      mt: 0.5,
+                                    }}
+                                  >
                                     <Chip
                                       label={
-                                        isAvailable ? 'Sẵn sàng' :
-                                          isOccupied ? 'Đang sử dụng' :
-                                            isMaintenance ? 'Bảo trì' :
-                                              'Không khả dụng'
+                                        isAvailable
+                                          ? "Sẵn sàng"
+                                          : isOccupied
+                                          ? "Đang sử dụng"
+                                          : isMaintenance
+                                          ? "Bảo trì"
+                                          : "Không khả dụng"
                                       }
                                       size="small"
                                       color={
-                                        isAvailable ? 'success' :
-                                          isOccupied ? 'warning' :
-                                            isMaintenance ? 'error' :
-                                              'default'
+                                        isAvailable
+                                          ? "success"
+                                          : isOccupied
+                                          ? "warning"
+                                          : isMaintenance
+                                          ? "error"
+                                          : "default"
                                       }
-                                      sx={{ height: 20, fontSize: '0.7rem' }}
+                                      sx={{ height: 20, fontSize: "0.7rem" }}
                                     />
                                   </Box>
                                   {isMaintenance && slot.lastMaintenance && (
-                                    <Typography variant="caption" color="error.main" sx={{ display: 'block', mt: 0.5 }}>
-                                      Bảo trì từ: {new Date(slot.lastMaintenance).toLocaleString('vi-VN', {
-                                        day: '2-digit',
-                                        month: '2-digit',
-                                        hour: '2-digit',
-                                        minute: '2-digit'
+                                    <Typography
+                                      variant="caption"
+                                      color="error.main"
+                                      sx={{ display: "block", mt: 0.5 }}
+                                    >
+                                      Bảo trì từ:{" "}
+                                      {new Date(
+                                        slot.lastMaintenance
+                                      ).toLocaleString("vi-VN", {
+                                        day: "2-digit",
+                                        month: "2-digit",
+                                        hour: "2-digit",
+                                        minute: "2-digit",
                                       })}
                                     </Typography>
                                   )}
                                 </Box>
                                 {isAvailable && (
-                                  <CheckCircle sx={{ color: 'success.main', fontSize: 32 }} />
+                                  <CheckCircle
+                                    sx={{ color: "success.main", fontSize: 32 }}
+                                  />
                                 )}
                                 {isMaintenance && (
-                                  <Box sx={{
-                                    bgcolor: 'error.main',
-                                    color: 'white',
-                                    borderRadius: '50%',
-                                    p: 1,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center'
-                                  }}>
-                                    <Typography variant="caption" fontWeight="bold">⚠️</Typography>
+                                  <Box
+                                    sx={{
+                                      bgcolor: "error.main",
+                                      color: "white",
+                                      borderRadius: "50%",
+                                      p: 1,
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                    }}
+                                  >
+                                    <Typography
+                                      variant="caption"
+                                      fontWeight="bold"
+                                    >
+                                      ⚠️
+                                    </Typography>
                                   </Box>
                                 )}
                               </Box>
@@ -353,11 +438,13 @@ const BookingModal = ({ open, onClose, station, onBookingComplete }) => {
                     Trụ sạc này chưa có cổng nào được cấu hình.
                   </Alert>
                 )}
-                {getAllSlots().length > 0 && getAvailableSlots().length === 0 && (
-                  <Alert severity="warning" sx={{ mt: 2 }}>
-                    Tất cả {getAllSlots().length} cổng của trụ này đang bận hoặc bảo trì. Vui lòng chọn trụ sạc khác.
-                  </Alert>
-                )}
+                {getAllSlots().length > 0 &&
+                  getAvailableSlots().length === 0 && (
+                    <Alert severity="warning" sx={{ mt: 2 }}>
+                      Tất cả {getAllSlots().length} cổng của trụ này đang bận
+                      hoặc bảo trì. Vui lòng chọn trụ sạc khác.
+                    </Alert>
+                  )}
               </>
             )}
           </Box>
@@ -391,7 +478,7 @@ const BookingModal = ({ open, onClose, station, onBookingComplete }) => {
               Xác nhận thông tin đặt chỗ
             </Typography>
 
-            {bookingResult === 'success' && (
+            {bookingResult === "success" && (
               <Alert severity="success" sx={{ mb: 2 }}>
                 <Typography variant="body2">
                   <strong>✅ {resultMessage}</strong>
@@ -399,7 +486,7 @@ const BookingModal = ({ open, onClose, station, onBookingComplete }) => {
               </Alert>
             )}
 
-            {bookingResult === 'error' && (
+            {bookingResult === "error" && (
               <Alert severity="error" sx={{ mb: 2 }}>
                 <Typography variant="body2">
                   <strong>❌ {resultMessage}</strong>
@@ -410,7 +497,11 @@ const BookingModal = ({ open, onClose, station, onBookingComplete }) => {
             {!bookingResult && (
               <>
                 <Paper elevation={1} sx={{ p: 3, mb: 3 }}>
-                  <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                  <Typography
+                    variant="subtitle1"
+                    fontWeight="bold"
+                    gutterBottom
+                  >
                     📍 Thông tin trạm sạc
                   </Typography>
                   <Grid container spacing={2}>
@@ -435,7 +526,8 @@ const BookingModal = ({ open, onClose, station, onBookingComplete }) => {
                         Trụ sạc:
                       </Typography>
                       <Typography variant="body1" fontWeight="medium">
-                        {selectedChargingPost?.name} ({selectedChargingPost?.power}kW)
+                        {selectedChargingPost?.name} (
+                        {selectedChargingPost?.power}kW)
                       </Typography>
                     </Grid>
                     <Grid item xs={6}>
@@ -451,10 +543,11 @@ const BookingModal = ({ open, onClose, station, onBookingComplete }) => {
                         Lịch sạc:
                       </Typography>
                       <Typography variant="body1" fontWeight="medium">
-                        {selectedDateTime?.schedulingType === 'immediate'
+                        {selectedDateTime?.schedulingType === "immediate"
                           ? "Sạc ngay"
-                          : selectedDateTime?.scheduledDateTime?.toLocaleString('vi-VN') || 'Chưa chọn'
-                        }
+                          : selectedDateTime?.scheduledDateTime?.toLocaleString(
+                              "vi-VN"
+                            ) || "Chưa chọn"}
                       </Typography>
                     </Grid>
                     <Grid item xs={6}>
@@ -462,10 +555,12 @@ const BookingModal = ({ open, onClose, station, onBookingComplete }) => {
                         Giá dự kiến:
                       </Typography>
                       <Typography variant="body1" fontWeight="medium">
-                        {selectedChargingPost?.type === 'AC' ?
-                          `${station?.charging?.pricing?.acRate?.toLocaleString()} VNĐ/kWh` :
-                          `${(station?.charging?.pricing?.dcRate || station?.charging?.pricing?.dcUltraRate)?.toLocaleString()} VNĐ/kWh`
-                        }
+                        {selectedChargingPost?.type === "AC"
+                          ? `${station?.charging?.pricing?.acRate?.toLocaleString()} VNĐ/kWh`
+                          : `${(
+                              station?.charging?.pricing?.dcRate ||
+                              station?.charging?.pricing?.dcUltraRate
+                            )?.toLocaleString()} VNĐ/kWh`}
                       </Typography>
                     </Grid>
                   </Grid>
@@ -473,7 +568,8 @@ const BookingModal = ({ open, onClose, station, onBookingComplete }) => {
 
                 <Alert severity="info" sx={{ mb: 2 }}>
                   <Typography variant="body2">
-                    💡 <strong>Lưu ý:</strong> Vui lòng có mặt tại trạm sạc trước 15 phút để tránh mất chỗ.
+                    💡 <strong>Lưu ý:</strong> Vui lòng có mặt tại trạm sạc
+                    trước 15 phút.
                   </Typography>
                 </Alert>
 
@@ -503,7 +599,11 @@ const BookingModal = ({ open, onClose, station, onBookingComplete }) => {
       case 1:
         return selectedSlot !== null;
       case 2:
-        return selectedDateTime !== null && (selectedDateTime.schedulingType === 'immediate' || selectedDateTime.isValid);
+        return (
+          selectedDateTime !== null &&
+          (selectedDateTime.schedulingType === "immediate" ||
+            selectedDateTime.isValid)
+        );
       case 3:
         return agreeTerms;
       default:
