@@ -354,7 +354,12 @@ const StationMapLeaflet = ({ stations, onStationSelect }) => {
                                                     color={isAvailable ? 'success' : 'error'}
                                                     sx={{ borderRadius: '16px', fontWeight: 600 }}
                                                 />
-                                                {/* operating hours intentionally omitted from popup - shown only in list */}
+                                                {/* Show operating hours in the popup when available */}
+                                                {station.operatingHours && (
+                                                    <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
+                                                        {formatOperatingHours(station.operatingHours)}
+                                                    </Typography>
+                                                )}
                                             </Box>
                                             <Button
                                                 fullWidth
@@ -399,7 +404,7 @@ const StationMapLeaflet = ({ stations, onStationSelect }) => {
                                 bgcolor: 'white',
                                 boxShadow: 2,
                                 '&:hover': { bgcolor: 'grey.100' },
-                                zIndex: 1000
+                                zIndex: 1400
                             }}
                             onClick={handleCenterOnUser}
                         >
@@ -415,7 +420,7 @@ const StationMapLeaflet = ({ stations, onStationSelect }) => {
                     left: 16,
                     p: 2,
                     minWidth: 220,
-                    zIndex: 10,
+                    zIndex: 1300,
                     boxShadow: 4,
                     bgcolor: 'rgba(255,255,255,0.95)'
                 }}>
@@ -459,9 +464,7 @@ const StationMapLeaflet = ({ stations, onStationSelect }) => {
                             </Box>
                         )}
                     </Box>
-                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2, pt: 2, borderTop: 1, borderColor: 'divider' }}>
-                        💡 Click vào marker trạm để xem chi tiết
-                    </Typography>
+                    {/* Hint removed as requested */}
                 </Card>
 
                 {/* Selected Station Info Card */}
@@ -472,7 +475,7 @@ const StationMapLeaflet = ({ stations, onStationSelect }) => {
                         left: 16,
                         p: 2,
                         maxWidth: 350,
-                        zIndex: 10,
+                        zIndex: 1300,
                         boxShadow: 4,
                         bgcolor: 'rgba(255,255,255,0.98)'
                     }}>
@@ -496,7 +499,12 @@ const StationMapLeaflet = ({ stations, onStationSelect }) => {
                                 size="small"
                                 color={selectedStation.stats?.available > 0 ? 'success' : 'error'}
                             />
-                            {/* operating hours shown only in the list; removed from selected card */}
+                            {/* Show operating hours here as well for the selected station */}
+                            {selectedStation.operatingHours && (
+                                <Typography variant="caption" color="text.secondary" sx={{ alignSelf: 'center' }}>
+                                    {formatOperatingHours(selectedStation.operatingHours)}
+                                </Typography>
+                            )}
                         </Stack>
 
                         <Stack spacing={1}>

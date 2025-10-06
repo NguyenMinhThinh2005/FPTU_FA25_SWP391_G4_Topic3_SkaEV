@@ -82,9 +82,9 @@ const Sidebar = ({ open, onClose }) => {
             icon: <Person />,
             path: "/customer/profile"
           },
-          // 2. Sạc xe điện (luồng sạc chính)
+          // 2. Đặt chỗ sạc (luồng sạc chính)
           {
-            text: "Sạc xe điện",
+            text: "Đặt chỗ sạc",
             icon: <ElectricCar />,
             path: "/customer/charging"
           },
