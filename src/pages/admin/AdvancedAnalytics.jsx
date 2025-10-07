@@ -225,25 +225,25 @@ const AdvancedAnalytics = () => {
       >
         <Box>
           <Typography variant="h4" fontWeight="bold" gutterBottom>
-            Advanced Analytics 📊
+            Phân tích nâng cao 📊
           </Typography>
           <Typography variant="body1" color="text.secondary">
-            Comprehensive insights into your EV charging network performance
+            Thông tin chi tiết về hiệu suất mạng lưới sạc xe điện của bạn
           </Typography>
         </Box>
 
         <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
           {/* Time Range Selector */}
           <FormControl size="small" sx={{ minWidth: 120 }}>
-            <InputLabel>Time Range</InputLabel>
+            <InputLabel>Khoảng thời gian</InputLabel>
             <Select
               value={timeRange}
-              label="Time Range"
+              label="Khoảng thời gian"
               onChange={(e) => setTimeRange(e.target.value)}
             >
-              <MenuItem value="7d">Last 7 Days</MenuItem>
-              <MenuItem value="30d">Last 30 Days</MenuItem>
-              <MenuItem value="90d">Last 90 Days</MenuItem>
+              <MenuItem value="7d">7 ngày qua</MenuItem>
+              <MenuItem value="30d">30 ngày qua</MenuItem>
+              <MenuItem value="90d">90 ngày qua</MenuItem>
             </Select>
           </FormControl>
 
@@ -252,7 +252,7 @@ const AdvancedAnalytics = () => {
             startIcon={<Download />}
             onClick={() => console.log("Export report")}
           >
-            Export
+            Xuất báo cáo
           </Button>
 
           <Button
@@ -260,7 +260,7 @@ const AdvancedAnalytics = () => {
             startIcon={<Refresh />}
             onClick={() => setAnalyticsData(generateAnalyticsData())}
           >
-            Refresh
+            Làm mới
           </Button>
         </Box>
       </Box>
@@ -284,7 +284,7 @@ const AdvancedAnalytics = () => {
                     {formatCurrency(kpis.totalRevenue)}
                   </Typography>
                   <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                    Total Revenue
+                    Tổng doanh thu
                   </Typography>
                   <Box
                     sx={{
@@ -300,8 +300,7 @@ const AdvancedAnalytics = () => {
                       <TrendingDown sx={{ fontSize: 16 }} />
                     )}
                     <Typography variant="caption">
-                      {Math.abs(kpis.revenueGrowth).toFixed(1)}% vs previous
-                      period
+                      {Math.abs(kpis.revenueGrowth).toFixed(1)}% so với kỳ trước
                     </Typography>
                   </Box>
                 </Box>
@@ -327,11 +326,10 @@ const AdvancedAnalytics = () => {
                     {kpis.totalSessions.toLocaleString()}
                   </Typography>
                   <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                    Charging Sessions
+                    Phiên sạc
                   </Typography>
                   <Typography variant="caption" sx={{ opacity: 0.8 }}>
-                    {(kpis.totalSessions / analyticsData.length).toFixed(0)} per
-                    day average
+                    {(kpis.totalSessions / analyticsData.length).toFixed(0)} trung bình mỗi ngày
                   </Typography>
                 </Box>
               </Box>
@@ -356,10 +354,10 @@ const AdvancedAnalytics = () => {
                     {kpis.totalEnergy.toFixed(0)}
                   </Typography>
                   <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                    kWh Delivered
+                    kWh đã cung cấp
                   </Typography>
                   <Typography variant="caption" sx={{ opacity: 0.8 }}>
-                    {(kpis.totalEnergy * 0.5).toFixed(0)} kg CO₂ saved
+                    {(kpis.totalEnergy * 0.5).toFixed(0)} kg CO₂ đã tiết kiệm
                   </Typography>
                 </Box>
               </Box>
@@ -384,10 +382,10 @@ const AdvancedAnalytics = () => {
                     {kpis.avgUtilization.toFixed(1)}%
                   </Typography>
                   <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                    Avg Utilization
+                    Sử dụng trung bình
                   </Typography>
                   <Typography variant="caption" sx={{ opacity: 0.8 }}>
-                    Network efficiency
+                    Hiệu suất mạng lưới
                   </Typography>
                 </Box>
               </Box>
@@ -403,7 +401,7 @@ const AdvancedAnalytics = () => {
           <Card>
             <CardContent>
               <Typography variant="h6" fontWeight="bold" gutterBottom>
-                Revenue & Sessions Trend
+                Xu hướng doanh thu & phiên sạc
               </Typography>
               <Box sx={{ height: 300 }}>
                 <ResponsiveContainer width="100%" height="100%">
@@ -422,13 +420,13 @@ const AdvancedAnalytics = () => {
                       fillOpacity={0.3}
                       stroke={colors.primary}
                       strokeWidth={2}
-                      name="Revenue"
+                      name="Doanh thu"
                     />
                     <Bar
                       yAxisId="right"
                       dataKey="sessions"
                       fill={colors.secondary}
-                      name="Sessions"
+                      name="Phiên sạc"
                       opacity={0.8}
                     />
                   </ComposedChart>
@@ -443,7 +441,7 @@ const AdvancedAnalytics = () => {
           <Card>
             <CardContent>
               <Typography variant="h6" fontWeight="bold" gutterBottom>
-                Revenue by Station Type
+                Doanh thu theo loại trạm
               </Typography>
               <Box sx={{ height: 300 }}>
                 <ResponsiveContainer width="100%" height="100%">
@@ -493,7 +491,7 @@ const AdvancedAnalytics = () => {
           <Card>
             <CardContent>
               <Typography variant="h6" fontWeight="bold" gutterBottom>
-                Usage Pattern by Hour
+                Mẫu sử dụng theo giờ
               </Typography>
               <Box sx={{ height: 300 }}>
                 <ResponsiveContainer width="100%" height="100%">
@@ -505,7 +503,7 @@ const AdvancedAnalytics = () => {
                     <Bar
                       dataKey="sessions"
                       fill={colors.info}
-                      name="Sessions"
+                      name="Phiên sạc"
                     />
                   </BarChart>
                 </ResponsiveContainer>
@@ -519,7 +517,7 @@ const AdvancedAnalytics = () => {
           <Card>
             <CardContent>
               <Typography variant="h6" fontWeight="bold" gutterBottom>
-                Energy Delivered & Utilization
+                Năng lượng cung cấp & Sử dụng
               </Typography>
               <Box sx={{ height: 300 }}>
                 <ResponsiveContainer width="100%" height="100%">
@@ -537,7 +535,7 @@ const AdvancedAnalytics = () => {
                       fill={colors.success}
                       fillOpacity={0.3}
                       stroke={colors.success}
-                      name="Energy (kWh)"
+                      name="Năng lượng (kWh)"
                     />
                     <Line
                       yAxisId="right"
@@ -545,7 +543,7 @@ const AdvancedAnalytics = () => {
                       dataKey="utilization"
                       stroke={colors.warning}
                       strokeWidth={3}
-                      name="Utilization (%)"
+                      name="Sử dụng (%)"
                     />
                   </ComposedChart>
                 </ResponsiveContainer>
@@ -559,19 +557,19 @@ const AdvancedAnalytics = () => {
       <Card>
         <CardContent>
           <Typography variant="h6" fontWeight="bold" gutterBottom>
-            Station Performance Leaderboard
+            Bảng xếp hạng hiệu suất trạm sạc
           </Typography>
           <TableContainer>
             <Table>
               <TableHead>
                 <TableRow>
-                  <TableCell>Rank</TableCell>
-                  <TableCell>Station</TableCell>
-                  <TableCell align="center">Revenue</TableCell>
-                  <TableCell align="center">Sessions</TableCell>
-                  <TableCell align="center">Utilization</TableCell>
-                  <TableCell align="center">Efficiency</TableCell>
-                  <TableCell align="center">Status</TableCell>
+                  <TableCell>Xếp hạng</TableCell>
+                  <TableCell>Trạm sạc</TableCell>
+                  <TableCell align="center">Doanh thu</TableCell>
+                  <TableCell align="center">Phiên</TableCell>
+                  <TableCell align="center">Sử dụng</TableCell>
+                  <TableCell align="center">Hiệu suất</TableCell>
+                  <TableCell align="center">Trạng thái</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>

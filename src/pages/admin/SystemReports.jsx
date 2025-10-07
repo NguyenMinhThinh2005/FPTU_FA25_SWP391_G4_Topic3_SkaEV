@@ -150,36 +150,36 @@ const AdminSystemReports = () => {
           }}
         >
           <Typography variant="h4" fontWeight="bold">
-            System Reports
+          Báo cáo hệ thống
           </Typography>
           <Box sx={{ display: "flex", gap: 2 }}>
             <FormControl size="small" sx={{ minWidth: 120 }}>
-              <InputLabel>Date Range</InputLabel>
+              <InputLabel>Khoảng thời gian</InputLabel>
               <Select
                 value={dateRange}
-                label="Date Range"
+                label="Khoảng thời gian"
                 onChange={(e) => setDateRange(e.target.value)}
               >
-                <MenuItem value="last7days">Last 7 Days</MenuItem>
-                <MenuItem value="last30days">Last 30 Days</MenuItem>
-                <MenuItem value="last3months">Last 3 Months</MenuItem>
-                <MenuItem value="last6months">Last 6 Months</MenuItem>
-                <MenuItem value="lastyear">Last Year</MenuItem>
+               <MenuItem value="last7days">7 ngày qua</MenuItem>
+                <MenuItem value="last30days">30 ngày qua</MenuItem>
+                <MenuItem value="last3months">3 tháng qua</MenuItem>
+                <MenuItem value="last6months">6 tháng qua</MenuItem>
+                <MenuItem value="lastyear">Năm qua</MenuItem>
               </Select>
             </FormControl>
             <Button startIcon={<Download />} onClick={handleExportReport}>
-              Export
+            Xuất báo cáo
             </Button>
             <Button
               startIcon={<Refresh />}
               onClick={() => window.location.reload()}
             >
-              Refresh
+              Làm mới
             </Button>
           </Box>
         </Box>
         <Typography variant="body1" color="text.secondary">
-          Comprehensive system analytics and performance reports
+        Báo cáo tổng hợp dữ liệu và hiệu suất hoạt động của hệ thống
         </Typography>
       </Box>
 
@@ -197,14 +197,14 @@ const AdminSystemReports = () => {
                     {formatCurrency(210000000)}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    Monthly Revenue
+                  Doanh thu tháng
                   </Typography>
                 </Box>
               </Box>
               <Box sx={{ display: "flex", alignItems: "center" }}>
                 <TrendingUp sx={{ color: "success.main", mr: 1 }} />
                 <Typography variant="body2" color="success.main">
-                  +12.5% vs last month
+                  +12.5% so với tháng trước
                 </Typography>
               </Box>
             </CardContent>
@@ -223,14 +223,14 @@ const AdminSystemReports = () => {
                     1,890
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    Charging Sessions
+                  Phiên sạc
                   </Typography>
                 </Box>
               </Box>
               <Box sx={{ display: "flex", alignItems: "center" }}>
                 <TrendingUp sx={{ color: "success.main", mr: 1 }} />
                 <Typography variant="body2" color="success.main">
-                  +8.2% vs last month
+                  +8.2% so với tháng trước
                 </Typography>
               </Box>
             </CardContent>
@@ -249,14 +249,14 @@ const AdminSystemReports = () => {
                     4,577
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    Total Users
+                  Tổng người dùng
                   </Typography>
                 </Box>
               </Box>
               <Box sx={{ display: "flex", alignItems: "center" }}>
                 <TrendingUp sx={{ color: "success.main", mr: 1 }} />
                 <Typography variant="body2" color="success.main">
-                  +15.3% vs last month
+                  +15.3% so với tháng trước
                 </Typography>
               </Box>
             </CardContent>
@@ -275,14 +275,14 @@ const AdminSystemReports = () => {
                     127
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    Active Stations
+                  Trạm đang hoạt động
                   </Typography>
                 </Box>
               </Box>
               <Box sx={{ display: "flex", alignItems: "center" }}>
                 <TrendingUp sx={{ color: "success.main", mr: 1 }} />
                 <Typography variant="body2" color="success.main">
-                  +5 new stations
+                  +5 trạm mới
                 </Typography>
               </Box>
             </CardContent>
@@ -293,10 +293,10 @@ const AdminSystemReports = () => {
       {/* Tabs */}
       <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
         <Tabs value={tabValue} onChange={handleTabChange}>
-          <Tab label="Revenue Analytics" />
-          <Tab label="Station Performance" />
-          <Tab label="User Analytics" />
-          <Tab label="System Health" />
+          <Tab label="Phân tích doanh thu" />
+          <Tab label="Hiệu suất trạm" />
+          <Tab label="Phân tích người dùng" />
+          <Tab label="Tình trạng hệ thống" />
         </Tabs>
       </Box>
 
@@ -307,7 +307,7 @@ const AdminSystemReports = () => {
             <Card>
               <CardContent>
                 <Typography variant="h6" fontWeight="bold" gutterBottom>
-                  Revenue Trend (Last 6 Months)
+                Xu hướng doanh thu (6 tháng gần nhất)
                 </Typography>
                 <ResponsiveContainer width="100%" height={400}>
                   <AreaChart data={mockRevenueData}>
@@ -317,17 +317,17 @@ const AdminSystemReports = () => {
                     <RechartsTooltip
                       formatter={(value, name) => [
                         name === "revenue" ? formatCurrency(value) : value,
-                        name === "revenue" ? "Revenue" : "Sessions",
+                        name === "revenue" ? "Doanh thu" : "Phiên truy cập",
                       ]}
                     />
                     <Legend />
                     <Area
                       type="monotone"
-                      dataKey="revenue"
+                      dataKey="Doanh thu"
                       stackId="1"
                       stroke="#8884d8"
                       fill="#8884d8"
-                      fillOpacity={0.6}
+                      fillOpacity={0.6} name="Doanh thu"
                     />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -339,7 +339,7 @@ const AdminSystemReports = () => {
             <Card>
               <CardContent>
                 <Typography variant="h6" fontWeight="bold" gutterBottom>
-                  Sessions vs Users Growth
+                Biểu đồ phiên truy cập và người dùng
                 </Typography>
                 <ResponsiveContainer width="100%" height={300}>
                   <LineChart data={mockRevenueData}>
@@ -350,13 +350,13 @@ const AdminSystemReports = () => {
                     <Legend />
                     <Line
                       type="monotone"
-                      dataKey="sessions"
+                      dataKey="Phiên truy cập"
                       stroke="#8884d8"
                       strokeWidth={2}
                     />
                     <Line
                       type="monotone"
-                      dataKey="users"
+                      dataKey="Người dùng"
                       stroke="#82ca9d"
                       strokeWidth={2}
                     />
@@ -370,11 +370,11 @@ const AdminSystemReports = () => {
             <Card>
               <CardContent>
                 <Typography variant="h6" fontWeight="bold" gutterBottom>
-                  Revenue Breakdown
+                  Phân tích doanh thu
                 </Typography>
                 <Box sx={{ mb: 2 }}>
                   <Typography variant="body2" gutterBottom>
-                    Charging Fees (85%)
+                    Phí sạc (85%)
                   </Typography>
                   <LinearProgress
                     variant="determinate"
@@ -383,7 +383,7 @@ const AdminSystemReports = () => {
                   />
 
                   <Typography variant="body2" gutterBottom>
-                    Subscription Fees (10%)
+                  Phí thuê bao (10%)
                   </Typography>
                   <LinearProgress
                     variant="determinate"
@@ -392,7 +392,7 @@ const AdminSystemReports = () => {
                   />
 
                   <Typography variant="body2" gutterBottom>
-                    Partnership Revenue (5%)
+                    Doanh thu từ đối tác (5%)
                   </Typography>
                   <LinearProgress
                     variant="determinate"
@@ -412,18 +412,18 @@ const AdminSystemReports = () => {
             <Card>
               <CardContent>
                 <Typography variant="h6" fontWeight="bold" gutterBottom>
-                  Station Performance Overview
+                  Hiệu suất trạm
                 </Typography>
                 <TableContainer component={Paper} variant="outlined">
                   <Table>
                     <TableHead>
                       <TableRow>
-                        <TableCell>Station Name</TableCell>
-                        <TableCell align="center">Usage Rate</TableCell>
-                        <TableCell align="center">Sessions</TableCell>
-                        <TableCell align="center">Revenue</TableCell>
-                        <TableCell align="center">Status</TableCell>
-                        <TableCell align="center">Actions</TableCell>
+                        <TableCell>Tên trạm</TableCell>
+                        <TableCell align="center">Tỷ lệ sử dụng</TableCell>
+                        <TableCell align="center">Phiên</TableCell>
+                        <TableCell align="center">Doanh thu</TableCell>
+                        <TableCell align="center">Trạng thái</TableCell>
+                        <TableCell align="center">Thao tác</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -470,10 +470,10 @@ const AdminSystemReports = () => {
                             <Chip
                               label={
                                 station.usage > 80
-                                  ? "High Usage"
+                                  ? "Sử dụng cao"
                                   : station.usage > 60
-                                    ? "Normal"
-                                    : "Low Usage"
+                                    ? "Sử dụng bình thường"
+                                    : "Sử dụng thấp"
                               }
                               color={
                                 station.usage > 80
@@ -503,13 +503,13 @@ const AdminSystemReports = () => {
         </Grid>
       )}
 
-      {tabValue === 2 && (
+{tabValue === 2 && (
         <Grid container spacing={3}>
           <Grid item xs={12} md={8}>
             <Card>
               <CardContent>
                 <Typography variant="h6" fontWeight="bold" gutterBottom>
-                  User Growth Distribution
+                  Phân tích người dùng
                 </Typography>
                 <ResponsiveContainer width="100%" height={400}>
                   <PieChart>
@@ -537,7 +537,7 @@ const AdminSystemReports = () => {
             <Card>
               <CardContent>
                 <Typography variant="h6" fontWeight="bold" gutterBottom>
-                  User Statistics
+                  Thống kê người dùng
                 </Typography>
                 {mockUserGrowth.map((item, index) => (
                   <Box key={index} sx={{ mb: 2 }}>
@@ -561,7 +561,14 @@ const AdminSystemReports = () => {
                           Math.max(...mockUserGrowth.map((u) => u.value))) *
                         100
                       }
-                      sx={{ height: 6, borderRadius: 3 }}
+                      sx={{ 
+                        height: 6, 
+                        borderRadius: 3,
+                        backgroundColor: `${item.color}20`,
+                        '& .MuiLinearProgress-bar': {
+                          backgroundColor: item.color
+                        }
+                      }}
                     />
                   </Box>
                 ))}
@@ -575,8 +582,8 @@ const AdminSystemReports = () => {
         <Grid container spacing={3}>
           <Grid item xs={12}>
             <Alert severity="info" sx={{ mb: 3 }}>
-              System health metrics are updated in real-time. All values shown
-              are current as of the last system check.
+            Các chỉ số tình trạng hệ thống được cập nhật theo thời gian thực.
+            Tất cả các giá trị hiển thị là dữ liệu mới nhất từ lần kiểm tra hệ thống gần nhất.
             </Alert>
           </Grid>
 
@@ -601,7 +608,7 @@ const AdminSystemReports = () => {
                       size="small"
                     />
                   </Box>
-                  <Typography
+                  <Typography   
                     variant="h3"
                     fontWeight="bold"
                     color="primary.main"
@@ -612,17 +619,17 @@ const AdminSystemReports = () => {
                   </Typography>
                   {metric.status === "excellent" && (
                     <Typography variant="body2" color="success.main">
-                      ✓ Operating within optimal parameters
+                      ✓ Hoạt động trong tham số tối ưu
                     </Typography>
                   )}
                   {metric.status === "good" && (
                     <Typography variant="body2" color="info.main">
-                      → Performance is satisfactory
+                      → Hiệu suất ổn định
                     </Typography>
                   )}
                   {metric.status === "warning" && (
                     <Typography variant="body2" color="warning.main">
-                      ⚠ Requires attention
+                      ⚠ Cần chú ý
                     </Typography>
                   )}
                 </CardContent>

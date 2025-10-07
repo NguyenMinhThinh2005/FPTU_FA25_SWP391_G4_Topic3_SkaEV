@@ -49,8 +49,11 @@ import {
   Speed,
   Battery80,
   PowerSettingsNew,
+  Close,
+  Save,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
+import ConfirmDialog from "../../components/ui/ConfirmDialog";
 import useAuthStore from "../../store/authStore";
 import useStationStore from "../../store/stationStore";
 import { mockData } from "../../data/mockData";
@@ -65,23 +68,26 @@ const StationManagement = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [viewMode, setViewMode] = useState("list"); // 'list' | 'map'
   const [filterStatus, setFilterStatus] = useState("all");
+  const [deleteDialog, setDeleteDialog] = useState({
+    open: false,
+    stationId: null,
+    stationName: ""
+  });
 
   // Form state for station editing/creation
   const [stationForm, setStationForm] = useState({
     name: "",
     address: "",
-    city: "",
-    province: "",
-    latitude: "",
-    longitude: "",
     totalPorts: 4,
     fastChargePorts: 2,
     standardPorts: 2,
     pricePerKwh: 3500,
-    operatingHours: "24/7",
-    amenities: [],
     status: "active",
+    availableSlots: 4,
   });
+
+  // Validation errors
+  const [errors, setErrors] = useState({});
 
   // Station analytics data
   const stationAnalytics = stations.map((station) => {
@@ -124,18 +130,12 @@ const StationManagement = () => {
     setStationForm({
       name: station.name,
       address: station.location.address,
-      city: station.location.city || "",
-      province: station.location.province || "",
-      latitude: station.location.coordinates?.lat || "",
-      longitude: station.location.coordinates?.lng || "",
       totalPorts: station.charging.totalPorts,
       fastChargePorts: station.charging.fastChargePorts || 0,
-      standardPorts:
-        station.charging.standardPorts || station.charging.totalPorts,
+      standardPorts: station.charging.standardPorts || station.charging.totalPorts,
       pricePerKwh: station.charging.pricePerKwh,
-      operatingHours: station.operatingHours || "24/7",
-      amenities: station.amenities || [],
       status: station.status,
+      availableSlots: station.charging.availablePorts || station.charging.totalPorts,
     });
     setDialogOpen(true);
   };
@@ -145,52 +145,89 @@ const StationManagement = () => {
     setStationForm({
       name: "",
       address: "",
-      city: "",
-      province: "",
-      latitude: "",
-      longitude: "",
       totalPorts: 4,
       fastChargePorts: 2,
       standardPorts: 2,
       pricePerKwh: 3500,
-      operatingHours: "24/7",
-      amenities: [],
       status: "active",
+      availableSlots: 4,
     });
     setDialogOpen(true);
+    setErrors({});
   };
 
-  const handleSaveStation = () => {
+  const handleDeleteClick = (station) => {
+    setDeleteDialog({
+      open: true,
+      stationId: station.id,
+      stationName: station.name
+    });
+  };
+
+  const handleDeleteConfirm = async () => {
+    try {
+      await deleteStation(deleteDialog.stationId);
+      setDeleteDialog({ open: false, stationId: null, stationName: "" });
+    } catch (error) {
+      console.error("Error deleting station:", error);
+      alert("Có lỗi xảy ra khi xóa trạm sạc. Vui lòng thử lại.");
+    }
+  };
+
+  const validateForm = () => {
+    const newErrors = {};
+    
+    if (!stationForm.name.trim()) newErrors.name = "Tên trạm sạc là bắt buộc";
+    if (!stationForm.address.trim()) newErrors.address = "Địa chỉ là bắt buộc";
+    
+    if (stationForm.totalPorts < 1) newErrors.totalPorts = "Tổng số cổng sạc phải lớn hơn 0";
+    if (stationForm.fastChargePorts < 0) newErrors.fastChargePorts = "Số cổng sạc nhanh không được âm";
+    if (stationForm.standardPorts < 0) newErrors.standardPorts = "Số cổng sạc tiêu chuẩn không được âm";
+    if (stationForm.fastChargePorts + stationForm.standardPorts !== stationForm.totalPorts) {
+      newErrors.totalPorts = "Tổng số cổng sạc nhanh và tiêu chuẩn phải bằng tổng số cổng";
+    }
+    if (stationForm.availableSlots > stationForm.totalPorts) {
+      newErrors.availableSlots = "Số slot có sẵn không được vượt quá tổng số cổng";
+    }
+    if (stationForm.pricePerKwh < 0) newErrors.pricePerKwh = "Giá mỗi kWh không được âm";
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSaveStation = async () => {
+    if (!validateForm()) return;
+
     const stationData = {
       name: stationForm.name,
       location: {
-        address: stationForm.address,
-        city: stationForm.city,
-        province: stationForm.province,
-        coordinates: {
-          lat: parseFloat(stationForm.latitude),
-          lng: parseFloat(stationForm.longitude),
-        },
+        address: stationForm.address
       },
       charging: {
         totalPorts: parseInt(stationForm.totalPorts),
-        availablePorts: parseInt(stationForm.totalPorts),
+        availablePorts: parseInt(stationForm.availableSlots),
         fastChargePorts: parseInt(stationForm.fastChargePorts),
         standardPorts: parseInt(stationForm.standardPorts),
-        pricePerKwh: parseFloat(stationForm.pricePerKwh),
+        pricePerKwh: parseFloat(stationForm.pricePerKwh)
       },
-      operatingHours: stationForm.operatingHours,
-      amenities: stationForm.amenities,
       status: stationForm.status,
+      lastUpdated: new Date().toISOString(),
     };
 
-    if (selectedStation) {
-      updateStation(selectedStation.id, stationData);
-    } else {
-      addStation(stationData);
+    try {
+      if (selectedStation) {
+        await updateStation(selectedStation.id, stationData);
+      } else {
+        await addStation({
+          ...stationData,
+          createdAt: new Date().toISOString(),
+        });
+      }
+      setDialogOpen(false);
+    } catch (error) {
+      console.error("Error saving station:", error);
+      alert("Có lỗi xảy ra khi lưu trạm sạc. Vui lòng thử lại.");
     }
-
-    setDialogOpen(false);
   };
 
   const filteredStations = stationAnalytics.filter((station) => {
@@ -230,25 +267,25 @@ const StationManagement = () => {
       >
         <Box>
           <Typography variant="h4" fontWeight="bold" gutterBottom>
-            Station Management ⚡
+            Quản lý trạm sạc ⚡
           </Typography>
           <Typography variant="body1" color="text.secondary">
-            Monitor and manage your EV charging station network
+            Giám sát và quản lý mạng lưới trạm sạc xe điện của bạn
           </Typography>
         </Box>
 
         <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
           <FormControl size="small" sx={{ minWidth: 120 }}>
-            <InputLabel>Filter Status</InputLabel>
+            <InputLabel>Lọc trạng thái</InputLabel>
             <Select
               value={filterStatus}
-              label="Filter Status"
+              label="Lọc trạng thái"
               onChange={(e) => setFilterStatus(e.target.value)}
             >
-              <MenuItem value="all">All Stations</MenuItem>
-              <MenuItem value="active">Active</MenuItem>
-              <MenuItem value="maintenance">Maintenance</MenuItem>
-              <MenuItem value="offline">Offline</MenuItem>
+              <MenuItem value="all">Tất cả trạm</MenuItem>
+              <MenuItem value="active">Hoạt động</MenuItem>
+              <MenuItem value="maintenance">Bảo trì</MenuItem>
+              <MenuItem value="offline">Ngoại tuyến</MenuItem>
             </Select>
           </FormControl>
 
@@ -257,7 +294,7 @@ const StationManagement = () => {
             startIcon={<Add />}
             onClick={handleCreateNew}
           >
-            Add Station
+            Thêm trạm sạc
           </Button>
         </Box>
       </Box>
@@ -281,7 +318,7 @@ const StationManagement = () => {
                     {filteredStations.length}
                   </Typography>
                   <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                    Total Stations
+                    Tổng số trạm
                   </Typography>
                 </Box>
               </Box>
@@ -309,7 +346,7 @@ const StationManagement = () => {
                     }
                   </Typography>
                   <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                    Active Stations
+                    Trạm hoạt động
                   </Typography>
                 </Box>
               </Box>
@@ -337,7 +374,7 @@ const StationManagement = () => {
                     )}
                   </Typography>
                   <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                    Total Ports
+                    Tổng số cổng
                   </Typography>
                 </Box>
               </Box>
@@ -367,7 +404,7 @@ const StationManagement = () => {
                     )}
                   </Typography>
                   <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                    Monthly Revenue
+                    Doanh thu tháng
                   </Typography>
                 </Box>
               </Box>
@@ -380,21 +417,21 @@ const StationManagement = () => {
       <Card>
         <CardContent>
           <Typography variant="h6" fontWeight="bold" gutterBottom>
-            Station Performance Overview
+            Tổng quan hiệu suất trạm sạc
           </Typography>
           <TableContainer>
             <Table>
               <TableHead>
                 <TableRow>
-                  <TableCell>Station</TableCell>
-                  <TableCell align="center">Status</TableCell>
-                  <TableCell align="center">Ports</TableCell>
-                  <TableCell align="center">Utilization</TableCell>
-                  <TableCell align="center">Monthly Revenue</TableCell>
-                  <TableCell align="center">Sessions</TableCell>
-                  <TableCell align="center">Avg Session</TableCell>
-                  <TableCell align="center">Issues</TableCell>
-                  <TableCell align="center">Actions</TableCell>
+                  <TableCell>Trạm sạc</TableCell>
+                  <TableCell align="center">Trạng thái</TableCell>
+                  <TableCell align="center">Cổng</TableCell>
+                  <TableCell align="center">Sử dụng</TableCell>
+                  <TableCell align="center">Doanh thu tháng</TableCell>
+                  <TableCell align="center">Phiên</TableCell>
+                  <TableCell align="center">Phiên TB</TableCell>
+                  <TableCell align="center">Sự cố</TableCell>
+                  <TableCell align="center">Thao tác</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -436,7 +473,7 @@ const StationManagement = () => {
                         {station.charging.totalPorts}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        available
+                        có sẵn
                       </Typography>
                     </TableCell>
                     <TableCell align="center">
@@ -475,7 +512,7 @@ const StationManagement = () => {
                         />
                       ) : (
                         <Typography variant="body2" color="text.secondary">
-                          None
+                          Không có
                         </Typography>
                       )}
                     </TableCell>
@@ -496,10 +533,11 @@ const StationManagement = () => {
                             <PowerSettingsNew />
                           </IconButton>
                         )}
-                        <IconButton size="small">
-                          <Visibility />
-                        </IconButton>
-                        <IconButton size="small" color="error">
+                        <IconButton 
+                          size="small" 
+                          color="error"
+                          onClick={() => handleDeleteClick(station)}
+                        >
                           <Delete />
                         </IconButton>
                       </Box>
@@ -516,202 +554,153 @@ const StationManagement = () => {
       <Dialog
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
-        maxWidth="md"
+        maxWidth="sm"
         fullWidth
       >
         <DialogTitle>
-          {selectedStation ? "Edit Station" : "Create New Station"}
+          {selectedStation ? "Chỉnh sửa: " + selectedStation.name : "Thêm trạm sạc nhanh"}
         </DialogTitle>
-        <DialogContent dividers>
-          <Grid container spacing={3}>
-            {/* Basic Information */}
-            <Grid item xs={12}>
-              <Typography variant="h6" gutterBottom>
-                Basic Information
-              </Typography>
-            </Grid>
 
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Station Name"
-                value={stationForm.name}
-                onChange={(e) =>
-                  setStationForm({ ...stationForm, name: e.target.value })
-                }
-              />
-            </Grid>
+        <DialogContent>
+          <Box sx={{ mt: 2 }}>
+            <Grid container spacing={2}>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Tên trạm sạc *"
+                  value={stationForm.name}
+                  onChange={(e) => {
+                    setStationForm({ ...stationForm, name: e.target.value });
+                    if (errors.name) setErrors({...errors, name: ""});
+                  }}
+                  error={!!errors.name}
+                  helperText={errors.name}
+                />
+              </Grid>
 
-            <Grid item xs={12} md={6}>
-              <FormControl fullWidth>
-                <InputLabel>Status</InputLabel>
-                <Select
-                  value={stationForm.status}
-                  label="Status"
-                  onChange={(e) =>
-                    setStationForm({ ...stationForm, status: e.target.value })
-                  }
-                >
-                  <MenuItem value="active">Active</MenuItem>
-                  <MenuItem value="maintenance">Maintenance</MenuItem>
-                  <MenuItem value="offline">Offline</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Địa chỉ *" 
+                  value={stationForm.address}
+                  onChange={(e) => {
+                    setStationForm({ ...stationForm, address: e.target.value });
+                    if (errors.address) setErrors({...errors, address: ""});
+                  }}
+                  error={!!errors.address}
+                  helperText={errors.address}
+                />
+              </Grid>
 
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Address"
-                value={stationForm.address}
-                onChange={(e) =>
-                  setStationForm({ ...stationForm, address: e.target.value })
-                }
-                multiline
-                rows={2}
-              />
-            </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Tổng cổng"
+                  type="number"
+                  value={stationForm.totalPorts}
+                  onChange={(e) => {
+                    setStationForm({ ...stationForm, totalPorts: parseInt(e.target.value) || 0 });
+                    if (errors.totalPorts) setErrors({...errors, totalPorts: ""});
+                  }}
+                  error={!!errors.totalPorts}
+                  helperText={errors.totalPorts}
+                />
+              </Grid>
 
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="City"
-                value={stationForm.city}
-                onChange={(e) =>
-                  setStationForm({ ...stationForm, city: e.target.value })
-                }
-              />
-            </Grid>
+              <Grid item xs={6}>
+                <TextField
+                  fullWidth
+                  label="Sạc nhanh (DC)"
+                  type="number"
+                  value={stationForm.fastChargePorts}
+                  onChange={(e) => {
+                    setStationForm({ ...stationForm, fastChargePorts: parseInt(e.target.value) || 0 });
+                    if (errors.fastChargePorts) setErrors({...errors, fastChargePorts: ""});
+                  }}
+                  error={!!errors.fastChargePorts}
+                  helperText={errors.fastChargePorts}
+                />
+              </Grid>
 
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Province"
-                value={stationForm.province}
-                onChange={(e) =>
-                  setStationForm({ ...stationForm, province: e.target.value })
-                }
-              />
-            </Grid>
+              <Grid item xs={6}>
+                <TextField
+                  fullWidth
+                  label="Sạc tiêu chuẩn (AC)"
+                  type="number" 
+                  value={stationForm.standardPorts}
+                  onChange={(e) => {
+                    setStationForm({ ...stationForm, standardPorts: parseInt(e.target.value) || 0 });
+                    if (errors.standardPorts) setErrors({...errors, standardPorts: ""});
+                  }}
+                  error={!!errors.standardPorts}
+                  helperText={errors.standardPorts}
+                />
+              </Grid>
 
-            {/* Coordinates */}
-            <Grid item xs={12}>
-              <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
-                Location Coordinates
-              </Typography>
-            </Grid>
+              <Grid item xs={6}>
+                <TextField
+                  fullWidth
+                  label="Giá (VND/kWh)"
+                  type="number"
+                  value={stationForm.pricePerKwh}
+                  onChange={(e) => {
+                    setStationForm({ ...stationForm, pricePerKwh: parseFloat(e.target.value) || 0 });
+                    if (errors.pricePerKwh) setErrors({...errors, pricePerKwh: ""});
+                  }}
+                  error={!!errors.pricePerKwh}
+                  helperText={errors.pricePerKwh}
+                />
+              </Grid>
 
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Latitude"
-                type="number"
-                value={stationForm.latitude}
-                onChange={(e) =>
-                  setStationForm({ ...stationForm, latitude: e.target.value })
-                }
-              />
-            </Grid>
+              <Grid item xs={6}>
+                <FormControl fullWidth>
+                  <InputLabel>Trạng thái</InputLabel>
+                  <Select
+                    value={stationForm.status}
+                    label="Trạng thái"
+                    onChange={(e) => setStationForm({ ...stationForm, status: e.target.value })}
+                  >
+                    <MenuItem value="active">Hoạt động</MenuItem>
+                    <MenuItem value="maintenance">Bảo trì</MenuItem>
+                    <MenuItem value="offline">Ngoại tuyến</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
 
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Longitude"
-                type="number"
-                value={stationForm.longitude}
-                onChange={(e) =>
-                  setStationForm({ ...stationForm, longitude: e.target.value })
-                }
-              />
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Slot có sẵn"
+                  type="number"
+                  value={stationForm.availableSlots}
+                  onChange={(e) => {
+                    setStationForm({ ...stationForm, availableSlots: parseInt(e.target.value) || 0 });
+                    if (errors.availableSlots) setErrors({...errors, availableSlots: ""});
+                  }}
+                  error={!!errors.availableSlots}
+                  helperText={errors.availableSlots}
+                />
+              </Grid>
             </Grid>
-
-            {/* Charging Configuration */}
-            <Grid item xs={12}>
-              <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
-                Charging Configuration
-              </Typography>
-            </Grid>
-
-            <Grid item xs={12} md={4}>
-              <TextField
-                fullWidth
-                label="Total Ports"
-                type="number"
-                value={stationForm.totalPorts}
-                onChange={(e) =>
-                  setStationForm({ ...stationForm, totalPorts: e.target.value })
-                }
-              />
-            </Grid>
-
-            <Grid item xs={12} md={4}>
-              <TextField
-                fullWidth
-                label="Fast Charge Ports"
-                type="number"
-                value={stationForm.fastChargePorts}
-                onChange={(e) =>
-                  setStationForm({
-                    ...stationForm,
-                    fastChargePorts: e.target.value,
-                  })
-                }
-              />
-            </Grid>
-
-            <Grid item xs={12} md={4}>
-              <TextField
-                fullWidth
-                label="Standard Ports"
-                type="number"
-                value={stationForm.standardPorts}
-                onChange={(e) =>
-                  setStationForm({
-                    ...stationForm,
-                    standardPorts: e.target.value,
-                  })
-                }
-              />
-            </Grid>
-
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Price per kWh (VND)"
-                type="number"
-                value={stationForm.pricePerKwh}
-                onChange={(e) =>
-                  setStationForm({
-                    ...stationForm,
-                    pricePerKwh: e.target.value,
-                  })
-                }
-              />
-            </Grid>
-
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Operating Hours"
-                value={stationForm.operatingHours}
-                onChange={(e) =>
-                  setStationForm({
-                    ...stationForm,
-                    operatingHours: e.target.value,
-                  })
-                }
-                placeholder="e.g., 24/7 or 06:00 - 22:00"
-              />
-            </Grid>
-          </Grid>
+          </Box>
         </DialogContent>
+
         <DialogActions>
-          <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
+          <Button onClick={() => setDialogOpen(false)}>Đóng</Button>
           <Button variant="contained" onClick={handleSaveStation}>
-            {selectedStation ? "Update Station" : "Create Station"}
+            {selectedStation ? "Lưu" : "Tạo trạm sạc"}
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={deleteDialog.open}
+        title="Xác nhận xóa"
+        message={`Bạn có chắc chắn muốn xóa trạm sạc "${deleteDialog.stationName}"? Hành động này không thể hoàn tác.`}
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setDeleteDialog({ open: false, stationId: null, stationName: "" })}
+      />
     </Box>
   );
 };

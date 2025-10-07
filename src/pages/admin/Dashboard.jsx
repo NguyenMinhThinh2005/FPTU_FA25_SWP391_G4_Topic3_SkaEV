@@ -16,6 +16,8 @@ import {
   Paper,
   Avatar,
   LinearProgress,
+
+  
   IconButton,
   Menu,
   MenuItem,
@@ -347,13 +349,6 @@ const AdminDashboard = () => {
           >
             Xuất báo cáo
           </Button>
-          <Button
-            variant="contained"
-            startIcon={<Add />}
-            onClick={() => setAddDialogOpen(true)}
-          >
-            Thêm trạm sạc
-          </Button>
         </Box>
       </Box>
 
@@ -386,7 +381,7 @@ const AdminDashboard = () => {
                     {totalStations}
                   </Typography>
                   <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                    Total Stations
+                    Tổng số trạm
                   </Typography>
                   <Typography variant="caption" sx={{ opacity: 0.8 }}>
                     {activeStations} hoạt động
@@ -414,10 +409,10 @@ const AdminDashboard = () => {
                     {totalUsers}
                   </Typography>
                   <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                    Total Users
+                    Tổng số người dùng
                   </Typography>
                   <Typography variant="caption" sx={{ opacity: 0.8 }}>
-                    +12 this week
+                    +12 tuần này
                   </Typography>
                 </Box>
               </Box>
@@ -445,7 +440,7 @@ const AdminDashboard = () => {
                     Phiên hoạt động
                   </Typography>
                   <Typography variant="caption" sx={{ opacity: 0.8 }}>
-                    {todayBookings} today
+                    {todayBookings} hôm nay
                   </Typography>
                 </Box>
               </Box>
@@ -470,10 +465,10 @@ const AdminDashboard = () => {
                     {formatCurrency(totalRevenue)}
                   </Typography>
                   <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                    Total Revenue
+                    Tổng doanh thu
                   </Typography>
                   <Typography variant="caption" sx={{ opacity: 0.8 }}>
-                    +18% vs last month
+                    +18% so với tháng trước
                   </Typography>
                 </Box>
               </Box>
@@ -496,7 +491,7 @@ const AdminDashboard = () => {
                 }}
               >
                 <Typography variant="h6" fontWeight="bold">
-                  Station Performance
+                  Hiệu suất trạm sạc
                 </Typography>
                 <Box sx={{ display: "flex", gap: 1 }}>
                   <IconButton size="small">
@@ -512,13 +507,13 @@ const AdminDashboard = () => {
                 <Table>
                   <TableHead>
                     <TableRow>
-                      <TableCell>Station</TableCell>
-                      <TableCell align="center">Status</TableCell>
-                      <TableCell align="center">Charging Posts</TableCell>
-                      <TableCell align="center">Utilization</TableCell>
-                      <TableCell align="center">Sessions</TableCell>
-                      <TableCell align="center">Revenue</TableCell>
-                      <TableCell align="center">Actions</TableCell>
+                      <TableCell>Trạm sạc</TableCell>
+                      <TableCell align="center">Trạng thái</TableCell>
+                      <TableCell align="center">Cổng sạc</TableCell>
+                      <TableCell align="center">Sử dụng</TableCell>
+                      <TableCell align="center">Phiên</TableCell>
+                      <TableCell align="center">Doanh thu</TableCell>
+                      <TableCell align="center">Thao tác</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -563,10 +558,10 @@ const AdminDashboard = () => {
                         <TableCell align="center">
                           <Box>
                             <Typography variant="body2" fontWeight="medium">
-                              {station.chargingPostsCount} Posts
+                              {station.chargingPostsCount} Cổng
                             </Typography>
                             <Typography variant="caption" color="text.secondary">
-                              {Math.max(0, station.totalSlots - station.occupiedSlots)}/{station.totalSlots} slots
+                              {Math.max(0, station.totalSlots - station.occupiedSlots)}/{station.totalSlots} slot
                             </Typography>
                           </Box>
                         </TableCell>
@@ -631,7 +626,7 @@ const AdminDashboard = () => {
                   }}
                 >
                   <Settings sx={{ mr: 1 }} />
-                  Schedule Maintenance
+                  Lên lịch bảo trì
                 </MenuItem>
                 <MenuItem
                   onClick={() => {
@@ -641,7 +636,7 @@ const AdminDashboard = () => {
                   sx={{ color: "error.main" }}
                 >
                   <Delete sx={{ mr: 1 }} />
-                  Delete Station
+                  Xóa trạm sạc
                 </MenuItem>
               </Menu>
             </CardContent>
@@ -653,7 +648,7 @@ const AdminDashboard = () => {
           <Card>
             <CardContent>
               <Typography variant="h6" fontWeight="bold" gutterBottom>
-                Recent Activities
+                Hoạt động gần đây
               </Typography>
 
               <Box sx={{ maxHeight: 400, overflowY: "auto" }}>
@@ -680,7 +675,7 @@ const AdminDashboard = () => {
               </Box>
 
               <Button variant="outlined" fullWidth sx={{ mt: 2 }}>
-                View All Activities
+                Xem tất cả hoạt động
               </Button>
             </CardContent>
           </Card>
@@ -689,7 +684,7 @@ const AdminDashboard = () => {
           <Card sx={{ mt: 3 }}>
             <CardContent>
               <Typography variant="h6" fontWeight="bold" gutterBottom>
-                Quick Actions
+                Thao tác nhanh
               </Typography>
 
               <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
@@ -699,7 +694,7 @@ const AdminDashboard = () => {
                   fullWidth
                   onClick={() => navigate("/admin/analytics")}
                 >
-                  View Analytics
+                  Xem phân tích
                 </Button>
                 <Button
                   variant="outlined"
@@ -707,7 +702,7 @@ const AdminDashboard = () => {
                   fullWidth
                   onClick={() => navigate("/admin/users")}
                 >
-                  Manage Users
+                  Quản lý người dùng
                 </Button>
                 <Button
                   variant="outlined"
@@ -715,7 +710,7 @@ const AdminDashboard = () => {
                   fullWidth
                   onClick={() => navigate("/admin/stations")}
                 >
-                  Manage Stations
+                  Quản lý trạm sạc
                 </Button>
                 <Button
                   variant="outlined"
@@ -723,7 +718,7 @@ const AdminDashboard = () => {
                   fullWidth
                   onClick={() => navigate("/admin/settings")}
                 >
-                  System Settings
+                  Cài đặt hệ thống
                 </Button>
               </Box>
             </CardContent>
@@ -739,24 +734,24 @@ const AdminDashboard = () => {
         fullWidth
       >
         <DialogTitle>
-          {inlineEdit ? `Chỉnh sửa: ${selectedStation?.name}` : `Station Details: ${selectedStation?.name || ''}`}
+          {inlineEdit ? `Chỉnh sửa: ${selectedStation?.name}` : `Chi tiết trạm sạc: ${selectedStation?.name || ''}`}
         </DialogTitle>
         <DialogContent>
           {selectedStation && !inlineEdit && (
             <Box sx={{ pt: 2 }}>
               <Grid container spacing={2}>
                 <Grid item xs={12} sm={6}>
-                  <Typography variant="subtitle2" gutterBottom>Location</Typography>
+                  <Typography variant="subtitle2" gutterBottom>Vị trí</Typography>
                   <Typography variant="body2" color="text.secondary">{selectedStation.location.address}</Typography>
                 </Grid>
                 <Grid item xs={12} sm={6}>
-                  <Typography variant="subtitle2" gutterBottom>Status</Typography>
+                  <Typography variant="subtitle2" gutterBottom>Trạng thái</Typography>
                   {getStatusChip(selectedStation.status)}
                 </Grid>
                 <Grid item xs={12} sm={6}>
-                  <Typography variant="subtitle2" gutterBottom>Charging Posts</Typography>
+                  <Typography variant="subtitle2" gutterBottom>Cổng sạc</Typography>
                   <Typography variant="body2">
-                    {(selectedStation.charging?.chargingPosts?.length) || Math.ceil((selectedStation.charging?.totalPorts || 0)/2)} posts, {(selectedStation.charging?.totalPorts || 0)} total slots
+                    {(selectedStation.charging?.chargingPosts?.length) || Math.ceil((selectedStation.charging?.totalPorts || 0)/2)} cổng, {(selectedStation.charging?.totalPorts || 0)} tổng slot
                   </Typography>
                 </Grid>
                 <Grid item xs={12} sm={6}>
@@ -764,11 +759,11 @@ const AdminDashboard = () => {
                   <Typography variant="body2">{selectedStation.charging?.availablePorts ?? 0} có sẵn</Typography>
                 </Grid>
                 <Grid item xs={12} sm={6}>
-                  <Typography variant="subtitle2" gutterBottom>Max Power (per post)</Typography>
+                  <Typography variant="subtitle2" gutterBottom>Công suất tối đa (mỗi cổng)</Typography>
                   <Typography variant="body2">{selectedStation.charging?.chargingPosts?.[0]?.power || 'Không có'}kW</Typography>
                 </Grid>
                 <Grid item xs={12} sm={6}>
-                  <Typography variant="subtitle2" gutterBottom>Revenue (Month)</Typography>
+                  <Typography variant="subtitle2" gutterBottom>Doanh thu (Tháng)</Typography>
                   <Typography variant="body2">{formatCurrency(stationPerformance.find((s) => s.id === selectedStation.id)?.revenue || 0)}</Typography>
                 </Grid>
               </Grid>

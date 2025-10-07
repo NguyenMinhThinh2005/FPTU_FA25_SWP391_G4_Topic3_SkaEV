@@ -107,14 +107,14 @@ const UserManagement = () => {
       <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 3 }}>
         <Box>
           <Typography variant="h4" fontWeight="bold" gutterBottom>
-            User Management
+            Quản lý người dùng
           </Typography>
           <Typography variant="body1" color="text.secondary">
-            Manage customers, staff, and admins; assign roles
+            Quản lý khách hàng, nhân viên và quản trị viên; phân quyền vai trò
           </Typography>
         </Box>
         <Button variant="contained" startIcon={<Add />} onClick={openCreate}>
-          Add User
+          Thêm người dùng
         </Button>
       </Box>
 
@@ -124,7 +124,7 @@ const UserManagement = () => {
             <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
-                placeholder="Search by name, email, or phone"
+                placeholder="Tìm kiếm theo tên, email hoặc số điện thoại"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 InputProps={{
@@ -138,9 +138,9 @@ const UserManagement = () => {
             </Grid>
             <Grid item xs={12} md={3}>
               <FormControl fullWidth>
-                <InputLabel>Role</InputLabel>
-                <Select value={roleFilter} label="Role" onChange={(e) => setRoleFilter(e.target.value)}>
-                  <MenuItem value="all">All</MenuItem>
+                <InputLabel>Vai trò</InputLabel>
+                <Select value={roleFilter} label="Vai trò" onChange={(e) => setRoleFilter(e.target.value)}>
+                  <MenuItem value="all">Tất cả</MenuItem>
                   {roleOptions.map((r) => (
                     <MenuItem key={r.value} value={r.value}>{r.label}</MenuItem>
                   ))}
@@ -157,11 +157,11 @@ const UserManagement = () => {
             <Table>
               <TableHead>
                 <TableRow>
-                  <TableCell>User</TableCell>
+                  <TableCell>Người dùng</TableCell>
                   <TableCell>Email</TableCell>
-                  <TableCell>Phone</TableCell>
-                  <TableCell align="center">Role</TableCell>
-                  <TableCell align="center">Actions</TableCell>
+                  <TableCell>Số điện thoại</TableCell>
+                  <TableCell align="center">Vai trò</TableCell>
+                  <TableCell align="center">Thao tác</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -207,13 +207,13 @@ const UserManagement = () => {
       </Card>
 
       <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>{editUser ? "Edit User" : "Add User"}</DialogTitle>
+        <DialogTitle>{editUser ? "Chỉnh sửa người dùng" : "Thêm người dùng"}</DialogTitle>
         <DialogContent dividers>
           <Grid container spacing={2}>
             <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
-                label="First Name"
+                label="Tên"
                 value={form.firstName}
                 onChange={(e) => setForm({ ...form, firstName: e.target.value })}
               />
@@ -221,7 +221,7 @@ const UserManagement = () => {
             <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
-                label="Last Name"
+                label="Họ"
                 value={form.lastName}
                 onChange={(e) => setForm({ ...form, lastName: e.target.value })}
               />
@@ -237,15 +237,15 @@ const UserManagement = () => {
             <Grid item xs={12}>
               <TextField
                 fullWidth
-                label="Phone"
+                label="Số điện thoại"
                 value={form.phone}
                 onChange={(e) => setForm({ ...form, phone: e.target.value })}
               />
             </Grid>
             <Grid item xs={12}>
               <FormControl fullWidth>
-                <InputLabel>Role</InputLabel>
-                <Select value={form.role} label="Role" onChange={(e) => setForm({ ...form, role: e.target.value })}>
+                <InputLabel>Vai trò</InputLabel>
+                <Select value={form.role} label="Vai trò" onChange={(e) => setForm({ ...form, role: e.target.value })}>
                   {roleOptions.map((r) => (
                     <MenuItem key={r.value} value={r.value}>{r.label}</MenuItem>
                   ))}
@@ -255,8 +255,8 @@ const UserManagement = () => {
           </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleSave}>{editUser ? "Save Changes" : "Create User"}</Button>
+          <Button onClick={() => setDialogOpen(false)}>Hủy</Button>
+          <Button variant="contained" onClick={handleSave}>{editUser ? "Lưu thay đổi" : "Tạo người dùng"}</Button>
         </DialogActions>
       </Dialog>
     </Box>

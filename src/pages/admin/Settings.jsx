@@ -166,21 +166,21 @@ const AdminSettings = () => {
       {/* Header */}
       <Box sx={{ mb: 4 }}>
         <Typography variant="h4" fontWeight="bold" gutterBottom>
-          System Settings
+          Cài đặt hệ thống
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          Configure system preferences and manage application settings
+          Cấu hình tùy chọn hệ thống và quản lý cài đặt ứng dụng
         </Typography>
       </Box>
 
       {/* Tabs */}
       <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
         <Tabs value={tabValue} onChange={handleTabChange}>
-          <Tab label="General" />
-          <Tab label="Security" />
-          <Tab label="Notifications" />
-          <Tab label="API Keys" />
-          <Tab label="Backup" />
+          <Tab label="Chung" />
+          <Tab label="Bảo mật" />
+          <Tab label="Thông báo" />
+          <Tab label="Khóa API" />
+          <Tab label="Sao lưu" />
         </Tabs>
       </Box>
 
@@ -191,7 +191,7 @@ const AdminSettings = () => {
             <Card>
               <CardContent>
                 <Typography variant="h6" fontWeight="bold" gutterBottom>
-                  System Configuration
+                  Cấu hình hệ thống
                 </Typography>
 
                 <FormControlLabel
@@ -203,14 +203,14 @@ const AdminSettings = () => {
                       }
                     />
                   }
-                  label="Maintenance Mode"
+                  label="Chế độ bảo trì"
                 />
                 <Typography
                   variant="body2"
                   color="text.secondary"
                   sx={{ ml: 4, mb: 2 }}
                 >
-                  Enable maintenance mode to prevent user access during updates
+                  Bật chế độ bảo trì để ngăn người dùng truy cập trong quá trình cập nhật
                 </Typography>
 
                 <FormControlLabel
@@ -222,14 +222,14 @@ const AdminSettings = () => {
                       }
                     />
                   }
-                  label="Automatic Backup"
+                  label="Sao lưu tự động"
                 />
                 <Typography
                   variant="body2"
                   color="text.secondary"
                   sx={{ ml: 4, mb: 2 }}
                 >
-                  Automatically backup system data daily at 2:00 AM
+                  Tự động sao lưu dữ liệu hệ thống hàng ngày lúc 2:00 sáng
                 </Typography>
 
                 <FormControlLabel
@@ -244,14 +244,14 @@ const AdminSettings = () => {
                       }
                     />
                   }
-                  label="System Notifications"
+                  label="Thông báo hệ thống"
                 />
                 <Typography
                   variant="body2"
                   color="text.secondary"
                   sx={{ ml: 4, mb: 2 }}
                 >
-                  Enable system-wide notifications for administrators
+                  Bật thông báo toàn hệ thống cho quản trị viên
                 </Typography>
 
                 <FormControlLabel
@@ -263,14 +263,14 @@ const AdminSettings = () => {
                       }
                     />
                   }
-                  label="Debug Mode"
+                  label="Chế độ gỡ lỗi"
                 />
                 <Typography
                   variant="body2"
                   color="text.secondary"
                   sx={{ ml: 4 }}
                 >
-                  Enable detailed logging for troubleshooting
+                  Bật ghi log chi tiết để khắc phục sự cố
                 </Typography>
               </CardContent>
             </Card>
@@ -280,35 +280,35 @@ const AdminSettings = () => {
             <Card>
               <CardContent>
                 <Typography variant="h6" fontWeight="bold" gutterBottom>
-                  Regional Settings
+                  Cài đặt khu vực
                 </Typography>
 
                 <FormControl fullWidth sx={{ mb: 2 }}>
-                  <InputLabel>Currency</InputLabel>
+                  <InputLabel>Tiền tệ</InputLabel>
                   <Select
                     value={settings.currency}
-                    label="Currency"
+                    label="Tiền tệ"
                     onChange={(e) =>
                       handleSettingChange("currency", e.target.value)
                     }
                   >
-                    <MenuItem value="VND">Vietnamese Dong (VND)</MenuItem>
-                    <MenuItem value="USD">US Dollar (USD)</MenuItem>
+                    <MenuItem value="VND">Đồng Việt Nam (VND)</MenuItem>
+                    <MenuItem value="USD">Đô la Mỹ (USD)</MenuItem>
                     <MenuItem value="EUR">Euro (EUR)</MenuItem>
                   </Select>
                 </FormControl>
 
                 <FormControl fullWidth sx={{ mb: 2 }}>
-                  <InputLabel>Timezone</InputLabel>
+                  <InputLabel>Múi giờ</InputLabel>
                   <Select
                     value={settings.timezone}
-                    label="Timezone"
+                    label="Múi giờ"
                     onChange={(e) =>
                       handleSettingChange("timezone", e.target.value)
                     }
                   >
                     <MenuItem value="Asia/Ho_Chi_Minh">
-                      Vietnam (UTC+7)
+                      Việt Nam (UTC+7)
                     </MenuItem>
                     <MenuItem value="UTC">UTC (UTC+0)</MenuItem>
                     <MenuItem value="America/New_York">
@@ -318,25 +318,25 @@ const AdminSettings = () => {
                 </FormControl>
 
                 <FormControl fullWidth sx={{ mb: 2 }}>
-                  <InputLabel>Language</InputLabel>
+                  <InputLabel>Ngôn ngữ</InputLabel>
                   <Select
                     value={settings.language}
-                    label="Language"
+                    label="Ngôn ngữ"
                     onChange={(e) =>
                       handleSettingChange("language", e.target.value)
                     }
                   >
                     <MenuItem value="vi">Tiếng Việt</MenuItem>
-                    <MenuItem value="en">Tiếng Anh</MenuItem>
+                    <MenuItem value="en">English</MenuItem>
                     <MenuItem value="zh">中文</MenuItem>
                   </Select>
                 </FormControl>
 
                 <FormControl fullWidth>
-                  <InputLabel>Date Format</InputLabel>
+                  <InputLabel>Định dạng ngày</InputLabel>
                   <Select
                     value={settings.dateFormat}
-                    label="Date Format"
+                    label="Định dạng ngày"
                     onChange={(e) =>
                       handleSettingChange("dateFormat", e.target.value)
                     }
@@ -353,14 +353,14 @@ const AdminSettings = () => {
           <Grid item xs={12}>
             <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 2 }}>
               <Button variant="outlined" startIcon={<Restore />}>
-                Reset to Default
+                Đặt lại mặc định
               </Button>
               <Button
                 variant="contained"
                 startIcon={<Save />}
                 onClick={handleSaveSettings}
               >
-                Save Settings
+                Lưu cài đặt
               </Button>
             </Box>
           </Grid>
@@ -374,7 +374,7 @@ const AdminSettings = () => {
             <Card>
               <CardContent>
                 <Typography variant="h6" fontWeight="bold" gutterBottom>
-                  Authentication Settings
+                Cài đặt xác thực bảo mật hai yếu tố
                 </Typography>
 
                 <FormControlLabel
@@ -386,19 +386,19 @@ const AdminSettings = () => {
                       }
                     />
                   }
-                  label="Two-Factor Authentication"
+                    label="Xác thực bảo mật hai yếu tố"
                 />
                 <Typography
                   variant="body2"
                   color="text.secondary"
                   sx={{ ml: 4, mb: 3 }}
                 >
-                  Require 2FA for admin accounts
+                  Yêu cầu xác thực bảo mật hai yếu tố cho tài khoản quản trị viên
                 </Typography>
 
                 <TextField
                   fullWidth
-                  label="Password Expiry (days)"
+                  label="Hạn sử dụng mật khẩu (ngày)"
                   type="number"
                   value={settings.passwordExpiry}
                   onChange={(e) =>
@@ -412,7 +412,7 @@ const AdminSettings = () => {
 
                 <TextField
                   fullWidth
-                  label="Session Timeout (minutes)"
+                  label="Hạn sử dụng phiên (phút)"
                   type="number"
                   value={settings.sessionTimeout}
                   onChange={(e) =>
@@ -426,7 +426,7 @@ const AdminSettings = () => {
 
                 <TextField
                   fullWidth
-                  label="Max Login Attempts"
+                  label="Số lần đăng nhập tối đa"
                   type="number"
                   value={settings.loginAttempts}
                   onChange={(e) =>
@@ -444,23 +444,23 @@ const AdminSettings = () => {
             <Card>
               <CardContent>
                 <Typography variant="h6" fontWeight="bold" gutterBottom>
-                  Security Status
+                  Trạng thái bảo mật
                 </Typography>
 
                 <Alert severity="success" sx={{ mb: 2 }}>
-                  SSL Certificate valid until Dec 31, 2024
+                  Chứng chỉ SSL hợp lệ đến ngày 31/12/2024
                 </Alert>
 
                 <Alert severity="info" sx={{ mb: 2 }}>
-                  Last security scan: March 15, 2024
+                  Lần kiểm tra bảo mật cuối: 15/03/2024
                 </Alert>
 
                 <Alert severity="warning">
-                  3 failed login attempts in the last 24 hours
+                  3 lần đăng nhập thất bại trong 24 giờ qua
                 </Alert>
 
                 <Button variant="outlined" fullWidth sx={{ mt: 2 }}>
-                  Run Security Scan
+                  Chạy kiểm tra bảo mật
                 </Button>
               </CardContent>
             </Card>
@@ -475,7 +475,7 @@ const AdminSettings = () => {
             <Card>
               <CardContent>
                 <Typography variant="h6" fontWeight="bold" gutterBottom>
-                  Notification Channels
+                  Kênh thông báo
                 </Typography>
 
                 <FormControlLabel
@@ -490,7 +490,7 @@ const AdminSettings = () => {
                       }
                     />
                   }
-                  label="Email Notifications"
+                  label="Thông báo email"
                 />
 
                 <FormControlLabel
@@ -502,7 +502,7 @@ const AdminSettings = () => {
                       }
                     />
                   }
-                  label="SMS Alerts"
+                  label="Thông báo SMS"
                 />
 
                 <FormControlLabel
@@ -517,12 +517,12 @@ const AdminSettings = () => {
                       }
                     />
                   }
-                  label="Push Notifications"
+                  label="Thông báo đẩy"
                 />
 
                 <TextField
                   fullWidth
-                  label="Alert Threshold (%)"
+                    label="Ngưỡng thông báo (%)"
                   type="number"
                   value={settings.alertThreshold}
                   onChange={(e) =>
@@ -532,7 +532,7 @@ const AdminSettings = () => {
                     )
                   }
                   sx={{ mt: 2 }}
-                  helperText="Send alert when system usage exceeds this percentage"
+                  helperText="Gửi thông báo khi sử dụng hệ thống vượt quá tỷ lệ này"
                 />
               </CardContent>
             </Card>
@@ -555,10 +555,10 @@ const AdminSettings = () => {
                   }}
                 >
                   <Typography variant="h6" fontWeight="bold">
-                    API Keys Management
+                    Quản lý khóa API
                   </Typography>
                   <Button startIcon={<Add />} variant="contained">
-                    Add API Key
+                    Thêm khóa API
                   </Button>
                 </Box>
 
@@ -577,7 +577,7 @@ const AdminSettings = () => {
                               variant="caption"
                               color="text.secondary"
                             >
-                              Last used: {apiKey.lastUsed}
+                              Sử dụng lần cuối: {apiKey.lastUsed}
                             </Typography>
                           </Box>
                         }
@@ -615,7 +615,7 @@ const AdminSettings = () => {
             <Card>
               <CardContent>
                 <Typography variant="h6" fontWeight="bold" gutterBottom>
-                  Backup Configuration
+                  Cài đặt sao lưu
                 </Typography>
 
                 <Button
@@ -624,19 +624,19 @@ const AdminSettings = () => {
                   onClick={handleCreateBackup}
                   sx={{ mb: 3 }}
                 >
-                  Create Backup Now
+                  Tạo sao lưu ngay
                 </Button>
 
                 <Alert severity="info" sx={{ mb: 2 }}>
-                  Next automatic backup: March 16, 2024 at 2:00 AM
+                  Sao lưu tự động tiếp theo: 16/03/2024 lúc 2:00 sáng
                 </Alert>
 
                 <Typography variant="subtitle2" gutterBottom>
-                  Backup Settings
+                  Cài đặt sao lưu
                 </Typography>
                 <FormControlLabel
                   control={<Switch checked={settings.autoBackup} />}
-                  label="Enable Automatic Backup"
+                  label="Bật sao lưu tự động"
                 />
               </CardContent>
             </Card>
@@ -646,7 +646,7 @@ const AdminSettings = () => {
             <Card>
               <CardContent>
                 <Typography variant="h6" fontWeight="bold" gutterBottom>
-                  Backup History
+                  Lịch sử sao lưu
                 </Typography>
 
                 <List>
@@ -685,13 +685,13 @@ const AdminSettings = () => {
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle>Edit API Key</DialogTitle>
+        <DialogTitle>Chỉnh sửa khóa API</DialogTitle>
         <DialogContent>
           {selectedApiKey && (
             <Box sx={{ mt: 2 }}>
               <TextField
                 fullWidth
-                label="API Key Name"
+                label="Tên khóa API"
                 defaultValue={selectedApiKey.name}
                 sx={{ mb: 2 }}
               />
@@ -713,7 +713,7 @@ const AdminSettings = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setEditDialog(false)}>Cancel</Button>
-          <Button variant="contained">Save Changes</Button>
+          <Button variant="contained">Lưu Thay đổi</Button>
         </DialogActions>
       </Dialog>
     </Box>
