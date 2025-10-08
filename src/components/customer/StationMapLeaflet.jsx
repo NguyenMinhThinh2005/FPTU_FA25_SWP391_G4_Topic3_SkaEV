@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
     Box,
     Card,
@@ -170,8 +170,10 @@ const getStationCoords = (station) => {
 const StationMapLeaflet = ({ stations, onStationSelect }) => {
     const [userLocation, setUserLocation] = useState(null);
     const [selectedStation, setSelectedStation] = useState(null);
+    const [selectedFromList, setSelectedFromList] = useState(false);
     const [showRoute, setShowRoute] = useState(false);
     const [mapReady, setMapReady] = useState(false);
+    const mapRef = useRef(null);
 
     // Debug stations prop
     useEffect(() => {
@@ -251,7 +253,18 @@ const StationMapLeaflet = ({ stations, onStationSelect }) => {
 
     const handleStationClick = (station) => {
         setSelectedStation(station);
+        setSelectedFromList(false);
         setShowRoute(false);
+    };
+
+    const handleListSelect = (station) => {
+        setSelectedStation(station);
+        setSelectedFromList(true);
+        // center map on the selected station for visibility
+        const coords = getStationCoords(station);
+        if (mapRef.current && coords.lat && coords.lng) {
+            mapRef.current.setView([coords.lat, coords.lng], 15, { animate: true });
+        }
     };
 
     const handleShowDirection = () => {
@@ -292,7 +305,8 @@ const StationMapLeaflet = ({ stations, onStationSelect }) => {
                         scrollWheelZoom={true}
                         attributionControl={false}
                         whenCreated={(map) => {
-                            // Prevent multiple initialization
+                            // store map ref and prevent multiple initialization
+                            mapRef.current = map;
                             setTimeout(() => {
                                 map.invalidateSize();
                             }, 100);
@@ -379,6 +393,47 @@ const StationMapLeaflet = ({ stations, onStationSelect }) => {
                                 </Marker>
                             );
                         })}
+
+                        {/* If a station was selected from the list, show a popup at its location */}
+                        {selectedStation && selectedFromList && (() => {
+                            const coords = getStationCoords(selectedStation);
+                            if (!coords.lat || !coords.lng) return null;
+                            return (
+                                <Popup position={[coords.lat, coords.lng]} onClose={() => setSelectedStation(null)}>
+                                    <Box sx={{ p: 1, minWidth: 220 }}>
+                                        <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
+                                            {selectedStation.name}
+                                        </Typography>
+                                        <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
+                                            📍 {selectedStation.location?.address || selectedStation.address}
+                                        </Typography>
+                                        <Box sx={{ mb: 1 }}>
+                                            <Chip
+                                                label={`${selectedStation.stats?.available} / ${selectedStation.stats?.total} cổng đang trống`}
+                                                size="small"
+                                                color={selectedStation.stats?.available > 0 ? 'success' : 'error'}
+                                                sx={{ borderRadius: '16px', fontWeight: 600 }}
+                                            />
+                                            {selectedStation.operatingHours && (
+                                                <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
+                                                    {formatOperatingHours(selectedStation.operatingHours)}
+                                                </Typography>
+                                            )}
+                                        </Box>
+                                        <Button
+                                            fullWidth
+                                            variant="contained"
+                                            size="small"
+                                            onClick={() => {
+                                                if (onStationSelect) onStationSelect(selectedStation);
+                                            }}
+                                        >
+                                            Chọn trạm này
+                                        </Button>
+                                    </Box>
+                                </Popup>
+                            );
+                        })()}
 
                         {/* Route line */}
                         {showRoute && userLocation && selectedStation && (() => {
@@ -467,72 +522,7 @@ const StationMapLeaflet = ({ stations, onStationSelect }) => {
                     {/* Hint removed as requested */}
                 </Card>
 
-                {/* Selected Station Info Card */}
-                {selectedStation && (
-                    <Card sx={{
-                        position: 'absolute',
-                        top: 16,
-                        left: 16,
-                        p: 2,
-                        maxWidth: 350,
-                        zIndex: 1300,
-                        boxShadow: 4,
-                        bgcolor: 'rgba(255,255,255,0.98)'
-                    }}>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
-                            <Typography variant="h6" fontWeight="bold">
-                                {selectedStation.name}
-                            </Typography>
-                            <IconButton size="small" onClick={() => setSelectedStation(null)}>
-                                <CloseIcon fontSize="small" />
-                            </IconButton>
-                        </Box>
-
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                            📍 {selectedStation.location?.address || selectedStation.address}
-                        </Typography>
-
-                        <Stack direction="row" spacing={1} sx={{ mb: 2 }} flexWrap="wrap">
-                            <Chip
-                                icon={<EvStationIcon />}
-                                label={`${selectedStation.stats?.available} / ${selectedStation.stats?.total} cổng đang trống`}
-                                size="small"
-                                color={selectedStation.stats?.available > 0 ? 'success' : 'error'}
-                            />
-                            {/* Show operating hours here as well for the selected station */}
-                            {selectedStation.operatingHours && (
-                                <Typography variant="caption" color="text.secondary" sx={{ alignSelf: 'center' }}>
-                                    {formatOperatingHours(selectedStation.operatingHours)}
-                                </Typography>
-                            )}
-                        </Stack>
-
-                        <Stack spacing={1}>
-                            {userLocation && (
-                                <Button
-                                    fullWidth
-                                    variant={showRoute ? 'contained' : 'outlined'}
-                                    startIcon={<DirectionsIcon />}
-                                    onClick={handleShowDirection}
-                                    color="primary"
-                                >
-                                    {showRoute ? 'Đang chỉ đường' : 'Chỉ đường'}
-                                </Button>
-                            )}
-                            <Button
-                                fullWidth
-                                variant="contained"
-                                onClick={() => {
-                                    if (onStationSelect) {
-                                        onStationSelect(selectedStation);
-                                    }
-                                }}
-                            >
-                                Chọn trạm này
-                            </Button>
-                        </Stack>
-                    </Card>
-                )}
+                {/* Selected station card removed — popups now appear at station locations */}
             </Box>
 
             {/* Station List */}
@@ -550,7 +540,7 @@ const StationMapLeaflet = ({ stations, onStationSelect }) => {
                     return (
                         <Box
                             key={station.id}
-                            onClick={() => handleStationClick(station)}
+                            onClick={() => handleListSelect(station)}
                             sx={{
                                 borderRadius: 2,
                                 mb: 1,

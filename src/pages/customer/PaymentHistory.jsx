@@ -197,7 +197,7 @@ const PaymentHistory = () => {
                         </Select>
                     </FormControl>
                     <Button variant="outlined" startIcon={<Download />}>
-                        Xuất tất cả
+                        Xuất báo cáo
                     </Button>
                 </Box>
             </Box>

@@ -205,14 +205,7 @@ const AnalyticsPage = () => {
                         </Tabs>
 
                         <Box sx={{ display: 'flex', gap: 1 }}>
-                            <Button
-                                startIcon={<FilterList />}
-                                variant="outlined"
-                                size="small"
-                                sx={{ textTransform: 'none' }}
-                            >
-                                Bộ lọc
-                            </Button>
+
                             <Button
                                 startIcon={<Download />}
                                 variant="contained"

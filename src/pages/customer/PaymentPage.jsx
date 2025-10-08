@@ -22,9 +22,10 @@ import {
     Download,
     FilterList,
 } from '@mui/icons-material';
-import useBookingStore from '../../store/bookingStore';
+import useCustomerStore from '../../store/customerStore';
 import useAuthStore from '../../store/authStore';
-import { formatCurrency } from '../../utils/helpers';
+import useBookingStore from '../../store/bookingStore';
+import useVehicleStore from '../../store/vehicleStore';
 
 // Import existing components
 import PaymentHistory from './PaymentHistory';
@@ -32,34 +33,38 @@ import PaymentMethods from './PaymentMethods';
 
 const PaymentPage = () => {
     const [activeTab, setActiveTab] = useState(0);
-    const { getBookingStats } = useBookingStore();
-    const { user } = useAuthStore();
+    const customerStore = useCustomerStore();
+    const authStore = useAuthStore();
+    const bookingStore = useBookingStore();
+    const vehicleStore = useVehicleStore();
+    const summary = customerStore.getCustomerSummary(authStore, bookingStore, vehicleStore);
+    const stats = summary.stats;
+    const user = summary.user;
+    const formatCurrency = customerStore.formatCurrency;
 
     const handleTabChange = (event, newValue) => {
         setActiveTab(newValue);
     };
 
-    const stats = getBookingStats();
-
-    // Mock payment stats
+    // Thống kê hiển thị, lấy từ stats đã đồng bộ
     const paymentStats = [
         {
             title: 'Tổng chi tiêu tháng này',
-            value: formatCurrency(stats.totalAmount || 2450000),
+            value: formatCurrency(stats.totalAmount || 0),
             icon: <AccountBalance />,
             color: 'primary',
             trend: '+15.2%'
         },
         {
             title: 'Số giao dịch',
-            value: `${stats.total || 28} lần`,
+            value: `${stats.totalBookings || 0} lần`,
             icon: <Receipt />,
             color: 'success',
-            trend: '+8 giao dịch'
+            trend: `+${stats.completedBookings || 0} giao dịch`
         },
         {
             title: 'Phương thức ưa thích',
-            value: 'Thẻ tín dụng',
+            value: user?.preferredPayment || 'Thẻ tín dụng',
             icon: <CreditCard />,
             color: 'info',
             trend: '65% sử dụng'
@@ -182,22 +187,8 @@ const PaymentPage = () => {
                         </Tabs>
 
                         <Box sx={{ display: 'flex', gap: 1 }}>
-                            <Button
-                                startIcon={<FilterList />}
-                                variant="outlined"
-                                size="small"
-                                sx={{ textTransform: 'none' }}
-                            >
-                                Bộ lọc
-                            </Button>
-                            <Button
-                                startIcon={<Download />}
-                                variant="contained"
-                                size="small"
-                                sx={{ textTransform: 'none' }}
-                            >
-                                Xuất báo cáo
-                            </Button>
+
+
                         </Box>
                     </Box>
                 </Box>

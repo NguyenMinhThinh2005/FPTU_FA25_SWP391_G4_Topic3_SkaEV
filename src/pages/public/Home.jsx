@@ -34,7 +34,7 @@ const HomePage = () => {
       icon: <LocationOn sx={{ fontSize: 40, color: "success.main" }} />,
       title: "Mạng lưới rộng khắp",
       description:
-        "Hơn 127 trạm sạc tại 63 tỉnh thành, phủ sóng các tuyến đường chính và khu đô thị",
+        "3 trạm sạc tại trung tâm thành phố, cung cấp đầy đủ nhu cầu sử dụng cho khu đô thị",
     },
     {
       icon: <TrendingUp sx={{ fontSize: 40, color: "secondary.main" }} />,
@@ -51,9 +51,9 @@ const HomePage = () => {
   ];
 
   const stats = [
-    { label: "Trạm sạc hoạt động", value: "127+", color: "primary" },
-    { label: "Khách hàng đăng ký", value: "15,680+", color: "success" },
-    { label: "Lượt sạc thành công", value: "89,234+", color: "warning" },
+    { label: "Trạm sạc hoạt động", value: "3", color: "primary" },
+    { label: "Khách hàng đăng ký", value: "1,000+", color: "success" },
+    { label: "Lượt sạc thành công", value: "20,000+", color: "warning" },
     { label: "Độ tin cậy hệ thống", value: "99.8%", color: "secondary" },
   ];
 

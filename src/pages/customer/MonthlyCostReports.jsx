@@ -444,13 +444,7 @@ const MonthlyCostReports = () => {
                 </Card>
             )}
 
-            {/* Tips */}
-            <Alert severity="info" sx={{ mt: 4 }}>
-                <Typography variant="body2">
-                    💡 <strong>Mẹo tiết kiệm:</strong> Sạc vào giờ thấp điểm (22:00 - 06:00) để được giá ưu đãi.
-                    Sử dụng sạc chậm AC khi có thời gian để tiết kiệm chi phí.
-                </Typography>
-            </Alert>
+
         </Box>
     );
 };
