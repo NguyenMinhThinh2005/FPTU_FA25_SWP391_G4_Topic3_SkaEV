@@ -40,7 +40,7 @@ const ChargingDateTimePicker = ({
 }) => {
   const [selectedDate, setSelectedDate] = useState(initialDateTime?.date || null);
   const [selectedTime, setSelectedTime] = useState(initialDateTime?.time || null);
-  const [schedulingType, setSchedulingType] = useState(initialDateTime ? 'scheduled' : 'immediate');
+  const [schedulingType, setSchedulingType] = useState('scheduled'); // Always scheduled, removed immediate option
   const [errors, setErrors] = useState({});
   const [availableSlots, setAvailableSlots] = useState([]);
 
@@ -78,51 +78,50 @@ const ChargingDateTimePicker = ({
     const newErrors = {};
     const now = new Date();
 
-    if (schedulingType === 'scheduled') {
-      // Validate date
-      if (!selectedDate) {
-        newErrors.date = 'Vui lòng chọn ngày sạc';
-      } else {
-        const today = startOfDay(now);
-        const selectedDay = startOfDay(selectedDate);
-        const maxDate = addDays(today, 7); // Allow booking up to 7 days ahead
+    // Always require date and time since "Sạc ngay" option is removed
+    // Validate date
+    if (!selectedDate) {
+      newErrors.date = 'Vui lòng chọn ngày sạc';
+    } else {
+      const today = startOfDay(now);
+      const selectedDay = startOfDay(selectedDate);
+      const maxDate = addDays(today, 7); // Allow booking up to 7 days ahead
 
-        if (isBefore(selectedDay, today)) {
-          newErrors.date = 'Không thể chọn ngày trong quá khứ';
-        } else if (isAfter(selectedDay, maxDate)) {
-          newErrors.date = 'Chỉ có thể đặt lịch tối đa 7 ngày trước';
+      if (isBefore(selectedDay, today)) {
+        newErrors.date = 'Không thể chọn ngày trong quá khứ';
+      } else if (isAfter(selectedDay, maxDate)) {
+        newErrors.date = 'Chỉ có thể đặt lịch tối đa 7 ngày trước';
+      }
+    }
+
+    // Validate time
+    if (!selectedTime) {
+      newErrors.time = 'Vui lòng chọn giờ sạc';
+    } else if (selectedDate) {
+      const selectedDateTime = new Date(
+        selectedDate.getFullYear(), 
+        selectedDate.getMonth(), 
+        selectedDate.getDate(),
+        selectedTime.getHours(), 
+        selectedTime.getMinutes()
+      );
+
+      // Check if selected time is in the past (for today only)
+      if (format(selectedDate, 'yyyy-MM-dd') === format(now, 'yyyy-MM-dd')) {
+        const oneHourLater = new Date(now.getTime() + 60 * 60 * 1000); // 1 hour from now
+        if (isBefore(selectedDateTime, oneHourLater)) {
+          newErrors.time = 'Vui lòng chọn thời gian ít nhất 1 giờ sau hiện tại';
         }
       }
 
-      // Validate time
-      if (!selectedTime) {
-        newErrors.time = 'Vui lòng chọn giờ sạc';
-      } else if (selectedDate) {
-        const selectedDateTime = new Date(
-          selectedDate.getFullYear(), 
-          selectedDate.getMonth(), 
-          selectedDate.getDate(),
-          selectedTime.getHours(), 
-          selectedTime.getMinutes()
-        );
+      // Check station operating hours
+      if (station?.operatingHours && station.operatingHours !== '24/7') {
+        const openTime = station.operatingHours.open;
+        const closeTime = station.operatingHours.close;
+        const selectedHour = format(selectedTime, 'HH:mm');
 
-        // Check if selected time is in the past (for today only)
-        if (format(selectedDate, 'yyyy-MM-dd') === format(now, 'yyyy-MM-dd')) {
-          const oneHourLater = new Date(now.getTime() + 60 * 60 * 1000); // 1 hour from now
-          if (isBefore(selectedDateTime, oneHourLater)) {
-            newErrors.time = 'Vui lòng chọn thời gian ít nhất 1 giờ sau hiện tại';
-          }
-        }
-
-        // Check station operating hours
-        if (station?.operatingHours && station.operatingHours !== '24/7') {
-          const openTime = station.operatingHours.open;
-          const closeTime = station.operatingHours.close;
-          const selectedHour = format(selectedTime, 'HH:mm');
-
-          if (selectedHour < openTime || selectedHour > closeTime) {
-            newErrors.time = `Trạm sạc chỉ hoạt động từ ${openTime} - ${closeTime}`;
-          }
+        if (selectedHour < openTime || selectedHour > closeTime) {
+          newErrors.time = `Trạm sạc chỉ hoạt động từ ${openTime} - ${closeTime}`;
         }
       }
     }
@@ -143,12 +142,8 @@ const ChargingDateTimePicker = ({
   };
 
   const handleSchedulingTypeChange = (type) => {
-    setSchedulingType(type);
-    if (type === 'immediate') {
-      setSelectedDate(null);
-      setSelectedTime(null);
-      setErrors({});
-    }
+    // Removed immediate option, always scheduled
+    setSchedulingType('scheduled');
   };
 
   const handleQuickDateSelect = (days) => {
@@ -191,66 +186,32 @@ const ChargingDateTimePicker = ({
             Lên lịch sạc
           </Typography>
 
-          {/* Scheduling Type Selection */}
+          {/* Scheduling Type Selection - Removed "Sạc ngay" option */}
           <Box sx={{ mb: 3 }}>
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6}>
-                <Paper 
-                  elevation={schedulingType === 'immediate' ? 3 : 1}
-                  sx={{ 
-                    p: 2, 
-                    cursor: disabled ? 'not-allowed' : 'pointer',
-                    border: schedulingType === 'immediate' ? '2px solid #1976d2' : '1px solid #e0e0e0',
-                    opacity: disabled ? 0.6 : 1
-                  }}
-                  onClick={() => !disabled && handleSchedulingTypeChange('immediate')}
-                >
-                  <Box sx={{ textAlign: 'center' }}>
-                    <CheckCircle 
-                      color={schedulingType === 'immediate' ? 'primary' : 'disabled'} 
-                      sx={{ fontSize: 32, mb: 1 }}
-                    />
-                    <Typography variant="subtitle1" fontWeight={schedulingType === 'immediate' ? 'bold' : 'normal'}>
-                      Sạc ngay
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Bắt đầu sạc ngay khi đến trạm
-                    </Typography>
-                  </Box>
-                </Paper>
-              </Grid>
-              
-              <Grid item xs={12} sm={6}>
-                <Paper 
-                  elevation={schedulingType === 'scheduled' ? 3 : 1}
-                  sx={{ 
-                    p: 2, 
-                    cursor: disabled ? 'not-allowed' : 'pointer',
-                    border: schedulingType === 'scheduled' ? '2px solid #1976d2' : '1px solid #e0e0e0',
-                    opacity: disabled ? 0.6 : 1
-                  }}
-                  onClick={() => !disabled && handleSchedulingTypeChange('scheduled')}
-                >
-                  <Box sx={{ textAlign: 'center' }}>
-                    <CalendarToday 
-                      color={schedulingType === 'scheduled' ? 'primary' : 'disabled'} 
-                      sx={{ fontSize: 32, mb: 1 }}
-                    />
-                    <Typography variant="subtitle1" fontWeight={schedulingType === 'scheduled' ? 'bold' : 'normal'}>
-                      Đặt lịch
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Chọn ngày và giờ cụ thể
-                    </Typography>
-                  </Box>
-                </Paper>
-              </Grid>
-            </Grid>
+            <Paper 
+              elevation={3}
+              sx={{ 
+                p: 2, 
+                border: '2px solid #1976d2',
+              }}
+            >
+              <Box sx={{ textAlign: 'center' }}>
+                <CalendarToday 
+                  color="primary"
+                  sx={{ fontSize: 32, mb: 1 }}
+                />
+                <Typography variant="subtitle1" fontWeight="bold">
+                  Đặt lịch sạc
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Chọn ngày và giờ cụ thể để sạc xe
+                </Typography>
+              </Box>
+            </Paper>
           </Box>
 
           {/* Scheduled DateTime Selection */}
-          {schedulingType === 'scheduled' && (
-            <Box>
+          <Box>
               {/* Quick Date Selection */}
               <Typography variant="subtitle2" gutterBottom>
                 Chọn nhanh:
@@ -375,10 +336,9 @@ const ChargingDateTimePicker = ({
                 </Alert>
               )}
             </Box>
-          )}
 
           {/* Summary */}
-          {schedulingType === 'scheduled' && selectedDate && selectedTime && Object.keys(errors).length === 0 && (
+          {selectedDate && selectedTime && Object.keys(errors).length === 0 && (
             <Paper elevation={1} sx={{ p: 2, bgcolor: '#f8f9fa', border: '1px solid #e3f2fd' }}>
               <Typography variant="subtitle2" color="primary" gutterBottom>
                 📅 Tóm tắt lịch sạc
@@ -393,14 +353,6 @@ const ChargingDateTimePicker = ({
                 Vui lòng có mặt tại trạm sạc trước 15 phút
               </Typography>
             </Paper>
-          )}
-
-          {schedulingType === 'immediate' && (
-            <Alert severity="success" icon={<CheckCircle />}>
-              <Typography variant="body2">
-                <strong>Sạc ngay:</strong> Bạn có thể bắt đầu sạc ngay khi đến trạm
-              </Typography>
-            </Alert>
           )}
         </CardContent>
       </Card>

@@ -68,7 +68,7 @@ const QRCodeScanner = ({ onScanSuccess, onClose }) => {
             bookingTime: new Date().toISOString(),
             scannedAt: new Date().toISOString(),
             autoStart: true,
-            schedulingType: 'immediate',
+            schedulingType: 'qr_immediate', // Special case: QR scan for immediate charging (not pre-scheduled)
             source: 'qr_scan'
           });
 

@@ -127,7 +127,7 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
           parkingFee: station.charging.pricing.parkingFee || 0,
         },
         bookingTime: new Date().toISOString(),
-        schedulingType: selectedDateTime?.schedulingType || "immediate",
+        schedulingType: selectedDateTime?.schedulingType || "scheduled", // Changed from "immediate" to "scheduled"
         scheduledDateTime: selectedDateTime?.scheduledDateTime || null,
         scheduledDate: selectedDateTime?.scheduledDate
           ? selectedDateTime.scheduledDate.toISOString().split("T")[0]
