@@ -165,7 +165,7 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
       setTimeout(() => {
         handleClose();
       }, 3000);
-    } catch (error) {
+    } catch {
       setBookingResult("error");
       setResultMessage("Có lỗi xảy ra khi đặt chỗ. Vui lòng thử lại.");
     } finally {
@@ -582,36 +582,14 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
                     trước 15 phút.
                   </Typography>
                 </Alert>
-                {/* Checkbox đồng ý điều khoản */}
                 <FormControlLabel
                   control={
                     <Checkbox
                       checked={agreeTerms}
                       onChange={(e) => setAgreeTerms(e.target.checked)}
-                      color="primary"
                     />
                   }
-                  label={
-                    <span>
-                      Tôi đồng ý với{" "}
-                      <a
-                        href="/terms"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        điều khoản sử dụng
-                      </a>{" "}
-                      và{" "}
-                      <a
-                        href="/privacy"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        chính sách dịch vụ
-                      </a>
-                    </span>
-                  }
-                  sx={{ mt: 2, mb: 1 }}
+                  label="Tôi đồng ý với điều khoản sử dụng và chính sách thanh toán"
                 />
               </>
             )}
