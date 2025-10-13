@@ -341,15 +341,7 @@ const AdminDashboard = () => {
             Giám sát và quản lý mạng lưới sạc SkaEV
           </Typography>
         </Box>
-        <Box sx={{ display: "flex", gap: 2 }}>
-          <Button
-            variant="outlined"
-            startIcon={<Download />}
-            onClick={() => console.log("Export report")}
-          >
-            Xuất báo cáo
-          </Button>
-        </Box>
+
       </Box>
 
 
@@ -673,40 +665,7 @@ const AdminDashboard = () => {
           </Card>
 
           {/* Quick Actions */}
-          <Card sx={{ mt: 3 }}>
-            <CardContent>
-              <Typography variant="h6" fontWeight="bold" gutterBottom>
-                Thao tác nhanh
-              </Typography>
 
-              <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                <Button
-                  variant="contained"
-                  startIcon={<Analytics />}
-                  fullWidth
-                  onClick={() => navigate("/admin/analytics")}
-                >
-                  Xem phân tích
-                </Button>
-                <Button
-                  variant="outlined"
-                  startIcon={<People />}
-                  fullWidth
-                  onClick={() => navigate("/admin/users")}
-                >
-                  Quản lý người dùng
-                </Button>
-                <Button
-                  variant="outlined"
-                  startIcon={<LocationOn />}
-                  fullWidth
-                  onClick={() => navigate("/admin/stations")}
-                >
-                  Quản lý trạm sạc
-                </Button>
-              </Box>
-            </CardContent>
-          </Card>
         </Grid>
       </Grid>
 

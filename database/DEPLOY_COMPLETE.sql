@@ -1,3 +1,16 @@
+-- =====================================================================================
+-- SkaEV Database - Complete Deployment Script for Microsoft SQL Server 2019+
+-- =====================================================================================
+-- Description: Complete deployment script including schema, stored procedures, and verification
+-- Database: SkaEV_DB (Electric Vehicle Charging Station Management)
+-- Version: 1.0
+-- Date: October 13, 2025
+-- Author: SWP391_G4_Topic3
+-- =====================================================================================
+
+-- =====================================================================================
+-- SECTION 1: DATABASE CREATION
+-- =====================================================================================
 -- SECTION 1: CREATE DATABASE AND USE
 IF DB_ID(N'SkaEV_DB') IS NULL
 BEGIN
