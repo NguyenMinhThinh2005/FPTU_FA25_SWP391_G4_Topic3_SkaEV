@@ -57,51 +57,53 @@ import {
   ResponsiveContainer,
   ComposedChart,
 } from "recharts";
-import { useNavigate } from "react-router-dom";
+// removed useNavigate as it was unused
 import useAuthStore from "../../store/authStore";
 import useStationStore from "../../store/stationStore";
 import { mockData } from "../../data/mockData";
-import { formatCurrency, formatDate } from "../../utils/helpers";
+import { formatCurrency } from "../../utils/helpers";
+
+// generateAnalyticsData moved out of component to avoid useEffect missing-deps lint
+const generateAnalyticsDataFor = (timeRange) => {
+  const days = timeRange === "7d" ? 7 : timeRange === "30d" ? 30 : 90;
+  const data = [];
+
+  for (let i = days - 1; i >= 0; i--) {
+    const date = new Date();
+    date.setDate(date.getDate() - i);
+
+    data.push({
+      date: date.toISOString().split("T")[0],
+      dateLabel: date.toLocaleDateString("vi-VN", {
+        month: "short",
+        day: "numeric",
+      }),
+      revenue: Math.random() * 2000000 + 500000,
+      sessions: Math.floor(Math.random() * 50) + 20,
+      energy: Math.random() * 500 + 200,
+      users: Math.floor(Math.random() * 30) + 10,
+      utilization: Math.random() * 40 + 40,
+      avgSessionTime: Math.random() * 60 + 30,
+    });
+  }
+
+  return data;
+};
 
 const AdvancedAnalytics = () => {
-  const navigate = useNavigate();
-  const { user } = useAuthStore();
+  // optionally use auth store in future; keep reference to avoid unused import
+  useAuthStore();
   const { stations } = useStationStore();
   const [timeRange, setTimeRange] = useState("7d");
-  const [selectedMetric, setSelectedMetric] = useState("revenue");
-  const [anchorEl, setAnchorEl] = useState(null);
+  // removed unused states: selectedMetric, anchorEl
 
-  // Generate mock analytics data
-  const generateAnalyticsData = () => {
-    const days = timeRange === "7d" ? 7 : timeRange === "30d" ? 30 : 90;
-    const data = [];
-
-    for (let i = days - 1; i >= 0; i--) {
-      const date = new Date();
-      date.setDate(date.getDate() - i);
-
-      data.push({
-        date: date.toISOString().split("T")[0],
-        dateLabel: date.toLocaleDateString("vi-VN", {
-          month: "short",
-          day: "numeric",
-        }),
-        revenue: Math.random() * 2000000 + 500000,
-        sessions: Math.floor(Math.random() * 50) + 20,
-        energy: Math.random() * 500 + 200,
-        users: Math.floor(Math.random() * 30) + 10,
-        utilization: Math.random() * 40 + 40,
-        avgSessionTime: Math.random() * 60 + 30,
-      });
-    }
-
-    return data;
-  };
-
-  const [analyticsData, setAnalyticsData] = useState(generateAnalyticsData());
+  // Generate mock analytics data (use external helper to satisfy lint rules)
+  const [analyticsData, setAnalyticsData] = useState(
+    generateAnalyticsDataFor(timeRange)
+  );
 
   useEffect(() => {
-    setAnalyticsData(generateAnalyticsData());
+    setAnalyticsData(generateAnalyticsDataFor(timeRange));
   }, [timeRange]);
 
   // Calculate KPIs
@@ -168,8 +170,6 @@ const AdvancedAnalytics = () => {
       };
     })
     .sort((a, b) => b.revenue - a.revenue);
-
-  
 
   // Chart colors
   const colors = {
@@ -247,11 +247,12 @@ const AdvancedAnalytics = () => {
             </Select>
           </FormControl>
 
-
           <Button
             variant="contained"
             startIcon={<Refresh />}
-            onClick={() => setAnalyticsData(generateAnalyticsData())}
+            onClick={() =>
+              setAnalyticsData(generateAnalyticsDataFor(timeRange))
+            }
           >
             Làm mới
           </Button>
@@ -322,7 +323,8 @@ const AdvancedAnalytics = () => {
                     Phiên sạc
                   </Typography>
                   <Typography variant="caption" sx={{ opacity: 0.8 }}>
-                    {(kpis.totalSessions / analyticsData.length).toFixed(0)} trung bình mỗi ngày
+                    {(kpis.totalSessions / analyticsData.length).toFixed(0)}{" "}
+                    trung bình mỗi ngày
                   </Typography>
                 </Box>
               </Box>
@@ -474,8 +476,6 @@ const AdvancedAnalytics = () => {
           </Card>
         </Grid>
       </Grid>
-
-      
 
       {/* Charts Row 2 */}
       <Grid container spacing={3} sx={{ mb: 4 }}>

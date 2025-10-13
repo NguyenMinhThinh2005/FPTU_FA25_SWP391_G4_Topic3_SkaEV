@@ -85,7 +85,8 @@ class MockApiClient {
       case "GET":
         if (url.includes("/nearby")) {
           // Filter stations by distance (mock)
-          const { lat, lng, radius = 20 } = params;
+          // params.lat/lng unused in mock implementation; rename to _lat/_lng to avoid lint warnings
+          const { lat: _lat, lng: _lng, radius = 20 } = params || {};
           const nearbyStations = mockData.stations.filter(
             () => Math.random() > 0.3
           );
@@ -133,7 +134,7 @@ class MockApiClient {
           message: "Bookings retrieved",
         };
 
-      case "POST":
+      case "POST": {
         // Create booking
         const newBooking = {
           id: `booking-${Date.now()}`,
@@ -147,6 +148,7 @@ class MockApiClient {
           data: newBooking,
           message: "Tạo đặt chỗ thành công",
         };
+      }
 
       default:
         return {

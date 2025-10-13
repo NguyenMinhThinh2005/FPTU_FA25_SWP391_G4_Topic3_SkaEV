@@ -1,0 +1,8 @@
+# Ignore backup and temporary files generated during development
+
+**/\*.backup.jsx
+**/_\_backup.jsx
+\*\*/_.backup.\*
+node_modules/
+dist/
+build/

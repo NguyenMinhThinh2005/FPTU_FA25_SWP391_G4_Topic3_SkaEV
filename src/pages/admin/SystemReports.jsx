@@ -104,7 +104,6 @@ const mockSystemHealth = [
 const AdminSystemReports = () => {
   const [tabValue, setTabValue] = useState(0);
   const [dateRange, setDateRange] = useState("last30days");
-  const [reportType, setReportType] = useState("overview");
 
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);
@@ -150,7 +149,7 @@ const AdminSystemReports = () => {
           }}
         >
           <Typography variant="h4" fontWeight="bold">
-          Báo cáo hệ thống
+            Báo cáo hệ thống
           </Typography>
           <Box sx={{ display: "flex", gap: 2 }}>
             <FormControl size="small" sx={{ minWidth: 120 }}>
@@ -160,7 +159,7 @@ const AdminSystemReports = () => {
                 label="Khoảng thời gian"
                 onChange={(e) => setDateRange(e.target.value)}
               >
-               <MenuItem value="last7days">7 ngày qua</MenuItem>
+                <MenuItem value="last7days">7 ngày qua</MenuItem>
                 <MenuItem value="last30days">30 ngày qua</MenuItem>
                 <MenuItem value="last3months">3 tháng qua</MenuItem>
                 <MenuItem value="last6months">6 tháng qua</MenuItem>
@@ -168,7 +167,7 @@ const AdminSystemReports = () => {
               </Select>
             </FormControl>
             <Button startIcon={<Download />} onClick={handleExportReport}>
-            Xuất báo cáo
+              Xuất báo cáo
             </Button>
             <Button
               startIcon={<Refresh />}
@@ -179,7 +178,7 @@ const AdminSystemReports = () => {
           </Box>
         </Box>
         <Typography variant="body1" color="text.secondary">
-        Báo cáo tổng hợp dữ liệu và hiệu suất hoạt động của hệ thống
+          Báo cáo tổng hợp dữ liệu và hiệu suất hoạt động của hệ thống
         </Typography>
       </Box>
 
@@ -197,7 +196,7 @@ const AdminSystemReports = () => {
                     {formatCurrency(210000000)}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                  Doanh thu tháng
+                    Doanh thu tháng
                   </Typography>
                 </Box>
               </Box>
@@ -223,7 +222,7 @@ const AdminSystemReports = () => {
                     1,890
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                  Phiên sạc
+                    Phiên sạc
                   </Typography>
                 </Box>
               </Box>
@@ -249,7 +248,7 @@ const AdminSystemReports = () => {
                     4,577
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                  Tổng người dùng
+                    Tổng người dùng
                   </Typography>
                 </Box>
               </Box>
@@ -275,7 +274,7 @@ const AdminSystemReports = () => {
                     127
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                  Trạm đang hoạt động
+                    Trạm đang hoạt động
                   </Typography>
                 </Box>
               </Box>
@@ -307,7 +306,7 @@ const AdminSystemReports = () => {
             <Card>
               <CardContent>
                 <Typography variant="h6" fontWeight="bold" gutterBottom>
-                Xu hướng doanh thu (6 tháng gần nhất)
+                  Xu hướng doanh thu (6 tháng gần nhất)
                 </Typography>
                 <ResponsiveContainer width="100%" height={400}>
                   <AreaChart data={mockRevenueData}>
@@ -327,7 +326,8 @@ const AdminSystemReports = () => {
                       stackId="1"
                       stroke="#8884d8"
                       fill="#8884d8"
-                      fillOpacity={0.6} name="Doanh thu"
+                      fillOpacity={0.6}
+                      name="Doanh thu"
                     />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -339,7 +339,7 @@ const AdminSystemReports = () => {
             <Card>
               <CardContent>
                 <Typography variant="h6" fontWeight="bold" gutterBottom>
-                Biểu đồ phiên truy cập và người dùng
+                  Biểu đồ phiên truy cập và người dùng
                 </Typography>
                 <ResponsiveContainer width="100%" height={300}>
                   <LineChart data={mockRevenueData}>
@@ -383,7 +383,7 @@ const AdminSystemReports = () => {
                   />
 
                   <Typography variant="body2" gutterBottom>
-                  Phí thuê bao (10%)
+                    Phí thuê bao (10%)
                   </Typography>
                   <LinearProgress
                     variant="determinate"
@@ -472,15 +472,15 @@ const AdminSystemReports = () => {
                                 station.usage > 80
                                   ? "Sử dụng cao"
                                   : station.usage > 60
-                                    ? "Sử dụng bình thường"
-                                    : "Sử dụng thấp"
+                                  ? "Sử dụng bình thường"
+                                  : "Sử dụng thấp"
                               }
                               color={
                                 station.usage > 80
                                   ? "success"
                                   : station.usage > 60
-                                    ? "info"
-                                    : "warning"
+                                  ? "info"
+                                  : "warning"
                               }
                               size="small"
                             />
@@ -503,7 +503,7 @@ const AdminSystemReports = () => {
         </Grid>
       )}
 
-{tabValue === 2 && (
+      {tabValue === 2 && (
         <Grid container spacing={3}>
           <Grid item xs={12} md={8}>
             <Card>
@@ -561,13 +561,13 @@ const AdminSystemReports = () => {
                           Math.max(...mockUserGrowth.map((u) => u.value))) *
                         100
                       }
-                      sx={{ 
-                        height: 6, 
+                      sx={{
+                        height: 6,
                         borderRadius: 3,
                         backgroundColor: `${item.color}20`,
-                        '& .MuiLinearProgress-bar': {
-                          backgroundColor: item.color
-                        }
+                        "& .MuiLinearProgress-bar": {
+                          backgroundColor: item.color,
+                        },
                       }}
                     />
                   </Box>
@@ -582,8 +582,9 @@ const AdminSystemReports = () => {
         <Grid container spacing={3}>
           <Grid item xs={12}>
             <Alert severity="info" sx={{ mb: 3 }}>
-            Các chỉ số tình trạng hệ thống được cập nhật theo thời gian thực.
-            Tất cả các giá trị hiển thị là dữ liệu mới nhất từ lần kiểm tra hệ thống gần nhất.
+              Các chỉ số tình trạng hệ thống được cập nhật theo thời gian thực.
+              Tất cả các giá trị hiển thị là dữ liệu mới nhất từ lần kiểm tra hệ
+              thống gần nhất.
             </Alert>
           </Grid>
 
@@ -608,7 +609,7 @@ const AdminSystemReports = () => {
                       size="small"
                     />
                   </Box>
-                  <Typography   
+                  <Typography
                     variant="h3"
                     fontWeight="bold"
                     color="primary.main"
