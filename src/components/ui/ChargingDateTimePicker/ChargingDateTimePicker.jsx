@@ -186,30 +186,6 @@ const ChargingDateTimePicker = ({
             Lên lịch sạc
           </Typography>
 
-          {/* Scheduling Type Selection - Removed "Sạc ngay" option */}
-          <Box sx={{ mb: 3 }}>
-            <Paper 
-              elevation={3}
-              sx={{ 
-                p: 2, 
-                border: '2px solid #1976d2',
-              }}
-            >
-              <Box sx={{ textAlign: 'center' }}>
-                <CalendarToday 
-                  color="primary"
-                  sx={{ fontSize: 32, mb: 1 }}
-                />
-                <Typography variant="subtitle1" fontWeight="bold">
-                  Đặt lịch sạc
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Chọn ngày và giờ cụ thể để sạc xe
-                </Typography>
-              </Box>
-            </Paper>
-          </Box>
-
           {/* Scheduled DateTime Selection */}
           <Box>
               {/* Quick Date Selection */}

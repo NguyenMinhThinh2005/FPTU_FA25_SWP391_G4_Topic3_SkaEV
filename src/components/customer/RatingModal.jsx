@@ -65,21 +65,15 @@ import {
 import { formatCurrency } from "../../utils/helpers";
 
 const RatingModal = ({ open, onClose, chargingSession, station, onSubmit }) => {
-  // Add error boundary protection
-  if (!open) return null;
-
   // Provide default values to prevent errors
   const safeChargingSession = chargingSession || {};
   const safeStation = station || { id: "unknown", name: "Trạm sạc" };
+  // Chỉ giữ các đánh giá quan trọng
   const [ratings, setRatings] = useState({
     overall: 0,
     chargingSpeed: 0,
     cleanliness: 0,
     accessibility: 0,
-    pricing: 0,
-    connectivity: 0,
-    safety: 0,
-    amenities: 0,
   });
 
   const [review, setReview] = useState("");
@@ -90,6 +84,9 @@ const RatingModal = ({ open, onClose, chargingSession, station, onSubmit }) => {
   const [allowPublicReview, setAllowPublicReview] = useState(true);
   const [stationIssues, setStationIssues] = useState([]);
   const [chargingEfficiency, setChargingEfficiency] = useState("excellent");
+
+  // Add error boundary protection
+  if (!open) return null;
 
   const quickFeedbackOptions = [
     // Positive feedback
@@ -193,6 +190,7 @@ const RatingModal = ({ open, onClose, chargingSession, station, onSubmit }) => {
     },
   ];
 
+  // Chỉ giữ các tiêu chí đánh giá quan trọng
   const ratingCategories = [
     {
       key: "overall",
@@ -204,43 +202,19 @@ const RatingModal = ({ open, onClose, chargingSession, station, onSubmit }) => {
       key: "chargingSpeed",
       label: "Tốc độ sạc",
       icon: <Speed />,
-      description: "Hiệu suất sạc so với công bố",
+      description: "Hiệu suất sạc thực tế",
     },
     {
       key: "cleanliness",
       label: "Độ sạch sẽ",
       icon: <CleaningServices />,
-      description: "Vệ sinh trạm và khu vực xung quanh",
+      description: "Vệ sinh trạm/khu vực",
     },
     {
       key: "accessibility",
       label: "Khả năng tiếp cận",
       icon: <LocationOn />,
-      description: "Dễ tìm, đỗ xe và sử dụng",
-    },
-    {
-      key: "pricing",
-      label: "Giá cả",
-      icon: <AttachMoney />,
-      description: "Tính cạnh tranh của giá sạc",
-    },
-    {
-      key: "connectivity",
-      label: "Kết nối & App",
-      icon: <Wifi />,
-      description: "Chất lượng WiFi và ứng dụng",
-    },
-    {
-      key: "safety",
-      label: "An toàn & Bảo mật",
-      icon: <Security />,
-      description: "Cảm giác an toàn khi sử dụng",
-    },
-    {
-      key: "amenities",
-      label: "Tiện ích",
-      icon: <Restaurant />,
-      description: "Toilet, cửa hàng, khu nghỉ",
+      description: "Dễ tìm, đỗ xe, sử dụng",
     },
   ];
 
@@ -551,67 +525,23 @@ const RatingModal = ({ open, onClose, chargingSession, station, onSubmit }) => {
           </CardContent>
         </Card>
 
-        {/* Detailed Rating Categories */}
-        <Typography
-          variant="h6"
-          gutterBottom
-          sx={{ display: "flex", alignItems: "center", gap: 1 }}
-        >
-          <Star sx={{ color: "primary.main" }} />
-          Đánh giá chi tiết từng khía cạnh
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-          Hãy đánh giá trung thực để giúp cộng đồng EV có thông tin chính xác
-          nhất
-        </Typography>
-
-        <Grid container spacing={3} sx={{ mb: 3 }}>
-          {ratingCategories.map((category) => (
-            <Grid item xs={12} sm={6} key={category.key}>
-              <Card variant="outlined" sx={{ p: 2, height: "100%" }}>
-                <Box
-                  sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}
-                >
-                  <Tooltip title={category.description} arrow>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                      {category.icon}
-                      <Typography variant="subtitle2" fontWeight="medium">
-                        {category.label}
-                      </Typography>
-                      <Info sx={{ fontSize: 16, color: "text.secondary" }} />
-                    </Box>
-                  </Tooltip>
-                </Box>
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{ display: "block", mb: 1.5 }}
-                >
-                  {category.description}
-                </Typography>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                  <Rating
-                    size="large"
-                    value={ratings[category.key]}
-                    onChange={(event, newValue) =>
-                      handleRatingChange(category.key, newValue)
-                    }
-                    precision={0.5}
-                  />
-                  {ratings[category.key] > 0 && (
-                    <Typography
-                      variant="body2"
-                      color="primary.main"
-                      fontWeight="medium"
-                    >
-                      {ratings[category.key]}/5
-                    </Typography>
-                  )}
-                </Box>
-              </Card>
-            </Grid>
-          ))}
-        </Grid>
+        {/* Đánh giá tổng thể - tối giản, nổi bật */}
+        <Box sx={{ maxWidth: 400, mx: "auto", mb: 3, textAlign: "center" }}>
+          <Typography variant="h5" sx={{ fontWeight: 700, color: "primary.main", mb: 1, letterSpacing: 0.5 }}>
+            Đánh giá tổng thể
+          </Typography>
+          <Card variant="outlined" sx={{ borderRadius: 4, boxShadow: "0 2px 12px rgba(25,118,210,0.08)", p: 0, background: "#f8fafc", minHeight: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <CardContent sx={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', p: 3 }}>
+              <Rating
+                name="overall"
+                value={ratings.overall || 0}
+                onChange={(_, value) => handleRatingChange("overall", value)}
+                size="large"
+                sx={{ fontSize: 38, mx: 'auto' }}
+              />
+            </CardContent>
+          </Card>
+        </Box>
 
         <Divider sx={{ my: 3 }} />
 
@@ -675,102 +605,10 @@ const RatingModal = ({ open, onClose, chargingSession, station, onSubmit }) => {
           </AccordionDetails>
         </Accordion>
 
-        {/* Negative Feedback */}
-        <Accordion>
-          <AccordionSummary expandIcon={<ExpandMore />}>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-              <Warning sx={{ color: "warning.main" }} />
-              <Typography fontWeight="medium" color="warning.main">
-                Vấn đề cần cải thiện (
-                {
-                  quickFeedback.filter(
-                    (id) =>
-                      quickFeedbackOptions.find((opt) => opt.id === id)
-                        ?.type === "negative"
-                  ).length
-                }
-                )
-              </Typography>
-            </Box>
-          </AccordionSummary>
-          <AccordionDetails>
-            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
-              {quickFeedbackOptions
-                .filter((option) => option.type === "negative")
-                .map((option) => (
-                  <Chip
-                    key={option.id}
-                    label={option.label}
-                    icon={option.icon}
-                    clickable
-                    color={
-                      quickFeedback.includes(option.id) ? "warning" : "default"
-                    }
-                    variant={
-                      quickFeedback.includes(option.id) ? "filled" : "outlined"
-                    }
-                    onClick={() => toggleQuickFeedback(option.id)}
-                    sx={{
-                      borderColor: "warning.main",
-                      "&:hover": {
-                        bgcolor: "warning.50",
-                      },
-                    }}
-                  />
-                ))}
-            </Box>
-          </AccordionDetails>
-        </Accordion>
 
         <Box sx={{ my: 3 }} />
 
-        {/* Additional Assessment */}
-        <Grid container spacing={3} sx={{ mb: 3 }}>
-          {/* Recommendation */}
-          <Grid item xs={12} sm={6}>
-            <Card variant="outlined" sx={{ p: 2 }}>
-              <Typography variant="subtitle2" gutterBottom>
-                Bạn có giới thiệu trạm này cho người khác không?
-              </Typography>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={wouldRecommend}
-                    onChange={(e) => setWouldRecommend(e.target.checked)}
-                    color="success"
-                  />
-                }
-                label={
-                  wouldRecommend ? "Có, tôi sẽ giới thiệu" : "Không giới thiệu"
-                }
-              />
-            </Card>
-          </Grid>
-
-          {/* Charging Efficiency */}
-          <Grid item xs={12} sm={6}>
-            <Card variant="outlined" sx={{ p: 2 }}>
-              <Typography variant="subtitle2" gutterBottom>
-                Hiệu suất sạc so với kỳ vọng
-              </Typography>
-              <FormControl size="small" fullWidth>
-                <Select
-                  value={chargingEfficiency}
-                  onChange={(e) => setChargingEfficiency(e.target.value)}
-                >
-                  <MenuItem value="excellent">
-                    Tuyệt vời - Vượt mong đợi
-                  </MenuItem>
-                  <MenuItem value="good">Tốt - Đúng như quảng cáo</MenuItem>
-                  <MenuItem value="average">
-                    Trung bình - Chấp nhận được
-                  </MenuItem>
-                  <MenuItem value="poor">Kém - Dưới mong đợi</MenuItem>
-                </Select>
-              </FormControl>
-            </Card>
-          </Grid>
-        </Grid>
+        
 
         {/* Issue Reporting */}
         <Accordion>
@@ -842,18 +680,6 @@ const RatingModal = ({ open, onClose, chargingSession, station, onSubmit }) => {
           inputProps={{ maxLength: 500 }}
         />
 
-        {/* Privacy Settings */}
-        <Box sx={{ mt: 2 }}>
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={allowPublicReview}
-                onChange={(e) => setAllowPublicReview(e.target.checked)}
-              />
-            }
-            label="Cho phép hiển thị đánh giá này công khai (ẩn danh)"
-          />
-        </Box>
       </DialogContent>
 
       <DialogActions sx={{ p: 3, bgcolor: "grey.50" }}>

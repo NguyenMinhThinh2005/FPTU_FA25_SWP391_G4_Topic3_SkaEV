@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import ConfirmDialog from "../ui/ConfirmDialog";
 import {
   Dialog,
   DialogTitle,
@@ -30,7 +31,7 @@ import {
 } from "@mui/icons-material";
 import { CONNECTOR_TYPES } from "../../utils/constants";
 
-const VehicleEditModal = ({ open, onClose, vehicle, onSave }) => {
+const VehicleEditModal = ({ open, onClose, vehicle, onSave, onSetDefault }) => {
   const [formData, setFormData] = useState({
     nickname: "",
     make: "",
@@ -40,9 +41,10 @@ const VehicleEditModal = ({ open, onClose, vehicle, onSave }) => {
     maxChargingSpeed: "",
     connectorTypes: [],
     licensePlate: "",
-    color: "",
-    isDefault: false
+    color: ""
   });
+  const [isDefault, setIsDefault] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const [newConnectorType, setNewConnectorType] = useState("");
 
@@ -65,9 +67,11 @@ const VehicleEditModal = ({ open, onClose, vehicle, onSave }) => {
         maxChargingSpeed: vehicle.maxChargingSpeed || "",
         connectorTypes: vehicle.connectorTypes || [],
         licensePlate: vehicle.licensePlate || "",
-        color: vehicle.color || "",
-        isDefault: vehicle.isDefault || false
+        color: vehicle.color || ""
       });
+      setIsDefault(vehicle.isDefault || false);
+    } else {
+      setIsDefault(false);
     }
   }, [vehicle]);
 
@@ -95,19 +99,31 @@ const VehicleEditModal = ({ open, onClose, vehicle, onSave }) => {
     }));
   };
 
+
   const handleSave = () => {
     // Validate required fields
     if (!formData.make || !formData.model || !formData.year) {
       alert("Vui lòng điền đầy đủ thông tin bắt buộc (Hãng xe, Model, Năm sản xuất)");
       return;
     }
-
     if (formData.connectorTypes.length === 0) {
       alert("Vui lòng chọn ít nhất một loại sạc hỗ trợ");
       return;
     }
+    onSave(formData, isDefault);
+    onClose();
+  };
 
-    onSave(formData);
+  // Delete vehicle logic
+  const handleDelete = () => {
+    setConfirmOpen(true);
+  };
+
+  const handleConfirmDelete = () => {
+    setConfirmOpen(false);
+    if (typeof onSave === 'function') {
+      onSave({ ...formData, _delete: true, _id: vehicle?.id });
+    }
     onClose();
   };
 
@@ -328,35 +344,40 @@ const VehicleEditModal = ({ open, onClose, vehicle, onSave }) => {
           </Grid>
 
           {/* Default Vehicle Setting */}
-          <Grid item xs={12} sx={{ mt: 2 }}>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={formData.isDefault}
-                  onChange={(e) => handleInputChange('isDefault', e.target.checked)}
-                  color="primary"
-                />
-              }
-              label="Đặt làm xe mặc định"
-            />
-          </Grid>
+
         </Grid>
       </DialogContent>
 
       <Divider />
 
-      <DialogActions sx={{ p: 3 }}>
-        <Button onClick={onClose} variant="outlined">
-          Hủy
-        </Button>
+      <DialogActions sx={{ p: 3, display: 'flex', justifyContent: 'space-between' }}>
+        <Box>
+          <Button onClick={onClose} variant="outlined" sx={{ mr: 1 }}>
+            Hủy
+          </Button>
+          <Button 
+            onClick={handleSave} 
+            variant="contained" 
+            color="primary"
+            sx={{ minWidth: 120 }}
+          >
+            Lưu thay đổi
+          </Button>
+        </Box>
         <Button 
-          onClick={handleSave} 
-          variant="contained" 
-          color="primary"
-          sx={{ minWidth: 120 }}
+          onClick={handleDelete} 
+          variant="outlined" 
+          color="error"
         >
-          Lưu thay đổi
+          Xóa xe
         </Button>
+        <ConfirmDialog
+          open={confirmOpen}
+          title="Xác nhận xóa xe"
+          message="Bạn có chắc chắn muốn xóa xe này? Hành động này không thể hoàn tác."
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setConfirmOpen(false)}
+        />
       </DialogActions>
     </Dialog>
   );

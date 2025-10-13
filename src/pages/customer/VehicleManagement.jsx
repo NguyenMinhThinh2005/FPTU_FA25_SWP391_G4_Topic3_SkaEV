@@ -42,6 +42,7 @@ import {
     Speed,
     Info,
 } from "@mui/icons-material";
+import VehicleEditModal from "./VehicleEditModal";
 
 const VehicleManagement = () => {
     const [searchParams] = useSearchParams();
@@ -162,13 +163,27 @@ const VehicleManagement = () => {
         setDefaultVehicle(vehicleId);
     };
 
-    const handleSave = () => {
+    const handleSave = (formData, isDefault) => {
+        if (formData && formData._delete) {
+            const idToDelete = formData._id || (selectedVehicle && selectedVehicle.id);
+            if (idToDelete) {
+                deleteVehicle(idToDelete);
+            }
+            setDialogOpen(false);
+            return;
+        }
         if (selectedVehicle) {
             // Update existing vehicle
             updateVehicle(selectedVehicle.id, formData);
+            if (isDefault) {
+                setDefaultVehicle(selectedVehicle.id);
+            }
         } else {
             // Add new vehicle
-            addVehicle(formData);
+            const newVehicle = addVehicle(formData);
+            if (isDefault && newVehicle?.id) {
+                setDefaultVehicle(newVehicle.id);
+            }
         }
         setDialogOpen(false);
     };
@@ -223,14 +238,6 @@ const VehicleManagement = () => {
                         >
                             <DirectionsCar sx={{ fontSize: 40, color: "white" }} />
                         </Avatar>
-                        <Box>
-                            <Typography variant="h4" fontWeight="bold" gutterBottom>
-                                🚗 Quản lý xe điện
-                            </Typography>
-                            <Typography variant="h6" sx={{ opacity: 0.9 }}>
-                                Quản lý thông tin các phương tiện điện của bạn
-                            </Typography>
-                        </Box>
                     </Stack>
                     <Button
                         variant="contained"
@@ -249,6 +256,14 @@ const VehicleManagement = () => {
                     </Button>
                 </Stack>
             </Paper>
+
+            {/* Add/Edit Vehicle Modal */}
+            <VehicleEditModal
+                open={dialogOpen}
+                onClose={() => setDialogOpen(false)}
+                vehicle={selectedVehicle}
+                onSave={handleSave}
+            />
 
             {/* Info Alert */}
             <Alert severity="info" sx={{ mb: 4 }}>
@@ -312,7 +327,7 @@ const VehicleManagement = () => {
                                                     {vehicle.nickname}
                                                 </Typography>
                                                 <Typography variant="body2" color="text.secondary">
-                                                    {vehicle.make} {vehicle.model} ({vehicle.year})
+                                                    {vehicle.make} {vehicle.model}
                                                 </Typography>
                                             </Box>
                                         </Box>
@@ -396,152 +411,12 @@ const VehicleManagement = () => {
             )}
 
             {/* Add/Edit Vehicle Dialog */}
-            <Dialog
+            <VehicleEditModal
                 open={dialogOpen}
                 onClose={() => setDialogOpen(false)}
-                maxWidth="md"
-                fullWidth
-            >
-                <DialogTitle>
-                    {selectedVehicle ? "Chỉnh sửa thông tin xe" : "Thêm xe mới"}
-                </DialogTitle>
-                <DialogContent dividers>
-                    <Grid container spacing={3}>
-                        <Grid item xs={12}>
-                            <TextField
-                                fullWidth
-                                label="Tên gọi (Nickname)"
-                                value={formData.nickname}
-                                onChange={(e) =>
-                                    setFormData({ ...formData, nickname: e.target.value })
-                                }
-                                placeholder="VD: Xe chính, Xe gia đình..."
-                            />
-                        </Grid>
-
-                        <Grid item xs={12} sm={6}>
-                            <FormControl fullWidth>
-                                <InputLabel>Hãng xe</InputLabel>
-                                <Select
-                                    value={formData.make}
-                                    label="Hãng xe"
-                                    onChange={(e) =>
-                                        setFormData({ ...formData, make: e.target.value })
-                                    }
-                                >
-                                    {makeOptions.map((make) => (
-                                        <MenuItem key={make} value={make}>
-                                            {make}
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
-                        </Grid>
-
-                        <Grid item xs={12} sm={6}>
-                            <TextField
-                                fullWidth
-                                label="Model"
-                                value={formData.model}
-                                onChange={(e) =>
-                                    setFormData({ ...formData, model: e.target.value })
-                                }
-                                placeholder="VD: VF8, Model 3..."
-                            />
-                        </Grid>
-
-                        <Grid item xs={12} sm={6}>
-                            <TextField
-                                fullWidth
-                                label="Năm sản xuất"
-                                value={formData.year}
-                                onChange={(e) =>
-                                    setFormData({ ...formData, year: e.target.value })
-                                }
-                                placeholder="VD: 2024"
-                            />
-                        </Grid>
-
-                        <Grid item xs={12} sm={6}>
-                            <TextField
-                                fullWidth
-                                label="Dung lượng pin (kWh)"
-                                value={formData.batteryCapacity}
-                                onChange={(e) =>
-                                    setFormData({ ...formData, batteryCapacity: e.target.value })
-                                }
-                                placeholder="VD: 87.7"
-                            />
-                        </Grid>
-
-                        <Grid item xs={12} sm={6}>
-                            <TextField
-                                fullWidth
-                                label="Tốc độ sạc tối đa (kW)"
-                                value={formData.maxChargingSpeed}
-                                onChange={(e) =>
-                                    setFormData({ ...formData, maxChargingSpeed: e.target.value })
-                                }
-                                placeholder="VD: 150"
-                            />
-                        </Grid>
-
-                        <Grid item xs={12} sm={6}>
-                            <FormControl fullWidth>
-                                <InputLabel>Loại cổng sạc</InputLabel>
-                                <Select
-                                    value={formData.connectorTypes || []}
-                                    label="Loại cổng sạc"
-                                    multiple
-                                    onChange={(e) =>
-                                        setFormData({ ...formData, connectorTypes: e.target.value })
-                                    }
-                                    renderValue={(selected) => selected.map(value => {
-                                        const type = connectorTypes.find(t => t.value === value);
-                                        return type ? type.label : value;
-                                    }).join(', ')}
-                                >
-                                    {connectorTypes.map((type) => (
-                                        <MenuItem key={type.value} value={type.value}>
-                                            {type.label}
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
-                        </Grid>
-
-                        <Grid item xs={12} sm={6}>
-                            <TextField
-                                fullWidth
-                                label="Biển số xe"
-                                value={formData.licensePlate}
-                                onChange={(e) =>
-                                    setFormData({ ...formData, licensePlate: e.target.value })
-                                }
-                                placeholder="VD: 30A-123.45"
-                            />
-                        </Grid>
-
-                        <Grid item xs={12} sm={6}>
-                            <TextField
-                                fullWidth
-                                label="Màu xe"
-                                value={formData.color}
-                                onChange={(e) =>
-                                    setFormData({ ...formData, color: e.target.value })
-                                }
-                                placeholder="VD: Xanh, Trắng, Đen..."
-                            />
-                        </Grid>
-                    </Grid>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setDialogOpen(false)}>Hủy</Button>
-                    <Button variant="contained" onClick={handleSave}>
-                        {selectedVehicle ? "Cập nhật" : "Thêm xe"}
-                    </Button>
-                </DialogActions>
-            </Dialog>
+                vehicle={selectedVehicle}
+                onSave={handleSave}
+            />
         </Container>
     );
 };
