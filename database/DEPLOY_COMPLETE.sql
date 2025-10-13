@@ -11,11 +11,10 @@
 -- =====================================================================================
 -- SECTION 1: DATABASE CREATION
 -- =====================================================================================
-USE master;
-GO
-
-IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = 'SkaEV_DB')
+-- SECTION 1: CREATE DATABASE AND USE
+IF DB_ID(N'SkaEV_DB') IS NULL
 BEGIN
+    PRINT 'Creating database SkaEV_DB...';
     CREATE DATABASE SkaEV_DB;
     PRINT 'Database SkaEV_DB created successfully.';
 END
@@ -25,7 +24,7 @@ BEGIN
 END
 GO
 
-USE SkaEV_DB;
+USE [SkaEV_DB];
 GO
 
 PRINT '=====================================================================================';
@@ -217,18 +216,18 @@ END
 GO
 
 -- =====================================================================================
--- Table: soc_tracking
+-- Table: soc_tracking (escaped reserved identifiers)
 -- =====================================================================================
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'soc_tracking')
 BEGIN
     CREATE TABLE soc_tracking (
         tracking_id INT IDENTITY(1,1) PRIMARY KEY,
         booking_id INT NOT NULL,
-        timestamp DATETIME2 NOT NULL DEFAULT GETDATE(),
+        [timestamp] DATETIME2 NOT NULL DEFAULT GETDATE(),
         current_soc DECIMAL(5,2) NOT NULL,
         voltage DECIMAL(10,2),
-        current DECIMAL(10,2),
-        power DECIMAL(10,2),
+        [current] DECIMAL(10,2),
+        [power] DECIMAL(10,2),
         energy_delivered DECIMAL(10,2),
         temperature DECIMAL(5,2),
         estimated_time_remaining INT,
@@ -360,13 +359,14 @@ BEGIN
     CREATE TABLE pricing_rules (
         rule_id INT IDENTITY(1,1) PRIMARY KEY,
         station_id INT,
-        vehicle_type NVARCHAR(50) CHECK (vehicle_type IN ('motorcycle', 'car', NULL)),
+        vehicle_type NVARCHAR(50) NULL,
         time_range_start TIME,
         time_range_end TIME,
         base_price DECIMAL(10,2) NOT NULL,
         is_active BIT NOT NULL DEFAULT 1,
         created_at DATETIME2 NOT NULL DEFAULT GETDATE(),
         updated_at DATETIME2 NOT NULL DEFAULT GETDATE(),
+        CONSTRAINT CK_pricing_vehicle_type CHECK (vehicle_type IN ('motorcycle', 'car') OR vehicle_type IS NULL),
         CONSTRAINT FK_pricing_stations FOREIGN KEY (station_id) REFERENCES charging_stations(station_id) ON DELETE CASCADE
     );
     PRINT 'Table pricing_rules created.';
@@ -403,102 +403,102 @@ PRINT 'Creating indexes...';
 GO
 
 -- Users indexes
-IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_users_email')
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_users_email' AND object_id = OBJECT_ID('users'))
     CREATE INDEX idx_users_email ON users(email);
 
-IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_users_role')
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_users_role' AND object_id = OBJECT_ID('users'))
     CREATE INDEX idx_users_role ON users(role);
 
 -- Vehicles indexes
-IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_vehicles_user')
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_vehicles_user' AND object_id = OBJECT_ID('vehicles'))
     CREATE INDEX idx_vehicles_user ON vehicles(user_id);
 
-IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_vehicles_license')
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_vehicles_license' AND object_id = OBJECT_ID('vehicles'))
     CREATE UNIQUE INDEX idx_vehicles_license ON vehicles(license_plate) WHERE license_plate IS NOT NULL;
 
 -- Charging stations indexes
-IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_stations_city')
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_stations_city' AND object_id = OBJECT_ID('charging_stations'))
     CREATE INDEX idx_stations_city ON charging_stations(city);
 
-IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_stations_status')
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_stations_status' AND object_id = OBJECT_ID('charging_stations'))
     CREATE INDEX idx_stations_status ON charging_stations(status);
 
-IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_stations_location' AND type_desc = 'SPATIAL')
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_stations_location' AND object_id = OBJECT_ID('charging_stations'))
     CREATE SPATIAL INDEX idx_stations_location ON charging_stations(location);
 
 -- Charging posts indexes
-IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_posts_station')
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_posts_station' AND object_id = OBJECT_ID('charging_posts'))
     CREATE INDEX idx_posts_station ON charging_posts(station_id);
 
-IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_posts_status')
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_posts_status' AND object_id = OBJECT_ID('charging_posts'))
     CREATE INDEX idx_posts_status ON charging_posts(status);
 
 -- Charging slots indexes
-IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_slots_post')
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_slots_post' AND object_id = OBJECT_ID('charging_slots'))
     CREATE INDEX idx_slots_post ON charging_slots(post_id);
 
-IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_slots_status')
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_slots_status' AND object_id = OBJECT_ID('charging_slots'))
     CREATE INDEX idx_slots_status ON charging_slots(status);
 
 -- Bookings indexes
-IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_bookings_user')
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_bookings_user' AND object_id = OBJECT_ID('bookings'))
     CREATE INDEX idx_bookings_user ON bookings(user_id);
 
-IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_bookings_station')
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_bookings_station' AND object_id = OBJECT_ID('bookings'))
     CREATE INDEX idx_bookings_station ON bookings(station_id);
 
-IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_bookings_slot')
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_bookings_slot' AND object_id = OBJECT_ID('bookings'))
     CREATE INDEX idx_bookings_slot ON bookings(slot_id);
 
-IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_bookings_status')
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_bookings_status' AND object_id = OBJECT_ID('bookings'))
     CREATE INDEX idx_bookings_status ON bookings(status);
 
-IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_bookings_scheduled_start')
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_bookings_scheduled_start' AND object_id = OBJECT_ID('bookings'))
     CREATE INDEX idx_bookings_scheduled_start ON bookings(scheduled_start_time);
 
 -- SOC tracking indexes
-IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_soc_booking')
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_soc_booking' AND object_id = OBJECT_ID('soc_tracking'))
     CREATE INDEX idx_soc_booking ON soc_tracking(booking_id);
 
-IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_soc_timestamp')
-    CREATE INDEX idx_soc_timestamp ON soc_tracking(timestamp);
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_soc_timestamp' AND object_id = OBJECT_ID('soc_tracking'))
+    CREATE INDEX idx_soc_timestamp ON soc_tracking([timestamp]);
 
 -- Invoices indexes
-IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_invoices_user')
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_invoices_user' AND object_id = OBJECT_ID('invoices'))
     CREATE INDEX idx_invoices_user ON invoices(user_id);
 
-IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_invoices_status')
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_invoices_status' AND object_id = OBJECT_ID('invoices'))
     CREATE INDEX idx_invoices_status ON invoices(payment_status);
 
 -- QR codes indexes
-IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_qr_station')
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_qr_station' AND object_id = OBJECT_ID('qr_codes'))
     CREATE INDEX idx_qr_station ON qr_codes(station_id);
 
-IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_qr_slot')
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_qr_slot' AND object_id = OBJECT_ID('qr_codes'))
     CREATE INDEX idx_qr_slot ON qr_codes(slot_id);
 
-IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_qr_active')
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_qr_active' AND object_id = OBJECT_ID('qr_codes'))
     CREATE INDEX idx_qr_active ON qr_codes(is_active);
 
 -- Notifications indexes
-IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_notifications_user')
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_notifications_user' AND object_id = OBJECT_ID('notifications'))
     CREATE INDEX idx_notifications_user ON notifications(user_id);
 
-IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_notifications_read')
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_notifications_read' AND object_id = OBJECT_ID('notifications'))
     CREATE INDEX idx_notifications_read ON notifications(is_read);
 
 -- System logs indexes
-IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_logs_type')
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_logs_type' AND object_id = OBJECT_ID('system_logs'))
     CREATE INDEX idx_logs_type ON system_logs(log_type);
 
-IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_logs_created')
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_logs_created' AND object_id = OBJECT_ID('system_logs'))
     CREATE INDEX idx_logs_created ON system_logs(created_at);
 
 -- Reviews indexes
-IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_reviews_station')
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_reviews_station' AND object_id = OBJECT_ID('reviews'))
     CREATE INDEX idx_reviews_station ON reviews(station_id);
 
-IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_reviews_user')
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_reviews_user' AND object_id = OBJECT_ID('reviews'))
     CREATE INDEX idx_reviews_user ON reviews(user_id);
 
 PRINT 'All indexes created successfully.';
@@ -520,7 +520,7 @@ AFTER UPDATE
 AS
 BEGIN
     SET NOCOUNT ON;
-    UPDATE users
+    UPDATE u
     SET updated_at = GETDATE()
     FROM users u
     INNER JOIN inserted i ON u.user_id = i.user_id;
@@ -536,7 +536,7 @@ AFTER UPDATE
 AS
 BEGIN
     SET NOCOUNT ON;
-    UPDATE user_profiles
+    UPDATE up
     SET updated_at = GETDATE()
     FROM user_profiles up
     INNER JOIN inserted i ON up.profile_id = i.profile_id;
@@ -552,7 +552,7 @@ AFTER UPDATE
 AS
 BEGIN
     SET NOCOUNT ON;
-    UPDATE vehicles
+    UPDATE v
     SET updated_at = GETDATE()
     FROM vehicles v
     INNER JOIN inserted i ON v.vehicle_id = i.vehicle_id;
@@ -568,7 +568,7 @@ AFTER UPDATE
 AS
 BEGIN
     SET NOCOUNT ON;
-    UPDATE charging_stations
+    UPDATE cs
     SET updated_at = GETDATE()
     FROM charging_stations cs
     INNER JOIN inserted i ON cs.station_id = i.station_id;
@@ -584,7 +584,7 @@ AFTER UPDATE
 AS
 BEGIN
     SET NOCOUNT ON;
-    UPDATE charging_posts
+    UPDATE cp
     SET updated_at = GETDATE()
     FROM charging_posts cp
     INNER JOIN inserted i ON cp.post_id = i.post_id;
@@ -600,7 +600,7 @@ AFTER UPDATE
 AS
 BEGIN
     SET NOCOUNT ON;
-    UPDATE charging_slots
+    UPDATE cs
     SET updated_at = GETDATE()
     FROM charging_slots cs
     INNER JOIN inserted i ON cs.slot_id = i.slot_id;
@@ -616,7 +616,7 @@ AFTER UPDATE
 AS
 BEGIN
     SET NOCOUNT ON;
-    UPDATE bookings
+    UPDATE b
     SET updated_at = GETDATE()
     FROM bookings b
     INNER JOIN inserted i ON b.booking_id = i.booking_id;
@@ -632,7 +632,7 @@ AFTER UPDATE
 AS
 BEGIN
     SET NOCOUNT ON;
-    UPDATE invoices
+    UPDATE inv
     SET updated_at = GETDATE()
     FROM invoices inv
     INNER JOIN inserted i ON inv.invoice_id = i.invoice_id;
@@ -648,7 +648,7 @@ AFTER UPDATE
 AS
 BEGIN
     SET NOCOUNT ON;
-    UPDATE qr_codes
+    UPDATE qr
     SET updated_at = GETDATE()
     FROM qr_codes qr
     INNER JOIN inserted i ON qr.qr_id = i.qr_id;
@@ -664,7 +664,7 @@ AFTER UPDATE
 AS
 BEGIN
     SET NOCOUNT ON;
-    UPDATE reviews
+    UPDATE r
     SET updated_at = GETDATE()
     FROM reviews r
     INNER JOIN inserted i ON r.review_id = i.review_id;
@@ -680,7 +680,7 @@ AFTER UPDATE
 AS
 BEGIN
     SET NOCOUNT ON;
-    UPDATE pricing_rules
+    UPDATE pr
     SET updated_at = GETDATE()
     FROM pricing_rules pr
     INNER JOIN inserted i ON pr.rule_id = i.rule_id;
@@ -1043,7 +1043,6 @@ BEGIN
         DECLARE @qr_id INT;
         DECLARE @station_id INT;
         DECLARE @slot_id INT;
-        DECLARE @booking_id INT;
         
         -- Validate QR code
         SELECT @qr_id = qr_id, @station_id = station_id, @slot_id = slot_id
@@ -1125,7 +1124,7 @@ END;
 GO
 
 -- =====================================================================================
--- Stored Procedure: Update SOC Progress
+-- Stored Procedure: Update SOC Progress (escaped reserved identifiers)
 -- =====================================================================================
 IF OBJECT_ID('sp_update_soc_progress', 'P') IS NOT NULL
     DROP PROCEDURE sp_update_soc_progress;
@@ -1144,7 +1143,7 @@ BEGIN
     SET NOCOUNT ON;
     
     INSERT INTO soc_tracking (
-        booking_id, current_soc, voltage, current, power,
+        booking_id, current_soc, voltage, [current], [power],
         energy_delivered, temperature, estimated_time_remaining
     )
     VALUES (
@@ -1347,7 +1346,7 @@ END;
 GO
 
 -- =====================================================================================
--- Stored Procedure: Get Booking SOC History
+-- Stored Procedure: Get Booking SOC History (escaped reserved identifiers)
 -- =====================================================================================
 IF OBJECT_ID('sp_get_booking_soc_history', 'P') IS NOT NULL
     DROP PROCEDURE sp_get_booking_soc_history;
@@ -1360,17 +1359,17 @@ BEGIN
     
     SELECT 
         tracking_id,
-        timestamp,
+        [timestamp],
         current_soc,
         voltage,
-        current,
-        power,
+        [current],
+        [power],
         energy_delivered,
         temperature,
         estimated_time_remaining
     FROM soc_tracking
     WHERE booking_id = @booking_id
-    ORDER BY timestamp ASC;
+    ORDER BY [timestamp] ASC;
 END;
 GO
 
@@ -1398,7 +1397,7 @@ END;
 GO
 
 -- =====================================================================================
--- Stored Procedure: Get Station Analytics
+-- Stored Procedure: Get Station Analytics (fixed aggregate over subquery)
 -- =====================================================================================
 IF OBJECT_ID('sp_get_station_analytics', 'P') IS NOT NULL
     DROP PROCEDURE sp_get_station_analytics;
@@ -1410,21 +1409,28 @@ CREATE PROCEDURE sp_get_station_analytics
 AS
 BEGIN
     SET NOCOUNT ON;
-    
+
+    ;WITH bookings_in_range AS (
+        SELECT *
+        FROM bookings
+        WHERE station_id = @station_id
+          AND created_at BETWEEN @start_date AND @end_date
+    ),
+    energy_per_booking AS (
+        SELECT booking_id, SUM(energy_delivered) AS total_energy_delivered_kwh
+        FROM soc_tracking
+        GROUP BY booking_id
+    )
     SELECT 
         COUNT(*) AS total_bookings,
-        SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed_bookings,
-        SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled_bookings,
-        AVG(CASE WHEN status = 'completed' THEN DATEDIFF(MINUTE, actual_start_time, actual_end_time) END) AS avg_session_duration_minutes,
-        SUM(CASE WHEN status = 'completed' THEN 
-            ISNULL((SELECT SUM(energy_delivered) FROM soc_tracking WHERE booking_id = b.booking_id), 0)
-        ELSE 0 END) AS total_energy_delivered_kwh,
-        SUM(CASE WHEN status = 'completed' THEN 
-            ISNULL((SELECT total_amount FROM invoices WHERE booking_id = b.booking_id), 0)
-        ELSE 0 END) AS total_revenue
-    FROM bookings b
-    WHERE station_id = @station_id
-        AND created_at BETWEEN @start_date AND @end_date;
+        SUM(CASE WHEN b.status = 'completed' THEN 1 ELSE 0 END) AS completed_bookings,
+        SUM(CASE WHEN b.status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled_bookings,
+        AVG(CASE WHEN b.status = 'completed' THEN DATEDIFF(MINUTE, b.actual_start_time, b.actual_end_time) END) AS avg_session_duration_minutes,
+        SUM(CASE WHEN b.status = 'completed' THEN COALESCE(e.total_energy_delivered_kwh, 0) ELSE 0 END) AS total_energy_delivered_kwh,
+        SUM(CASE WHEN b.status = 'completed' THEN COALESCE(i.total_amount, 0) ELSE 0 END) AS total_revenue
+    FROM bookings_in_range b
+    LEFT JOIN energy_per_booking e ON e.booking_id = b.booking_id
+    LEFT JOIN invoices i ON i.booking_id = b.booking_id;
 END;
 GO
 
@@ -1464,11 +1470,12 @@ GO
 -- List all tables
 PRINT 'Tables:';
 SELECT 
-    TABLE_NAME,
-    (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = t.TABLE_NAME) AS column_count
+    t.TABLE_NAME,
+    (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS c WHERE c.TABLE_NAME = t.TABLE_NAME AND c.TABLE_SCHEMA = t.TABLE_SCHEMA) AS column_count
 FROM INFORMATION_SCHEMA.TABLES t
-WHERE TABLE_TYPE = 'BASE TABLE'
-ORDER BY TABLE_NAME;
+WHERE t.TABLE_TYPE = 'BASE TABLE'
+  AND t.TABLE_SCHEMA = 'dbo'
+ORDER BY t.TABLE_NAME;
 GO
 
 -- List all stored procedures
