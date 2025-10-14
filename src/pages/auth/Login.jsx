@@ -50,8 +50,23 @@ const LoginPage = () => {
     const result = await login(formData.email, formData.password);
 
     if (result.success) {
-      // Navigation will be handled by the PublicRoute component
-      console.log("Login successful");
+      console.log("Login successful", result.data);
+      
+      // Navigate based on user role
+      const userRole = result.data?.user?.role;
+      switch (userRole) {
+        case "admin":
+          navigate("/admin/dashboard");
+          break;
+        case "staff":
+          navigate("/staff/dashboard");
+          break;
+        case "customer":
+          navigate("/customer/charging");
+          break;
+        default:
+          navigate("/");
+      }
     }
   };
 

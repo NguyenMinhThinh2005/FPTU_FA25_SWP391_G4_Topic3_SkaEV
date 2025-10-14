@@ -16,25 +16,41 @@ const useAuthStore = create(
         set({ loading: true, error: null });
 
         try {
-          // Real API call
+          // Real API call - backend returns: { userId, email, fullName, role, token, expiresAt }
           const response = await authAPI.login({ email, password });
 
-          if (response.success && response.data) {
-            set({
-              user: response.data.user,
-              isAuthenticated: true,
-              loading: false,
-            });
+          // Transform backend response to expected format
+          const userData = {
+            user_id: response.userId,
+            email: response.email,
+            full_name: response.fullName,
+            role: response.role,
+          };
 
-            return { success: true, data: response.data };
-          } else {
-            throw new Error(
-              response.message || "Email hoặc mật khẩu không đúng"
-            );
+          // Store token in localStorage
+          localStorage.setItem('token', response.token);
+          if (response.refreshToken) {
+            localStorage.setItem('refreshToken', response.refreshToken);
           }
+
+          set({
+            user: userData,
+            isAuthenticated: true,
+            loading: false,
+          });
+
+          return { 
+            success: true, 
+            data: { 
+              user: userData, 
+              token: response.token 
+            } 
+          };
         } catch (error) {
           const errorMessage =
-            error.message || "Đã xảy ra lỗi khi đăng nhập";
+            error.response?.data?.message || 
+            error.message || 
+            "Email hoặc mật khẩu không đúng";
           set({ loading: false, error: errorMessage });
           return { success: false, error: errorMessage };
         }
