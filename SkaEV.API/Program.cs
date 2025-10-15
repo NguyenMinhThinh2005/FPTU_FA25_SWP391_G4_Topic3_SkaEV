@@ -89,6 +89,20 @@ builder.Services.AddCors(options =>
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IStationService, StationService>();
 builder.Services.AddScoped<IBookingService, BookingService>();
+builder.Services.AddScoped<IPaymentMethodService, PaymentMethodService>();
+builder.Services.AddScoped<IReportService, ReportService>();
+
+// New Services
+builder.Services.AddScoped<IInvoiceService, InvoiceService>();
+builder.Services.AddScoped<IVehicleService, VehicleService>();
+builder.Services.AddScoped<IReviewService, ReviewService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<IQRCodeService, QRCodeService>();
+builder.Services.AddScoped<IPostService, PostService>();
+builder.Services.AddScoped<ISlotService, SlotService>();
+builder.Services.AddScoped<IUserProfileService, UserProfileService>();
+builder.Services.AddScoped<IAdminUserService, AdminUserService>();
+builder.Services.AddScoped<IIssueService, IssueService>(); // Optional - requires 08_ADD_ISSUES_TABLE.sql
 
 // Configure Swagger
 builder.Services.AddEndpointsApiExplorer();

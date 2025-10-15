@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using SkaEV.API.Domain.Entities;
+using SkaEV.API.Domain.Entities.Views;
 using NetTopologySuite.Geometries;
 
 namespace SkaEV.API.Infrastructure.Data;
@@ -10,7 +11,7 @@ public class SkaEVDbContext : DbContext
     {
     }
 
-    // DbSets
+    // DbSets - Tables
     public DbSet<User> Users { get; set; }
     public DbSet<UserProfile> UserProfiles { get; set; }
     public DbSet<Vehicle> Vehicles { get; set; }
@@ -26,6 +27,16 @@ public class SkaEVDbContext : DbContext
     public DbSet<Review> Reviews { get; set; }
     public DbSet<PricingRule> PricingRules { get; set; }
     public DbSet<StationStaff> StationStaff { get; set; }
+    public DbSet<PaymentMethod> PaymentMethods { get; set; }
+    public DbSet<Payment> Payments { get; set; }
+
+    // DbSets - Views (read-only)
+    public DbSet<UserCostReport> UserCostReports { get; set; }
+    public DbSet<UserChargingHabit> UserChargingHabits { get; set; }
+    public DbSet<AdminRevenueReport> AdminRevenueReports { get; set; }
+    public DbSet<AdminUsageReport> AdminUsageReports { get; set; }
+    public DbSet<StationPerformance> StationPerformances { get; set; }
+    public DbSet<PaymentMethodsSummary> PaymentMethodsSummaries { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -403,6 +414,99 @@ public class SkaEVDbContext : DbContext
                 .WithMany(s => s.StationStaff)
                 .HasForeignKey(e => e.StationId)
                 .OnDelete(DeleteBehavior.NoAction);
+        });
+
+        // PaymentMethod configuration
+        modelBuilder.Entity<PaymentMethod>(entity =>
+        {
+            entity.HasKey(e => e.PaymentMethodId);
+            entity.ToTable("payment_methods");
+            entity.Property(e => e.PaymentMethodId).HasColumnName("payment_method_id");
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+            entity.Property(e => e.Type).HasColumnName("type").HasMaxLength(50).IsRequired();
+            entity.Property(e => e.Provider).HasColumnName("provider").HasMaxLength(50);
+            entity.Property(e => e.CardNumberLast4).HasColumnName("card_number_last4").HasMaxLength(4);
+            entity.Property(e => e.CardholderName).HasColumnName("cardholder_name").HasMaxLength(255);
+            entity.Property(e => e.ExpiryMonth).HasColumnName("expiry_month");
+            entity.Property(e => e.ExpiryYear).HasColumnName("expiry_year");
+            entity.Property(e => e.IsDefault).HasColumnName("is_default");
+            entity.Property(e => e.IsActive).HasColumnName("is_active");
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at").IsRequired();
+            entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").IsRequired();
+
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Payment configuration
+        modelBuilder.Entity<Payment>(entity =>
+        {
+            entity.HasKey(e => e.PaymentId);
+            entity.ToTable("payments");
+            entity.Property(e => e.PaymentId).HasColumnName("payment_id");
+            entity.Property(e => e.InvoiceId).HasColumnName("invoice_id");
+            entity.Property(e => e.PaymentMethodId).HasColumnName("payment_method_id");
+            entity.Property(e => e.Amount).HasColumnName("amount").HasColumnType("decimal(10,2)").IsRequired();
+            entity.Property(e => e.PaymentType).HasColumnName("payment_type").HasMaxLength(50).IsRequired();
+            entity.Property(e => e.Status).HasColumnName("status").HasMaxLength(50).IsRequired();
+            entity.Property(e => e.TransactionId).HasColumnName("transaction_id").HasMaxLength(255);
+            entity.Property(e => e.ProcessedByStaffId).HasColumnName("processed_by_staff_id");
+            entity.Property(e => e.ProcessedAt).HasColumnName("processed_at");
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at").IsRequired();
+
+            entity.HasOne(e => e.Invoice)
+                .WithMany()
+                .HasForeignKey(e => e.InvoiceId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.PaymentMethod)
+                .WithMany()
+                .HasForeignKey(e => e.PaymentMethodId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+            entity.HasOne(e => e.ProcessedByStaff)
+                .WithMany()
+                .HasForeignKey(e => e.ProcessedByStaffId)
+                .OnDelete(DeleteBehavior.NoAction);
+        });
+
+        // Configure Views (read-only, no keys needed)
+        modelBuilder.Entity<UserCostReport>(entity =>
+        {
+            entity.ToView("v_user_cost_reports");
+            entity.HasNoKey();
+        });
+
+        modelBuilder.Entity<UserChargingHabit>(entity =>
+        {
+            entity.ToView("v_user_charging_habits");
+            entity.HasNoKey();
+        });
+
+        modelBuilder.Entity<AdminRevenueReport>(entity =>
+        {
+            entity.ToView("v_admin_revenue_reports");
+            entity.HasNoKey();
+        });
+
+        modelBuilder.Entity<AdminUsageReport>(entity =>
+        {
+            entity.ToView("v_admin_usage_reports");
+            entity.HasNoKey();
+        });
+
+        modelBuilder.Entity<StationPerformance>(entity =>
+        {
+            entity.ToView("v_station_performance");
+            entity.HasNoKey();
+        });
+
+        modelBuilder.Entity<PaymentMethodsSummary>(entity =>
+        {
+            entity.ToView("v_payment_methods_summary");
+            entity.HasNoKey();
         });
     }
 }
