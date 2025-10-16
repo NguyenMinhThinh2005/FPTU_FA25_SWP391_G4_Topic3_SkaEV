@@ -251,6 +251,36 @@ export const paymentsAPI = {
   },
 };
 
+export const vehiclesAPI = {
+  getAll: (params) => {
+    return axiosInstance.get('/vehicles', { params });
+  },
+
+  getById: (id) => {
+    return axiosInstance.get(`/vehicles/${id}`);
+  },
+
+  getUserVehicles: () => {
+    return axiosInstance.get('/vehicles/my-vehicles');
+  },
+
+  create: (vehicleData) => {
+    return axiosInstance.post('/vehicles', vehicleData);
+  },
+
+  update: (id, vehicleData) => {
+    return axiosInstance.put(`/vehicles/${id}`, vehicleData);
+  },
+
+  delete: (id) => {
+    return axiosInstance.delete(`/vehicles/${id}`);
+  },
+
+  setDefault: (id) => {
+    return axiosInstance.post(`/vehicles/${id}/set-default`);
+  },
+};
+
 // Health check
 export const healthAPI = {
   check: () => {

@@ -1,205 +1,442 @@
-import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { create } from "zustand";import { create } from "zustand";
+
+import { persist } from "zustand/middleware";import { persist } from "zustand/middleware";
+
+import { vehiclesAPI } from "../services/api";import { CONNECTOR_TYPES } from "../utils/constants";
+
 import { CONNECTOR_TYPES } from "../utils/constants";
 
 const useVehicleStore = create(
-    persist(
-        (set, get) => ({
-            // State
-            vehicles: [
-                {
-                    id: "1",
-                    nickname: "Xe chính",
-                    make: "VinFast",
+
+const useVehicleStore = create(    persist(
+
+  persist(        (set, get) => ({
+
+    (set, get) => ({            // State
+
+      // State            vehicles: [
+
+      vehicles: [],                {
+
+      currentVehicle: null,                    id: "1",
+
+      loading: false,                    nickname: "Xe chính",
+
+      error: null,                    make: "VinFast",
+
                     model: "VF8",
-                    year: "2024",
-                    batteryCapacity: "87.7",
-                    maxChargingSpeed: "150",
-                    connectorTypes: [CONNECTOR_TYPES.CCS2], // Standardized to array
-                    licensePlate: "30A-123.45",
+
+      // Initialize data from API                    year: "2024",
+
+      initializeData: async () => {                    batteryCapacity: "87.7",
+
+        console.log("🚀 Initializing vehicles from API...");                    maxChargingSpeed: "150",
+
+        await get().fetchVehicles();                    connectorTypes: [CONNECTOR_TYPES.CCS2], // Standardized to array
+
+      },                    licensePlate: "30A-123.45",
+
                     color: "Xanh",
-                    isDefault: true,
-                },
-                {
-                    id: "2",
-                    nickname: "Xe gia đình",
-                    make: "Tesla",
-                    model: "Model 3",
-                    year: "2023",
-                    batteryCapacity: "75",
-                    maxChargingSpeed: "250",
-                    connectorTypes: [CONNECTOR_TYPES.CCS2, CONNECTOR_TYPES.TYPE2],
-                    licensePlate: "29B-678.90",
-                    color: "Trắng",
-                    isDefault: false,
-                },
-            ],
-            currentVehicle: null,
-            loading: false,
-            error: null,
 
-            // Actions
-            addVehicle: (vehicleData) => {
-                const newVehicle = {
-                    ...vehicleData,
-                    id: `vehicle_${Date.now()}`,
-                    connectorTypes: Array.isArray(vehicleData.connectorTypes)
-                        ? vehicleData.connectorTypes
-                        : [vehicleData.connectorTypes].filter(Boolean),
-                };
+      // Fetch user's vehicles from API                    isDefault: true,
 
-                set((state) => ({
-                    vehicles: [...state.vehicles, newVehicle]
+      fetchVehicles: async () => {                },
+
+        set({ loading: true, error: null });                {
+
+        try {                    id: "2",
+
+          const response = await vehiclesAPI.getUserVehicles();                    nickname: "Xe gia đình",
+
+                              make: "Tesla",
+
+          if (response.success && response.data) {                    model: "Model 3",
+
+            const vehicles = Array.isArray(response.data)                     year: "2023",
+
+              ? response.data                     batteryCapacity: "75",
+
+              : response.data.vehicles || [];                    maxChargingSpeed: "250",
+
+                                connectorTypes: [CONNECTOR_TYPES.CCS2, CONNECTOR_TYPES.TYPE2],
+
+            console.log("✅ Vehicles loaded from API:", vehicles.length);                    licensePlate: "29B-678.90",
+
+                                color: "Trắng",
+
+            // Set default vehicle as current if none selected                    isDefault: false,
+
+            const defaultVehicle = vehicles.find(v => v.isDefault) || vehicles[0];                },
+
+                        ],
+
+            set({             currentVehicle: null,
+
+              vehicles,             loading: false,
+
+              currentVehicle: get().currentVehicle || defaultVehicle,            error: null,
+
+              loading: false 
+
+            });            // Actions
+
+            return { success: true, data: vehicles };            addVehicle: (vehicleData) => {
+
+          } else {                const newVehicle = {
+
+            throw new Error(response.message || "Không thể tải danh sách vehicles");                    ...vehicleData,
+
+          }                    id: `vehicle_${Date.now()}`,
+
+        } catch (error) {                    connectorTypes: Array.isArray(vehicleData.connectorTypes)
+
+          const errorMessage = error.message || "Đã xảy ra lỗi khi tải vehicles";                        ? vehicleData.connectorTypes
+
+          console.error("❌ Fetch vehicles error:", errorMessage);                        : [vehicleData.connectorTypes].filter(Boolean),
+
+          set({ error: errorMessage, loading: false, vehicles: [] });                };
+
+          return { success: false, error: errorMessage };
+
+        }                set((state) => ({
+
+      },                    vehicles: [...state.vehicles, newVehicle]
+
                 }));
 
-                return newVehicle;
-            },
+      // Add new vehicle via API
 
-            updateVehicle: (vehicleId, updates) => {
-                set((state) => ({
-                    vehicles: state.vehicles.map((vehicle) =>
-                        vehicle.id === vehicleId
-                            ? {
-                                ...vehicle,
+      addVehicle: async (vehicleData) => {                return newVehicle;
+
+        set({ loading: true, error: null });            },
+
+        try {
+
+          const data = {            updateVehicle: (vehicleId, updates) => {
+
+            ...vehicleData,                set((state) => ({
+
+            connectorTypes: Array.isArray(vehicleData.connectorTypes)                    vehicles: state.vehicles.map((vehicle) =>
+
+              ? vehicleData.connectorTypes                        vehicle.id === vehicleId
+
+              : [vehicleData.connectorTypes].filter(Boolean),                            ? {
+
+          };                                ...vehicle,
+
                                 ...updates,
-                                connectorTypes: Array.isArray(updates.connectorTypes)
-                                    ? updates.connectorTypes
-                                    : updates.connectorTypes
-                                        ? [updates.connectorTypes]
-                                        : vehicle.connectorTypes,
-                            }
-                            : vehicle
-                    ),
-                }));
-            },
 
-            deleteVehicle: (vehicleId) => {
-                set((state) => ({
-                    vehicles: state.vehicles.filter((vehicle) => vehicle.id !== vehicleId),
-                    currentVehicle: state.currentVehicle?.id === vehicleId ? null : state.currentVehicle,
-                }));
-            },
+          const response = await vehiclesAPI.create(data);                                connectorTypes: Array.isArray(updates.connectorTypes)
 
-            setDefaultVehicle: (vehicleId) => {
-                set((state) => ({
-                    vehicles: state.vehicles.map((vehicle) => ({
-                        ...vehicle,
-                        isDefault: vehicle.id === vehicleId,
-                    })),
-                    currentVehicle: state.vehicles.find((v) => v.id === vehicleId) || state.currentVehicle,
-                }));
-            },
+                                              ? updates.connectorTypes
 
-            setCurrentVehicle: (vehicleId) => {
-                const vehicle = get().vehicles.find((v) => v.id === vehicleId);
-                set({ currentVehicle: vehicle });
-            },
+          if (response.success && response.data) {                                    : updates.connectorTypes
 
-            // Getters
-            getDefaultVehicle: () => {
-                const { vehicles } = get();
-                return vehicles.find((vehicle) => vehicle.isDefault) || vehicles[0] || null;
-            },
+            const newVehicle = response.data;                                        ? [updates.connectorTypes]
 
-            getVehicleById: (vehicleId) => {
-                const { vehicles } = get();
-                return vehicles.find((vehicle) => vehicle.id === vehicleId);
-            },
+            set((s) => ({                                         : vehicle.connectorTypes,
 
-            getCompatibleConnectorTypes: () => {
-                const { vehicles } = get();
-                const allConnectors = new Set();
+              vehicles: [...s.vehicles, newVehicle],                             }
 
-                vehicles.forEach((vehicle) => {
-                    if (vehicle.connectorTypes) {
-                        vehicle.connectorTypes.forEach((type) => allConnectors.add(type));
-                    }
-                });
+              loading: false                             : vehicle
 
-                return Array.from(allConnectors);
-            },
+            }));                    ),
 
-            getCurrentVehicleConnectors: () => {
-                const currentVehicle = get().currentVehicle || get().getDefaultVehicle();
-                return currentVehicle?.connectorTypes || [];
-            },
+            return { success: true, data: newVehicle };                }));
 
-            // Utility methods
-            isConnectorCompatible: (connectorType, vehicleId = null) => {
-                const vehicle = vehicleId
-                    ? get().getVehicleById(vehicleId)
-                    : get().currentVehicle || get().getDefaultVehicle();
+          } else {            },
 
-                if (!vehicle || !vehicle.connectorTypes) return false;
-                return vehicle.connectorTypes.includes(connectorType);
-            },
+            throw new Error(response.message || "Không thể tạo vehicle");
 
-            // Sync with user profile
-            syncWithUserProfile: (userVehicleData) => {
-                if (!userVehicleData) return;
+          }            deleteVehicle: (vehicleId) => {
 
-                // Convert user profile vehicle data to store format
-                const syncedVehicle = {
-                    id: "user_profile_vehicle",
-                    nickname: "Xe từ hồ sơ",
-                    make: userVehicleData.make,
-                    model: userVehicleData.model,
-                    year: userVehicleData.year,
-                    batteryCapacity: userVehicleData.batteryCapacity?.toString(),
-                    maxChargingSpeed: "150", // Default
-                    connectorTypes: Array.isArray(userVehicleData.chargingType)
-                        ? userVehicleData.chargingType.map(type => {
-                            // Convert formats: "AC Type 2" -> "Type 2", "DC CCS" -> "CCS2"
-                            if (type.includes("Type 2")) return CONNECTOR_TYPES.TYPE2;
-                            if (type.includes("CCS")) return CONNECTOR_TYPES.CCS2;
-                            if (type.includes("CHAdeMO")) return CONNECTOR_TYPES.CHADEMO;
-                            return type;
-                        })
-                        : [CONNECTOR_TYPES.TYPE2], // Default fallback
-                    licensePlate: "",
-                    color: "",
-                    isDefault: true,
-                };
+        } catch (error) {                set((state) => ({
 
-                // Check if profile vehicle already exists
-                const existingVehicle = get().vehicles.find(v => v.id === "user_profile_vehicle");
+          const errorMessage = error.message || "Đã xảy ra lỗi khi tạo vehicle";                    vehicles: state.vehicles.filter((vehicle) => vehicle.id !== vehicleId),
 
-                if (existingVehicle) {
-                    get().updateVehicle("user_profile_vehicle", syncedVehicle);
-                } else {
-                    set((state) => ({
-                        vehicles: [syncedVehicle, ...state.vehicles.map(v => ({ ...v, isDefault: false }))],
-                    }));
-                }
-            },
+          console.error("❌ Add vehicle error:", errorMessage);                    currentVehicle: state.currentVehicle?.id === vehicleId ? null : state.currentVehicle,
 
-            // Initialize
-            initializeWithUserData: (userData) => {
-                if (userData?.vehicle) {
-                    get().syncWithUserProfile(userData.vehicle);
-                }
+          set({ error: errorMessage, loading: false });                }));
 
-                // Set default vehicle as current if none selected
-                if (!get().currentVehicle) {
-                    const defaultVehicle = get().getDefaultVehicle();
-                    if (defaultVehicle) {
-                        set({ currentVehicle: defaultVehicle });
-                    }
-                }
-            },
+          return { success: false, error: errorMessage };            },
 
-            setLoading: (loading) => set({ loading }),
-            setError: (error) => set({ error }),
-            clearError: () => set({ error: null }),
-        }),
-        {
-            name: "skaev-vehicle-storage",
-            partialize: (state) => ({
-                vehicles: state.vehicles,
-                currentVehicle: state.currentVehicle,
-            }),
         }
+
+      },            setDefaultVehicle: (vehicleId) => {
+
+                set((state) => ({
+
+      // Update vehicle via API                    vehicles: state.vehicles.map((vehicle) => ({
+
+      updateVehicle: async (vehicleId, updates) => {                        ...vehicle,
+
+        set({ loading: true, error: null });                        isDefault: vehicle.id === vehicleId,
+
+        try {                    })),
+
+          const data = {                    currentVehicle: state.vehicles.find((v) => v.id === vehicleId) || state.currentVehicle,
+
+            ...updates,                }));
+
+            connectorTypes: updates.connectorTypes            },
+
+              ? Array.isArray(updates.connectorTypes)
+
+                ? updates.connectorTypes            setCurrentVehicle: (vehicleId) => {
+
+                : [updates.connectorTypes]                const vehicle = get().vehicles.find((v) => v.id === vehicleId);
+
+              : undefined,                set({ currentVehicle: vehicle });
+
+          };            },
+
+
+
+          const response = await vehiclesAPI.update(vehicleId, data);            // Getters
+
+                      getDefaultVehicle: () => {
+
+          if (response.success && response.data) {                const { vehicles } = get();
+
+            const updatedVehicle = response.data;                return vehicles.find((vehicle) => vehicle.isDefault) || vehicles[0] || null;
+
+            set((s) => ({            },
+
+              vehicles: s.vehicles.map((v) => v.id === vehicleId ? updatedVehicle : v),
+
+              currentVehicle: s.currentVehicle?.id === vehicleId ? updatedVehicle : s.currentVehicle,            getVehicleById: (vehicleId) => {
+
+              loading: false,                const { vehicles } = get();
+
+            }));                return vehicles.find((vehicle) => vehicle.id === vehicleId);
+
+            return { success: true, data: updatedVehicle };            },
+
+          } else {
+
+            throw new Error(response.message || "Không thể cập nhật vehicle");            getCompatibleConnectorTypes: () => {
+
+          }                const { vehicles } = get();
+
+        } catch (error) {                const allConnectors = new Set();
+
+          const errorMessage = error.message || "Đã xảy ra lỗi khi cập nhật vehicle";
+
+          console.error("❌ Update vehicle error:", errorMessage);                vehicles.forEach((vehicle) => {
+
+          set({ error: errorMessage, loading: false });                    if (vehicle.connectorTypes) {
+
+          return { success: false, error: errorMessage };                        vehicle.connectorTypes.forEach((type) => allConnectors.add(type));
+
+        }                    }
+
+      },                });
+
+
+
+      // Delete vehicle via API                return Array.from(allConnectors);
+
+      deleteVehicle: async (vehicleId) => {            },
+
+        set({ loading: true, error: null });
+
+        try {            getCurrentVehicleConnectors: () => {
+
+          const response = await vehiclesAPI.delete(vehicleId);                const currentVehicle = get().currentVehicle || get().getDefaultVehicle();
+
+                          return currentVehicle?.connectorTypes || [];
+
+          if (response.success) {            },
+
+            set((s) => ({
+
+              vehicles: s.vehicles.filter((v) => v.id !== vehicleId),            // Utility methods
+
+              currentVehicle: s.currentVehicle?.id === vehicleId ? null : s.currentVehicle,            isConnectorCompatible: (connectorType, vehicleId = null) => {
+
+              loading: false,                const vehicle = vehicleId
+
+            }));                    ? get().getVehicleById(vehicleId)
+
+            return { success: true };                    : get().currentVehicle || get().getDefaultVehicle();
+
+          } else {
+
+            throw new Error(response.message || "Không thể xóa vehicle");                if (!vehicle || !vehicle.connectorTypes) return false;
+
+          }                return vehicle.connectorTypes.includes(connectorType);
+
+        } catch (error) {            },
+
+          const errorMessage = error.message || "Đã xảy ra lỗi khi xóa vehicle";
+
+          console.error("❌ Delete vehicle error:", errorMessage);            // Sync with user profile
+
+          set({ error: errorMessage, loading: false });            syncWithUserProfile: (userVehicleData) => {
+
+          return { success: false, error: errorMessage };                if (!userVehicleData) return;
+
+        }
+
+      },                // Convert user profile vehicle data to store format
+
+                const syncedVehicle = {
+
+      // Set default vehicle via API                    id: "user_profile_vehicle",
+
+      setDefaultVehicle: async (vehicleId) => {                    nickname: "Xe từ hồ sơ",
+
+        set({ loading: true, error: null });                    make: userVehicleData.make,
+
+        try {                    model: userVehicleData.model,
+
+          const response = await vehiclesAPI.setDefault(vehicleId);                    year: userVehicleData.year,
+
+                              batteryCapacity: userVehicleData.batteryCapacity?.toString(),
+
+          if (response.success) {                    maxChargingSpeed: "150", // Default
+
+            set((s) => ({                    connectorTypes: Array.isArray(userVehicleData.chargingType)
+
+              vehicles: s.vehicles.map((v) => ({                        ? userVehicleData.chargingType.map(type => {
+
+                ...v,                            // Convert formats: "AC Type 2" -> "Type 2", "DC CCS" -> "CCS2"
+
+                isDefault: v.id === vehicleId,                            if (type.includes("Type 2")) return CONNECTOR_TYPES.TYPE2;
+
+              })),                            if (type.includes("CCS")) return CONNECTOR_TYPES.CCS2;
+
+              currentVehicle: s.vehicles.find((v) => v.id === vehicleId) || s.currentVehicle,                            if (type.includes("CHAdeMO")) return CONNECTOR_TYPES.CHADEMO;
+
+              loading: false,                            return type;
+
+            }));                        })
+
+            return { success: true };                        : [CONNECTOR_TYPES.TYPE2], // Default fallback
+
+          } else {                    licensePlate: "",
+
+            throw new Error(response.message || "Không thể đặt xe mặc định");                    color: "",
+
+          }                    isDefault: true,
+
+        } catch (error) {                };
+
+          const errorMessage = error.message || "Đã xảy ra lỗi khi đặt xe mặc định";
+
+          console.error("❌ Set default vehicle error:", errorMessage);                // Check if profile vehicle already exists
+
+          set({ error: errorMessage, loading: false });                const existingVehicle = get().vehicles.find(v => v.id === "user_profile_vehicle");
+
+          return { success: false, error: errorMessage };
+
+        }                if (existingVehicle) {
+
+      },                    get().updateVehicle("user_profile_vehicle", syncedVehicle);
+
+                } else {
+
+      // Local state setters                    set((state) => ({
+
+      setCurrentVehicle: (vehicleId) => {                        vehicles: [syncedVehicle, ...state.vehicles.map(v => ({ ...v, isDefault: false }))],
+
+        const vehicle = get().vehicles.find((v) => v.id === vehicleId);                    }));
+
+        set({ currentVehicle: vehicle });                }
+
+      },            },
+
+
+
+      // Getters            // Initialize
+
+      getDefaultVehicle: () => {            initializeWithUserData: (userData) => {
+
+        const { vehicles } = get();                if (userData?.vehicle) {
+
+        return vehicles.find((vehicle) => vehicle.isDefault) || vehicles[0] || null;                    get().syncWithUserProfile(userData.vehicle);
+
+      },                }
+
+
+
+      getVehicleById: (vehicleId) => {                // Set default vehicle as current if none selected
+
+        const { vehicles } = get();                if (!get().currentVehicle) {
+
+        return vehicles.find((vehicle) => vehicle.id === vehicleId);                    const defaultVehicle = get().getDefaultVehicle();
+
+      },                    if (defaultVehicle) {
+
+                        set({ currentVehicle: defaultVehicle });
+
+      getCompatibleConnectorTypes: () => {                    }
+
+        const { vehicles } = get();                }
+
+        const allConnectors = new Set();            },
+
+        vehicles.forEach((vehicle) => {
+
+          if (vehicle.connectorTypes) {            setLoading: (loading) => set({ loading }),
+
+            vehicle.connectorTypes.forEach((type) => allConnectors.add(type));            setError: (error) => set({ error }),
+
+          }            clearError: () => set({ error: null }),
+
+        });        }),
+
+        return Array.from(allConnectors);        {
+
+      },            name: "skaev-vehicle-storage",
+
+            partialize: (state) => ({
+
+      getCurrentVehicleConnectors: () => {                vehicles: state.vehicles,
+
+        const currentVehicle = get().currentVehicle || get().getDefaultVehicle();                currentVehicle: state.currentVehicle,
+
+        return currentVehicle?.connectorTypes || [];            }),
+
+      },        }
+
     )
+
+      // Utility methods);
+
+      isConnectorCompatible: (connectorType, vehicleId = null) => {
+
+        const vehicle = vehicleIdexport default useVehicleStore;
+          ? get().getVehicleById(vehicleId)
+          : get().currentVehicle || get().getDefaultVehicle();
+        if (!vehicle || !vehicle.connectorTypes) return false;
+        return vehicle.connectorTypes.includes(connectorType);
+      },
+
+      // Initialize with user data (for backward compatibility)
+      initializeWithUserData: async (userData) => {
+        // Fetch vehicles from API instead of using local data
+        await get().fetchVehicles();
+        
+        // Set default vehicle as current if none selected
+        if (!get().currentVehicle) {
+          const defaultVehicle = get().getDefaultVehicle();
+          if (defaultVehicle) {
+            set({ currentVehicle: defaultVehicle });
+          }
+        }
+      },
+
+      clearError: () => set({ error: null }),
+    }),
+    {
+      name: "skaev-vehicle-storage",
+      partialize: (state) => ({
+        vehicles: state.vehicles,
+        currentVehicle: state.currentVehicle,
+      }),
+    }
+  )
 );
 
 export default useVehicleStore;
