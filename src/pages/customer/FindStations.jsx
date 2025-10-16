@@ -20,7 +20,6 @@ import {
   ListItemText,
   ListItemIcon,
   Divider,
-  Rating,
   Avatar,
   Snackbar,
   Alert,
@@ -409,30 +408,6 @@ const FindStations = () => {
                                     )}
                                     {getText("units.perKwh")}
                                   </span>
-                                </span>
-                              </span>
-
-                              <span
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "4px",
-                                }}
-                              >
-                                <Rating
-                                  value={station.ratings.overall}
-                                  precision={0.1}
-                                  size="small"
-                                  readOnly
-                                />
-                                <span
-                                  style={{
-                                    fontSize: "0.75rem",
-                                    color: "rgba(0, 0, 0, 0.6)",
-                                  }}
-                                >
-                                  {station.ratings.overall} (
-                                  {station.ratings.totalReviews} {getText("stations.reviews")})
                                 </span>
                               </span>
                             </span>

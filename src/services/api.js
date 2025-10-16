@@ -1,7 +1,8 @@
 // Real API service for SkaEV - Connects to ASP.NET Core Backend
 import axios from 'axios';
 
-// Backend API Base URL
+// Backend API Base URL  
+// Use HTTP port 5000 if running with dotnet run, or HTTPS port 5001 if running from Visual Studio
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
 // Create axios instance with default config

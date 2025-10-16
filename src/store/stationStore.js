@@ -2,6 +2,76 @@ import { create } from "zustand";
 import { stationsAPI } from "../services/api";
 import { calculateDistance } from "../utils/helpers";
 
+// Transform API response to frontend format
+const transformStationData = (apiStation) => {
+  try {
+    const totalPosts = apiStation.totalPosts || 0;
+    const availablePosts = apiStation.availablePosts || 0;
+    
+    // Generate mock charging posts and slots (since API doesn't provide detailed structure)
+    const chargingPosts = [];
+    for (let i = 1; i <= totalPosts; i++) {
+      const slotsPerPost = 2; // Each post has 2 slots
+      const slots = [];
+      
+      for (let j = 1; j <= slotsPerPost; j++) {
+        slots.push({
+          slotId: `${apiStation.stationId}-post${i}-slot${j}`,
+          slotNumber: j,
+          connectorType: j === 1 ? "CCS2" : "CHAdeMO",
+          maxPower: j === 1 ? 150 : 100,
+          status: i <= availablePosts ? "available" : "occupied",
+          currentRate: j === 1 ? 3500 : 5000,
+        });
+      }
+      
+      chargingPosts.push({
+        postId: `${apiStation.stationId}-post${i}`,
+        postNumber: i,
+        status: i <= availablePosts ? "available" : "occupied",
+        slots: slots,
+      });
+    }
+    
+    return {
+      id: apiStation.stationId,
+      stationId: apiStation.stationId,
+      name: apiStation.stationName || apiStation.name,
+      status: apiStation.status || "active",
+      location: {
+        address: apiStation.address,
+        city: apiStation.city,
+        coordinates: {
+          lat: apiStation.latitude,
+          lng: apiStation.longitude,
+        },
+      },
+      charging: {
+        totalPorts: totalPosts,
+        availablePorts: availablePosts,
+        chargingPosts: chargingPosts, // Add detailed structure
+        maxPower: 150,
+        connectorTypes: ["CCS2", "CHAdeMO"],
+        pricing: {
+          acRate: 3500,
+          dcRate: 5000,
+          dcFastRate: 7000,
+        },
+      },
+      amenities: apiStation.amenities || [],
+      operatingHours: apiStation.operatingHours || "00:00-24:00",
+      imageUrl: apiStation.stationImageUrl,
+      ratings: {
+        overall: 4.5,
+        totalReviews: 0,
+      },
+    };
+  } catch (error) {
+    console.error("❌ Transform error for station:", apiStation, error);
+    throw error;
+  }
+};
+
 const useStationStore = create((set, get) => ({
   // State
   stations: [], // Will be fetched from API
@@ -46,22 +116,35 @@ const useStationStore = create((set, get) => ({
   fetchStations: async () => {
     set({ loading: true, error: null });
     try {
+      console.log("📡 Fetching stations from API...");
       const response = await stationsAPI.getAll();
+      console.log("📥 API Response:", response);
 
-      if (response.success && response.data) {
-        const stations = Array.isArray(response.data)
-          ? response.data
-          : response.data.stations || [];
+      // API returns {data: Array, count: Number} or {success: true, data: Array}
+      const hasData = response.data && Array.isArray(response.data);
+      const isSuccess = response.success !== false; // If success field exists, check it; otherwise assume success
+      
+      if (hasData && isSuccess) {
+        const rawStations = response.data;
+
+        console.log("📊 Raw stations from API:", rawStations.length);
+        
+        // Transform API data to frontend format
+        const stations = rawStations.map(transformStationData);
 
         console.log("✅ Stations loaded from API:", stations.length);
+        console.log("🔍 First station sample:", stations[0]);
+        
         set({ stations, loading: false });
         return { success: true, data: stations };
       } else {
+        console.error("❌ API response invalid - success:", response.success, "hasData:", hasData);
         throw new Error(response.message || "Không thể tải danh sách trạm");
       }
     } catch (error) {
       const errorMessage = error.message || "Đã xảy ra lỗi khi tải trạm sạc";
       console.error("❌ Fetch stations error:", errorMessage);
+      console.error("❌ Full error:", error);
       set({ error: errorMessage, loading: false, stations: [] });
       return { success: false, error: errorMessage };
     }
@@ -73,9 +156,12 @@ const useStationStore = create((set, get) => ({
       const response = await stationsAPI.getNearby(userLocation, radius);
 
       if (response.success && response.data) {
-        const nearby = Array.isArray(response.data)
+        const rawNearby = Array.isArray(response.data)
           ? response.data
           : response.data.stations || [];
+
+        // Transform API data to frontend format
+        const nearby = rawNearby.map(transformStationData);
 
         // If API doesn't provide distance, calculate it locally
         const nearbyWithDistance = nearby.map((station) => {
