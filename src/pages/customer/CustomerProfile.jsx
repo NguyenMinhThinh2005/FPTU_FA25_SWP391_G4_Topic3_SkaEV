@@ -56,7 +56,7 @@ function TabPanel({ children, value, index, ...other }) {
 const CustomerProfile = () => {
   const { user, updateProfile } = useAuthStore();
   const { bookingHistory, getBookingStats } = useBookingStore();
-  const { vehicles, initializeWithUserData, updateVehicle } = useVehicleStore();
+  const { vehicles, updateVehicle } = useVehicleStore();
   const [tabValue, setTabValue] = useState(0);
   const [editMode, setEditMode] = useState(false);
   const [vehicleEditModal, setVehicleEditModal] = useState({
@@ -78,23 +78,8 @@ const CustomerProfile = () => {
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   useEffect(() => {
-    if (bookingHistory.length === 0) {
-          }
-
-    // Initialize vehicle data with user data
-    const getCurrentUserData = () => {
-      if (user?.id) {
-        const userData = mockUsers.find(u => u.id === user.id);
-        return userData;
-      }
-      return mockUsers.find(u => u.role === 'customer') || mockUsers[2]; // Default to first customer
-    };
-
-    const userData = getCurrentUserData();
-    if (userData) {
-      initializeWithUserData(userData);
-    }
-  }, [bookingHistory.length, user?.id, initializeWithUserData]);
+    // No initialization needed - data is fetched by UnifiedDataSync
+  }, []);
 
   const rawBookingStats = getBookingStats();
 
