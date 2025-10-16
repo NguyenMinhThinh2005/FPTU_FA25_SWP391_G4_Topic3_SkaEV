@@ -28,9 +28,8 @@ const useCustomerStore = create(
                         }
 
                         // Initialize vehicle data
-                        const userData = get().getUserMockData(user.id);
-                        if (userData) {
-                            vehicleStore.default.getState().initializeWithUserData(userData);
+                        if (vehicleStore.default.getState().vehicles.length === 0) {
+                            vehicleStore.default.getState().fetchVehicles();
                         }
                     }
 
@@ -45,48 +44,6 @@ const useCustomerStore = create(
                     set({ loading: false, error: error.message });
                     return { success: false, error: error.message };
                 }
-            },
-
-            
-                        vehicle: {
-                            make: "Tesla",
-                            model: "Model 3",
-                            year: 2023,
-                            batteryCapacity: 75,
-                            chargingType: ["AC Type 2", "DC CCS"],
-                        },
-                        preferences: {
-                            maxDistance: 15,
-                            preferredPayment: "credit-card",
-                            priceRange: [5000, 15000],
-                        },
-                    },
-                    {
-                        id: "customer-002",
-                        email: "anna.nguyen@outlook.com",
-                        role: "customer",
-                        profile: {
-                            firstName: "Anna",
-                            lastName: "Nguyen",
-                            phone: "+84 906 789 012",
-                            verified: true,
-                        },
-                        vehicle: {
-                            make: "VinFast",
-                            model: "VF 8",
-                            year: 2024,
-                            batteryCapacity: 87.7,
-                            chargingType: ["AC Type 2", "DC CCS"],
-                        },
-                        preferences: {
-                            maxDistance: 20,
-                            preferredPayment: "e-wallet",
-                            priceRange: [6000, 12000],
-                        },
-                    },
-                ];
-
-                return mockUsers.find(u => u.id === userId) || mockUsers.find(u => u.role === 'customer');
             },
 
             // Unified data getters - Note: These should be called from components with proper stores
