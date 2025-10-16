@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("SkaEV.API")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+88c50557d5f4e8051b3e1c2e1c7851a3946c34dd")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+d3020002385cfddcccf2b407f93a650c17787af8")]
 [assembly: System.Reflection.AssemblyProductAttribute("SkaEV.API")]
 [assembly: System.Reflection.AssemblyTitleAttribute("SkaEV.API")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
