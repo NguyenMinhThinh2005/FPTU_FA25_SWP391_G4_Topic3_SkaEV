@@ -24,7 +24,6 @@ import HomePage from "./pages/public/Home";
 import TestPage from "./pages/TestPage";
 import ChargingFlow from "./pages/customer/ChargingFlow";
 import DateTimePickerDemo from "./pages/DateTimePickerDemo";
-import MockAPIDemo from "./pages/MockAPIDemo";
 
 // Customer Pages
 import CustomerDashboard from "./pages/customer/Dashboard";
@@ -108,7 +107,6 @@ function App() {
               <Route path="/" element={<HomePage />} />
               <Route path="/test" element={<TestPage />} />
               <Route path="/datetime-demo" element={<DateTimePickerDemo />} />
-              <Route path="/api-demo" element={<MockAPIDemo />} />
               <Route
                 path="/login"
                 element={
