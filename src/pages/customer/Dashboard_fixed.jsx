@@ -1,4 +1,4 @@
-/* eslint-disable */
+﻿/* eslint-disable */
 import React, { useState, useEffect } from "react";
 import {
   Box,
@@ -47,7 +47,6 @@ import {
 import { useNavigate } from "react-router-dom";
 import useAuthStore from "../../store/authStore";
 import useStationStore from "../../store/stationStore";
-import { mockData } from "../../data/mockData";
 import {
   formatCurrency,
   formatDate,
@@ -66,7 +65,7 @@ const CustomerDashboard = () => {
   const [userLocation, setUserLocation] = useState(null);
 
   // Get user's booking data
-  const userBookings = mockData.bookings.filter(
+  const userBookings = bookings.filter(
     (booking) => booking.userId === user?.id
   );
   const recentBookings = userBookings.slice(0, 4);
@@ -205,7 +204,7 @@ const CustomerDashboard = () => {
       >
         <Box>
           <Typography variant="h4" fontWeight="bold" gutterBottom>
-            Chào mừng trở lại, {user?.profile?.firstName || 'Tài xế'}! ⚡
+            ChÃ o má»«ng trá»Ÿ láº¡i, {user?.profile?.firstName || 'TÃ i xáº¿'}! âš¡
           </Typography>
           <Typography variant="body1" color="text.secondary">
             Your electric journey dashboard - Let's charge up your day!
@@ -273,7 +272,7 @@ const CustomerDashboard = () => {
           sx={{ mb: 3 }}
           action={
             <Button color="inherit" size="small">
-              Xem chi tiết
+              Xem chi tiáº¿t
             </Button>
           }
         >
@@ -404,7 +403,7 @@ const CustomerDashboard = () => {
                     {co2Saved}
                   </Typography>
                   <Typography variant="body2" sx={{ opacity: 0.8 }}>
-                    kg CO₂ Saved
+                    kg COâ‚‚ Saved
                   </Typography>
                 </Box>
               </Box>
@@ -479,7 +478,7 @@ const CustomerDashboard = () => {
                                   variant="caption"
                                   color="text.secondary"
                                 >
-                                  Port {booking.portNumber} •{" "}
+                                  Port {booking.portNumber} â€¢{" "}
                                   {booking.connectorType}
                                 </Typography>
                               </Box>
@@ -494,7 +493,7 @@ const CustomerDashboard = () => {
                         secondary={
                           <Box sx={{ mt: 1 }}>
                             <Typography variant="body2" color="text.secondary">
-                              {formatDate(booking.date)} • {booking.duration}{" "}
+                              {formatDate(booking.date)} â€¢ {booking.duration}{" "}
                               minutes
                             </Typography>
                             <Box
@@ -505,7 +504,7 @@ const CustomerDashboard = () => {
                               }}
                             >
                               <Typography variant="body2" fontWeight="medium">
-                                {booking.energyDelivered?.toFixed(1)} kWh •{" "}
+                                {booking.energyDelivered?.toFixed(1)} kWh â€¢{" "}
                                 {formatCurrency(booking.cost)}
                               </Typography>
                               {booking.status === "completed" && (
@@ -520,7 +519,7 @@ const CustomerDashboard = () => {
                                     sx={{ fontSize: 14, color: "warning.main" }}
                                   />
                                   <Typography variant="caption">
-                                    {booking.rating || "Đánh giá phiên này"}
+                                    {booking.rating || "ÄÃ¡nh giÃ¡ phiÃªn nÃ y"}
                                   </Typography>
                                 </Box>
                               )}
@@ -642,7 +641,7 @@ const CustomerDashboard = () => {
                         station.location.coordinates.lat,
                         station.location.coordinates.lng
                       ).toFixed(1)}km away`}{" "}
-                    • Up to {station.charging.maxPower}kW
+                    â€¢ Up to {station.charging.maxPower}kW
                   </Typography>
                   <Box
                     sx={{
@@ -681,7 +680,7 @@ const CustomerDashboard = () => {
                 </Avatar>
                 <Box>
                   <Typography variant="subtitle1" fontWeight="medium">
-                    {user?.profile ? `${user.profile.firstName} ${user.profile.lastName}` : 'Khách hàng'}
+                    {user?.profile ? `${user.profile.firstName} ${user.profile.lastName}` : 'KhÃ¡ch hÃ ng'}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     {user?.email}
@@ -716,3 +715,4 @@ const CustomerDashboard = () => {
 };
 
 export default CustomerDashboard;
+

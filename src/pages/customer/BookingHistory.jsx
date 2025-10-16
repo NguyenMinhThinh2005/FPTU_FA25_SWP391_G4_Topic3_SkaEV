@@ -1,4 +1,4 @@
-/* eslint-disable */
+﻿/* eslint-disable */
 import React, { useState } from "react";
 import {
   Box,
@@ -34,7 +34,6 @@ import {
   Download,
 } from "@mui/icons-material";
 import { formatCurrency, formatDate } from "../../utils/helpers";
-import { mockData } from "../../data/mockData";
 import { useMasterDataSync } from "../../hooks/useMasterDataSync";
 import { getText } from "../../utils/vietnameseTexts";
 
@@ -66,7 +65,7 @@ const BookingHistory = () => {
       case "completed":
         return getText("booking.completed");
       case "active":
-        return "Đang hoạt động";
+        return "Äang hoáº¡t Ä‘á»™ng";
       case "cancelled":
         return getText("booking.cancelled");
       case "pending":
@@ -121,7 +120,7 @@ const BookingHistory = () => {
                 {userBookings.length}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Tổng số lượt
+                Tá»•ng sá»‘ lÆ°á»£t
               </Typography>
             </CardContent>
           </Card>
@@ -133,7 +132,7 @@ const BookingHistory = () => {
                 {userBookings.filter((b) => b.status === "completed").length}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Hoàn thành
+                HoÃ n thÃ nh
               </Typography>
             </CardContent>
           </Card>
@@ -147,7 +146,7 @@ const BookingHistory = () => {
                 )}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Tổng chi phí
+                Tá»•ng chi phÃ­
               </Typography>
             </CardContent>
           </Card>
@@ -161,7 +160,7 @@ const BookingHistory = () => {
                   .toFixed(1)}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                {getText("units.kwh")} đã sạc
+                {getText("units.kwh")} Ä‘Ã£ sáº¡c
               </Typography>
             </CardContent>
           </Card>
@@ -172,7 +171,7 @@ const BookingHistory = () => {
       <Card>
         <CardContent>
           <Typography variant="h6" fontWeight="bold" gutterBottom>
-            Lịch sử sạc gần đây
+            Lá»‹ch sá»­ sáº¡c gáº§n Ä‘Ã¢y
           </Typography>
 
           {userBookings.length === 0 ? (
@@ -190,13 +189,13 @@ const BookingHistory = () => {
               <Table>
                 <TableHead>
                   <TableRow>
-                    <TableCell>Trạm sạc</TableCell>
-                    <TableCell>Ngày & Giờ</TableCell>
-                    <TableCell>Thời lượng</TableCell>
-                    <TableCell>Năng lượng</TableCell>
-                    <TableCell>Chi phí</TableCell>
-                    <TableCell>Trạng thái</TableCell>
-                    <TableCell align="center">Thao tác</TableCell>
+                    <TableCell>Tráº¡m sáº¡c</TableCell>
+                    <TableCell>NgÃ y & Giá»</TableCell>
+                    <TableCell>Thá»i lÆ°á»£ng</TableCell>
+                    <TableCell>NÄƒng lÆ°á»£ng</TableCell>
+                    <TableCell>Chi phÃ­</TableCell>
+                    <TableCell>Tráº¡ng thÃ¡i</TableCell>
+                    <TableCell align="center">Thao tÃ¡c</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -217,15 +216,15 @@ const BookingHistory = () => {
                           </Avatar>
                           <Box>
                             <Typography variant="subtitle2" fontWeight="medium">
-                              {mockData.stations.find(
+                              {stations.find(
                                 (s) => s.id === booking.stationId
-                              )?.name || "Trạm không xác định"}
+                              )?.name || "Tráº¡m khÃ´ng xÃ¡c Ä‘á»‹nh"}
                             </Typography>
                             <Typography
                               variant="caption"
                               color="text.secondary"
                             >
-                              Cổng {booking.portNumber || "Không có"}
+                              Cá»•ng {booking.portNumber || "KhÃ´ng cÃ³"}
                             </Typography>
                           </Box>
                         </Box>
@@ -245,14 +244,14 @@ const BookingHistory = () => {
                               booking.startTime,
                               booking.endTime
                             )
-                            : "Đang tiến hành"}
+                            : "Äang tiáº¿n hÃ nh"}
                         </Typography>
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2">
                           {booking.energyDelivered
                             ? `${booking.energyDelivered} ${getText("units.kwh")}`
-                            : "Không có"}
+                            : "KhÃ´ng cÃ³"}
                         </Typography>
                       </TableCell>
                       <TableCell>
@@ -276,7 +275,7 @@ const BookingHistory = () => {
                             <Visibility />
                           </IconButton>
                         </Tooltip>
-                        <Tooltip title="Tải xuống hóa đơn">
+                        <Tooltip title="Táº£i xuá»‘ng hÃ³a Ä‘Æ¡n">
                           <IconButton size="small">
                             <Download />
                           </IconButton>
@@ -304,7 +303,7 @@ const BookingHistory = () => {
             <Grid container spacing={3}>
               <Grid item xs={12} md={6}>
                 <Typography variant="h6" gutterBottom>
-                  Thông tin phiên sạc
+                  ThÃ´ng tin phiÃªn sáº¡c
                 </Typography>
                 <Box sx={{ mb: 2 }}>
                   <Typography variant="body2" color="text.secondary">
@@ -320,7 +319,7 @@ const BookingHistory = () => {
                   </Typography>
                   <Typography variant="body1" fontWeight="medium">
                     {
-                      mockData.stations.find(
+                      stations.find(
                         (s) => s.id === selectedBooking.stationId
                       )?.name
                     }
@@ -328,10 +327,10 @@ const BookingHistory = () => {
                 </Box>
                 <Box sx={{ mb: 2 }}>
                   <Typography variant="body2" color="text.secondary">
-                    Số cổng
+                    Sá»‘ cá»•ng
                   </Typography>
                   <Typography variant="body1" fontWeight="medium">
-                    {selectedBooking.portNumber || "Không có"}
+                    {selectedBooking.portNumber || "KhÃ´ng cÃ³"}
                   </Typography>
                 </Box>
                 <Box sx={{ mb: 2 }}>
@@ -348,24 +347,24 @@ const BookingHistory = () => {
 
               <Grid item xs={12} md={6}>
                 <Typography variant="h6" gutterBottom>
-                  Chi tiết sạc
+                  Chi tiáº¿t sáº¡c
                 </Typography>
                 <Box sx={{ mb: 2 }}>
                   <Typography variant="body2" color="text.secondary">
-                    Thời gian bắt đầu
+                    Thá»i gian báº¯t Ä‘áº§u
                   </Typography>
                   <Typography variant="body1" fontWeight="medium">
-                    {formatDate(selectedBooking.actualStartTime || selectedBooking.scheduledTime)} lúc{" "}
+                    {formatDate(selectedBooking.actualStartTime || selectedBooking.scheduledTime)} lÃºc{" "}
                     {new Date(selectedBooking.actualStartTime || selectedBooking.scheduledTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
                   </Typography>
                 </Box>
                 {(selectedBooking.endTime || selectedBooking.estimatedEndTime) && (
                   <Box sx={{ mb: 2 }}>
                     <Typography variant="body2" color="text.secondary">
-                      Thời gian kết thúc {selectedBooking.estimatedEndTime && !selectedBooking.endTime ? '(ước tính)' : ''}
+                      Thá»i gian káº¿t thÃºc {selectedBooking.estimatedEndTime && !selectedBooking.endTime ? '(Æ°á»›c tÃ­nh)' : ''}
                     </Typography>
                     <Typography variant="body1" fontWeight="medium">
-                      {formatDate(selectedBooking.endTime || selectedBooking.estimatedEndTime)} lúc{" "}
+                      {formatDate(selectedBooking.endTime || selectedBooking.estimatedEndTime)} lÃºc{" "}
                       {new Date(selectedBooking.endTime || selectedBooking.estimatedEndTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
                     </Typography>
                   </Box>
@@ -380,12 +379,12 @@ const BookingHistory = () => {
                         selectedBooking.startTime,
                         selectedBooking.endTime
                       )
-                      : "Đang tiến hành"}
+                      : "Äang tiáº¿n hÃ nh"}
                   </Typography>
                 </Box>
                 <Box sx={{ mb: 2 }}>
                   <Typography variant="body2" color="text.secondary">
-                    Năng lượng đã sạc
+                    NÄƒng lÆ°á»£ng Ä‘Ã£ sáº¡c
                   </Typography>
                   <Typography variant="body1" fontWeight="medium">
                     {selectedBooking.energyDelivered
@@ -413,7 +412,7 @@ const BookingHistory = () => {
         <DialogActions>
           <Button onClick={handleCloseDialog}>{getText("common.close")}</Button>
           <Button variant="contained" startIcon={<Download />}>
-            Tải hóa đơn
+            Táº£i hÃ³a Ä‘Æ¡n
           </Button>
         </DialogActions>
       </Dialog>
@@ -422,3 +421,4 @@ const BookingHistory = () => {
 };
 
 export default BookingHistory;
+

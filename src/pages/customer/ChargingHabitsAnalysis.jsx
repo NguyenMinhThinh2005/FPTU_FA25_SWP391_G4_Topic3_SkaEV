@@ -1,4 +1,4 @@
-/* eslint-disable */
+﻿/* eslint-disable */
 import React, { useState, useEffect } from "react";
 import {
     Box,
@@ -26,8 +26,7 @@ import {
     TableHead,
     TableRow,
     Alert,
-    Divider,
-} from "@mui/material";
+    Divider} from "@mui/material";
 import {
     Psychology,
     LocationOn,
@@ -41,22 +40,16 @@ import {
     CalendarMonth,
     AttachMoney,
     EmojiEvents,
-    QueryStats,
-} from "@mui/icons-material";
+    QueryStats} from "@mui/icons-material";
 import { formatCurrency } from "../../utils/helpers";
 import useBookingStore from "../../store/bookingStore";
 
 const ChargingHabitsAnalysis = () => {
     const [timeRange, setTimeRange] = useState("3months");
-    const { bookingHistory, getBookingStats, initializeMockData } = useBookingStore();
+    const { bookingHistory, getBookingStats} = useBookingStore();
 
     // Initialize data if needed
-    useEffect(() => {
-        if (bookingHistory.length === 0) {
-            initializeMockData();
-        }
-    }, [bookingHistory.length, initializeMockData]);
-
+    
     // Calculate habits data from booking store
     const bookingStats = getBookingStats();
     const completedBookings = bookingHistory.filter(b => b.status === 'completed');
@@ -123,7 +116,7 @@ const ChargingHabitsAnalysis = () => {
                     avgCost: 142000,
                     avgDuration: 95,
                     usageReason: "Overnight/long-term parking",
-                    efficiency: "Tiết kiệm chi phí"
+                    efficiency: "Tiáº¿t kiá»‡m chi phÃ­"
                 },
                 {
                     type: "DC Fast (50-100kW)",
@@ -132,7 +125,7 @@ const ChargingHabitsAnalysis = () => {
                     avgCost: 168000,
                     avgDuration: 65,
                     usageReason: "Quick top-up during activities",
-                    efficiency: "Cân bằng thời gian/chi phí"
+                    efficiency: "CÃ¢n báº±ng thá»i gian/chi phÃ­"
                 },
                 {
                     type: "DC Ultra (150kW+)",
@@ -141,29 +134,29 @@ const ChargingHabitsAnalysis = () => {
                     avgCost: 195000,
                     avgDuration: 42,
                     usageReason: "Emergency charging/highway trips",
-                    efficiency: "Ưu tiên tốc độ"
+                    efficiency: "Æ¯u tiÃªn tá»‘c Ä‘á»™"
                 }
             ],
 
             // Behavioral Insights
             insights: [
                 {
-                    title: "Thời gian sạc tối ưu",
-                    finding: "Bạn sạc hiệu quả nhất vào 18:00-20:00 tại Vincom Mega Mall",
-                    impact: "Tiết kiệm 12% chi phí so với trung bình",
-                    recommendation: "Tiếp tục duy trì thói quen này để tối ưu chi phí"
+                    title: "Thá»i gian sáº¡c tá»‘i Æ°u",
+                    finding: "Báº¡n sáº¡c hiá»‡u quáº£ nháº¥t vÃ o 18:00-20:00 táº¡i Vincom Mega Mall",
+                    impact: "Tiáº¿t kiá»‡m 12% chi phÃ­ so vá»›i trung bÃ¬nh",
+                    recommendation: "Tiáº¿p tá»¥c duy trÃ¬ thÃ³i quen nÃ y Ä‘á»ƒ tá»‘i Æ°u chi phÃ­"
                 },
                 {
-                    title: "Lựa chọn trạm thông minh",
-                    finding: "Top 2 trạm yêu thích có rating cao và chi phí hợp lý",
-                    impact: "Satisfaction score 4.7/5 trung bình",
-                    recommendation: "Khám phá thêm 2-3 trạm backup cho linh hoạt hơn"
+                    title: "Lá»±a chá»n tráº¡m thÃ´ng minh",
+                    finding: "Top 2 tráº¡m yÃªu thÃ­ch cÃ³ rating cao vÃ  chi phÃ­ há»£p lÃ½",
+                    impact: "Satisfaction score 4.7/5 trung bÃ¬nh",
+                    recommendation: "KhÃ¡m phÃ¡ thÃªm 2-3 tráº¡m backup cho linh hoáº¡t hÆ¡n"
                 },
                 {
-                    title: "Tối ưu công suất sạc",
-                    finding: "44% dùng AC slow khi có thời gian dài",
-                    impact: "Tiết kiệm 25% chi phí so với chỉ dùng DC Fast",
-                    recommendation: "Tăng tỷ lệ sạc chậm khi đỗ xe qua đêm"
+                    title: "Tá»‘i Æ°u cÃ´ng suáº¥t sáº¡c",
+                    finding: "44% dÃ¹ng AC slow khi cÃ³ thá»i gian dÃ i",
+                    impact: "Tiáº¿t kiá»‡m 25% chi phÃ­ so vá»›i chá»‰ dÃ¹ng DC Fast",
+                    recommendation: "TÄƒng tá»· lá»‡ sáº¡c cháº­m khi Ä‘á»— xe qua Ä‘Ãªm"
                 }
             ],
 
@@ -175,9 +168,9 @@ const ChargingHabitsAnalysis = () => {
 
             // Seasonal Analysis
             seasonalTrends: [
-                { period: "Tháng 7", sessions: 19, avgCost: 158000, trend: "Stable usage" },
-                { period: "Tháng 8", sessions: 17, avgCost: 164000, trend: "Slight increase in cost" },
-                { period: "Tháng 9", sessions: 21, avgCost: 155000, trend: "Increased frequency, optimized cost" }
+                { period: "ThÃ¡ng 7", sessions: 19, avgCost: 158000, trend: "Stable usage" },
+                { period: "ThÃ¡ng 8", sessions: 17, avgCost: 164000, trend: "Slight increase in cost" },
+                { period: "ThÃ¡ng 9", sessions: 21, avgCost: 155000, trend: "Increased frequency, optimized cost" }
             ]
         }
     };
@@ -190,10 +183,10 @@ const ChargingHabitsAnalysis = () => {
 
     const getPowerEfficiencyScore = () => {
         const acPercentage = currentData.powerUsageAnalysis[0].percentage;
-        if (acPercentage >= 50) return { score: 95, level: "Xuất sắc" };
-        if (acPercentage >= 35) return { score: 80, level: "Tốt" };
-        if (acPercentage >= 20) return { score: 65, level: "Trung bình" };
-        return { score: 40, level: "Cần cải thiện" };
+        if (acPercentage >= 50) return { score: 95, level: "Xuáº¥t sáº¯c" };
+        if (acPercentage >= 35) return { score: 80, level: "Tá»‘t" };
+        if (acPercentage >= 20) return { score: 65, level: "Trung bÃ¬nh" };
+        return { score: 40, level: "Cáº§n cáº£i thiá»‡n" };
     };
 
     const getTimeOptimizationScore = () => {
@@ -208,10 +201,10 @@ const ChargingHabitsAnalysis = () => {
 
         const ratio = offPeakHours / (peakHours + offPeakHours);
 
-        if (ratio >= 0.4) return { score: 90, level: "Tối ưu" };
-        if (ratio >= 0.2) return { score: 75, level: "Khá tốt" };
-        if (ratio >= 0.1) return { score: 60, level: "Trung bình" };
-        return { score: 45, level: "Chưa tối ưu" };
+        if (ratio >= 0.4) return { score: 90, level: "Tá»‘i Æ°u" };
+        if (ratio >= 0.2) return { score: 75, level: "KhÃ¡ tá»‘t" };
+        if (ratio >= 0.1) return { score: 60, level: "Trung bÃ¬nh" };
+        return { score: 45, level: "ChÆ°a tá»‘i Æ°u" };
     };
 
     const efficiencyScore = getPowerEfficiencyScore();
@@ -227,23 +220,23 @@ const ChargingHabitsAnalysis = () => {
                     </Avatar>
                     <Box>
                         <Typography variant="h4" fontWeight="bold">
-                            Thói quen sạc theo giờ
+                            ThÃ³i quen sáº¡c theo giá»
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
-                            Thống kê tần suất sạc xe theo từng khung giờ trong ngày
+                            Thá»‘ng kÃª táº§n suáº¥t sáº¡c xe theo tá»«ng khung giá» trong ngÃ y
                         </Typography>
                     </Box>
                 </Box>
                 <FormControl sx={{ minWidth: 180 }}>
-                    <InputLabel>Khoảng thời gian</InputLabel>
+                    <InputLabel>Khoáº£ng thá»i gian</InputLabel>
                     <Select
                         value={timeRange}
-                        label="Khoảng thời gian"
+                        label="Khoáº£ng thá»i gian"
                         onChange={(e) => setTimeRange(e.target.value)}
                     >
-                        <MenuItem value="3months">3 tháng qua</MenuItem>
-                        <MenuItem value="6months">6 tháng qua</MenuItem>
-                        <MenuItem value="year">1 năm qua</MenuItem>
+                        <MenuItem value="3months">3 thÃ¡ng qua</MenuItem>
+                        <MenuItem value="6months">6 thÃ¡ng qua</MenuItem>
+                        <MenuItem value="year">1 nÄƒm qua</MenuItem>
                     </Select>
                 </FormControl>
             </Box>
@@ -266,7 +259,7 @@ const ChargingHabitsAnalysis = () => {
 
                             <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
                                 <Typography variant="h6" color="primary.main" fontWeight="bold">
-                                    {timeSlot.sessions} phiên sạc
+                                    {timeSlot.sessions} phiÃªn sáº¡c
                                 </Typography>
                                 <Typography variant="body2" color="text.secondary">
                                     {timeSlot.percentage}%
@@ -275,7 +268,7 @@ const ChargingHabitsAnalysis = () => {
 
                             {timeSlot.sessions > 0 && (
                                 <Typography variant="body2" sx={{ mb: 1 }}>
-                                    Chi phí TB: {formatCurrency(timeSlot.avgCost)}
+                                    Chi phÃ­ TB: {formatCurrency(timeSlot.avgCost)}
                                 </Typography>
                             )}
 

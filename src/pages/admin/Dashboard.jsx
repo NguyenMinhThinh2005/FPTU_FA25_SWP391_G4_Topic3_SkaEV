@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import {
   Box,
   Typography,
@@ -57,7 +57,6 @@ import {
 import { useNavigate } from "react-router-dom";
 import useAuthStore from "../../store/authStore";
 import useStationStore from "../../store/stationStore";
-import { mockData } from "../../data/mockData";
 import { formatCurrency } from "../../utils/helpers";
 import { STATION_STATUS, USER_ROLES } from "../../utils/constants";
 import EditStationModal from "../../components/admin/EditStationModal";
@@ -107,7 +106,7 @@ const AdminDashboard = () => {
 
   // Debug: Log when stations change
   useEffect(() => {
-    console.log("🔄 Stations updated in Dashboard:", stations.length);
+    console.log("ðŸ”„ Stations updated in Dashboard:", stations.length);
     stations.forEach((station) => {
       console.log(`Station ${station.name}:`, {
         id: station.id,
@@ -121,31 +120,31 @@ const AdminDashboard = () => {
   // System Overview Stats (recalculated when stations change)
   const totalStations = stations.length;
   const activeStations = stations.filter((s) => s.status === "active").length;
-  const totalUsers = mockData.users.length;
-  mockData.bookings.length;
-  const todayBookings = mockData.bookings.filter(
+  const totalUsers = users.length;
+  bookings.length;
+  const todayBookings = bookings.filter(
     (b) => new Date(b.date).toDateString() === new Date().toDateString()
   ).length;
-  const totalRevenue = mockData.bookings.reduce((sum, b) => sum + b.cost, 0);
-  const activeChargingSessions = mockData.bookings.filter(
+  const totalRevenue = bookings.reduce((sum, b) => sum + b.cost, 0);
+  const activeChargingSessions = bookings.filter(
     (b) => b.status === "in_progress"
   ).length;
 
-  // Station Performance với chargingPosts structure
+  // Station Performance vá»›i chargingPosts structure
   const stationPerformance = stations
     .map((station) => {
-      const stationBookings = mockData.bookings.filter(
+      const stationBookings = bookings.filter(
         (b) => b.stationId === station.id
       );
       const revenue = stationBookings.reduce((sum, b) => sum + b.cost, 0);
 
-      // Tính utilization từ chargingPosts hoặc totalPorts
+      // TÃ­nh utilization tá»« chargingPosts hoáº·c totalPorts
       let totalSlots = 0;
       let occupiedSlots = 0;
       let chargingPostsCount = 0;
 
       if (station.charging?.totalPorts) {
-        // Ưu tiên totalPorts nếu đã được cập nhật từ UI
+        // Æ¯u tiÃªn totalPorts náº¿u Ä‘Ã£ Ä‘Æ°á»£c cáº­p nháº­t tá»« UI
         totalSlots = station.charging.totalPorts;
         if (station.charging?.availablePorts != null) {
           occupiedSlots = Math.max(
@@ -162,7 +161,7 @@ const AdminDashboard = () => {
         chargingPostsCount =
           station.charging?.chargingPosts?.length || Math.ceil(totalSlots / 2);
       } else if (station.charging?.chargingPosts) {
-        // Backward-compatible: tính từ chargingPosts nếu không có totalPorts
+        // Backward-compatible: tÃ­nh tá»« chargingPosts náº¿u khÃ´ng cÃ³ totalPorts
         station.charging.chargingPosts.forEach((post) => {
           totalSlots += post.totalSlots;
           occupiedSlots += post.totalSlots - post.availableSlots;
@@ -185,7 +184,7 @@ const AdminDashboard = () => {
     })
     .sort((a, b) => b.revenue - a.revenue);
 
-  // Recent Activities với chargingPosts context
+  // Recent Activities vá»›i chargingPosts context
   const recentActivities = [
     {
       id: 1,
@@ -204,14 +203,14 @@ const AdminDashboard = () => {
     {
       id: 3,
       type: "user",
-      message: "New user registration: Nguyễn Văn An",
+      message: "New user registration: Nguyá»…n VÄƒn An",
       time: "30 minutes ago",
       severity: "success",
     },
     {
       id: 4,
       type: "payment",
-      message: "DC Fast Charging completed: ₫125,000",
+      message: "DC Fast Charging completed: â‚«125,000",
       time: "1 hour ago",
       severity: "success",
     },
@@ -259,7 +258,7 @@ const AdminDashboard = () => {
       case "delete":
         if (
           window.confirm(
-            `Bạn có chắc chắn muốn xóa trạm sạc "${station.name}"?`
+            `Báº¡n cÃ³ cháº¯c cháº¯n muá»‘n xÃ³a tráº¡m sáº¡c "${station.name}"?`
           )
         ) {
           deleteStation(station.id).then((res) => {
@@ -267,7 +266,7 @@ const AdminDashboard = () => {
               setSelectedStation(null);
               setOpenStationDialog(false);
             } else {
-              alert("Xóa trạm thất bại. Vui lòng thử lại.");
+              alert("XÃ³a tráº¡m tháº¥t báº¡i. Vui lÃ²ng thá»­ láº¡i.");
             }
           });
         }
@@ -281,7 +280,7 @@ const AdminDashboard = () => {
     try {
       const result = await updateStation(stationId, updatedData);
       if (result.success) {
-        alert("Cập nhật trạm sạc thành công!");
+        alert("Cáº­p nháº­t tráº¡m sáº¡c thÃ nh cÃ´ng!");
         // Force component re-render by updating selectedStation if it's the same station
         if (selectedStation && selectedStation.id === stationId) {
           const updatedStation = stations.find((s) => s.id === stationId);
@@ -292,7 +291,7 @@ const AdminDashboard = () => {
       }
     } catch (error) {
       console.error("Error updating station:", error);
-      alert("Có lỗi xảy ra khi cập nhật trạm sạc.");
+      alert("CÃ³ lá»—i xáº£y ra khi cáº­p nháº­t tráº¡m sáº¡c.");
     }
   };
 
@@ -317,19 +316,19 @@ const AdminDashboard = () => {
         });
       }
 
-      alert("Lên lịch bảo trì thành công!");
+      alert("LÃªn lá»‹ch báº£o trÃ¬ thÃ nh cÃ´ng!");
       console.log("Maintenance scheduled:", maintenanceData);
     } catch (error) {
       console.error("Error scheduling maintenance:", error);
-      alert("Có lỗi xảy ra khi lên lịch bảo trì.");
+      alert("CÃ³ lá»—i xáº£y ra khi lÃªn lá»‹ch báº£o trÃ¬.");
     }
   };
 
   const getStatusChip = (status) => {
     const configs = {
-      active: { label: "Hoạt động", color: "success" },
-      inactive: { label: "Không hoạt động", color: "error" },
-      maintenance: { label: "Bảo trì", color: "warning" },
+      active: { label: "Hoáº¡t Ä‘á»™ng", color: "success" },
+      inactive: { label: "KhÃ´ng hoáº¡t Ä‘á»™ng", color: "error" },
+      maintenance: { label: "Báº£o trÃ¬", color: "warning" },
       construction: { label: "Construction", color: "info" },
     };
 
@@ -363,10 +362,10 @@ const AdminDashboard = () => {
       >
         <Box>
           <Typography variant="h4" fontWeight="bold" gutterBottom>
-            Quản trị hệ thống 🔧
+            Quáº£n trá»‹ há»‡ thá»‘ng ðŸ”§
           </Typography>
           <Typography variant="body1" color="text.secondary">
-            Giám sát và quản lý mạng lưới sạc SkaEV
+            GiÃ¡m sÃ¡t vÃ  quáº£n lÃ½ máº¡ng lÆ°á»›i sáº¡c SkaEV
           </Typography>
         </Box>
       </Box>
@@ -390,10 +389,10 @@ const AdminDashboard = () => {
                     {totalStations}
                   </Typography>
                   <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                    Tổng số trạm
+                    Tá»•ng sá»‘ tráº¡m
                   </Typography>
                   <Typography variant="caption" sx={{ opacity: 0.8 }}>
-                    {activeStations} hoạt động
+                    {activeStations} hoáº¡t Ä‘á»™ng
                   </Typography>
                 </Box>
               </Box>
@@ -418,10 +417,10 @@ const AdminDashboard = () => {
                     {totalUsers}
                   </Typography>
                   <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                    Tổng số người dùng
+                    Tá»•ng sá»‘ ngÆ°á»i dÃ¹ng
                   </Typography>
                   <Typography variant="caption" sx={{ opacity: 0.8 }}>
-                    +12 tuần này
+                    +12 tuáº§n nÃ y
                   </Typography>
                 </Box>
               </Box>
@@ -446,10 +445,10 @@ const AdminDashboard = () => {
                     {activeChargingSessions}
                   </Typography>
                   <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                    Phiên hoạt động
+                    PhiÃªn hoáº¡t Ä‘á»™ng
                   </Typography>
                   <Typography variant="caption" sx={{ opacity: 0.8 }}>
-                    {todayBookings} hôm nay
+                    {todayBookings} hÃ´m nay
                   </Typography>
                 </Box>
               </Box>
@@ -474,10 +473,10 @@ const AdminDashboard = () => {
                     {formatCurrency(totalRevenue)}
                   </Typography>
                   <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                    Tổng doanh thu
+                    Tá»•ng doanh thu
                   </Typography>
                   <Typography variant="caption" sx={{ opacity: 0.8 }}>
-                    +18% so với tháng trước
+                    +18% so vá»›i thÃ¡ng trÆ°á»›c
                   </Typography>
                 </Box>
               </Box>
@@ -500,7 +499,7 @@ const AdminDashboard = () => {
                 }}
               >
                 <Typography variant="h6" fontWeight="bold">
-                  Hiệu suất trạm sạc
+                  Hiá»‡u suáº¥t tráº¡m sáº¡c
                 </Typography>
                 <Box sx={{ display: "flex", gap: 1 }}>
                   <IconButton size="small">
@@ -516,13 +515,13 @@ const AdminDashboard = () => {
                 <Table>
                   <TableHead>
                     <TableRow>
-                      <TableCell>Trạm sạc</TableCell>
-                      <TableCell align="center">Trạng thái</TableCell>
-                      <TableCell align="center">Cổng sạc</TableCell>
-                      <TableCell align="center">Sử dụng</TableCell>
-                      <TableCell align="center">Phiên</TableCell>
+                      <TableCell>Tráº¡m sáº¡c</TableCell>
+                      <TableCell align="center">Tráº¡ng thÃ¡i</TableCell>
+                      <TableCell align="center">Cá»•ng sáº¡c</TableCell>
+                      <TableCell align="center">Sá»­ dá»¥ng</TableCell>
+                      <TableCell align="center">PhiÃªn</TableCell>
                       <TableCell align="center">Doanh thu</TableCell>
-                      <TableCell align="center">Thao tác</TableCell>
+                      <TableCell align="center">Thao tÃ¡c</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -570,7 +569,7 @@ const AdminDashboard = () => {
                         <TableCell align="center">
                           <Box>
                             <Typography variant="body2" fontWeight="medium">
-                              {station.chargingPostsCount} Cổng
+                              {station.chargingPostsCount} Cá»•ng
                             </Typography>
                             <Typography
                               variant="caption"
@@ -635,7 +634,7 @@ const AdminDashboard = () => {
                   }}
                 >
                   <Visibility sx={{ mr: 1 }} />
-                  Xem chi tiết
+                  Xem chi tiáº¿t
                 </MenuItem>
                 {/* Removed separate Edit Station to encourage inline editing inside details */}
                 <MenuItem
@@ -645,7 +644,7 @@ const AdminDashboard = () => {
                   }}
                 >
                   <Settings sx={{ mr: 1 }} />
-                  Lên lịch bảo trì
+                  LÃªn lá»‹ch báº£o trÃ¬
                 </MenuItem>
                 <MenuItem
                   onClick={() => {
@@ -655,7 +654,7 @@ const AdminDashboard = () => {
                   sx={{ color: "error.main" }}
                 >
                   <Delete sx={{ mr: 1 }} />
-                  Xóa trạm sạc
+                  XÃ³a tráº¡m sáº¡c
                 </MenuItem>
               </Menu>
             </CardContent>
@@ -667,7 +666,7 @@ const AdminDashboard = () => {
           <Card>
             <CardContent>
               <Typography variant="h6" fontWeight="bold" gutterBottom>
-                Hoạt động gần đây
+                Hoáº¡t Ä‘á»™ng gáº§n Ä‘Ã¢y
               </Typography>
 
               <Box sx={{ maxHeight: 400, overflowY: "auto" }}>
@@ -694,7 +693,7 @@ const AdminDashboard = () => {
               </Box>
 
               <Button variant="outlined" fullWidth sx={{ mt: 2 }}>
-                Xem tất cả hoạt động
+                Xem táº¥t cáº£ hoáº¡t Ä‘á»™ng
               </Button>
             </CardContent>
           </Card>
@@ -715,8 +714,8 @@ const AdminDashboard = () => {
       >
         <DialogTitle>
           {inlineEdit
-            ? `Chỉnh sửa: ${selectedStation?.name}`
-            : `Chi tiết trạm sạc: ${selectedStation?.name || ""}`}
+            ? `Chá»‰nh sá»­a: ${selectedStation?.name}`
+            : `Chi tiáº¿t tráº¡m sáº¡c: ${selectedStation?.name || ""}`}
         </DialogTitle>
         <DialogContent>
           {selectedStation && !inlineEdit && (
@@ -724,7 +723,7 @@ const AdminDashboard = () => {
               <Grid container spacing={2}>
                 <Grid item xs={12} sm={6}>
                   <Typography variant="subtitle2" gutterBottom>
-                    Vị trí
+                    Vá»‹ trÃ­
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     {selectedStation.location.address}
@@ -732,43 +731,43 @@ const AdminDashboard = () => {
                 </Grid>
                 <Grid item xs={12} sm={6}>
                   <Typography variant="subtitle2" gutterBottom>
-                    Trạng thái
+                    Tráº¡ng thÃ¡i
                   </Typography>
                   {getStatusChip(selectedStation.status)}
                 </Grid>
                 <Grid item xs={12} sm={6}>
                   <Typography variant="subtitle2" gutterBottom>
-                    Cổng sạc
+                    Cá»•ng sáº¡c
                   </Typography>
                   <Typography variant="body2">
                     {selectedStation.charging?.chargingPosts?.length ||
                       Math.ceil(
                         (selectedStation.charging?.totalPorts || 0) / 2
                       )}{" "}
-                    cổng, {selectedStation.charging?.totalPorts || 0} tổng slot
+                    cá»•ng, {selectedStation.charging?.totalPorts || 0} tá»•ng slot
                   </Typography>
                 </Grid>
                 <Grid item xs={12} sm={6}>
                   <Typography variant="subtitle2" gutterBottom>
-                    Slot có sẵn
+                    Slot cÃ³ sáºµn
                   </Typography>
                   <Typography variant="body2">
-                    {selectedStation.charging?.availablePorts ?? 0} có sẵn
+                    {selectedStation.charging?.availablePorts ?? 0} cÃ³ sáºµn
                   </Typography>
                 </Grid>
                 <Grid item xs={12} sm={6}>
                   <Typography variant="subtitle2" gutterBottom>
-                    Công suất tối đa (mỗi cổng)
+                    CÃ´ng suáº¥t tá»‘i Ä‘a (má»—i cá»•ng)
                   </Typography>
                   <Typography variant="body2">
                     {selectedStation.charging?.chargingPosts?.[0]?.power ||
-                      "Không có"}
+                      "KhÃ´ng cÃ³"}
                     kW
                   </Typography>
                 </Grid>
                 <Grid item xs={12} sm={6}>
                   <Typography variant="subtitle2" gutterBottom>
-                    Doanh thu (Tháng)
+                    Doanh thu (ThÃ¡ng)
                   </Typography>
                   <Typography variant="body2">
                     {formatCurrency(
@@ -797,7 +796,7 @@ const AdminDashboard = () => {
                     });
                   }}
                 >
-                  Chỉnh sửa tại đây
+                  Chá»‰nh sá»­a táº¡i Ä‘Ã¢y
                 </Button>
               </Box>
             </Box>
@@ -809,7 +808,7 @@ const AdminDashboard = () => {
                 <Grid item xs={12} sm={6}>
                   <TextField
                     fullWidth
-                    label="Tên trạm sạc"
+                    label="TÃªn tráº¡m sáº¡c"
                     value={inlineForm.name}
                     onChange={(e) =>
                       setInlineForm({ ...inlineForm, name: e.target.value })
@@ -818,24 +817,24 @@ const AdminDashboard = () => {
                 </Grid>
                 <Grid item xs={12} sm={6}>
                   <FormControl fullWidth>
-                    <InputLabel>Trạng thái</InputLabel>
+                    <InputLabel>Tráº¡ng thÃ¡i</InputLabel>
                     <Select
-                      label="Trạng thái"
+                      label="Tráº¡ng thÃ¡i"
                       value={inlineForm.status}
                       onChange={(e) =>
                         setInlineForm({ ...inlineForm, status: e.target.value })
                       }
                     >
-                      <MenuItem value="active">Hoạt động</MenuItem>
-                      <MenuItem value="maintenance">Bảo trì</MenuItem>
-                      <MenuItem value="offline">Tạm ngưng</MenuItem>
+                      <MenuItem value="active">Hoáº¡t Ä‘á»™ng</MenuItem>
+                      <MenuItem value="maintenance">Báº£o trÃ¬</MenuItem>
+                      <MenuItem value="offline">Táº¡m ngÆ°ng</MenuItem>
                     </Select>
                   </FormControl>
                 </Grid>
                 <Grid item xs={12}>
                   <TextField
                     fullWidth
-                    label="Địa chỉ"
+                    label="Äá»‹a chá»‰"
                     value={inlineForm.address}
                     onChange={(e) =>
                       setInlineForm({ ...inlineForm, address: e.target.value })
@@ -846,7 +845,7 @@ const AdminDashboard = () => {
                   <TextField
                     fullWidth
                     type="number"
-                    label="Tổng cổng"
+                    label="Tá»•ng cá»•ng"
                     value={inlineForm.totalPorts}
                     onChange={(e) =>
                       setInlineForm({
@@ -860,7 +859,7 @@ const AdminDashboard = () => {
                   <TextField
                     fullWidth
                     type="number"
-                    label="Sạc nhanh (DC)"
+                    label="Sáº¡c nhanh (DC)"
                     value={inlineForm.fastChargePorts}
                     onChange={(e) =>
                       setInlineForm({
@@ -874,7 +873,7 @@ const AdminDashboard = () => {
                   <TextField
                     fullWidth
                     type="number"
-                    label="Sạc tiêu chuẩn (AC)"
+                    label="Sáº¡c tiÃªu chuáº©n (AC)"
                     value={inlineForm.standardPorts}
                     onChange={(e) =>
                       setInlineForm({
@@ -888,7 +887,7 @@ const AdminDashboard = () => {
                   <TextField
                     fullWidth
                     type="number"
-                    label="Giá (VND/kWh)"
+                    label="GiÃ¡ (VND/kWh)"
                     value={inlineForm.pricePerKwh}
                     onChange={(e) =>
                       setInlineForm({
@@ -902,7 +901,7 @@ const AdminDashboard = () => {
                   <TextField
                     fullWidth
                     type="number"
-                    label="Slot có sẵn"
+                    label="Slot cÃ³ sáºµn"
                     value={selectedStation?.charging?.availablePorts ?? 0}
                     onChange={(e) =>
                       setSelectedStation((prev) =>
@@ -936,7 +935,7 @@ const AdminDashboard = () => {
               setInlineEdit(false);
             }}
           >
-            Đóng
+            ÄÃ³ng
           </Button>
           {inlineEdit && (
             <Button
@@ -996,7 +995,7 @@ const AdminDashboard = () => {
                 setInlineEdit(false);
               }}
             >
-              Lưu
+              LÆ°u
             </Button>
           )}
         </DialogActions>
@@ -1025,11 +1024,11 @@ const AdminDashboard = () => {
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle>Thêm trạm sạc nhanh</DialogTitle>
+        <DialogTitle>ThÃªm tráº¡m sáº¡c nhanh</DialogTitle>
         <DialogContent sx={{ pt: 2 }}>
           <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
             <TextField
-              label="Tên trạm sạc *"
+              label="TÃªn tráº¡m sáº¡c *"
               value={addForm.name}
               onChange={(e) => setAddForm({ ...addForm, name: e.target.value })}
               error={!!addErrors.name}
@@ -1037,7 +1036,7 @@ const AdminDashboard = () => {
               fullWidth
             />
             <TextField
-              label="Địa chỉ *"
+              label="Äá»‹a chá»‰ *"
               value={addForm.address}
               onChange={(e) =>
                 setAddForm({ ...addForm, address: e.target.value })
@@ -1049,7 +1048,7 @@ const AdminDashboard = () => {
             <Grid container spacing={2}>
               <Grid item xs={12} sm={4}>
                 <TextField
-                  label="Tổng cổng"
+                  label="Tá»•ng cá»•ng"
                   type="number"
                   value={addForm.totalPorts}
                   onChange={(e) =>
@@ -1063,7 +1062,7 @@ const AdminDashboard = () => {
               </Grid>
               <Grid item xs={12} sm={4}>
                 <TextField
-                  label="Sạc nhanh (DC)"
+                  label="Sáº¡c nhanh (DC)"
                   type="number"
                   value={addForm.fastChargePorts}
                   onChange={(e) =>
@@ -1077,7 +1076,7 @@ const AdminDashboard = () => {
               </Grid>
               <Grid item xs={12} sm={4}>
                 <TextField
-                  label="Sạc tiêu chuẩn (AC)"
+                  label="Sáº¡c tiÃªu chuáº©n (AC)"
                   type="number"
                   value={addForm.standardPorts}
                   onChange={(e) =>
@@ -1093,7 +1092,7 @@ const AdminDashboard = () => {
             <Grid container spacing={2}>
               <Grid item xs={12} sm={6}>
                 <TextField
-                  label="Giá (VND/kWh)"
+                  label="GiÃ¡ (VND/kWh)"
                   type="number"
                   value={addForm.pricePerKwh}
                   onChange={(e) =>
@@ -1107,17 +1106,17 @@ const AdminDashboard = () => {
               </Grid>
               <Grid item xs={12} sm={6}>
                 <FormControl fullWidth>
-                  <InputLabel>Trạng thái</InputLabel>
+                  <InputLabel>Tráº¡ng thÃ¡i</InputLabel>
                   <Select
-                    label="Trạng thái"
+                    label="Tráº¡ng thÃ¡i"
                     value={addForm.status}
                     onChange={(e) =>
                       setAddForm({ ...addForm, status: e.target.value })
                     }
                   >
-                    <MenuItem value="active">Hoạt động</MenuItem>
-                    <MenuItem value="maintenance">Bảo trì</MenuItem>
-                    <MenuItem value="offline">Tạm ngưng</MenuItem>
+                    <MenuItem value="active">Hoáº¡t Ä‘á»™ng</MenuItem>
+                    <MenuItem value="maintenance">Báº£o trÃ¬</MenuItem>
+                    <MenuItem value="offline">Táº¡m ngÆ°ng</MenuItem>
                   </Select>
                 </FormControl>
               </Grid>
@@ -1125,13 +1124,13 @@ const AdminDashboard = () => {
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setAddDialogOpen(false)}>Hủy</Button>
+          <Button onClick={() => setAddDialogOpen(false)}>Há»§y</Button>
           <Button
             variant="contained"
             onClick={async () => {
               const errs = {};
-              if (!addForm.name.trim()) errs.name = "Tên trạm sạc là bắt buộc";
-              if (!addForm.address.trim()) errs.address = "Địa chỉ là bắt buộc";
+              if (!addForm.name.trim()) errs.name = "TÃªn tráº¡m sáº¡c lÃ  báº¯t buá»™c";
+              if (!addForm.address.trim()) errs.address = "Äá»‹a chá»‰ lÃ  báº¯t buá»™c";
               setAddErrors(errs);
               if (Object.keys(errs).length) return;
 
@@ -1139,8 +1138,8 @@ const AdminDashboard = () => {
                 name: addForm.name,
                 location: {
                   address: addForm.address,
-                  city: "TP. Hồ Chí Minh",
-                  province: "TP. Hồ Chí Minh",
+                  city: "TP. Há»“ ChÃ­ Minh",
+                  province: "TP. Há»“ ChÃ­ Minh",
                   coordinates: { lat: 10.7769, lng: 106.7009 },
                 },
                 charging: {
@@ -1159,11 +1158,11 @@ const AdminDashboard = () => {
               if (res?.success) {
                 setAddDialogOpen(false);
               } else {
-                alert("Không thể thêm trạm sạc. Vui lòng thử lại.");
+                alert("KhÃ´ng thá»ƒ thÃªm tráº¡m sáº¡c. Vui lÃ²ng thá»­ láº¡i.");
               }
             }}
           >
-            Tạo trạm sạc
+            Táº¡o tráº¡m sáº¡c
           </Button>
         </DialogActions>
       </Dialog>
@@ -1181,3 +1180,4 @@ const AdminDashboard = () => {
 };
 
 export default AdminDashboard;
+

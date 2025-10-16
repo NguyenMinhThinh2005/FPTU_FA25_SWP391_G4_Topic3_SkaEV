@@ -1,4 +1,4 @@
-/* eslint-disable */
+﻿/* eslint-disable */
 import React, { useState, useEffect } from 'react';
 import {
     Container,
@@ -11,8 +11,7 @@ import {
     Card,
     CardContent,
     Chip,
-    Button,
-} from '@mui/material';
+    Button} from '@mui/material';
 import {
     Analytics,
     Assessment,
@@ -22,8 +21,7 @@ import {
     TrendingUp,
     ElectricBolt,
     AccountBalanceWallet,
-    Schedule,
-} from '@mui/icons-material';
+    Schedule} from '@mui/icons-material';
 import useBookingStore from '../../store/bookingStore';
 import useAuthStore from '../../store/authStore';
 import useVehicleStore from '../../store/vehicleStore';
@@ -36,17 +34,16 @@ import ChargingHabitsAnalysis from './ChargingHabitsAnalysis';
 
 const AnalyticsPage = () => {
     const [activeTab, setActiveTab] = useState(0);
-    const { getBookingStats, bookingHistory, initializeMockData } = useBookingStore();
+    const { getBookingStats, bookingHistory} = useBookingStore();
     const { user } = useAuthStore();
     const { vehicles } = useVehicleStore();
 
     // Ensure data is initialized
     useEffect(() => {
         if (bookingHistory.length === 0) {
-            console.log('⚠️ AnalyticsPage - No data, initializing...');
-            initializeMockData();
-        }
-    }, [bookingHistory.length, initializeMockData]);
+            console.log('âš ï¸ AnalyticsPage - No data, initializing...');
+                    }
+    }, [bookingHistory.length]);
 
     const handleTabChange = (event, newValue) => {
         setActiveTab(newValue);
@@ -54,38 +51,38 @@ const AnalyticsPage = () => {
 
     const stats = getBookingStats();
 
-    // Debug: Log stats để kiểm tra dữ liệu
-    console.log('📊 AnalyticsPage - Stats from getBookingStats():', {
+    // Debug: Log stats Ä‘á»ƒ kiá»ƒm tra dá»¯ liá»‡u
+    console.log('ðŸ“Š AnalyticsPage - Stats from getBookingStats():', {
         stats,
         bookingHistoryLength: bookingHistory.length
     });
 
-    // Quick Stats Cards - Sử dụng field names đúng từ bookingStore
+    // Quick Stats Cards - Sá»­ dá»¥ng field names Ä‘Ãºng tá»« bookingStore
     const quickStats = [
         {
-            title: 'Tổng phiên sạc',
-            value: stats.completed || 0, // Chỉ đếm completed bookings
+            title: 'Tá»•ng phiÃªn sáº¡c',
+            value: stats.completed || 0, // Chá»‰ Ä‘áº¿m completed bookings
             icon: <ElectricBolt />,
             color: 'primary',
             trend: '+12%'
         },
         {
-            title: 'Năng lượng tiêu thụ',
-            value: `${parseFloat(stats.totalEnergyCharged || 0).toFixed(1)} kWh`, // ✅ Đúng field name
+            title: 'NÄƒng lÆ°á»£ng tiÃªu thá»¥',
+            value: `${parseFloat(stats.totalEnergyCharged || 0).toFixed(1)} kWh`, // âœ… ÄÃºng field name
             icon: <TrendingUp />,
             color: 'success',
             trend: '+8.5%'
         },
         {
-            title: 'Chi phí tháng này',
+            title: 'Chi phÃ­ thÃ¡ng nÃ y',
             value: formatCurrency(parseFloat(stats.totalAmount || 0)),
             icon: <AccountBalanceWallet />,
             color: 'warning',
             trend: '-5.2%'
         },
         {
-            title: 'Thời gian sạc TB',
-            value: `${stats.averageDuration || 0} phút`, // ✅ Hiển thị phút/phiên
+            title: 'Thá»i gian sáº¡c TB',
+            value: `${stats.averageDuration || 0} phÃºt`, // âœ… Hiá»ƒn thá»‹ phÃºt/phiÃªn
             icon: <Schedule />,
             color: 'info',
             trend: '+2.1%'
@@ -94,17 +91,17 @@ const AnalyticsPage = () => {
 
     const tabs = [
         {
-            label: 'Phân tích tổng quan',
+            label: 'PhÃ¢n tÃ­ch tá»•ng quan',
             icon: <Analytics />,
             component: <CustomerAnalytics />
         },
         {
-            label: 'Báo cáo chi phí',
+            label: 'BÃ¡o cÃ¡o chi phÃ­',
             icon: <Assessment />,
             component: <MonthlyCostReports />
         },
         {
-            label: 'Thói quen sạc',
+            label: 'ThÃ³i quen sáº¡c',
             icon: <Psychology />,
             component: <ChargingHabitsAnalysis />
         }
@@ -116,10 +113,10 @@ const AnalyticsPage = () => {
             <Box sx={{ mb: 4 }}>
                 <Typography variant="h4" fontWeight="bold" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <Analytics sx={{ fontSize: 40, color: 'primary.main' }} />
-                    📊 Thống kê & Báo cáo
+                    ðŸ“Š Thá»‘ng kÃª & BÃ¡o cÃ¡o
                 </Typography>
                 <Typography variant="body1" color="text.secondary">
-                    Phân tích chi tiết về hoạt động sạc xe và chi phí của bạn
+                    PhÃ¢n tÃ­ch chi tiáº¿t vá» hoáº¡t Ä‘á»™ng sáº¡c xe vÃ  chi phÃ­ cá»§a báº¡n
                 </Typography>
             </Box>
 
@@ -213,7 +210,7 @@ const AnalyticsPage = () => {
                                 size="small"
                                 sx={{ textTransform: 'none' }}
                             >
-                                Xuất báo cáo
+                                Xuáº¥t bÃ¡o cÃ¡o
                             </Button>
                         </Box>
                     </Box>
@@ -231,3 +228,4 @@ const AnalyticsPage = () => {
 };
 
 export default AnalyticsPage;
+

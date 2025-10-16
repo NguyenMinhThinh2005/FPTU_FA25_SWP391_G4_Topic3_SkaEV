@@ -55,7 +55,7 @@ import { useNavigate } from "react-router-dom";
 import ConfirmDialog from "../../components/ui/ConfirmDialog";
 import useAuthStore from "../../store/authStore";
 import useStationStore from "../../store/stationStore";
-import { mockData } from "../../data/mockData";
+import useBookingStore from "../../store/bookingStore";
 import { formatCurrency } from "../../utils/helpers";
 
 const StationManagement = () => {
@@ -65,6 +65,7 @@ const StationManagement = () => {
   const { user } = useAuthStore();
   const { stations, addStation, updateStation, deleteStation, remoteDisableStation, remoteEnableStation } =
     useStationStore();
+  const { bookings } = useBookingStore();
   const [selectedStation, setSelectedStation] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   // eslint-disable-next-line no-unused-vars
@@ -93,7 +94,7 @@ const StationManagement = () => {
 
   // Station analytics data
   const stationAnalytics = stations.map((station) => {
-    const stationBookings = mockData.bookings.filter(
+    const stationBookings = bookings.filter(
       (b) => b.stationId === station.id
     );
     const thisMonthBookings = stationBookings.filter((b) => {

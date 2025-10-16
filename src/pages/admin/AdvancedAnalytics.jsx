@@ -60,7 +60,7 @@ import {
 // removed useNavigate as it was unused
 import useAuthStore from "../../store/authStore";
 import useStationStore from "../../store/stationStore";
-import { mockData } from "../../data/mockData";
+import useBookingStore from "../../store/bookingStore";
 import { formatCurrency } from "../../utils/helpers";
 
 // generateAnalyticsData moved out of component to avoid useEffect missing-deps lint
@@ -94,6 +94,7 @@ const AdvancedAnalytics = () => {
   // optionally use auth store in future; keep reference to avoid unused import
   useAuthStore();
   const { stations } = useStationStore();
+  const { bookings } = useBookingStore();
   const [timeRange, setTimeRange] = useState("7d");
   // removed unused states: selectedMetric, anchorEl
 
@@ -151,7 +152,7 @@ const AdvancedAnalytics = () => {
   // Station performance data
   const stationPerformance = stations
     .map((station) => {
-      const stationBookings = mockData.bookings.filter(
+      const stationBookings = bookings.filter(
         (b) => b.stationId === station.id
       );
       const revenue = stationBookings.reduce((sum, b) => sum + b.cost, 0);

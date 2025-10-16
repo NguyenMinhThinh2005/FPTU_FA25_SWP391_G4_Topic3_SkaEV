@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import {
   Box,
   Typography,
@@ -50,7 +50,6 @@ import useStationStore from "../../store/stationStore";
 import useBookingStore from "../../store/bookingStore";
 import QRScanner from "../../components/customer/QRScanner";
 import ChargingStatus from "../../components/ui/ChargingStatus/ChargingStatus";
-import { mockData } from "../../data/mockData";
 import {
   formatCurrency,
   formatDate,
@@ -82,7 +81,7 @@ const CustomerDashboard = () => {
   const scheduledBookings = getScheduledBookings();
 
   // Get user's booking data
-  const userBookings = mockData.bookings.filter(
+  const userBookings = bookings.filter(
     (booking) => booking.userId === user?.id
   );
   const recentBookings = userBookings.slice(0, 4);
@@ -220,7 +219,7 @@ const CustomerDashboard = () => {
       >
         <Box>
           <Typography variant="h4" fontWeight="bold" gutterBottom>
-            Chào mừng trở lại, {user?.profile?.firstName || 'Tài xế'}! ⚡
+            ChÃ o má»«ng trá»Ÿ láº¡i, {user?.profile?.firstName || 'TÃ i xáº¿'}! âš¡
           </Typography>
           <Typography variant="body1" color="text.secondary">
             Your electric journey dashboard - Let's charge up your day!
@@ -301,13 +300,13 @@ const CustomerDashboard = () => {
               size="small"
               onClick={() => navigate(`/customer/booking/${activeBooking.id}`)}
             >
-              Xem chi tiết
+              Xem chi tiáº¿t
             </Button>
           }
         >
           <Typography variant="body2">
             <strong>
-              {activeBooking.status === "charging" ? "Phiên sạc đang hoạt động" : "Đặt chỗ đã xác nhận"}:
+              {activeBooking.status === "charging" ? "PhiÃªn sáº¡c Ä‘ang hoáº¡t Ä‘á»™ng" : "Äáº·t chá»— Ä‘Ã£ xÃ¡c nháº­n"}:
             </strong>{" "}
             {activeBooking.stationName}
             {activeBooking.status === "charging"
@@ -447,7 +446,7 @@ const CustomerDashboard = () => {
                     {co2Saved}
                   </Typography>
                   <Typography variant="body2" sx={{ opacity: 0.8 }}>
-                    kg CO₂ Saved
+                    kg COâ‚‚ Saved
                   </Typography>
                 </Box>
               </Box>
@@ -522,7 +521,7 @@ const CustomerDashboard = () => {
                                   variant="caption"
                                   color="text.secondary"
                                 >
-                                  Port {booking.portNumber} •{" "}
+                                  Port {booking.portNumber} â€¢{" "}
                                   {booking.connectorType}
                                 </Typography>
                               </Box>
@@ -537,13 +536,13 @@ const CustomerDashboard = () => {
                         secondary={
                           <Box sx={{ mt: 1 }}>
                             <Typography variant="body2" color="text.secondary">
-                              {formatDate(booking.date || booking.createdAt)} • {booking.duration || 'N/A'}{" "}
+                              {formatDate(booking.date || booking.createdAt)} â€¢ {booking.duration || 'N/A'}{" "}
                               minutes
                             </Typography>
                             {/* Show scheduled time for scheduled bookings */}
                             {booking.schedulingType === 'scheduled' && booking.scheduledDateTime && (
                               <Typography variant="body2" color="primary.main" sx={{ fontWeight: 'medium' }}>
-                                📅 Lịch sạc: {new Date(booking.scheduledDateTime).toLocaleString('vi-VN')}
+                                ðŸ“… Lá»‹ch sáº¡c: {new Date(booking.scheduledDateTime).toLocaleString('vi-VN')}
                               </Typography>
                             )}
                             <Box
@@ -554,7 +553,7 @@ const CustomerDashboard = () => {
                               }}
                             >
                               <Typography variant="body2" fontWeight="medium">
-                                {booking.energyDelivered?.toFixed(1) || 'N/A'} kWh •{" "}
+                                {booking.energyDelivered?.toFixed(1) || 'N/A'} kWh â€¢{" "}
                                 {formatCurrency(booking.cost || 0)}
                               </Typography>
                               {booking.status === "completed" && (
@@ -569,7 +568,7 @@ const CustomerDashboard = () => {
                                     sx={{ fontSize: 14, color: "warning.main" }}
                                   />
                                   <Typography variant="caption">
-                                    {booking.rating || "Đánh giá phiên này"}
+                                    {booking.rating || "ÄÃ¡nh giÃ¡ phiÃªn nÃ y"}
                                   </Typography>
                                 </Box>
                               )}
@@ -611,7 +610,7 @@ const CustomerDashboard = () => {
                     fontWeight: "bold"
                   }}
                 >
-                  Quét QR để sạc ngay
+                  QuÃ©t QR Ä‘á»ƒ sáº¡c ngay
                 </Button>
                 <Button
                   variant="contained"
@@ -655,7 +654,7 @@ const CustomerDashboard = () => {
             <Card sx={{ mb: 3 }}>
               <CardContent>
                 <Typography variant="h6" fontWeight="bold" gutterBottom>
-                  📅 Lịch sạc sắp tới
+                  ðŸ“… Lá»‹ch sáº¡c sáº¯p tá»›i
                 </Typography>
                 {scheduledBookings.slice(0, 2).map((booking) => (
                   <Paper
@@ -674,14 +673,14 @@ const CustomerDashboard = () => {
                           {booking.stationName}
                         </Typography>
                         <Typography variant="body2" color="primary.main" sx={{ fontWeight: 'medium' }}>
-                          📅 {new Date(booking.scheduledDateTime).toLocaleString('vi-VN')}
+                          ðŸ“… {new Date(booking.scheduledDateTime).toLocaleString('vi-VN')}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
-                          {booking.chargerType?.name} • {booking.slot?.id}
+                          {booking.chargerType?.name} â€¢ {booking.slot?.id}
                         </Typography>
                       </Box>
                       <Chip
-                        label="Đã lên lịch"
+                        label="ÄÃ£ lÃªn lá»‹ch"
                         color="warning"
                         size="small"
                         icon={<Schedule />}
@@ -691,7 +690,7 @@ const CustomerDashboard = () => {
                 ))}
                 {scheduledBookings.length > 2 && (
                   <Button variant="text" size="small" fullWidth>
-                    Xem thêm {scheduledBookings.length - 2} lịch khác
+                    Xem thÃªm {scheduledBookings.length - 2} lá»‹ch khÃ¡c
                   </Button>
                 )}
               </CardContent>
@@ -751,7 +750,7 @@ const CustomerDashboard = () => {
                         station.location.coordinates.lat,
                         station.location.coordinates.lng
                       ).toFixed(1)}km away`}{" "}
-                    • Up to {station.charging.maxPower}kW
+                    â€¢ Up to {station.charging.maxPower}kW
                   </Typography>
                   <Box
                     sx={{
@@ -790,7 +789,7 @@ const CustomerDashboard = () => {
                 </Avatar>
                 <Box>
                   <Typography variant="subtitle1" fontWeight="medium">
-                    {user?.profile ? `${user.profile.firstName} ${user.profile.lastName}` : 'Khách hàng'}
+                    {user?.profile ? `${user.profile.firstName} ${user.profile.lastName}` : 'KhÃ¡ch hÃ ng'}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     {user?.email}
@@ -825,3 +824,4 @@ const CustomerDashboard = () => {
 };
 
 export default CustomerDashboard;
+

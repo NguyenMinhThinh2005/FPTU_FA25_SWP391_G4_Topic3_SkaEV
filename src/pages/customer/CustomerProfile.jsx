@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import {
   Box,
   Typography,
@@ -37,7 +37,6 @@ import useAuthStore from "../../store/authStore";
 import useBookingStore from "../../store/bookingStore";
 import useVehicleStore from "../../store/vehicleStore";
 import { formatCurrency } from "../../utils/helpers";
-import { mockUsers } from "../../data/mockData";
 import VehicleEditModal from "../../components/customer/VehicleEditModal";
 
 function TabPanel({ children, value, index, ...other }) {
@@ -56,7 +55,7 @@ function TabPanel({ children, value, index, ...other }) {
 
 const CustomerProfile = () => {
   const { user, updateProfile } = useAuthStore();
-  const { bookingHistory, initializeMockData, getBookingStats } = useBookingStore();
+  const { bookingHistory, getBookingStats } = useBookingStore();
   const { vehicles, initializeWithUserData, updateVehicle } = useVehicleStore();
   const [tabValue, setTabValue] = useState(0);
   const [editMode, setEditMode] = useState(false);
@@ -65,10 +64,10 @@ const CustomerProfile = () => {
     vehicle: null
   });
   const [profileData, setProfileData] = useState({
-    name: user?.profile ? `${user.profile.firstName} ${user.profile.lastName}` : "Nguyễn Văn An",
+    name: user?.profile ? `${user.profile.firstName} ${user.profile.lastName}` : "Nguyá»…n VÄƒn An",
     email: user?.email || "customer@skaev.com",
     phone: user?.profile?.phone || "+84 901 234 567",
-    address: "123 Nguyễn Huệ, Quận 1, TP.HCM"
+    address: "123 Nguyá»…n Huá»‡, Quáº­n 1, TP.HCM"
   });
   const [profileErrors, setProfileErrors] = useState({
     name: '',
@@ -80,8 +79,7 @@ const CustomerProfile = () => {
 
   useEffect(() => {
     if (bookingHistory.length === 0) {
-      initializeMockData();
-    }
+          }
 
     // Initialize vehicle data with user data
     const getCurrentUserData = () => {
@@ -96,7 +94,7 @@ const CustomerProfile = () => {
     if (userData) {
       initializeWithUserData(userData);
     }
-  }, [bookingHistory.length, initializeMockData, user?.id, initializeWithUserData]);
+  }, [bookingHistory.length, user?.id, initializeWithUserData]);
 
   const rawBookingStats = getBookingStats();
 
@@ -126,27 +124,27 @@ const CustomerProfile = () => {
 
     // Validate name
     if (!profileData.name || profileData.name.trim().length < 3) {
-      errors.name = 'Họ tên phải có ít nhất 3 ký tự';
+      errors.name = 'Há» tÃªn pháº£i cÃ³ Ã­t nháº¥t 3 kÃ½ tá»±';
       isValid = false;
     }
 
     // Validate email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!profileData.email || !emailRegex.test(profileData.email)) {
-      errors.email = 'Email không hợp lệ';
+      errors.email = 'Email khÃ´ng há»£p lá»‡';
       isValid = false;
     }
 
     // Validate phone (Vietnamese format)
     const phoneRegex = /^(\+84|0)(3|5|7|8|9)[0-9]{8}$/;
     if (!profileData.phone || !phoneRegex.test(profileData.phone)) {
-      errors.phone = 'Số điện thoại không hợp lệ (VD: 0901234567)';
+      errors.phone = 'Sá»‘ Ä‘iá»‡n thoáº¡i khÃ´ng há»£p lá»‡ (VD: 0901234567)';
       isValid = false;
     }
 
     // Validate address
     if (!profileData.address || profileData.address.trim().length < 10) {
-      errors.address = 'Địa chỉ phải có ít nhất 10 ký tự';
+      errors.address = 'Äá»‹a chá»‰ pháº£i cÃ³ Ã­t nháº¥t 10 kÃ½ tá»±';
       isValid = false;
     }
 
@@ -183,10 +181,10 @@ const CustomerProfile = () => {
   const handleCancelEdit = () => {
     // Reset to original data
     setProfileData({
-      name: user?.profile ? `${user.profile.firstName} ${user.profile.lastName}` : "Nguyễn Văn An",
+      name: user?.profile ? `${user.profile.firstName} ${user.profile.lastName}` : "Nguyá»…n VÄƒn An",
       email: user?.email || "customer@skaev.com",
       phone: user?.profile?.phone || "+84 901 234 567",
-      address: "123 Nguyễn Huệ, Quận 1, TP.HCM"
+      address: "123 Nguyá»…n Huá»‡, Quáº­n 1, TP.HCM"
     });
     setProfileErrors({
       name: '',
@@ -226,12 +224,12 @@ const CustomerProfile = () => {
       '& [role="tabpanel"]::after': {
         display: 'none'
       },
-      '& *:contains("TÀI KHOẢN"), & *:contains("SẠC XE")': {
+      '& *:contains("TÃ€I KHOáº¢N"), & *:contains("Sáº C XE")': {
         display: 'none !important'
       }
     }}>
       <Typography variant="h4" gutterBottom sx={{ mb: 3, fontWeight: "bold" }}>
-        Hồ sơ cá nhân
+        Há»“ sÆ¡ cÃ¡ nhÃ¢n
       </Typography>
 
       <Card sx={{ mb: 3 }}>
@@ -241,9 +239,9 @@ const CustomerProfile = () => {
           variant="fullWidth"
           indicatorColor="primary"
         >
-          <Tab icon={<Person />} label="HỒ SƠ CÁ NHÂN" />
-          <Tab icon={<ElectricCar />} label="QUẢN LÝ XE" />
-          <Tab icon={<History />} label="LỊCH SỬ SẠC" />
+          <Tab icon={<Person />} label="Há»’ SÆ  CÃ NHÃ‚N" />
+          <Tab icon={<ElectricCar />} label="QUáº¢N LÃ XE" />
+          <Tab icon={<History />} label="Lá»ŠCH Sá»¬ Sáº C" />
         </Tabs>
       </Card>
 
@@ -258,7 +256,7 @@ const CustomerProfile = () => {
                 <Typography variant="h5" fontWeight="bold" gutterBottom>
                   {profileData.name}
                 </Typography>
-                <Chip label="Tài xế" color="primary" />
+                <Chip label="TÃ i xáº¿" color="primary" />
                 <Box sx={{ mt: 2 }}>
                   <Button
                     variant={editMode ? "contained" : "outlined"}
@@ -266,7 +264,7 @@ const CustomerProfile = () => {
                     onClick={editMode ? handleSaveProfile : () => setEditMode(true)}
                     fullWidth
                   >
-                    {editMode ? "Lưu thay đổi" : "Chỉnh sửa"}
+                    {editMode ? "LÆ°u thay Ä‘á»•i" : "Chá»‰nh sá»­a"}
                   </Button>
                 </Box>
               </CardContent>
@@ -275,12 +273,12 @@ const CustomerProfile = () => {
           <Grid item xs={12} md={8}>
             <Card>
               <CardContent>
-                <Typography variant="h6" gutterBottom>Thông tin chi tiết</Typography>
+                <Typography variant="h6" gutterBottom>ThÃ´ng tin chi tiáº¿t</Typography>
                 <Divider sx={{ mb: 3 }} />
 
                 {saveSuccess && (
                   <Alert severity="success" sx={{ mb: 2 }}>
-                    ✅ Cập nhật thông tin thành công!
+                    âœ… Cáº­p nháº­t thÃ´ng tin thÃ nh cÃ´ng!
                   </Alert>
                 )}
 
@@ -288,7 +286,7 @@ const CustomerProfile = () => {
                   <Grid item xs={12} sm={6}>
                     <TextField
                       fullWidth
-                      label="Họ và tên"
+                      label="Há» vÃ  tÃªn"
                       value={profileData.name}
                       disabled={!editMode}
                       onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
@@ -312,19 +310,19 @@ const CustomerProfile = () => {
                   <Grid item xs={12} sm={6}>
                     <TextField
                       fullWidth
-                      label="Số điện thoại"
+                      label="Sá»‘ Ä‘iá»‡n thoáº¡i"
                       value={profileData.phone}
                       disabled={!editMode}
                       onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })}
                       error={editMode && !!profileErrors.phone}
-                      helperText={editMode ? (profileErrors.phone || 'VD: 0901234567 hoặc +84901234567') : ''}
+                      helperText={editMode ? (profileErrors.phone || 'VD: 0901234567 hoáº·c +84901234567') : ''}
                       InputProps={{ startAdornment: <Phone sx={{ mr: 1, color: "text.secondary" }} /> }}
                     />
                   </Grid>
                   <Grid item xs={12} sm={6}>
                     <TextField
                       fullWidth
-                      label="Địa chỉ"
+                      label="Äá»‹a chá»‰"
                       value={profileData.address}
                       disabled={!editMode}
                       onChange={(e) => setProfileData({ ...profileData, address: e.target.value })}
@@ -336,8 +334,8 @@ const CustomerProfile = () => {
                 </Grid>
                 {editMode && (
                   <Box sx={{ mt: 3, display: "flex", gap: 2, justifyContent: "flex-end" }}>
-                    <Button variant="outlined" onClick={handleCancelEdit}>Hủy</Button>
-                    <Button variant="contained" onClick={handleSaveProfile}>Lưu thay đổi</Button>
+                    <Button variant="outlined" onClick={handleCancelEdit}>Há»§y</Button>
+                    <Button variant="contained" onClick={handleSaveProfile}>LÆ°u thay Ä‘á»•i</Button>
                   </Box>
                 )}
               </CardContent>
@@ -358,7 +356,7 @@ const CustomerProfile = () => {
                     </Avatar>
                     <Box>
                       <Typography variant="h6" fontWeight="bold">{vehicle.make} {vehicle.model}</Typography>
-                      <Typography variant="body2" color="text.secondary">{vehicle.year} • {vehicle.licensePlate || vehicle.nickname || 'Chưa đăng ký'}</Typography>
+                      <Typography variant="body2" color="text.secondary">{vehicle.year} â€¢ {vehicle.licensePlate || vehicle.nickname || 'ChÆ°a Ä‘Äƒng kÃ½'}</Typography>
                     </Box>
                   </Box>
                   <Grid container spacing={2}>
@@ -366,21 +364,21 @@ const CustomerProfile = () => {
                       <Box sx={{ textAlign: "center", p: 1 }}>
                         <BatteryFull color="success" />
                         <Typography variant="body2" fontWeight="medium">{vehicle.batteryCapacity || '87.7'} kWh</Typography>
-                        <Typography variant="caption" color="text.secondary">Dung lượng</Typography>
+                        <Typography variant="caption" color="text.secondary">Dung lÆ°á»£ng</Typography>
                       </Box>
                     </Grid>
                     <Grid item xs={4}>
                       <Box sx={{ textAlign: "center", p: 1 }}>
                         <Speed color="info" />
                         <Typography variant="body2" fontWeight="medium">{vehicle.range || Math.floor((parseFloat(vehicle.batteryCapacity) || 87.7) * 5.5)} km</Typography>
-                        <Typography variant="caption" color="text.secondary">Quãng đường</Typography>
+                        <Typography variant="caption" color="text.secondary">QuÃ£ng Ä‘Æ°á»ng</Typography>
                       </Box>
                     </Grid>
                     <Grid item xs={4}>
                       <Box sx={{ textAlign: "center", p: 1 }}>
                         <EmojiNature color="primary" />
                         <Typography variant="body2" fontWeight="medium">{vehicle.efficiency || '5.2'} km/kWh</Typography>
-                        <Typography variant="caption" color="text.secondary">Hiệu suất</Typography>
+                        <Typography variant="caption" color="text.secondary">Hiá»‡u suáº¥t</Typography>
                       </Box>
                     </Grid>
                   </Grid>
@@ -388,7 +386,7 @@ const CustomerProfile = () => {
                   {/* Charging Types Support */}
                   <Box sx={{ mt: 2 }}>
                     <Typography variant="body2" fontWeight="medium" gutterBottom>
-                      Loại sạc hỗ trợ:
+                      Loáº¡i sáº¡c há»— trá»£:
                     </Typography>
                     <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                       {(vehicle.connectorTypes || vehicle.chargingType || ["Type 2", "CCS2"]).map((type, index) => (
@@ -410,7 +408,7 @@ const CustomerProfile = () => {
                     onClick={() => handleEditVehicle(vehicle)}
                     startIcon={<Edit />}
                   >
-                    Chỉnh sửa thông tin
+                    Chá»‰nh sá»­a thÃ´ng tin
                   </Button>
                 </CardContent>
               </Card>
@@ -424,31 +422,31 @@ const CustomerProfile = () => {
           <Grid item xs={12} md={3}>
             <Card><CardContent sx={{ textAlign: "center" }}>
               <Typography variant="h4" color="primary.main" fontWeight="bold">{bookingStats.completed || 1}</Typography>
-              <Typography variant="body2" color="text.secondary">Tổng phiên sạc</Typography>
+              <Typography variant="body2" color="text.secondary">Tá»•ng phiÃªn sáº¡c</Typography>
             </CardContent></Card>
           </Grid>
           <Grid item xs={12} md={3}>
             <Card><CardContent sx={{ textAlign: "center" }}>
               <Typography variant="h4" color="success.main" fontWeight="bold">{bookingStats.completed}</Typography>
-              <Typography variant="body2" color="text.secondary">Hoàn thành</Typography>
+              <Typography variant="body2" color="text.secondary">HoÃ n thÃ nh</Typography>
             </CardContent></Card>
           </Grid>
           <Grid item xs={12} md={3}>
             <Card><CardContent sx={{ textAlign: "center" }}>
               <Typography variant="h4" color="info.main" fontWeight="bold">{bookingStats.totalEnergyCharged} kWh</Typography>
-              <Typography variant="body2" color="text.secondary">Tổng năng lượng</Typography>
+              <Typography variant="body2" color="text.secondary">Tá»•ng nÄƒng lÆ°á»£ng</Typography>
             </CardContent></Card>
           </Grid>
           <Grid item xs={12} md={3}>
             <Card><CardContent sx={{ textAlign: "center" }}>
               <Typography variant="h4" color="warning.main" fontWeight="bold">{formatCurrency(bookingStats.totalAmount)}</Typography>
-              <Typography variant="body2" color="text.secondary">Tổng chi phí</Typography>
+              <Typography variant="body2" color="text.secondary">Tá»•ng chi phÃ­</Typography>
             </CardContent></Card>
           </Grid>
           <Grid item xs={12}>
             <Card>
               <CardContent>
-                <Typography variant="h6" gutterBottom>Lịch sử sạc gần đây</Typography>
+                <Typography variant="h6" gutterBottom>Lá»‹ch sá»­ sáº¡c gáº§n Ä‘Ã¢y</Typography>
                 <Divider sx={{ mb: 2 }} />
                 <List>
                   {bookingHistory
@@ -471,7 +469,7 @@ const CustomerProfile = () => {
                           }
                         />
                         <Chip
-                          label={booking.status === "completed" ? "Hoàn thành" : "Đã hủy"}
+                          label={booking.status === "completed" ? "HoÃ n thÃ nh" : "ÄÃ£ há»§y"}
                           color={booking.status === "completed" ? "success" : "error"}
                           size="small"
                         />

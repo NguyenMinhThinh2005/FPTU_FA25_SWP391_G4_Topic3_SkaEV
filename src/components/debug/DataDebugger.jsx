@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { Box, Typography, Button, Card, CardContent, Alert } from '@mui/material';
 import useBookingStore from '../../store/bookingStore';
 import { formatCurrency } from '../../utils/helpers';
 
 const DataDebugger = () => {
-    const { bookingHistory, getBookingStats, initializeMockData } = useBookingStore();
+    const { bookingHistory, getBookingStats} = useBookingStore();
     const [debugInfo, setDebugInfo] = useState(null);
 
     const refreshDebugInfo = () => {
@@ -44,16 +44,15 @@ const DataDebugger = () => {
     }, [bookingHistory, getBookingStats]);
 
     const handleForceInit = () => {
-        console.log('🔄 Force initializing mock data...');
-        initializeMockData();
-        setTimeout(refreshDebugInfo, 500);
+        console.log('ðŸ”„ Force initializing mock data...');
+                setTimeout(refreshDebugInfo, 500);
     };
 
     return (
         <Card sx={{ mb: 3, bgcolor: '#f5f5f5' }}>
             <CardContent>
                 <Typography variant="h6" gutterBottom>
-                    🐛 Data Debug Panel
+                    ðŸ› Data Debug Panel
                 </Typography>
 
                 <Button

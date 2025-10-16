@@ -1,4 +1,4 @@
-/* eslint-disable */
+﻿/* eslint-disable */
 import React, { useState } from "react";
 import {
     Box,
@@ -21,8 +21,7 @@ import {
     TableRow,
     Chip,
     Alert,
-    LinearProgress,
-} from "@mui/material";
+    LinearProgress} from "@mui/material";
 import {
     Receipt,
     Download,
@@ -33,22 +32,16 @@ import {
     AttachMoney,
     ElectricCar,
     Schedule,
-    Assessment,
-} from "@mui/icons-material";
+    Assessment} from "@mui/icons-material";
 import { formatCurrency } from "../../utils/helpers";
 import useBookingStore from "../../store/bookingStore";
 
 const MonthlyCostReports = () => {
     const [selectedMonth, setSelectedMonth] = useState("2024-09");
-    const { bookingHistory, getBookingStats, initializeMockData } = useBookingStore();
+    const { bookingHistory, getBookingStats} = useBookingStore();
 
     // Initialize data if needed
-    React.useEffect(() => {
-        if (bookingHistory.length === 0) {
-            initializeMockData();
-        }
-    }, [bookingHistory.length, initializeMockData]);
-
+    React.
     // Calculate monthly data from booking store
     const bookingStats = getBookingStats();
     const completedBookings = bookingHistory.filter(b => b.status === 'completed');
@@ -63,8 +56,7 @@ const MonthlyCostReports = () => {
             comparedToLastMonth: {
                 costChange: 12.5,
                 sessionsChange: -6.7,
-                energyChange: 8.3,
-            },
+                energyChange: 8.3},
             dailyBreakdown: [
                 { date: "2024-09-01", sessions: 1, energy: 32, cost: 174000 },
                 { date: "2024-09-03", sessions: 1, energy: 28, cost: 152000 },
@@ -79,17 +71,16 @@ const MonthlyCostReports = () => {
             ],
             stationBreakdown: [
                 { name: "Vincom Mega Mall", sessions: 5, energy: 150, cost: 815000 },
-                { name: "AEON Mall Bình Tân", sessions: 3, energy: 96, cost: 522000 },
-                { name: "Lotte Mart Gò Vấp", sessions: 2, energy: 64, cost: 348000 },
-                { name: "Big C Thăng Long", sessions: 2, energy: 58, cost: 315000 },
-                { name: "Coopmart Cống Quỳnh", sessions: 3, energy: 82, cost: 445000 },
+                { name: "AEON Mall BÃ¬nh TÃ¢n", sessions: 3, energy: 96, cost: 522000 },
+                { name: "Lotte Mart GÃ² Váº¥p", sessions: 2, energy: 64, cost: 348000 },
+                { name: "Big C ThÄƒng Long", sessions: 2, energy: 58, cost: 315000 },
+                { name: "Coopmart Cá»‘ng Quá»³nh", sessions: 3, energy: 82, cost: 445000 },
             ],
             timeBreakdown: [
                 { period: "06:00 - 12:00", sessions: 3, percentage: 20 },
                 { period: "12:00 - 18:00", sessions: 6, percentage: 40 },
                 { period: "18:00 - 24:00", sessions: 6, percentage: 40 },
-            ],
-        },
+            ]},
         "2024-08": {
             totalCost: 2180000,
             totalSessions: 16,
@@ -99,9 +90,7 @@ const MonthlyCostReports = () => {
             comparedToLastMonth: {
                 costChange: -8.2,
                 sessionsChange: 14.3,
-                energyChange: 2.9,
-            },
-        },
+                energyChange: 2.9}},
         "2024-07": {
             totalCost: 2375000,
             totalSessions: 14,
@@ -111,10 +100,7 @@ const MonthlyCostReports = () => {
             comparedToLastMonth: {
                 costChange: 18.9,
                 sessionsChange: -12.5,
-                energyChange: -5.6,
-            },
-        },
-    };
+                energyChange: -5.6}}};
 
     const currentReport = monthlyReports[selectedMonth];
     const months = Object.keys(monthlyReports);
@@ -123,8 +109,7 @@ const MonthlyCostReports = () => {
         // Mock export functionality
         const reportData = {
             month: selectedMonth,
-            ...currentReport,
-        };
+            ...currentReport};
 
         const dataStr = JSON.stringify(reportData, null, 2);
         const dataBlob = new Blob([dataStr], { type: "application/json" });
@@ -152,8 +137,7 @@ const MonthlyCostReports = () => {
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "center",
-                    mb: 4,
-                }}
+                    mb: 4}}
             >
                 <Box sx={{ display: "flex", alignItems: "center" }}>
                     <Avatar sx={{ bgcolor: "primary.main", mr: 2 }}>
@@ -161,27 +145,26 @@ const MonthlyCostReports = () => {
                     </Avatar>
                     <Box>
                         <Typography variant="h4" fontWeight="bold">
-                            Báo cáo chi phí hằng tháng
+                            BÃ¡o cÃ¡o chi phÃ­ háº±ng thÃ¡ng
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
-                            Chi tiết chi phí sạc xe theo từng tháng
+                            Chi tiáº¿t chi phÃ­ sáº¡c xe theo tá»«ng thÃ¡ng
                         </Typography>
                     </Box>
                 </Box>
                 <Box sx={{ display: "flex", gap: 2 }}>
                     <FormControl sx={{ minWidth: 150 }}>
-                        <InputLabel>Tháng</InputLabel>
+                        <InputLabel>ThÃ¡ng</InputLabel>
                         <Select
                             value={selectedMonth}
-                            label="Tháng"
+                            label="ThÃ¡ng"
                             onChange={(e) => setSelectedMonth(e.target.value)}
                         >
                             {months.map((month) => (
                                 <MenuItem key={month} value={month}>
                                     {new Date(month + "-01").toLocaleDateString("vi-VN", {
                                         month: "long",
-                                        year: "numeric",
-                                    })}
+                                        year: "numeric"})}
                                 </MenuItem>
                             ))}
                         </Select>
@@ -191,13 +174,13 @@ const MonthlyCostReports = () => {
                         startIcon={<Download />}
                         onClick={handleExportReport}
                     >
-                        Xuất báo cáo
+                        Xuáº¥t bÃ¡o cÃ¡o
                     </Button>
                     <Button
                         variant="contained"
                         onClick={() => window.open("/customer/charging-habits", "_blank")}
                     >
-                        Xem thói quen chi tiết
+                        Xem thÃ³i quen chi tiáº¿t
                     </Button>
                 </Box>
             </Box>
@@ -208,8 +191,7 @@ const MonthlyCostReports = () => {
                     <Card
                         sx={{
                             background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                            color: "white",
-                        }}
+                            color: "white"}}
                     >
                         <CardContent>
                             <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
@@ -221,12 +203,12 @@ const MonthlyCostReports = () => {
                                         {formatCurrency(currentReport.totalCost)}
                                     </Typography>
                                     <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                                        Tổng chi phí
+                                        Tá»•ng chi phÃ­
                                     </Typography>
                                     <Box sx={{ display: "flex", alignItems: "center", mt: 0.5 }}>
                                         {getChangeIcon(currentReport.comparedToLastMonth.costChange)}
                                         <Typography variant="caption" sx={{ opacity: 0.8, ml: 0.5 }}>
-                                            {Math.abs(currentReport.comparedToLastMonth.costChange)}% so với tháng trước
+                                            {Math.abs(currentReport.comparedToLastMonth.costChange)}% so vá»›i thÃ¡ng trÆ°á»›c
                                         </Typography>
                                     </Box>
                                 </Box>
@@ -239,8 +221,7 @@ const MonthlyCostReports = () => {
                     <Card
                         sx={{
                             background: "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
-                            color: "white",
-                        }}
+                            color: "white"}}
                     >
                         <CardContent>
                             <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
@@ -252,12 +233,12 @@ const MonthlyCostReports = () => {
                                         {currentReport.totalSessions}
                                     </Typography>
                                     <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                                        Lần sạc
+                                        Láº§n sáº¡c
                                     </Typography>
                                     <Box sx={{ display: "flex", alignItems: "center", mt: 0.5 }}>
                                         {getChangeIcon(currentReport.comparedToLastMonth.sessionsChange)}
                                         <Typography variant="caption" sx={{ opacity: 0.8, ml: 0.5 }}>
-                                            {Math.abs(currentReport.comparedToLastMonth.sessionsChange)}% so với tháng trước
+                                            {Math.abs(currentReport.comparedToLastMonth.sessionsChange)}% so vá»›i thÃ¡ng trÆ°á»›c
                                         </Typography>
                                     </Box>
                                 </Box>
@@ -270,8 +251,7 @@ const MonthlyCostReports = () => {
                     <Card
                         sx={{
                             background: "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)",
-                            color: "white",
-                        }}
+                            color: "white"}}
                     >
                         <CardContent>
                             <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
@@ -283,12 +263,12 @@ const MonthlyCostReports = () => {
                                         {currentReport.totalEnergy}
                                     </Typography>
                                     <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                                        kWh tiêu thụ
+                                        kWh tiÃªu thá»¥
                                     </Typography>
                                     <Box sx={{ display: "flex", alignItems: "center", mt: 0.5 }}>
                                         {getChangeIcon(currentReport.comparedToLastMonth.energyChange)}
                                         <Typography variant="caption" sx={{ opacity: 0.8, ml: 0.5 }}>
-                                            {Math.abs(currentReport.comparedToLastMonth.energyChange)}% so với tháng trước
+                                            {Math.abs(currentReport.comparedToLastMonth.energyChange)}% so vá»›i thÃ¡ng trÆ°á»›c
                                         </Typography>
                                     </Box>
                                 </Box>
@@ -301,8 +281,7 @@ const MonthlyCostReports = () => {
                     <Card
                         sx={{
                             background: "linear-gradient(135deg, #fa709a 0%, #fee140 100%)",
-                            color: "white",
-                        }}
+                            color: "white"}}
                     >
                         <CardContent>
                             <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
@@ -314,10 +293,10 @@ const MonthlyCostReports = () => {
                                         {formatCurrency(currentReport.avgCostPerKwh)}
                                     </Typography>
                                     <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                                        /kWh trung bình
+                                        /kWh trung bÃ¬nh
                                     </Typography>
                                     <Typography variant="caption" sx={{ opacity: 0.8 }}>
-                                        {formatCurrency(currentReport.avgSessionCost)}/phiên
+                                        {formatCurrency(currentReport.avgSessionCost)}/phiÃªn
                                     </Typography>
                                 </Box>
                             </Box>
@@ -333,16 +312,16 @@ const MonthlyCostReports = () => {
                         <Card>
                             <CardContent>
                                 <Typography variant="h6" fontWeight="bold" gutterBottom>
-                                    Chi tiết theo ngày
+                                    Chi tiáº¿t theo ngÃ y
                                 </Typography>
                                 <TableContainer>
                                     <Table size="small">
                                         <TableHead>
                                             <TableRow>
-                                                <TableCell>Ngày</TableCell>
-                                                <TableCell align="center">Lần sạc</TableCell>
-                                                <TableCell align="center">Năng lượng (kWh)</TableCell>
-                                                <TableCell align="right">Chi phí</TableCell>
+                                                <TableCell>NgÃ y</TableCell>
+                                                <TableCell align="center">Láº§n sáº¡c</TableCell>
+                                                <TableCell align="center">NÄƒng lÆ°á»£ng (kWh)</TableCell>
+                                                <TableCell align="right">Chi phÃ­</TableCell>
                                             </TableRow>
                                         </TableHead>
                                         <TableBody>
@@ -372,14 +351,14 @@ const MonthlyCostReports = () => {
                         <Card>
                             <CardContent>
                                 <Typography variant="h6" fontWeight="bold" gutterBottom>
-                                    Phân bố theo giờ
+                                    PhÃ¢n bá»‘ theo giá»
                                 </Typography>
                                 {currentReport.timeBreakdown.map((time, index) => (
                                     <Box key={index} sx={{ mb: 3 }}>
                                         <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
                                             <Typography variant="body2">{time.period}</Typography>
                                             <Typography variant="body2" fontWeight="medium">
-                                                {time.sessions} lần ({time.percentage}%)
+                                                {time.sessions} láº§n ({time.percentage}%)
                                             </Typography>
                                         </Box>
                                         <LinearProgress
@@ -403,17 +382,17 @@ const MonthlyCostReports = () => {
                 <Card>
                     <CardContent>
                         <Typography variant="h6" fontWeight="bold" gutterBottom>
-                            Chi phí theo trạm sạc
+                            Chi phÃ­ theo tráº¡m sáº¡c
                         </Typography>
                         <TableContainer>
                             <Table>
                                 <TableHead>
                                     <TableRow>
-                                        <TableCell>Trạm sạc</TableCell>
-                                        <TableCell align="center">Số lần sạc</TableCell>
-                                        <TableCell align="center">Năng lượng (kWh)</TableCell>
-                                        <TableCell align="right">Chi phí</TableCell>
-                                        <TableCell align="right">% Tổng chi phí</TableCell>
+                                        <TableCell>Tráº¡m sáº¡c</TableCell>
+                                        <TableCell align="center">Sá»‘ láº§n sáº¡c</TableCell>
+                                        <TableCell align="center">NÄƒng lÆ°á»£ng (kWh)</TableCell>
+                                        <TableCell align="right">Chi phÃ­</TableCell>
+                                        <TableCell align="right">% Tá»•ng chi phÃ­</TableCell>
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
