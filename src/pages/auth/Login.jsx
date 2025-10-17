@@ -17,6 +17,7 @@ import {
 import { ElectricCar, Login, Google, Phone } from "@mui/icons-material";
 import { useNavigate, Link as RouterLink } from "react-router-dom";
 import useAuthStore from "../../store/authStore";
+import { authAPI } from "../../services/api";
 import { getText } from "../../utils/vietnameseTexts";
 import { googleAuth } from "../../services/socialAuthService";
 import PhoneOTPModal from "../../components/auth/PhoneOTPModal";
@@ -51,9 +52,24 @@ const LoginPage = () => {
 
     if (result.success) {
       console.log("Login successful", result.data);
-      
+
+      // Try to get role from login result first
+      let userRole = result.data?.user?.role;
+
+      // If backend only returned token, fetch profile to get role
+      if (!userRole) {
+        try {
+          const profile = await authAPI.getProfile();
+          userRole = profile?.role || profile?.Role || profile?.roleName;
+        } catch (err) {
+          console.warn("Failed to fetch profile after login:", err);
+        }
+      }
+
+      // Normalize role to lowercase when present
+      if (typeof userRole === "string") userRole = userRole.toLowerCase();
+
       // Navigate based on user role
-      const userRole = result.data?.user?.role;
       switch (userRole) {
         case "admin":
           navigate("/admin/dashboard");
