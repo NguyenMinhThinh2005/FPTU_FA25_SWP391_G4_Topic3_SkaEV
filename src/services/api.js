@@ -1,23 +1,24 @@
 // Real API service for SkaEV - Connects to ASP.NET Core Backend
-import axios from 'axios';
+import axios from "axios";
 
-// Backend API Base URL  
+// Backend API Base URL
 // Use HTTP port 5000 if running with dotnet run, or HTTPS port 5001 if running from Visual Studio
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
 
 // Create axios instance with default config
 const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
   timeout: 10000,
   headers: {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   },
 });
 
 // Request interceptor - Add auth token to requests
 axiosInstance.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem("token");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -42,14 +43,14 @@ axiosInstance.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        const refreshToken = localStorage.getItem('refreshToken');
+        const refreshToken = sessionStorage.getItem("refreshToken");
         if (refreshToken) {
           const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {
             refreshToken,
           });
 
           const { token } = response.data;
-          localStorage.setItem('token', token);
+          sessionStorage.setItem("token", token);
 
           // Retry original request with new token
           originalRequest.headers.Authorization = `Bearer ${token}`;
@@ -57,18 +58,16 @@ axiosInstance.interceptors.response.use(
         }
       } catch (refreshError) {
         // Refresh failed - logout user
-        localStorage.removeItem('token');
-        localStorage.removeItem('refreshToken');
-        window.location.href = '/login';
+        sessionStorage.removeItem("token");
+        sessionStorage.removeItem("refreshToken");
+        window.location.href = "/login";
         return Promise.reject(refreshError);
       }
     }
 
     // Handle other errors
     const errorMessage =
-      error.response?.data?.message ||
-      error.message ||
-      'An error occurred';
+      error.response?.data?.message || error.message || "An error occurred";
 
     return Promise.reject(new Error(errorMessage));
   }
@@ -77,41 +76,41 @@ axiosInstance.interceptors.response.use(
 // API service functions
 export const authAPI = {
   login: async (credentials) => {
-    const response = await axiosInstance.post('/auth/login', credentials);
-    // Store tokens
+    const response = await axiosInstance.post("/auth/login", credentials);
+    // Store tokens in sessionStorage
     if (response.token) {
-      localStorage.setItem('token', response.token);
-      localStorage.setItem('refreshToken', response.refreshToken || '');
+      sessionStorage.setItem("token", response.token);
+      sessionStorage.setItem("refreshToken", response.refreshToken || "");
     }
     return response;
   },
 
   register: (userData) => {
-    return axiosInstance.post('/auth/register', userData);
+    return axiosInstance.post("/auth/register", userData);
   },
 
   logout: () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('refreshToken');
-    return axiosInstance.post('/auth/logout');
+    sessionStorage.removeItem("token");
+    sessionStorage.removeItem("refreshToken");
+    return axiosInstance.post("/auth/logout");
   },
 
   refreshToken: (refreshToken) => {
-    return axiosInstance.post('/auth/refresh', { refreshToken });
+    return axiosInstance.post("/auth/refresh", { refreshToken });
   },
 
   getProfile: () => {
-    return axiosInstance.get('/auth/profile');
+    return axiosInstance.get("/auth/profile");
   },
 
   updateProfile: (profileData) => {
-    return axiosInstance.put('/auth/profile', profileData);
+    return axiosInstance.put("/auth/profile", profileData);
   },
 };
 
 export const stationsAPI = {
   getAll: (params) => {
-    return axiosInstance.get('/stations', { params });
+    return axiosInstance.get("/stations", { params });
   },
 
   getById: (id) => {
@@ -119,7 +118,7 @@ export const stationsAPI = {
   },
 
   getNearby: (latitude, longitude, radius = 10) => {
-    return axiosInstance.get('/stations/nearby', {
+    return axiosInstance.get("/stations/nearby", {
       params: { latitude, longitude, radius },
     });
   },
@@ -129,7 +128,7 @@ export const stationsAPI = {
   },
 
   create: (stationData) => {
-    return axiosInstance.post('/stations', stationData);
+    return axiosInstance.post("/stations", stationData);
   },
 
   update: (id, stationData) => {
@@ -141,7 +140,7 @@ export const stationsAPI = {
   },
 
   search: (searchQuery) => {
-    return axiosInstance.get('/stations/search', {
+    return axiosInstance.get("/stations/search", {
       params: { q: searchQuery },
     });
   },
@@ -149,7 +148,7 @@ export const stationsAPI = {
 
 export const bookingsAPI = {
   getAll: (params) => {
-    return axiosInstance.get('/bookings', { params });
+    return axiosInstance.get("/bookings", { params });
   },
 
   getById: (id) => {
@@ -157,11 +156,11 @@ export const bookingsAPI = {
   },
 
   getUserBookings: () => {
-    return axiosInstance.get('/bookings/my-bookings');
+    return axiosInstance.get("/bookings/my-bookings");
   },
 
   create: (bookingData) => {
-    return axiosInstance.post('/bookings', bookingData);
+    return axiosInstance.post("/bookings", bookingData);
   },
 
   update: (id, bookingData) => {
@@ -179,7 +178,7 @@ export const bookingsAPI = {
 
 export const usersAPI = {
   getAll: (params) => {
-    return axiosInstance.get('/users', { params });
+    return axiosInstance.get("/users", { params });
   },
 
   getById: (id) => {
@@ -187,7 +186,7 @@ export const usersAPI = {
   },
 
   create: (userData) => {
-    return axiosInstance.post('/users', userData);
+    return axiosInstance.post("/users", userData);
   },
 
   update: (id, userData) => {
@@ -199,13 +198,13 @@ export const usersAPI = {
   },
 
   changePassword: (passwordData) => {
-    return axiosInstance.post('/users/change-password', passwordData);
+    return axiosInstance.post("/users/change-password", passwordData);
   },
 };
 
 export const postsAPI = {
   getAll: (params) => {
-    return axiosInstance.get('/posts', { params });
+    return axiosInstance.get("/posts", { params });
   },
 
   getById: (id) => {
@@ -217,7 +216,7 @@ export const postsAPI = {
   },
 
   create: (postData) => {
-    return axiosInstance.post('/posts', postData);
+    return axiosInstance.post("/posts", postData);
   },
 
   update: (id, postData) => {
@@ -231,7 +230,7 @@ export const postsAPI = {
 
 export const paymentsAPI = {
   getAll: (params) => {
-    return axiosInstance.get('/payments', { params });
+    return axiosInstance.get("/payments", { params });
   },
 
   getById: (id) => {
@@ -239,7 +238,7 @@ export const paymentsAPI = {
   },
 
   create: (paymentData) => {
-    return axiosInstance.post('/payments', paymentData);
+    return axiosInstance.post("/payments", paymentData);
   },
 
   process: (id, paymentDetails) => {
@@ -253,7 +252,7 @@ export const paymentsAPI = {
 
 export const vehiclesAPI = {
   getAll: (params) => {
-    return axiosInstance.get('/vehicles', { params });
+    return axiosInstance.get("/vehicles", { params });
   },
 
   getById: (id) => {
@@ -261,11 +260,11 @@ export const vehiclesAPI = {
   },
 
   getUserVehicles: () => {
-    return axiosInstance.get('/vehicles/my-vehicles');
+    return axiosInstance.get("/vehicles/my-vehicles");
   },
 
   create: (vehicleData) => {
-    return axiosInstance.post('/vehicles', vehicleData);
+    return axiosInstance.post("/vehicles", vehicleData);
   },
 
   update: (id, vehicleData) => {
@@ -284,7 +283,7 @@ export const vehiclesAPI = {
 // Health check
 export const healthAPI = {
   check: () => {
-    return axios.get('http://localhost:5000/health');
+    return axios.get("http://localhost:5000/health");
   },
 };
 

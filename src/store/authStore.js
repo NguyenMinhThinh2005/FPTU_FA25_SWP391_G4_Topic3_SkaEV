@@ -27,10 +27,10 @@ const useAuthStore = create(
             role: response.role.toLowerCase(), // Normalize role to lowercase
           };
 
-          // Store token in localStorage
-          localStorage.setItem('token', response.token);
+          // Store token in sessionStorage (will be cleared when browser closes)
+          sessionStorage.setItem("token", response.token);
           if (response.refreshToken) {
-            localStorage.setItem('refreshToken', response.refreshToken);
+            sessionStorage.setItem("refreshToken", response.refreshToken);
           }
 
           set({
@@ -39,17 +39,17 @@ const useAuthStore = create(
             loading: false,
           });
 
-          return { 
-            success: true, 
-            data: { 
-              user: userData, 
-              token: response.token 
-            } 
+          return {
+            success: true,
+            data: {
+              user: userData,
+              token: response.token,
+            },
           };
         } catch (error) {
           const errorMessage =
-            error.response?.data?.message || 
-            error.message || 
+            error.response?.data?.message ||
+            error.message ||
             "Email hoặc mật khẩu không đúng";
           set({ loading: false, error: errorMessage });
           return { success: false, error: errorMessage };
@@ -124,6 +124,10 @@ const useAuthStore = create(
           console.error("Logout API error:", error);
           // Continue with local logout even if API fails
         } finally {
+          // Clear tokens from sessionStorage
+          sessionStorage.removeItem("token");
+          sessionStorage.removeItem("refreshToken");
+
           set({
             user: null,
             isAuthenticated: false,
@@ -156,6 +160,19 @@ const useAuthStore = create(
     }),
     {
       name: "skaev-auth-storage",
+      // Use sessionStorage instead of localStorage to clear session on browser close
+      storage: {
+        getItem: (name) => {
+          const value = sessionStorage.getItem(name);
+          return value ? JSON.parse(value) : null;
+        },
+        setItem: (name, value) => {
+          sessionStorage.setItem(name, JSON.stringify(value));
+        },
+        removeItem: (name) => {
+          sessionStorage.removeItem(name);
+        },
+      },
       partialize: (state) => ({
         user: state.user,
         isAuthenticated: state.isAuthenticated,
