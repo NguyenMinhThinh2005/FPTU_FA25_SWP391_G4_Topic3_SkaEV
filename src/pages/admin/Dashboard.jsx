@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import {
   Box,
   Typography,
@@ -59,7 +59,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import useAuthStore from "../../store/authStore";
 import useStationStore from "../../store/stationStore";
-import { mockData } from "../../data/mockData";
+import useBookingStore from "../../store/bookingStore";
 import { formatCurrency } from "../../utils/helpers";
 import { STATION_STATUS, USER_ROLES } from "../../utils/constants";
 
@@ -67,6 +67,7 @@ const AdminDashboard = () => {
   const navigate = useNavigate();
   useAuthStore();
   const { stations } = useStationStore();
+  const { bookingHistory } = useBookingStore();
   useState("today");
   const [anchorEl, setAnchorEl] = useState(null);
   const [openStationDialog, setOpenStationDialog] = useState(false);
@@ -88,23 +89,29 @@ const AdminDashboard = () => {
   // System Overview Stats
   const totalStations = stations.length;
   const activeStations = stations.filter((s) => s.status === "active").length;
-  const totalUsers = mockData.users.length;
-  mockData.bookings.length;
-  const todayBookings = mockData.bookings.filter(
-    (b) => new Date(b.date).toDateString() === new Date().toDateString()
+  const totalUsers = 0; // TODO: Fetch from user management API
+  const totalBookings = bookingHistory.length;
+  const todayBookings = bookingHistory.filter(
+    (b) => new Date(b.createdAt).toDateString() === new Date().toDateString()
   ).length;
-  const totalRevenue = mockData.bookings.reduce((sum, b) => sum + b.cost, 0);
-  const activeChargingSessions = mockData.bookings.filter(
+  const totalRevenue = bookingHistory.reduce(
+    (sum, b) => sum + (b.totalAmount || 0),
+    0
+  );
+  const activeChargingSessions = bookingHistory.filter(
     (b) => b.status === "in_progress"
   ).length;
 
   // Station Performance với chargingPosts structure
   const stationPerformance = stations
     .map((station) => {
-      const stationBookings = mockData.bookings.filter(
+      const stationBookings = bookingHistory.filter(
         (b) => b.stationId === station.id
       );
-      const revenue = stationBookings.reduce((sum, b) => sum + b.cost, 0);
+      const revenue = stationBookings.reduce(
+        (sum, b) => sum + (b.totalAmount || 0),
+        0
+      );
 
       // Tính utilization từ chargingPosts
       let totalSlots = 0;

@@ -1,0 +1,25 @@
+var builder = WebApplication.CreateBuilder(args);
+
+Console.WriteLine("=== Building minimal app ===");
+
+var app = builder.Build();
+
+Console.WriteLine("=== App built ===");
+
+app.MapGet("/", () => "SkaEV API is running!");
+app.MapGet("/health", () => "Healthy");
+
+Console.WriteLine("=== Starting app on http://localhost:5000 ===");
+Console.WriteLine("Press Ctrl+C to stop");
+
+try
+{
+    app.Run("http://localhost:5000");
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"=== ERROR: {ex.Message} ===");
+    Console.WriteLine(ex.StackTrace);
+}
+
+Console.WriteLine("=== App stopped ===");

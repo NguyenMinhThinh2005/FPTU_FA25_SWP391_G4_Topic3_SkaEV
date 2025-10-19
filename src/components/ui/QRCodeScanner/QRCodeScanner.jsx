@@ -1,4 +1,4 @@
-/* eslint-disable */
+﻿/* eslint-disable */
 import React, { useState, useRef, useEffect } from 'react';
 import { QrReader } from 'react-qr-reader';
 import useStationStore from '../../../store/stationStore';

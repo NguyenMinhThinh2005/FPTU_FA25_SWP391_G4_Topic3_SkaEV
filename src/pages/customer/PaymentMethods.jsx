@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import {
   Box,
   Typography,
@@ -53,37 +53,8 @@ const PaymentMethods = () => {
     isDefault: false,
   });
 
-  // Mock payment methods data
-  const [paymentMethods, setPaymentMethods] = useState([
-    {
-      id: "1",
-      type: "credit_card",
-      brand: "Visa",
-      lastFour: "4532",
-      expiryDate: "12/25",
-      cardholderName: "Nguyễn Văn An",
-      isDefault: true,
-      isExpired: false,
-    },
-    {
-      id: "2",
-      type: "credit_card",
-      brand: "Mastercard",
-      lastFour: "8765",
-      expiryDate: "08/24",
-      cardholderName: "Nguyễn Văn An",
-      isDefault: false,
-      isExpired: true,
-    },
-    {
-      id: "3",
-      type: "wallet",
-      provider: "MoMo",
-      accountNumber: "***789",
-      isDefault: false,
-      isExpired: false,
-    },
-  ]);
+  // TODO: Fetch payment methods from backend API
+  const [paymentMethods, setPaymentMethods] = useState([]);
 
   const handleAddNew = () => {
     setSelectedMethod(null);
@@ -198,12 +169,18 @@ const PaymentMethods = () => {
             right: 0,
             width: "30%",
             height: "100%",
-            background: "radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px)",
+            background:
+              "radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px)",
             backgroundSize: "20px 20px",
-          }
+          },
         }}
       >
-        <Stack direction={{ xs: "column", md: "row" }} spacing={3} alignItems="center" justifyContent="space-between">
+        <Stack
+          direction={{ xs: "column", md: "row" }}
+          spacing={3}
+          alignItems="center"
+          justifyContent="space-between"
+        >
           <Stack direction="row" alignItems="center" spacing={3}>
             <Avatar
               sx={{
@@ -248,7 +225,8 @@ const PaymentMethods = () => {
         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
           <Security />
           <Typography variant="body2">
-            Thông tin thanh toán của bạn được mã hóa và bảo mật. Chúng tôi không bao giờ lưu trữ thông tin thẻ đầy đủ của bạn.
+            Thông tin thanh toán của bạn được mã hóa và bảo mật. Chúng tôi không
+            bao giờ lưu trữ thông tin thẻ đầy đủ của bạn.
           </Typography>
         </Box>
       </Alert>
@@ -398,7 +376,9 @@ const PaymentMethods = () => {
         fullWidth
       >
         <DialogTitle>
-          {selectedMethod ? "Chỉnh sửa phương thức thanh toán" : getText("payment.addPaymentMethod")}
+          {selectedMethod
+            ? "Chỉnh sửa phương thức thanh toán"
+            : getText("payment.addPaymentMethod")}
         </DialogTitle>
         <DialogContent dividers>
           <Grid container spacing={3}>
@@ -412,8 +392,12 @@ const PaymentMethods = () => {
                     setFormData({ ...formData, type: e.target.value })
                   }
                 >
-                  <MenuItem value="credit_card">{getText("payment.creditCard")}</MenuItem>
-                  <MenuItem value="wallet">{getText("payment.wallet")}</MenuItem>
+                  <MenuItem value="credit_card">
+                    {getText("payment.creditCard")}
+                  </MenuItem>
+                  <MenuItem value="wallet">
+                    {getText("payment.wallet")}
+                  </MenuItem>
                 </Select>
               </FormControl>
             </Grid>
@@ -472,7 +456,9 @@ const PaymentMethods = () => {
           </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDialogOpen(false)}>{getText("common.cancel")}</Button>
+          <Button onClick={() => setDialogOpen(false)}>
+            {getText("common.cancel")}
+          </Button>
           <Button variant="contained" onClick={handleSave}>
             {selectedMethod ? "Cập nhật" : "Thêm"} phương thức thanh toán
           </Button>

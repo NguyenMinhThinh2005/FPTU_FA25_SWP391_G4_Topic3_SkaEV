@@ -1,4 +1,4 @@
-import { create } from "zustand";
+﻿import { create } from "zustand";
 import { stationsAPI } from "../services/api";
 import { calculateDistance } from "../utils/helpers";
 
@@ -7,32 +7,48 @@ const transformStationData = (apiStation) => {
   try {
     const totalPosts = apiStation.totalPosts || 0;
     const availablePosts = apiStation.availablePosts || 0;
-    
+
     // Generate mock charging posts and slots (since API doesn't provide detailed structure)
     const chargingPosts = [];
     for (let i = 1; i <= totalPosts; i++) {
       const slotsPerPost = 2; // Each post has 2 slots
       const slots = [];
-      
+
+      // Determine post type based on post number
+      const isAC = i <= Math.ceil(totalPosts * 0.3); // 30% AC posts
+      const isDCFast = !isAC && i <= Math.ceil(totalPosts * 0.7); // 40% DC Fast
+      // Remaining are DC Ultra
+
+      const postType = isAC ? "AC" : "DC";
+      const postPower = isAC ? 7 : isDCFast ? 50 : 150;
+      const postVoltage = isAC ? 220 : 400;
+
       for (let j = 1; j <= slotsPerPost; j++) {
         slots.push({
+          id: `${apiStation.stationId}-post${i}-slot${j}`, // Changed from slotId to id
           slotId: `${apiStation.stationId}-post${i}-slot${j}`,
           slotNumber: j,
-          connectorType: j === 1 ? "CCS2" : "CHAdeMO",
-          maxPower: j === 1 ? 150 : 100,
+          connectorType:
+            postType === "AC" ? "Type 2" : j === 1 ? "CCS2" : "CHAdeMO",
+          maxPower: postPower,
           status: i <= availablePosts ? "available" : "occupied",
-          currentRate: j === 1 ? 3500 : 5000,
+          currentRate: postType === "AC" ? 3000 : isDCFast ? 5000 : 7000,
         });
       }
-      
+
       chargingPosts.push({
+        id: `${apiStation.stationId}-post${i}`, // Added id field
         postId: `${apiStation.stationId}-post${i}`,
+        name: `Trụ sạc ${i}`, // Added name field
         postNumber: i,
+        type: postType, // Added type field (AC/DC)
+        power: postPower, // Added power field
+        voltage: postVoltage, // Added voltage field
         status: i <= availablePosts ? "available" : "occupied",
         slots: slots,
       });
     }
-    
+
     return {
       id: apiStation.stationId,
       stationId: apiStation.stationId,
@@ -123,22 +139,27 @@ const useStationStore = create((set, get) => ({
       // API returns {data: Array, count: Number} or {success: true, data: Array}
       const hasData = response.data && Array.isArray(response.data);
       const isSuccess = response.success !== false; // If success field exists, check it; otherwise assume success
-      
+
       if (hasData && isSuccess) {
         const rawStations = response.data;
 
         console.log("📊 Raw stations from API:", rawStations.length);
-        
+
         // Transform API data to frontend format
         const stations = rawStations.map(transformStationData);
 
         console.log("✅ Stations loaded from API:", stations.length);
         console.log("🔍 First station sample:", stations[0]);
-        
+
         set({ stations, loading: false });
         return { success: true, data: stations };
       } else {
-        console.error("❌ API response invalid - success:", response.success, "hasData:", hasData);
+        console.error(
+          "❌ API response invalid - success:",
+          response.success,
+          "hasData:",
+          hasData
+        );
         throw new Error(response.message || "Không thể tải danh sách trạm");
       }
     } catch (error) {
@@ -186,7 +207,8 @@ const useStationStore = create((set, get) => ({
         throw new Error(response.message || "Không thể tải trạm gần bạn");
       }
     } catch (error) {
-      const errorMessage = error.message || "Đã xảy ra lỗi khi tải trạm gần bạn";
+      const errorMessage =
+        error.message || "Đã xảy ra lỗi khi tải trạm gần bạn";
       console.error("❌ Fetch nearby stations error:", errorMessage);
       set({ error: errorMessage, loading: false });
       return { success: false, error: errorMessage };
@@ -199,7 +221,7 @@ const useStationStore = create((set, get) => ({
     console.log("🔍 FILTERING DEBUG:", {
       totalStations: stations.length,
       selectedConnectorTypes: filters.connectorTypes,
-      filtersObject: filters
+      filtersObject: filters,
     });
 
     if (stations.length === 0) {
@@ -209,7 +231,11 @@ const useStationStore = create((set, get) => ({
 
     const filtered = stations.filter((station) => {
       console.log(`\n📍 Checking station: ${station.name}`);
-      console.log(`   - Available connectors: ${JSON.stringify(station.charging?.connectorTypes)}`);
+      console.log(
+        `   - Available connectors: ${JSON.stringify(
+          station.charging?.connectorTypes
+        )}`
+      );
       console.log(`   - Station status: ${station.status}`);
 
       // Filter by station status - only active stations
@@ -221,16 +247,24 @@ const useStationStore = create((set, get) => ({
       // Filter by connector types
       if (filters.connectorTypes && filters.connectorTypes.length > 0) {
         const stationConnectors = station.charging?.connectorTypes || [];
-        console.log(`   - Filter connectors: ${JSON.stringify(filters.connectorTypes)}`);
-        console.log(`   - Station connectors: ${JSON.stringify(stationConnectors)}`);
+        console.log(
+          `   - Filter connectors: ${JSON.stringify(filters.connectorTypes)}`
+        );
+        console.log(
+          `   - Station connectors: ${JSON.stringify(stationConnectors)}`
+        );
 
-        const hasMatchingConnector = filters.connectorTypes.some((filterType) => {
-          const match = stationConnectors.includes(filterType);
-          console.log(`     Checking ${filterType}: ${match ? '✅' : '❌'}`);
-          return match;
-        });
+        const hasMatchingConnector = filters.connectorTypes.some(
+          (filterType) => {
+            const match = stationConnectors.includes(filterType);
+            console.log(`     Checking ${filterType}: ${match ? "✅" : "❌"}`);
+            return match;
+          }
+        );
 
-        console.log(`   - Has matching connector: ${hasMatchingConnector ? '✅' : '❌'}`);
+        console.log(
+          `   - Has matching connector: ${hasMatchingConnector ? "✅" : "❌"}`
+        );
         if (!hasMatchingConnector) return false;
       }
 
@@ -241,9 +275,13 @@ const useStationStore = create((set, get) => ({
           station.charging?.pricing?.dcRate || 0,
           station.charging?.pricing?.dcFastRate || 0
         );
-        console.log(`   - Max station price: ${maxStationPrice}, Filter max: ${filters.maxPrice}`);
+        console.log(
+          `   - Max station price: ${maxStationPrice}, Filter max: ${filters.maxPrice}`
+        );
         if (maxStationPrice > filters.maxPrice) {
-          console.log(`   ❌ Price too high: ${maxStationPrice} > ${filters.maxPrice}`);
+          console.log(
+            `   ❌ Price too high: ${maxStationPrice} > ${filters.maxPrice}`
+          );
           return false;
         }
       }
@@ -252,8 +290,10 @@ const useStationStore = create((set, get) => ({
       return true;
     });
 
-    console.log(`\n🎯 FILTER RESULT: ${filtered.length}/${stations.length} stations matched`);
-    console.log(`Matched stations: ${filtered.map(s => s.name).join(', ')}`);
+    console.log(
+      `\n🎯 FILTER RESULT: ${filtered.length}/${stations.length} stations matched`
+    );
+    console.log(`Matched stations: ${filtered.map((s) => s.name).join(", ")}`);
 
     return filtered;
   },
@@ -273,35 +313,28 @@ const useStationStore = create((set, get) => ({
   },
 
   // QR Code generation helper
-  generateQRCode: (stationId, portId = 'A01') => {
+  generateQRCode: (stationId, portId = "A01") => {
     return `SKAEV:STATION:${stationId}:${portId}`;
-  },
-
-  // Mock QR codes for demo
-  getMockQRCodes: () => {
-    return {
-      'station-001': 'SKAEV:STATION:station-001:A01',
-      'station-002': 'SKAEV:STATION:station-002:B02',
-      'station-003': 'SKAEV:STATION:station-003:C01',
-    };
   },
 
   // Remote control (minimal)
   setStationStatus: (stationId, status) => {
     set((state) => ({
-      stations: state.stations.map((s) => (s.id === stationId ? { ...s, status } : s)),
+      stations: state.stations.map((s) =>
+        s.id === stationId ? { ...s, status } : s
+      ),
     }));
   },
 
   remoteDisableStation: async (stationId) => {
     await new Promise((r) => setTimeout(r, 300));
-    get().setStationStatus(stationId, 'offline');
+    get().setStationStatus(stationId, "offline");
     return { success: true };
   },
 
   remoteEnableStation: async (stationId) => {
     await new Promise((r) => setTimeout(r, 300));
-    get().setStationStatus(stationId, 'active');
+    get().setStationStatus(stationId, "active");
     return { success: true };
   },
 
@@ -341,7 +374,11 @@ const useStationStore = create((set, get) => ({
         set((state) => ({
           stations: state.stations.map((station) =>
             station.id === stationId
-              ? { ...station, ...stationData, lastUpdated: new Date().toISOString() }
+              ? {
+                  ...station,
+                  ...stationData,
+                  lastUpdated: new Date().toISOString(),
+                }
               : station
           ),
           loading: false,
@@ -367,7 +404,9 @@ const useStationStore = create((set, get) => ({
 
       if (response.success) {
         set((state) => ({
-          stations: state.stations.filter((station) => station.id !== stationId),
+          stations: state.stations.filter(
+            (station) => station.id !== stationId
+          ),
           loading: false,
         }));
 

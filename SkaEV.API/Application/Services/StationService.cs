@@ -34,50 +34,57 @@ public class StationService : IStationService
 
         var sql = "EXEC sp_search_stations_by_location @latitude, @longitude, @radius_km";
 
-        var stations = await _context.ChargingStations
+        var stationsRaw = await _context.ChargingStations
             .FromSqlRaw(sql, latParam, lonParam, radiusParam)
-            .Select(s => new StationDto
-            {
-                StationId = s.StationId,
-                StationName = s.StationName,
-                Address = s.Address,
-                City = s.City,
-                Latitude = s.Latitude,
-                Longitude = s.Longitude,
-                TotalPosts = s.TotalPosts,
-                AvailablePosts = s.AvailablePosts,
-                OperatingHours = s.OperatingHours,
-                Amenities = s.Amenities != null ? JsonConvert.DeserializeObject<List<string>>(s.Amenities) : null,
-                StationImageUrl = s.StationImageUrl,
-                Status = s.Status
-            })
             .ToListAsync();
+
+        var stations = stationsRaw.Select(s => new StationDto
+        {
+            StationId = s.StationId,
+            StationName = s.StationName,
+            Address = s.Address,
+            City = s.City,
+            Latitude = s.Latitude,
+            Longitude = s.Longitude,
+            TotalPosts = s.TotalPosts,
+            AvailablePosts = s.AvailablePosts,
+            OperatingHours = s.OperatingHours,
+            Amenities = !string.IsNullOrEmpty(s.Amenities) 
+                ? s.Amenities.Split(',').Select(a => a.Trim()).ToList() 
+                : new List<string>(),
+            StationImageUrl = s.StationImageUrl,
+            Status = s.Status
+        }).ToList();
 
         return stations;
     }
 
     public async Task<StationDto?> GetStationByIdAsync(int stationId)
     {
-        var station = await _context.ChargingStations
+        var stationEntity = await _context.ChargingStations
             .Where(s => s.StationId == stationId)
-            .Select(s => new StationDto
-            {
-                StationId = s.StationId,
-                StationName = s.StationName,
-                Address = s.Address,
-                City = s.City,
-                Latitude = s.Latitude,
-                Longitude = s.Longitude,
-                TotalPosts = s.TotalPosts,
-                AvailablePosts = s.AvailablePosts,
-                OperatingHours = s.OperatingHours,
-                Amenities = s.Amenities != null ? JsonConvert.DeserializeObject<List<string>>(s.Amenities) : null,
-                StationImageUrl = s.StationImageUrl,
-                Status = s.Status
-            })
             .FirstOrDefaultAsync();
 
-        return station;
+        if (stationEntity == null)
+            return null;
+
+        return new StationDto
+        {
+            StationId = stationEntity.StationId,
+            StationName = stationEntity.StationName,
+            Address = stationEntity.Address,
+            City = stationEntity.City,
+            Latitude = stationEntity.Latitude,
+            Longitude = stationEntity.Longitude,
+            TotalPosts = stationEntity.TotalPosts,
+            AvailablePosts = stationEntity.AvailablePosts,
+            OperatingHours = stationEntity.OperatingHours,
+            Amenities = !string.IsNullOrEmpty(stationEntity.Amenities) 
+                ? stationEntity.Amenities.Split(',').Select(a => a.Trim()).ToList() 
+                : new List<string>(),
+            StationImageUrl = stationEntity.StationImageUrl,
+            Status = stationEntity.Status
+        };
     }
 
     public async Task<List<StationDto>> GetAllStationsAsync(string? city = null, string? status = null)
@@ -94,23 +101,25 @@ public class StationService : IStationService
             query = query.Where(s => s.Status == status);
         }
 
-        var stations = await query
-            .Select(s => new StationDto
-            {
-                StationId = s.StationId,
-                StationName = s.StationName,
-                Address = s.Address,
-                City = s.City,
-                Latitude = s.Latitude,
-                Longitude = s.Longitude,
-                TotalPosts = s.TotalPosts,
-                AvailablePosts = s.AvailablePosts,
-                OperatingHours = s.OperatingHours,
-                Amenities = s.Amenities != null ? JsonConvert.DeserializeObject<List<string>>(s.Amenities) : null,
-                StationImageUrl = s.StationImageUrl,
-                Status = s.Status
-            })
-            .ToListAsync();
+        var stationsRaw = await query.ToListAsync();
+
+        var stations = stationsRaw.Select(s => new StationDto
+        {
+            StationId = s.StationId,
+            StationName = s.StationName,
+            Address = s.Address,
+            City = s.City,
+            Latitude = s.Latitude,
+            Longitude = s.Longitude,
+            TotalPosts = s.TotalPosts,
+            AvailablePosts = s.AvailablePosts,
+            OperatingHours = s.OperatingHours,
+            Amenities = !string.IsNullOrEmpty(s.Amenities) 
+                ? s.Amenities.Split(',').Select(a => a.Trim()).ToList() 
+                : new List<string>(),
+            StationImageUrl = s.StationImageUrl,
+            Status = s.Status
+        }).ToList();
 
         return stations;
     }

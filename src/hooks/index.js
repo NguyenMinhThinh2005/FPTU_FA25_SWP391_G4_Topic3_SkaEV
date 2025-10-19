@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 
 // Export Vietnamese text hook
 export { useVietnameseText } from "./useVietnameseText";

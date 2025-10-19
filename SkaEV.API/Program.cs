@@ -194,12 +194,13 @@ if (app.Environment.IsDevelopment())
 // Disable HTTPS redirection in development for easier testing
 // app.UseHttpsRedirection();
 
+// IMPORTANT: CORS must be before Authentication/Authorization
 app.UseCors("AllowFrontend");
+
+app.UseSerilogRequestLogging();
 
 app.UseAuthentication();
 app.UseAuthorization();
-
-app.UseSerilogRequestLogging();
 
 app.MapControllers();
 

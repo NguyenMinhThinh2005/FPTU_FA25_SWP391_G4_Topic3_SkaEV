@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import {
   Box,
   Typography,
@@ -21,15 +21,13 @@ const QRScannerDemo = () => {
   const [scanResult, setScanResult] = useState(null);
   const [activeBooking, setActiveBooking] = useState(null);
 
-  const { getMockQRCodes, stations } = useStationStore();
+  const { generateQRCode, stations } = useStationStore();
   const {
     createBooking,
     initializeSOCTracking,
     startCharging,
     updateChargingProgress,
   } = useBookingStore();
-
-  const mockQRCodes = getMockQRCodes();
 
   const handleScanSuccess = (result) => {
     console.log("Scan success:", result);
@@ -166,7 +164,7 @@ const QRScannerDemo = () => {
                           {station.name}
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
-                          QR Code: {mockQRCodes[station.id]}
+                          QR Code: {generateQRCode(station.id, "A01")}
                         </Typography>
                         <br />
                         <Chip

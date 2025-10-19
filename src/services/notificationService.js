@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Notification Service - Push Notifications & In-App Notifications
  * Provides both Web Push API notifications and in-app notification center
  */

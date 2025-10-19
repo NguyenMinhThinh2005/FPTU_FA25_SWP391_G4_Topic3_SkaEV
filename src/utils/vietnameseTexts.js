@@ -1,4 +1,4 @@
-// Vietnamese text constants for the application
+﻿// Vietnamese text constants for the application
 export const VIETNAMESE_TEXTS = {
   // Common
   common: {

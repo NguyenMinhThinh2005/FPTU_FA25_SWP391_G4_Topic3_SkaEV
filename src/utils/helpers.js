@@ -1,4 +1,4 @@
-// Helper functions for SkaEV application
+﻿// Helper functions for SkaEV application
 
 /**
  * Format currency with Vietnamese Dong
