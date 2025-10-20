@@ -42,11 +42,12 @@ const QRScanner = ({ open, onClose, booking }) => {
             // Simulate QR scan - in real app this would use camera
             await new Promise(resolve => setTimeout(resolve, 2000));
 
-            // Mock QR data
+            // Mock QR data (prefer new port/pole shape, fall back to legacy fields)
             const qrData = {
                 stationId: booking?.stationId,
-                chargingPostId: booking?.chargingPost?.id,
-                slotId: booking?.slot?.id,
+                poleId: booking?.port?.poleId ?? booking?.chargingPost?.id ?? null,
+                // Prefer the new port shape; legacy "slot" fields are no longer used on the frontend
+                portId: booking?.port?.id ?? null,
                 scannedAt: new Date().toISOString()
             };
 
@@ -118,12 +119,19 @@ const QRScanner = ({ open, onClose, booking }) => {
                                     <LocationOn color="primary" />
                                 </Grid>
                                 <Grid item xs>
-                                    <Typography variant="subtitle1" fontWeight="medium">
-                                        {booking.stationName}
-                                    </Typography>
-                                    <Typography variant="body2" color="text.secondary">
-                                        {booking.chargingPost?.name} • {booking.slot?.connectorType}
-                                    </Typography>
+                                                        <Typography variant="subtitle1" fontWeight="medium">
+                                                            {booking.stationName}
+                                                        </Typography>
+                                                                                <Typography variant="body2" color="text.secondary">
+                                                                                    {(() => {
+                                                                                        const poleName = (booking.port?.poleName ?? booking.chargingPost?.name) || '';
+                                                                                        const portLabel = booking.port?.portNumber || booking.port?.id || booking.connector?.name || '';
+                                                                                        if (poleName && portLabel) return `Trụ ${poleName} — Cổng ${portLabel}`;
+                                                                                        if (poleName) return `Trụ ${poleName}`;
+                                                                                        if (portLabel) return `Cổng ${portLabel}`;
+                                                                                        return '';
+                                                                                    })()}
+                                                                                </Typography>
                                 </Grid>
                                 <Grid item>
                                     <Chip

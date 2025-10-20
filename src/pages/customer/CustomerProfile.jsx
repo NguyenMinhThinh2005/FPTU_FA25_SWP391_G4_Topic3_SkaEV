@@ -512,7 +512,7 @@ const CustomerProfile = () => {
                       fontWeight="medium"
                       gutterBottom
                     >
-                      Loáº¡i sáº¡c há»— trá»£:
+                      Loại sạc hỗ trợ:
                     </Typography>
                     <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
                       {(
@@ -537,7 +537,7 @@ const CustomerProfile = () => {
                     onClick={() => handleEditVehicle(vehicle)}
                     startIcon={<Edit />}
                   >
-                    Chá»‰nh sá»­a thÃ´ng tin
+                    Chỉnh sửa thông tin
                   </Button>
                 </CardContent>
               </Card>
@@ -555,7 +555,7 @@ const CustomerProfile = () => {
                   {bookingStats.completed || 1}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Tá»•ng phiÃªn sáº¡c
+                  Tổng phiên sạc
                 </Typography>
               </CardContent>
             </Card>
@@ -567,7 +567,7 @@ const CustomerProfile = () => {
                   {bookingStats.completed}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  HoÃ n thÃ nh
+                  Hoàn thành
                 </Typography>
               </CardContent>
             </Card>
@@ -579,7 +579,7 @@ const CustomerProfile = () => {
                   {bookingStats.totalEnergyCharged} kWh
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Tá»•ng nÄƒng lÆ°á»£ng
+                  Tổng năng lượng
                 </Typography>
               </CardContent>
             </Card>
@@ -591,7 +591,7 @@ const CustomerProfile = () => {
                   {formatCurrency(bookingStats.totalAmount)}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Tá»•ng chi phÃ­
+                  Tổng chi phí
                 </Typography>
               </CardContent>
             </Card>
@@ -600,7 +600,7 @@ const CustomerProfile = () => {
             <Card>
               <CardContent>
                 <Typography variant="h6" gutterBottom>
-                  Lá»‹ch sá»­ sáº¡c gáº§n Ä‘Ã¢y
+                  Lịch sử sạc gần đây
                 </Typography>
                 <Divider sx={{ mb: 2 }} />
                 <List>
@@ -656,8 +656,8 @@ const CustomerProfile = () => {
                         <Chip
                           label={
                             booking.status === "completed"
-                              ? "HoÃ n thÃ nh"
-                              : "ÄÃ£ há»§y"
+                              ? "Hoàn thành"
+                              : "Đã hủy"
                           }
                           color={
                             booking.status === "completed" ? "success" : "error"

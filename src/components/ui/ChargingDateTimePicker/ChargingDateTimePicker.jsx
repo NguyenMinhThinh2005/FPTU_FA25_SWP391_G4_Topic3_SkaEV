@@ -116,7 +116,7 @@ const ChargingDateTimePicker = ({
         isValid: Object.keys(errors).length === 0,
       });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [selectedDate, selectedTime, schedulingType, errors]);
 
   const validateDateTime = () => {

@@ -29,6 +29,7 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  Checkbox,
 } from "@mui/material";
 import {
   QrCodeScanner,
@@ -38,8 +39,6 @@ import {
   LocationOn,
   Speed,
   Search,
-  Map as MapIcon,
-  ViewList,
 } from "@mui/icons-material";
 import useBookingStore from "../../store/bookingStore";
 import useStationStore from "../../store/stationStore";
@@ -138,12 +137,7 @@ const ChargingFlow = () => {
 
   // Combined filter for stations based on search text and connector types
   const filteredStations = React.useMemo(() => {
-    console.log(
-      "🔍 FILTER START - Query:",
-      searchQuery,
-      "| Connector:",
-      filters.connectorTypes
-    );
+    console.log("🔍 FILTER START - Query:", searchQuery, "| Connector:", filters.connectorTypes);
     console.log("📊 Stations array:", stations);
 
     try {
@@ -152,38 +146,46 @@ const ChargingFlow = () => {
       console.log("📊 Total stations to filter:", stationList.length);
 
       if (stationList.length === 0) {
-        console.warn("⚠️ No stations available in store!");
+        // No stations available yet - return empty list silently.
+        // Avoid noisy console warnings that can confuse users.
         return [];
       }
 
+      // Helper: normalize text to remove diacritics and compare case-insensitively
+      const normalize = (str) =>
+        (str || "")
+          .toString()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .toLowerCase();
+
       // Apply text search filter if search query exists
       if (searchQuery && searchQuery.trim()) {
-        const query = searchQuery.toLowerCase().trim();
-        console.log("🔤 Applying text search for:", query);
+        const query = normalize(searchQuery.trim());
+        console.log("🔤 Applying normalized text search for:", query);
 
         stationList = stationList.filter((station) => {
           if (!station) return false;
 
-          // Search in station name
-          const matchesName =
-            station.name && station.name.toLowerCase().includes(query);
+          // Normalize and search in station name
+          const matchesName = station.name && normalize(station.name).includes(query);
+
+          // Search in city
+          const matchesCity =
+            station.location && station.location.city && normalize(station.location.city).includes(query);
 
           // Search in address
           const matchesAddress =
-            station.location &&
-            station.location.address &&
-            station.location.address.toLowerCase().includes(query);
+            station.location && station.location.address && normalize(station.location.address).includes(query);
 
           // Search in landmarks
           const matchesLandmarks =
             station.location &&
             station.location.landmarks &&
             Array.isArray(station.location.landmarks) &&
-            station.location.landmarks.some(
-              (landmark) => landmark && landmark.toLowerCase().includes(query)
-            );
+            station.location.landmarks.some((landmark) => landmark && normalize(landmark).includes(query));
 
-          const isMatch = matchesName || matchesAddress || matchesLandmarks;
+          const isMatch = matchesName || matchesCity || matchesAddress || matchesLandmarks;
           if (isMatch) {
             console.log("✅ Text match:", station.name);
           }
@@ -193,18 +195,15 @@ const ChargingFlow = () => {
       }
 
       // Apply connector type filter if selected (independent from text search)
-      // Handle both string and array format for connectorTypes
-      const connectorFilter = Array.isArray(filters.connectorTypes)
-        ? filters.connectorTypes[0]
-        : filters.connectorTypes;
+      // Support multiple selected connector types (array)
+      const connectorFilters = Array.isArray(filters.connectorTypes)
+        ? filters.connectorTypes.filter(Boolean)
+        : filters.connectorTypes
+        ? [filters.connectorTypes]
+        : [];
 
-      if (
-        connectorFilter &&
-        typeof connectorFilter === "string" &&
-        connectorFilter.trim() !== ""
-      ) {
-        const filterType = connectorFilter.trim();
-        console.log("🔌 Applying connector filter for:", filterType);
+      if (connectorFilters.length > 0) {
+        console.log("🔌 Applying connector filters:", connectorFilters);
 
         stationList = stationList.filter((station) => {
           if (!station || !station.charging) {
@@ -213,38 +212,26 @@ const ChargingFlow = () => {
           }
 
           // Check connectorTypes array first
-          if (
-            station.charging.connectorTypes &&
-            Array.isArray(station.charging.connectorTypes)
-          ) {
-            const hasConnector =
-              station.charging.connectorTypes.includes(filterType);
-            if (hasConnector) {
-              console.log(
-                "✅ Connector match in array:",
-                station.name,
-                station.charging.connectorTypes
-              );
-              return true;
-            }
+          const stationConnectors = station.charging.connectorTypes || [];
+          const hasMatchingConnector = connectorFilters.some((filterType) =>
+            stationConnectors.includes(filterType)
+          );
+
+          if (hasMatchingConnector) {
+            console.log("✅ Connector match in array:", station.name, stationConnectors);
+            return true;
           }
 
-          // Check chargingPosts if connectorTypes not available
-          if (
-            station.charging.chargingPosts &&
-            Array.isArray(station.charging.chargingPosts)
-          ) {
-            const hasInPosts = station.charging.chargingPosts.some(
-              (post) =>
-                post &&
-                post.slots &&
-                Array.isArray(post.slots) &&
-                post.slots.some(
-                  (slot) => slot && slot.connectorType === filterType
-                )
+          // Check poles/ports if connectorTypes not available
+          if (station.charging.poles && Array.isArray(station.charging.poles)) {
+            const hasInPoles = station.charging.poles.some((pole) =>
+              pole &&
+              pole.ports &&
+              Array.isArray(pole.ports) &&
+              pole.ports.some((port) => port && connectorFilters.includes(port.connectorType))
             );
-            if (hasInPosts) {
-              console.log("✅ Connector match in posts:", station.name);
+            if (hasInPoles) {
+              console.log("✅ Connector match in poles:", station.name);
               return true;
             }
           }
@@ -252,11 +239,8 @@ const ChargingFlow = () => {
           console.log("❌ No connector match:", station.name);
           return false;
         });
-        console.log(
-          "🔌 After connector filter:",
-          stationList.length,
-          "stations"
-        );
+
+        console.log("🔌 After connector filter:", stationList.length, "stations");
       }
 
       console.log("✅ FINAL RESULT:", stationList.length, "stations");
@@ -266,25 +250,22 @@ const ChargingFlow = () => {
 
       // Add stats to each station
       stationList = stationList.map((station) => {
-        if (!station.stats && station.charging?.chargingPosts) {
-          let totalSlots = 0;
-          let availableSlots = 0;
+        if (!station.stats && station.charging?.poles) {
+          let totalPorts = 0;
+          let availablePorts = 0;
 
-          station.charging.chargingPosts.forEach((post) => {
-            if (post.slots && Array.isArray(post.slots)) {
-              totalSlots += post.slots.length;
-              availableSlots += post.slots.filter(
-                (slot) => slot.status === "available"
-              ).length;
-            }
+          station.charging.poles.forEach((pole) => {
+            const ports = pole.ports || [];
+            totalPorts += ports.length;
+            availablePorts += ports.filter((port) => port.status === "available").length;
           });
 
           return {
             ...station,
             stats: {
-              total: totalSlots,
-              available: availableSlots,
-              occupied: totalSlots - availableSlots,
+              total: totalPorts,
+              available: availablePorts,
+              occupied: totalPorts - availablePorts,
             },
           };
         }
@@ -494,8 +475,8 @@ const ChargingFlow = () => {
             >
               <CardContent sx={{ p: 3 }}>
                 <Grid container spacing={2.5} alignItems="center">
-                  {/* Search Input - Wider on desktop */}
-                  <Grid item xs={12} md={5}>
+                  {/* Search Input - wider on desktop so it pushes filter to the right */}
+                  <Grid item xs={12} md={9}>
                     <TextField
                       fullWidth
                       placeholder="Tìm kiếm theo vị trí, tên trạm..."
@@ -526,18 +507,21 @@ const ChargingFlow = () => {
                   </Grid>
 
                   {/* Connector Type Filter */}
-                  <Grid item xs={12} sm={6} md={4}>
+                  <Grid item xs={12} sm={6} md={3}>
                     <FormControl fullWidth>
-                      <InputLabel>Loại cổng sạc</InputLabel>
+                      <InputLabel id="connector-label">Loại cổng sạc</InputLabel>
                       <Select
-                        value={filters.connectorTypes || ""}
+                        labelId="connector-label"
+                        id="connector-select"
+                        label="Loại cổng sạc"
+                        value={Array.isArray(filters.connectorTypes) ? (filters.connectorTypes[0] || "") : (filters.connectorTypes || "")}
                         onChange={(e) => {
-                          console.log(
-                            "🔌 Connector type changed:",
-                            e.target.value
-                          );
-                          updateFilters({ connectorTypes: e.target.value });
+                          const value = e.target.value;
+                          console.log("🔌 Connector type changed:", value);
+                          // Store single string (or empty) in filters
+                          updateFilters({ connectorTypes: value || "" });
                         }}
+                        renderValue={(selected) => (selected ? selected : null)}
                         sx={{
                           borderRadius: 2,
                           backgroundColor: "grey.50",
@@ -561,51 +545,7 @@ const ChargingFlow = () => {
                     </FormControl>
                   </Grid>
 
-                  {/* View Mode Toggle Buttons */}
-                  <Grid item xs={12} sm={6} md={3}>
-                    <Box
-                      sx={{
-                        display: "flex",
-                        gap: 1,
-                        justifyContent: { xs: "stretch", md: "flex-end" },
-                      }}
-                    >
-                      <Button
-                        variant={viewMode === "list" ? "contained" : "outlined"}
-                        onClick={() => setViewMode("list")}
-                        startIcon={<ViewList />}
-                        fullWidth
-                        sx={{
-                          borderRadius: 2,
-                          px: 2,
-                          fontWeight: viewMode === "list" ? 600 : 400,
-                          boxShadow:
-                            viewMode === "list"
-                              ? "0 2px 8px rgba(25,118,210,0.2)"
-                              : "none",
-                        }}
-                      >
-                        Danh sách
-                      </Button>
-                      <Button
-                        variant={viewMode === "map" ? "contained" : "outlined"}
-                        onClick={() => setViewMode("map")}
-                        startIcon={<MapIcon />}
-                        fullWidth
-                        sx={{
-                          borderRadius: 2,
-                          px: 2,
-                          fontWeight: viewMode === "map" ? 600 : 400,
-                          boxShadow:
-                            viewMode === "map"
-                              ? "0 2px 8px rgba(25,118,210,0.2)"
-                              : "none",
-                        }}
-                      >
-                        Bản đồ
-                      </Button>
-                    </Box>
-                  </Grid>
+                  {/* View Mode removed — always show map */}
                 </Grid>
               </CardContent>
             </Card>
@@ -613,195 +553,26 @@ const ChargingFlow = () => {
 
           {/* Stations List or Map */}
           <Grid item xs={12}>
-            {viewMode === "list" ? (
-              <Card>
-                <CardContent>
-                  <Typography
-                    variant="h6"
-                    gutterBottom
-                    sx={{
-                      fontWeight: "bold",
-                      color: "black",
-                      mb: 3,
-                      textAlign: "center",
-                    }}
-                  >
-                    Danh sách trạm SkaEV ({filteredStations.length} trạm)
-                  </Typography>
-                  {loading ? (
-                    <Box sx={{ textAlign: "center", py: 4 }}>
-                      <Typography>Đang tải...</Typography>
-                    </Box>
-                  ) : (
-                    <List>
-                      {filteredStations.map((station) => (
-                        <ListItem
-                          key={station.id}
-                          onClick={() => handleStationSelect(station)}
-                          sx={{
-                            borderRadius: 2,
-                            mb: 1,
-                            border: 1,
-                            borderColor: "divider",
-                            "&:hover": { backgroundColor: "grey.50" },
-                            cursor: "pointer",
-                          }}
-                        >
-                          <ListItemIcon>
-                            <Avatar
-                              src={getStationImage(station)}
-                              sx={{ width: 60, height: 60 }}
-                            >
-                              <ElectricCar />
-                            </Avatar>
-                          </ListItemIcon>
-                          <ListItemText
-                            primary={
-                              <Box
-                                sx={{
-                                  display: "flex",
-                                  justifyContent: "space-between",
-                                  alignItems: "start",
-                                }}
-                              >
-                                <Typography variant="h6" fontWeight="bold">
-                                  {station.name}
-                                </Typography>
-                                <Box
-                                  sx={{
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    alignItems: "flex-end",
-                                    gap: 0.5,
-                                  }}
-                                >
-                                  <Chip
-                                    label={`${station.charging.availablePorts}/${station.charging.totalPorts} cổng đang trống`}
-                                    size="small"
-                                    color="success"
-                                    sx={{ borderRadius: "16px" }}
-                                  />
-                                  {station.operatingHours && (
-                                    <Typography
-                                      variant="caption"
-                                      color="text.secondary"
-                                    >
-                                      {formatOperatingHours(
-                                        station.operatingHours
-                                      )}
-                                    </Typography>
-                                  )}
-                                </Box>
-                              </Box>
-                            }
-                            secondary={
-                              <Box component="span" sx={{ display: "block" }}>
-                                <Box
-                                  component="span"
-                                  sx={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 1,
-                                    mb: 1,
-                                  }}
-                                >
-                                  <LocationOn
-                                    sx={{
-                                      fontSize: 16,
-                                      color: "text.secondary",
-                                    }}
-                                  />
-                                  <Typography
-                                    variant="body2"
-                                    color="text.secondary"
-                                    component="span"
-                                  >
-                                    {station.location.address}
-                                  </Typography>
-                                </Box>
-                                <Box
-                                  component="span"
-                                  sx={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 2,
-                                  }}
-                                >
-                                  <Box
-                                    component="span"
-                                    sx={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: 1,
-                                    }}
-                                  >
-                                    <Speed
-                                      sx={{
-                                        fontSize: 16,
-                                        color: "primary.main",
-                                      }}
-                                    />
-                                    <Typography
-                                      variant="body2"
-                                      component="span"
-                                    >
-                                      Sạc nhanh lên đến{" "}
-                                      {station.charging.maxPower} kW
-                                    </Typography>
-                                  </Box>
-                                  <Typography
-                                    variant="body2"
-                                    color="success.main"
-                                    fontWeight="medium"
-                                    component="span"
-                                  >
-                                    Từ{" "}
-                                    {formatCurrency(
-                                      station.id === "station-001"
-                                        ? 8500
-                                        : station.id === "station-002"
-                                        ? 9500
-                                        : station.id === "station-003"
-                                        ? 7500
-                                        : station.charging.pricing.acRate
-                                    )}
-                                    /kWh
-                                  </Typography>
-                                </Box>
-                              </Box>
-                            }
-                          />
-                          <Button variant="contained" sx={{ ml: 2 }}>
-                            Đặt ngay
-                          </Button>
-                        </ListItem>
-                      ))}
-                    </List>
-                  )}
-                </CardContent>
-              </Card>
-            ) : (
-              <Card>
-                <CardContent>
-                  <Typography
-                    variant="h6"
-                    gutterBottom
-                    sx={{
-                      fontWeight: "bold",
-                      color: "black",
-                      mb: 3,
-                      textAlign: "center",
-                    }}
-                  >
-                    🗺️ Bản đồ trạm sạc ({filteredStations.length} trạm)
-                  </Typography>
-                  <StationMapLeaflet
-                    stations={filteredStations}
-                    onStationSelect={handleStationSelect}
-                  />
-                </CardContent>
-              </Card>
-            )}
+            <Card>
+              <CardContent>
+                <Typography
+                  variant="h6"
+                  gutterBottom
+                  sx={{
+                    fontWeight: "bold",
+                    color: "black",
+                    mb: 3,
+                    textAlign: "center",
+                  }}
+                >
+                  🗺️ Bản đồ trạm sạc ({filteredStations.length} trạm)
+                </Typography>
+                <StationMapLeaflet
+                  stations={filteredStations}
+                  onStationSelect={handleStationSelect}
+                />
+              </CardContent>
+            </Card>
           </Grid>
         </Grid>
       )}
@@ -1521,7 +1292,7 @@ const ChargingFlow = () => {
                         mb: 1,
                       }}
                     >
-                      <Typography variant="body2">Giá điện:</Typography>
+                      <Typography variant="body2">Giá sạc:</Typography>
                       <Typography variant="body2" fontWeight="medium">
                         {formatCurrency(sessionData.chargingRate)}/kWh
                       </Typography>

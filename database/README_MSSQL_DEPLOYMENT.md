@@ -142,7 +142,7 @@ EXEC sp_MSforeachtable
 -- Example for soc_charging_history
 CREATE PARTITION FUNCTION pf_monthly_history (DATETIME2)
 AS RANGE RIGHT FOR VALUES 
-    ('2024-01-01', '2024-02-01', '2024-03-01', ...);
+    ('2025-01-01', '2025-02-01', '2025-03-01', ...);
 
 CREATE PARTITION SCHEME ps_monthly_history
 AS PARTITION pf_monthly_history

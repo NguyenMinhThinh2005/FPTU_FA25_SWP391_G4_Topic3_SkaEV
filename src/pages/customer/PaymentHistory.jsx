@@ -49,7 +49,7 @@ import { formatCurrency } from "../../utils/helpers";
 import { useMasterDataSync } from "../../hooks/useMasterDataSync";
 
 const PaymentHistory = () => {
-    const [selectedMonth, setSelectedMonth] = useState("2024-09");
+    const [selectedMonth, setSelectedMonth] = useState("2025-09");
     const [selectedPayment, setSelectedPayment] = useState(null);
     const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
     const { bookingHistory, completedBookings, isDataReady } = useMasterDataSync();
@@ -94,7 +94,7 @@ const PaymentHistory = () => {
                     energyCost: energyCost,
                     parkingFee: parkingFee
                 },
-                invoiceNumber: `INV-${(booking.bookingDate || '2024-09-01').replace(/-/g, '')}-${(booking.id || 'BOOK001').slice(-3)}`,
+                invoiceNumber: `INV-${(booking.bookingDate || '2025-09-01').replace(/-/g, '')}-${(booking.id || 'BOOK001').slice(-3)}`,
                 taxInfo: {
                     subtotal: Math.round(totalCost / 1.1),
                     tax: Math.round(totalCost * 0.1),
@@ -107,7 +107,7 @@ const PaymentHistory = () => {
     const subscriptionPayments = [
         {
             id: "PAY-SUB-001",
-            date: "2024-09-01",
+            date: "2025-09-01",
             amount: 199000,
             method: "Banking Transfer",
             methodIcon: <LocalAtm />,
@@ -117,11 +117,11 @@ const PaymentHistory = () => {
             session: null,
             subscription: {
                 packageName: "Gói Tiết kiệm",
-                period: "09/2024",
+                period: "09/2025",
                 sessions: 20,
                 discount: "15%"
             },
-            invoiceNumber: "INV-2024-09-SUB-001",
+            invoiceNumber: "INV-2025-09-SUB-001",
             taxInfo: {
                 subtotal: 180909,
                 tax: 18091,
@@ -192,14 +192,12 @@ const PaymentHistory = () => {
                             label="Tháng"
                             onChange={(e) => setSelectedMonth(e.target.value)}
                         >
-                            <MenuItem value="2024-09">Tháng 9/2024</MenuItem>
-                            <MenuItem value="2024-08">Tháng 8/2024</MenuItem>
-                            <MenuItem value="2024-07">Tháng 7/2024</MenuItem>
+                            <MenuItem value="2025-09">Tháng 9/2025</MenuItem>
+                            <MenuItem value="2025-08">Tháng 8/2025</MenuItem>
+                            <MenuItem value="2025-07">Tháng 7/2025</MenuItem>
                         </Select>
                     </FormControl>
-                    <Button variant="outlined" startIcon={<Download />}>
-                        Xuất báo cáo
-                    </Button>
+
                 </Box>
             </Box>
 

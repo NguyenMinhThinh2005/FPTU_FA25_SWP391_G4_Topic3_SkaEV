@@ -80,8 +80,8 @@ const UserLocationMarker = ({ position, onClick }) => {
 
 // Custom marker cho charging station
 const StationMarker = ({ station, selected, onClick }) => {
-    const hasAvailableSlots = station.charging?.chargingPosts?.some(
-        post => post.availableSlots > 0
+    const hasAvailableSlots = station.charging?.poles?.some(
+        pole => (pole.availablePorts || 0) > 0
     );
 
     const pinColor = hasAvailableSlots ? '#4CAF50' : '#F44336';
@@ -111,16 +111,17 @@ const StationMarker = ({ station, selected, onClick }) => {
 
 // Custom InfoWindow cho station
 const StationInfoWindow = ({ station, onClose, onBooking }) => {
-    const hasAvailableSlots = station.charging?.chargingPosts?.some(
-        post => post.availableSlots > 0
+    // Prefer the normalized poles/ports model
+    const hasAvailableSlots = station.charging?.poles?.some(
+        pole => (pole.availablePorts || 0) > 0
     );
 
-    const totalSlots = station.charging?.chargingPosts?.reduce(
-        (sum, post) => sum + post.totalSlots, 0
+    const totalSlots = station.charging?.poles?.reduce(
+        (sum, pole) => sum + (pole.totalPorts || 0), 0
     ) || 0;
 
-    const availableSlots = station.charging?.chargingPosts?.reduce(
-        (sum, post) => sum + post.availableSlots, 0
+    const _availableSlots = station.charging?.poles?.reduce(
+        (sum, pole) => sum + (pole.availablePorts || 0), 0
     ) || 0;
 
     const formatOperatingHours = (oh) => {
@@ -187,22 +188,22 @@ const StationInfoWindow = ({ station, onClose, onBooking }) => {
                 <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
                     <BatteryChargingFull sx={{ fontSize: 18, color: 'text.secondary' }} />
                     <Typography variant="body2" sx={{ fontSize: '0.85rem' }}>
-                        {availableSlots}/{totalSlots} cổng sạc trống
+                        {station.charging?.poles?.length || 0} trụ • {totalSlots} cổng
                     </Typography>
                 </Stack>
 
                 <Divider sx={{ my: 1 }} />
 
-                {/* Charging Posts Summary */}
+                {/* Tổng quan trụ (Charging poles summary) */}
                 <Box sx={{ mb: 1.5 }}>
                     <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
                         Loại sạc:
                     </Typography>
                     <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
-                        {station.charging?.chargingPosts?.map((post, idx) => (
+                        {station.charging?.poles?.map((pole, idx) => (
                             <Chip
                                 key={idx}
-                                label={`${post.type} ${post.power}kW`}
+                                label={`Trụ ${pole.name || pole.id} — Cổng ${pole.totalPorts || (pole.ports || []).length}`}
                                 size="small"
                                 variant="outlined"
                                 sx={{ height: 22, fontSize: '0.7rem' }}

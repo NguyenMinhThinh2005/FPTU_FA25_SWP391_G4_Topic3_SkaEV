@@ -68,10 +68,9 @@ const AdminDashboard = () => {
   useAuthStore();
   const { stations } = useStationStore();
   const { bookingHistory } = useBookingStore();
-  useState("today");
-  const [anchorEl, setAnchorEl] = useState(null);
-  const [openStationDialog, setOpenStationDialog] = useState(false);
-  const [selectedStation, setSelectedStation] = useState(null);
+  const [_anchorEl, _setAnchorEl] = useState(null);
+  const [_openStationDialog, setOpenStationDialog] = useState(false);
+  const [_selectedStation, _setSelectedStation] = useState(null);
 
   // New states for driver-like flow
   const [searchQuery, setSearchQuery] = useState("");
@@ -90,7 +89,7 @@ const AdminDashboard = () => {
   const totalStations = stations.length;
   const activeStations = stations.filter((s) => s.status === "active").length;
   const totalUsers = 0; // TODO: Fetch from user management API
-  const totalBookings = bookingHistory.length;
+  
   const todayBookings = bookingHistory.filter(
     (b) => new Date(b.createdAt).toDateString() === new Date().toDateString()
   ).length;
@@ -102,7 +101,7 @@ const AdminDashboard = () => {
     (b) => b.status === "in_progress"
   ).length;
 
-  // Station Performance với chargingPosts structure
+      // Station Performance với poles/ports structure
   const stationPerformance = stations
     .map((station) => {
       const stationBookings = bookingHistory.filter(
@@ -113,28 +112,30 @@ const AdminDashboard = () => {
         0
       );
 
-      // Tính utilization từ chargingPosts
-      let totalSlots = 0;
-      let occupiedSlots = 0;
+      // Tính utilization từ poles/ports
+      let totalPorts = 0;
+      let occupiedPorts = 0;
 
-      if (station.charging?.chargingPosts) {
-        station.charging.chargingPosts.forEach((post) => {
-          totalSlots += post.totalSlots;
-          occupiedSlots += post.totalSlots - post.availableSlots;
+      if (station.charging?.poles) {
+        station.charging.poles.forEach((pole) => {
+          const ports = pole.totalPorts || (pole.ports || []).length;
+          totalPorts += ports;
+          const available = typeof pole.availablePorts === 'number' ? pole.availablePorts : (pole.ports || []).filter(p=>p.status==='available').length;
+          occupiedPorts += Math.max(0, ports - available);
         });
       }
 
       const utilization =
-        totalSlots > 0 ? (occupiedSlots / totalSlots) * 100 : 0;
+        totalPorts > 0 ? (occupiedPorts / totalPorts) * 100 : 0;
 
       return {
         ...station,
         bookingsCount: stationBookings.length,
         revenue,
         utilization,
-        totalSlots,
-        occupiedSlots,
-        chargingPostsCount: station.charging?.chargingPosts?.length || 0,
+        totalSlots: totalPorts,
+        occupiedSlots: occupiedPorts,
+        chargingPostsCount: station.charging?.poles?.length || 0,
       };
     })
     .sort((a, b) => b.revenue - a.revenue);
@@ -173,24 +174,24 @@ const AdminDashboard = () => {
     setActionDialog({ open: false, type: "", station: null });
   };
 
-  const getDistanceToStation = (station) => {
+  const getDistanceToStation = () => {
     // Mock distance calculation for admin view
     return (Math.random() * 10 + 1).toFixed(1);
   };
 
-  // Recent Activities với chargingPosts context
-  const recentActivities = [
+  // Recent Activities (ngữ cảnh: trụ sạc)
+  const _recentActivities = [
     {
       id: 1,
       type: "booking",
-      message: "New booking at Tech Park SuperCharger - Charging Post A",
+  message: "New booking at Tech Park SuperCharger - Pole A",
       time: "5 minutes ago",
       severity: "info",
     },
     {
       id: 2,
       type: "station",
-      message: 'Charging Post B at "Green Mall Hub" went offline',
+  message: 'Pole B at "Green Mall Hub" went offline',
       time: "15 minutes ago",
       severity: "warning",
     },
@@ -211,14 +212,14 @@ const AdminDashboard = () => {
     {
       id: 5,
       type: "maintenance",
-      message: "Maintenance scheduled for EcoPark Station - All Charging Posts",
+  message: "Maintenance scheduled for EcoPark Station - All Poles",
       time: "2 hours ago",
       severity: "info",
     },
     {
       id: 6,
-      type: "slot",
-      message: "Slot 1 at Tech Park SuperCharger - Post C is now available",
+      type: "port",
+      message: "Port A01 at Tech Park SuperCharger - Pole C is now available",
       time: "3 hours ago",
       severity: "success",
     },
@@ -236,7 +237,7 @@ const AdminDashboard = () => {
     return <Chip label={config.label} color={config.color} size="small" />;
   };
 
-  const getSeverityColor = (severity) => {
+  const _getSeverityColor = (severity) => {
     switch (severity) {
       case "success":
         return "success.main";
@@ -269,13 +270,7 @@ const AdminDashboard = () => {
           </Typography>
         </Box>
         <Box sx={{ display: "flex", gap: 2 }}>
-          <Button
-            variant="outlined"
-            startIcon={<Download />}
-            onClick={() => console.log("Export report")}
-          >
-            Xuất báo cáo
-          </Button>
+
           <Button
             variant="contained"
             startIcon={<Add />}
@@ -468,7 +463,7 @@ const AdminDashboard = () => {
               </Typography>
 
               <Box sx={{ maxHeight: 600, overflowY: "auto" }}>
-                {filteredStations.map((station, index) => (
+                {filteredStations.map((station) => (
                   <Box key={station.id}>
                     <Paper
                       sx={{
@@ -556,8 +551,7 @@ const AdminDashboard = () => {
                                 sx={{ fontSize: 16, color: "primary.main" }}
                               />
                               <Typography variant="body2">
-                                {station.chargingPostsCount} posts,{" "}
-                                {station.totalSlots} slots
+                                {station.chargingPostsCount} trụ, {station.totalSlots} cổng
                               </Typography>
                             </Box>
                             <Box
@@ -705,16 +699,13 @@ const AdminDashboard = () => {
                   • Status: {selectedStationForDetail.status}
                 </Box>
                 <Box sx={{ fontSize: "0.875rem", mb: 1 }}>
-                  • Charging Posts:{" "}
-                  {selectedStationForDetail.chargingPostsCount}
+                  • Trụ: {selectedStationForDetail.chargingPostsCount}
                 </Box>
                 <Box sx={{ fontSize: "0.875rem", mb: 1 }}>
-                  • Total Slots: {selectedStationForDetail.totalSlots}
+                  • Tổng số cổng: {selectedStationForDetail.totalSlots}
                 </Box>
                 <Box sx={{ fontSize: "0.875rem", mb: 1 }}>
-                  • Available Slots:{" "}
-                  {selectedStationForDetail.totalSlots -
-                    selectedStationForDetail.occupiedSlots}
+                  • Cổng khả dụng: {selectedStationForDetail.totalSlots - selectedStationForDetail.occupiedSlots}
                 </Box>
 
                 <Divider sx={{ my: 2 }} />
@@ -836,8 +827,8 @@ const AdminDashboard = () => {
       >
         <DialogTitle>Edit Station: {actionDialog.station?.name}</DialogTitle>
         <DialogContent>
-          <Typography variant="body2" sx={{ mb: 2 }}>
-            Manage station settings, charging posts, and operational parameters.
+                <Typography variant="body2" sx={{ mb: 2 }}>
+            Manage station settings, trụ sạc, and operational parameters.
           </Typography>
           <TextField
             fullWidth
@@ -889,14 +880,14 @@ const AdminDashboard = () => {
         </DialogTitle>
         <DialogContent>
           <Typography variant="body2" sx={{ mb: 2 }}>
-            Schedule maintenance for charging posts and equipment.
+            Schedule maintenance for poles and ports.
           </Typography>
           <FormControl fullWidth sx={{ mb: 2 }}>
-            <InputLabel>Charging Post</InputLabel>
+            <InputLabel>Pole</InputLabel>
             <Select>
-              {actionDialog.station?.charging?.chargingPosts?.map((post) => (
-                <MenuItem key={post.id} value={post.id}>
-                  {post.name} ({post.type} - {post.power}kW)
+              {actionDialog.station?.charging?.poles?.map((pole) => (
+                <MenuItem key={pole.id} value={pole.id}>
+                  {pole.name} ({pole.type} - {pole.power}kW)
                 </MenuItem>
               ))}
             </Select>

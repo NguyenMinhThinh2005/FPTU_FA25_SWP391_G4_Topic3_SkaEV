@@ -64,7 +64,8 @@ const CustomerDashboard = () => {
   const {
     getCurrentBooking,
     getChargingSession,
-    getScheduledBookings
+    getScheduledBookings,
+    bookings
   } = useBookingStore();
 
   const [anchorEl, setAnchorEl] = useState(null);
@@ -219,7 +220,7 @@ const CustomerDashboard = () => {
       >
         <Box>
           <Typography variant="h4" fontWeight="bold" gutterBottom>
-            ChÃ o má»«ng trá»Ÿ láº¡i, {user?.profile?.firstName || 'TÃ i xáº¿'}! âš¡
+            Chào mừng trở lại, {user?.profile?.firstName || 'Tài xế'}! ✨
           </Typography>
           <Typography variant="body1" color="text.secondary">
             Your electric journey dashboard - Let's charge up your day!
@@ -306,7 +307,7 @@ const CustomerDashboard = () => {
         >
           <Typography variant="body2">
             <strong>
-              {activeBooking.status === "charging" ? "PhiÃªn sáº¡c Ä‘ang hoáº¡t Ä‘á»™ng" : "Äáº·t chá»— Ä‘Ã£ xÃ¡c nháº­n"}:
+              {activeBooking.status === "charging" ? "Phiên sạc đang hoạt động" : "Đặt chỗ đã xác nhận"}:
             </strong>{" "}
             {activeBooking.stationName}
             {activeBooking.status === "charging"
@@ -446,7 +447,7 @@ const CustomerDashboard = () => {
                     {co2Saved}
                   </Typography>
                   <Typography variant="body2" sx={{ opacity: 0.8 }}>
-                    kg COâ‚‚ Saved
+                    kg CO₂ Saved
                   </Typography>
                 </Box>
               </Box>
@@ -521,8 +522,8 @@ const CustomerDashboard = () => {
                                   variant="caption"
                                   color="text.secondary"
                                 >
-                                  Port {booking.portNumber} â€¢{" "}
-                                  {booking.connectorType}
+                                  Cổng {booking.portNumber || booking.port?.id} •{' '}
+                                  {booking.connectorType || booking.port?.connectorType || booking.connector?.name}
                                 </Typography>
                               </Box>
                             </Box>
@@ -540,11 +541,11 @@ const CustomerDashboard = () => {
                               minutes
                             </Typography>
                             {/* Show scheduled time for scheduled bookings */}
-                            {booking.schedulingType === 'scheduled' && booking.scheduledDateTime && (
-                              <Typography variant="body2" color="primary.main" sx={{ fontWeight: 'medium' }}>
-                                ðŸ“… Lá»‹ch sáº¡c: {new Date(booking.scheduledDateTime).toLocaleString('vi-VN')}
-                              </Typography>
-                            )}
+                                {booking.schedulingType === 'scheduled' && booking.scheduledDateTime && (
+                                  <Typography variant="body2" color="primary.main" sx={{ fontWeight: 'medium' }}>
+                                    📅 Lịch sạc: {new Date(booking.scheduledDateTime).toLocaleString('vi-VN')}
+                                  </Typography>
+                                )}
                             <Box
                               sx={{
                                 display: "flex",
@@ -553,7 +554,7 @@ const CustomerDashboard = () => {
                               }}
                             >
                               <Typography variant="body2" fontWeight="medium">
-                                {booking.energyDelivered?.toFixed(1) || 'N/A'} kWh â€¢{" "}
+                                    {booking.energyDelivered?.toFixed(1) || 'N/A'} kWh •{" "}
                                 {formatCurrency(booking.cost || 0)}
                               </Typography>
                               {booking.status === "completed" && (
@@ -568,7 +569,7 @@ const CustomerDashboard = () => {
                                     sx={{ fontSize: 14, color: "warning.main" }}
                                   />
                                   <Typography variant="caption">
-                                    {booking.rating || "ÄÃ¡nh giÃ¡ phiÃªn nÃ y"}
+                                    {booking.rating || "Đánh giá phiên này"}
                                   </Typography>
                                 </Box>
                               )}
@@ -595,8 +596,8 @@ const CustomerDashboard = () => {
           {/* Quick Actions */}
           <Card sx={{ mb: 3 }}>
             <CardContent>
-              <Typography variant="h6" fontWeight="bold" gutterBottom>
-                Quick Actions
+                  <Typography variant="h4" fontWeight="bold" gutterBottom>
+                Chào mừng trở lại, {user?.profile?.firstName || 'Tài xế'}!
               </Typography>
               <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 <Button
@@ -610,7 +611,7 @@ const CustomerDashboard = () => {
                     fontWeight: "bold"
                   }}
                 >
-                  QuÃ©t QR Ä‘á»ƒ sáº¡c ngay
+                  Quét QR để sạc ngay
                 </Button>
                 <Button
                   variant="contained"
@@ -654,7 +655,7 @@ const CustomerDashboard = () => {
             <Card sx={{ mb: 3 }}>
               <CardContent>
                 <Typography variant="h6" fontWeight="bold" gutterBottom>
-                  ðŸ“… Lá»‹ch sáº¡c sáº¯p tá»›i
+                  📅 Lịch sạc sắp tới
                 </Typography>
                 {scheduledBookings.slice(0, 2).map((booking) => (
                   <Paper
@@ -673,14 +674,14 @@ const CustomerDashboard = () => {
                           {booking.stationName}
                         </Typography>
                         <Typography variant="body2" color="primary.main" sx={{ fontWeight: 'medium' }}>
-                          ðŸ“… {new Date(booking.scheduledDateTime).toLocaleString('vi-VN')}
+                          📅 {new Date(booking.scheduledDateTime).toLocaleString('vi-VN')}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
-                          {booking.chargerType?.name} â€¢ {booking.slot?.id}
+                          {booking.chargerType?.name} â€¢ Cổng {booking.port?.id || booking.portNumber || '—'}
                         </Typography>
                       </Box>
                       <Chip
-                        label="ÄÃ£ lÃªn lá»‹ch"
+                        label="Đã lên lịch"
                         color="warning"
                         size="small"
                         icon={<Schedule />}
@@ -690,7 +691,7 @@ const CustomerDashboard = () => {
                 ))}
                 {scheduledBookings.length > 2 && (
                   <Button variant="text" size="small" fullWidth>
-                    Xem thÃªm {scheduledBookings.length - 2} lá»‹ch khÃ¡c
+                    Xem thêm {scheduledBookings.length - 2} lịch khác
                   </Button>
                 )}
               </CardContent>
@@ -788,9 +789,9 @@ const CustomerDashboard = () => {
                   {user?.profile?.firstName?.charAt(0) || 'N'}
                 </Avatar>
                 <Box>
-                  <Typography variant="subtitle1" fontWeight="medium">
-                    {user?.profile ? `${user.profile.firstName} ${user.profile.lastName}` : 'KhÃ¡ch hÃ ng'}
-                  </Typography>
+                          <Typography variant="subtitle1" fontWeight="medium">
+                          {user?.profile ? `${user.profile.firstName} ${user.profile.lastName}` : 'Khách hàng'}
+                        </Typography>
                   <Typography variant="body2" color="text.secondary">
                     {user?.email}
                   </Typography>

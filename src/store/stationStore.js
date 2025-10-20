@@ -5,47 +5,51 @@ import { calculateDistance } from "../utils/helpers";
 // Transform API response to frontend format
 const transformStationData = (apiStation) => {
   try {
-    const totalPosts = apiStation.totalPosts || 0;
-    const availablePosts = apiStation.availablePosts || 0;
+    // API may still provide legacy totals named 'totalPosts' / 'availablePosts'.
+    // Map them to frontend-friendly pole/port names and keep backwards fallback.
+    const totalPoles = apiStation.totalPoles ?? apiStation.totalPosts ?? 0;
+    const availablePoles = apiStation.availablePoles ?? apiStation.availablePosts ?? 0;
 
-    // Generate mock charging posts and slots (since API doesn't provide detailed structure)
-    const chargingPosts = [];
-    for (let i = 1; i <= totalPosts; i++) {
-      const slotsPerPost = 2; // Each post has 2 slots
-      const slots = [];
+    // Generate mock poles and ports (since API doesn't provide detailed structure)
+    const poles = [];
+  for (let i = 1; i <= totalPoles; i++) {
+      const portsPerPole = 2; // Each pole has 2 ports
+      const ports = [];
 
-      // Determine post type based on post number
-      const isAC = i <= Math.ceil(totalPosts * 0.3); // 30% AC posts
-      const isDCFast = !isAC && i <= Math.ceil(totalPosts * 0.7); // 40% DC Fast
+  // Determine pole type based on pole number
+  const isAC = i <= Math.ceil(totalPoles * 0.3); // 30% AC poles
+  const isDCFast = !isAC && i <= Math.ceil(totalPoles * 0.7); // 40% DC Fast
       // Remaining are DC Ultra
 
-      const postType = isAC ? "AC" : "DC";
-      const postPower = isAC ? 7 : isDCFast ? 50 : 150;
-      const postVoltage = isAC ? 220 : 400;
+      const poleType = isAC ? "AC" : "DC";
+      const polePower = isAC ? 7 : isDCFast ? 50 : 150;
+      const poleVoltage = isAC ? 220 : 400;
 
-      for (let j = 1; j <= slotsPerPost; j++) {
-        slots.push({
-          id: `${apiStation.stationId}-post${i}-slot${j}`, // Changed from slotId to id
-          slotId: `${apiStation.stationId}-post${i}-slot${j}`,
-          slotNumber: j,
+      for (let j = 1; j <= portsPerPole; j++) {
+        ports.push({
+          id: `${apiStation.stationId}-pole${i}-port${j}`,
+          portId: `${apiStation.stationId}-pole${i}-port${j}`,
+          portNumber: j,
           connectorType:
-            postType === "AC" ? "Type 2" : j === 1 ? "CCS2" : "CHAdeMO",
-          maxPower: postPower,
-          status: i <= availablePosts ? "available" : "occupied",
-          currentRate: postType === "AC" ? 3000 : isDCFast ? 5000 : 7000,
+            poleType === "AC" ? "Type 2" : j === 1 ? "CCS2" : "CHAdeMO",
+          maxPower: polePower,
+          status: i <= availablePoles ? "available" : "occupied",
+          currentRate: poleType === "AC" ? 3000 : isDCFast ? 5000 : 7000,
         });
       }
 
-      chargingPosts.push({
-        id: `${apiStation.stationId}-post${i}`, // Added id field
-        postId: `${apiStation.stationId}-post${i}`,
-        name: `Trụ sạc ${i}`, // Added name field
-        postNumber: i,
-        type: postType, // Added type field (AC/DC)
-        power: postPower, // Added power field
-        voltage: postVoltage, // Added voltage field
-        status: i <= availablePosts ? "available" : "occupied",
-        slots: slots,
+      poles.push({
+        id: `${apiStation.stationId}-pole${i}`,
+        poleId: `${apiStation.stationId}-pole${i}`,
+        name: `Tr\u1ee5 s\u1ea1c ${i}`,
+        poleNumber: i,
+        type: poleType,
+        power: polePower,
+        voltage: poleVoltage,
+  status: i <= availablePoles ? "available" : "occupied",
+        ports: ports,
+        totalPorts: portsPerPole,
+        availablePorts: i <= availablePoles ? portsPerPole : 0,
       });
     }
 
@@ -63,11 +67,12 @@ const transformStationData = (apiStation) => {
         },
       },
       charging: {
-        totalPorts: totalPosts,
-        availablePorts: availablePosts,
-        chargingPosts: chargingPosts, // Add detailed structure
+  totalPoles: totalPoles,
+  totalPorts: totalPoles * 2,
+  availablePorts: availablePoles,
+        poles: poles,
         maxPower: 150,
-        connectorTypes: ["CCS2", "CHAdeMO"],
+        connectorTypes: ["CCS2", "CHAdeMO", "Type 2"],
         pricing: {
           acRate: 3500,
           dcRate: 5000,
@@ -244,27 +249,25 @@ const useStationStore = create((set, get) => ({
         return false;
       }
 
-      // Filter by connector types
-      if (filters.connectorTypes && filters.connectorTypes.length > 0) {
+      // Filter by connector types - accept string or array from UI
+      const connectorFilters = Array.isArray(filters.connectorTypes)
+        ? filters.connectorTypes.filter(Boolean)
+        : filters.connectorTypes
+        ? [filters.connectorTypes]
+        : [];
+
+      if (connectorFilters.length > 0) {
         const stationConnectors = station.charging?.connectorTypes || [];
-        console.log(
-          `   - Filter connectors: ${JSON.stringify(filters.connectorTypes)}`
-        );
-        console.log(
-          `   - Station connectors: ${JSON.stringify(stationConnectors)}`
-        );
+        console.log(`   - Filter connectors: ${JSON.stringify(connectorFilters)}`);
+        console.log(`   - Station connectors: ${JSON.stringify(stationConnectors)}`);
 
-        const hasMatchingConnector = filters.connectorTypes.some(
-          (filterType) => {
-            const match = stationConnectors.includes(filterType);
-            console.log(`     Checking ${filterType}: ${match ? "✅" : "❌"}`);
-            return match;
-          }
-        );
+        const hasMatchingConnector = connectorFilters.some((filterType) => {
+          const match = stationConnectors.includes(filterType);
+          console.log(`     Checking ${filterType}: ${match ? "✅" : "❌"}`);
+          return match;
+        });
 
-        console.log(
-          `   - Has matching connector: ${hasMatchingConnector ? "✅" : "❌"}`
-        );
+        console.log(`   - Has matching connector: ${hasMatchingConnector ? "✅" : "❌"}`);
         if (!hasMatchingConnector) return false;
       }
 

@@ -237,15 +237,18 @@ const FindStations = () => {
             {/* Connector Type Filter with Smart Suggestions */}
             <Grid item xs={12} md={3}>
               <FormControl fullWidth>
-                <InputLabel>{getText("stations.connectorType")}</InputLabel>
+                <InputLabel id="findstations-connector-label">{getText("stations.connectorType")}</InputLabel>
                 <Select
-                  value={filters.connectorTypes || []}
-                  multiple
+                  labelId="findstations-connector-label"
+                  id="findstations-connector-select"
+                  label={getText("stations.connectorType")}
+                  value={Array.isArray(filters.connectorTypes) ? (filters.connectorTypes[0] || "") : (filters.connectorTypes || "")}
                   onChange={(e) => {
-                    console.log("Selected connectors:", e.target.value);
-                    updateFilters({ connectorTypes: e.target.value });
+                    const value = e.target.value;
+                    console.log("Selected connector:", value);
+                    updateFilters({ connectorTypes: value || "" });
                   }}
-                  renderValue={(selected) => selected.join(', ')}
+                  renderValue={(selected) => (selected ? selected : null)}
                 >
                   {Object.values(CONNECTOR_TYPES).map((type) => {
                     const isVehicleCompatible = getCurrentVehicleConnectors().includes(type);

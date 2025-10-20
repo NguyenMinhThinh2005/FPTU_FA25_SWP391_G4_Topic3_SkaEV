@@ -31,44 +31,43 @@ const CustomerDashboard = () => {
     const { user } = useAuthStore();
     const { bookingHistory, getBookingStats } = useBookingStore();
 
-    // Khá»Ÿi táº¡o mock data náº¿u cáº§n
-    React.
-    // PhiÃªn sáº¡c hiá»‡n táº¡i (náº¿u cÃ³)
-    const [activeCharging] = useState(null); // Chá»‰ hiá»ƒn thá»‹ khi Ä‘ang cÃ³ phiÃªn sáº¡c
+    // Khởi tạo mock data nếu cần
+    // Phiên sạc hiện tại (nếu có)
+    const [activeCharging] = useState(null); // Chỉ hiển thị khi đang có phiên sạc
 
-    // Chá»©c nÄƒng chÃ­nh cho tÃ i xáº¿ EV
+    // Chức năng chính cho tài xế EV
     const quickActions = [
         {
-            title: "TÃ¬m tráº¡m sáº¡c",
-            description: "TÃ¬m tráº¡m gáº§n nháº¥t",
+            title: "Tìm trạm sạc",
+            description: "Tìm trạm gần nhất",
             icon: <LocationOn />,
             color: "primary",
             path: "/customer/charging"
         },
         {
-            title: "QuÃ©t QR",
-            description: "Báº¯t Ä‘áº§u sáº¡c ngay",
+            title: "Quét QR",
+            description: "Bắt đầu sạc ngay",
             icon: <QrCodeScanner />,
             color: "success",
             path: "/qr-demo"
         },
         {
-            title: "Thanh toÃ¡n",
-            description: "Quáº£n lÃ½ vÃ­ & tháº»",
+            title: "Thanh toán",
+            description: "Quản lý ví & thẻ",
             icon: <AccountBalanceWallet />,
             color: "warning",
             path: "/customer/payment"
         },
         {
-            title: "Thá»‘ng kÃª & BÃ¡o cÃ¡o Chi phÃ­",
-            description: "PhÃ¢n tÃ­ch chi phÃ­ & thá»‘ng kÃª sáº¡c",
+            title: "Thống kê & Báo cáo Chi phí",
+            description: "Phân tích chi phí & thống kê sạc",
             icon: <Assessment />,
             color: "info",
             path: "/customer/analytics"
         }
     ];
 
-    // Thá»‘ng kÃª thá»±c táº¿ tá»« booking store
+    // Thống kê thực tế từ booking store
     const bookingStats = getBookingStats();
     const monthlyStats = {
         chargingSessions: bookingStats.total,
@@ -81,24 +80,24 @@ const CustomerDashboard = () => {
 
     return (
         <Container maxWidth="lg" sx={{ py: 3 }}>
-            {/* Header chÃ o má»«ng Ä‘Æ¡n giáº£n */}
+            {/* Header chào mừng đơn giản */}
             <Box sx={{ mb: 4 }}>
                 <Typography variant="h4" fontWeight="bold" gutterBottom>
-                    ChÃ o má»«ng, {user?.profile?.firstName || 'TÃ i xáº¿'}!
+                    Chào mừng, {user?.profile?.firstName || 'Tài xế'}!
                 </Typography>
                 <Typography variant="body1" color="text.secondary">
-                    Quáº£n lÃ½ viá»‡c sáº¡c xe Ä‘iá»‡n cá»§a báº¡n
+                    Quản lý việc sạc xe điện của bạn
                 </Typography>
             </Box>
 
-            {/* ThÃ´ng bÃ¡o phiÃªn sáº¡c (chá»‰ hiá»ƒn thá»‹ khi Ä‘ang sáº¡c) */}
+            {/* Thông báo phiên sạc (chỉ hiển thị khi đang sạc) */}
             {activeCharging && (
                 <Alert severity="success" sx={{ mb: 3 }}>
                     <Typography variant="subtitle2" fontWeight="bold">
-                        Äang sáº¡c táº¡i {activeCharging.stationName}
+                        Đang sạc tại {activeCharging.stationName}
                     </Typography>
                     <Typography variant="body2">
-                        Pin: {activeCharging.currentSOC}% â€¢ Thá»i gian cÃ²n láº¡i: {activeCharging.timeRemaining} phÃºt
+                        Pin: {activeCharging.currentSOC}% • Thời gian còn lại: {activeCharging.timeRemaining} phút
                     </Typography>
                     <LinearProgress
                         variant="determinate"
@@ -108,9 +107,9 @@ const CustomerDashboard = () => {
                 </Alert>
             )}
 
-            {/* CÃ¡c chá»©c nÄƒng chÃ­nh */}
+            {/* Các chức năng chính */}
             <Typography variant="h6" fontWeight="bold" sx={{ mb: 2 }}>
-                Chá»©c nÄƒng chÃ­nh
+                Chức năng chính
             </Typography>
 
             <Grid container spacing={3} sx={{ mb: 4 }}>
@@ -151,11 +150,11 @@ const CustomerDashboard = () => {
                 ))}
             </Grid>
 
-            {/* Thá»‘ng kÃª thÃ¡ng nÃ y */}
+            {/* Thống kê tháng này */}
             <Card sx={{ mb: 3 }}>
                 <CardContent>
                     <Typography variant="h6" fontWeight="bold" gutterBottom>
-                        Tá»•ng quan thÃ¡ng nÃ y
+                        Tổng quan tháng này
                     </Typography>
                     <Grid container spacing={3}>
                         <Grid item xs={6} sm={3}>
@@ -164,7 +163,7 @@ const CustomerDashboard = () => {
                                     {monthlyStats.chargingSessions}
                                 </Typography>
                                 <Typography variant="body2" color="text.secondary">
-                                    láº§n sáº¡c
+                                    lần sạc
                                 </Typography>
                             </Box>
                         </Grid>
@@ -184,7 +183,7 @@ const CustomerDashboard = () => {
                                     {formatCurrency(monthlyStats.totalCost)}
                                 </Typography>
                                 <Typography variant="body2" color="text.secondary">
-                                    chi phÃ­
+                                    chi phí
                                 </Typography>
                             </Box>
                         </Grid>
@@ -194,7 +193,7 @@ const CustomerDashboard = () => {
                                     {formatCurrency(monthlyStats.averageCost)}
                                 </Typography>
                                 <Typography variant="body2" color="text.secondary">
-                                    VNÄ/kWh
+                                    VNĐ/kWh
                                 </Typography>
                             </Box>
                         </Grid>
@@ -202,12 +201,12 @@ const CustomerDashboard = () => {
                 </CardContent>
             </Card>
 
-            {/* Lá»‹ch sá»­ sáº¡c gáº§n Ä‘Ã¢y */}
+            {/* Lịch sử sạc gần đây */}
             <Card>
                 <CardContent>
                     <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
                         <Typography variant="h6" fontWeight="bold">
-                            Lá»‹ch sá»­ gáº§n Ä‘Ã¢y
+                            Lịch sử gần đây
                         </Typography>
                         <Button size="small" onClick={() => navigate("/customer/history")}>
                             Xem táº¥t cáº£
@@ -226,7 +225,7 @@ const CustomerDashboard = () => {
                                             {booking.stationName}
                                         </Typography>
                                         <Typography variant="caption" color="text.secondary">
-                                            {new Date(booking.createdAt).toLocaleDateString('vi-VN')} â€¢ {booking.energyDelivered || 0} kWh â€¢ {booking.chargingDuration || 0} phÃºt
+                                            {new Date(booking.createdAt).toLocaleDateString('vi-VN')} • {booking.energyDelivered || 0} kWh • {booking.chargingDuration || 0} phút
                                         </Typography>
                                     </Box>
                                 </Box>
@@ -235,7 +234,7 @@ const CustomerDashboard = () => {
                                         {formatCurrency(booking.totalAmount || booking.cost || 0)}
                                     </Typography>
                                     <Chip
-                                        label={booking.status === "completed" ? "HoÃ n thÃ nh" : booking.status === "cancelled" ? "ÄÃ£ há»§y" : "Äang xá»­ lÃ½"}
+                                        label={booking.status === "completed" ? "Hoàn thành" : booking.status === "cancelled" ? "Đã hủy" : "Đang xử lý"}
                                         size="small"
                                         color={booking.status === "completed" ? "success" : booking.status === "cancelled" ? "error" : "warning"}
                                     />
@@ -245,7 +244,7 @@ const CustomerDashboard = () => {
                         {bookingHistory.length === 0 && (
                             <Box sx={{ textAlign: "center", py: 4 }}>
                                 <Typography variant="body2" color="text.secondary">
-                                    ChÆ°a cÃ³ lá»‹ch sá»­ sáº¡c nÃ o
+                                    Chưa có lịch sử sạc nào
                                 </Typography>
                             </Box>
                         )}

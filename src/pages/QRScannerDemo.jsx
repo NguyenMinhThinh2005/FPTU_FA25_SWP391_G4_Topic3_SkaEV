@@ -83,7 +83,7 @@ const QRScannerDemo = () => {
         name: station.charging.connectorTypes[0] || "Tự động",
         compatible: "Tương thích",
       },
-      slot: {
+      port: {
         id: "A01",
         location: "Port A01",
       },

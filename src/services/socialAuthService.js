@@ -20,13 +20,13 @@ class SocialAuthService {
   }
 
   // Phone number verification - To be implemented with real backend
-  async loginWithPhone(phoneNumber) {
+  async loginWithPhone() {
     throw new Error(
       "Phone authentication not yet implemented. Please use email/password login."
     );
   }
 
-  async verifyPhoneOTP(phoneNumber, otpCode) {
+  async verifyPhoneOTP() {
     throw new Error("Phone OTP verification not yet implemented.");
   }
 
@@ -44,12 +44,12 @@ class SocialAuthService {
   }
 
   // Link social account to existing account - To be implemented
-  async linkSocialAccount(userId, provider, socialData) {
+  async linkSocialAccount() {
     throw new Error("Account linking not yet implemented.");
   }
 
   // Unlink social account - To be implemented
-  async unlinkSocialAccount(userId, provider) {
+  async unlinkSocialAccount() {
     throw new Error("Account unlinking not yet implemented.");
   }
 

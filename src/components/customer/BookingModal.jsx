@@ -36,7 +36,7 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
   const { createBooking } = useBookingStore();
   const [activeStep, setActiveStep] = useState(0);
   const [selectedChargingType, setSelectedChargingType] = useState(null); // Step 1: Choose charging type
-  const [selectedSlot, setSelectedSlot] = useState(null); // Step 2: Choose specific slot
+  const [selectedPort, setSelectedPort] = useState(null); // Step 2: Choose specific port
   const [selectedDateTime, setSelectedDateTime] = useState(null);
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -50,72 +50,97 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
     "Xác nhận đặt chỗ",
   ];
 
-  // Get unique charging types from all posts
+  // Helper to render pole label and ensure a single leading "Trụ" prefix
+  // - removes any leading/repeated occurrences of the word 'Trụ' from the
+  //   raw pole name, then prefixes a single 'Trụ ' to the cleaned name.
+  // This avoids results like "Trụ Trụ sạc 1" when the stored name already
+  // contains the word 'Trụ'.
+  const formatPoleLabel = (poleName) => {
+    if (!poleName) return "";
+    let name = String(poleName).trim();
+    // Remove any number of leading 'Trụ' tokens, plus surrounding punctuation/spaces
+    // Examples cleaned:
+    //  - "Trụ sạc 1" -> "sạc 1"
+    //  - "Trụ Trụ sạc 1" -> "sạc 1"
+    //  - "TRỤ: A01" -> "A01"
+    name = name.replace(/^((?:Trụ)[:\s\-–—]*)+/i, "").trim();
+    // If cleaning produced an empty name, fallback to original trimmed name
+    if (!name) {
+      name = String(poleName).trim();
+      // as a last resort, remove duplicated 'Trụ' words anywhere
+      name = name.replace(/(Trụ)\s+/gi, "Trụ ").trim();
+    }
+    // Ensure single prefix
+    if (/^Trụ\b/i.test(name)) return name;
+    return `Trụ ${name}`;
+  };
+
+  // Get unique charging types from all poles
   const getChargingTypes = () => {
-    if (!station?.charging?.chargingPosts) return [];
+    if (!station?.charging?.poles) return [];
 
     const typesMap = new Map();
-    station.charging.chargingPosts.forEach((post) => {
-      const key = `${post.type}-${post.power}`;
+    station.charging.poles.forEach((pole) => {
+      const key = `${pole.type}-${pole.power}`;
       if (!typesMap.has(key)) {
         typesMap.set(key, {
           id: key,
-          type: post.type,
-          power: post.power,
-          voltage: post.voltage,
+          type: pole.type,
+          power: pole.power,
+          voltage: pole.voltage,
           name:
-            post.type === "AC"
-              ? `Sạc chậm AC (${post.power}kW)`
-              : post.power >= 150
-              ? `Sạc siêu nhanh DC (${post.power}kW)`
-              : `Sạc nhanh DC (${post.power}kW)`,
+            pole.type === "AC"
+              ? `Sạc chậm AC`
+              : pole.power >= 150
+              ? `Sạc siêu nhanh DC`
+              : `Sạc nhanh DC`,
           rate:
-            post.type === "AC"
+            pole.type === "AC"
               ? station.charging.pricing.acRate
-              : post.power >= 150
-              ? station.charging.pricing.dcUltraRate
+              : pole.power >= 150
+              ? station.charging.pricing.dcFastRate || station.charging.pricing.dcRate
               : station.charging.pricing.dcRate,
           availableCount: 0,
         });
       }
-      // Count available slots
-      const availableSlots = post.slots.filter(
-        (s) => s.status === "available"
+      // Count available ports on this pole
+      const availablePorts = (pole.ports || []).filter(
+        (p) => p.status === "available"
       ).length;
       const current = typesMap.get(key);
-      current.availableCount += availableSlots;
+      current.availableCount += availablePorts;
     });
 
     return Array.from(typesMap.values());
   };
 
-  // Get all slots matching selected charging type
-  const getSlotsForType = () => {
-    if (!selectedChargingType || !station?.charging?.chargingPosts) return [];
+  // Get all ports matching selected charging type
+  const getPortsForType = () => {
+    if (!selectedChargingType || !station?.charging?.poles) return [];
 
-    const slots = [];
-    station.charging.chargingPosts.forEach((post) => {
+    const ports = [];
+    station.charging.poles.forEach((pole) => {
       if (
-        post.type === selectedChargingType.type &&
-        post.power === selectedChargingType.power
+        pole.type === selectedChargingType.type &&
+        pole.power === selectedChargingType.power
       ) {
-        post.slots.forEach((slot) => {
-          slots.push({
-            ...slot,
-            postName: post.name,
-            postId: post.id,
-            power: post.power,
-            type: post.type,
+        (pole.ports || []).forEach((port) => {
+          ports.push({
+            ...port,
+            poleName: pole.name,
+            poleId: pole.id,
+            power: pole.power,
+            type: pole.type,
           });
         });
       }
     });
 
-    return slots;
+    return ports;
   };
 
-  const getAvailableSlotsForType = () => {
-    return getSlotsForType().filter((slot) => slot.status === "available");
+  const getAvailablePortsForType = () => {
+    return getPortsForType().filter((port) => port.status === "available");
   };
 
   const handleNext = () => {
@@ -128,11 +153,11 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
 
   const handleChargingTypeSelect = (type) => {
     setSelectedChargingType(type);
-    setSelectedSlot(null); // Reset slot when type changes
+    setSelectedPort(null); // Reset port when type changes
   };
 
-  const handleSlotSelect = (slot) => {
-    setSelectedSlot(slot);
+  const handlePortSelect = (port) => {
+    setSelectedPort(port);
   };
 
   const handleDateTimeChange = (dateTimeData) => {
@@ -142,7 +167,7 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
   const handleConfirmBooking = async () => {
     if (
       !selectedChargingType ||
-      !selectedSlot ||
+      !selectedPort ||
       !selectedDateTime ||
       !agreeTerms
     ) {
@@ -156,16 +181,18 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
       const bookingData = {
         stationId: station.id,
         stationName: station.name,
-        chargingPost: {
-          id: selectedSlot.postId,
-          name: selectedSlot.postName,
+        chargerType: {
+          id: selectedChargingType.id,
+          name: selectedChargingType.name,
           type: selectedChargingType.type,
           power: selectedChargingType.power,
           voltage: selectedChargingType.voltage,
         },
-        slot: {
-          id: selectedSlot.id,
-          connectorType: selectedSlot.connectorType,
+        port: {
+          id: selectedPort.id,
+          connectorType: selectedPort.connectorType,
+          poleId: selectedPort.poleId,
+          poleName: selectedPort.poleName,
         },
         pricing: {
           baseRate,
@@ -182,7 +209,7 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
           : null,
       };
 
-      const booking = createBooking(bookingData);
+  const booking = createBooking(bookingData);
       setBookingResult("success");
 
       // Success message for scheduled booking
@@ -221,7 +248,7 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
   const handleClose = () => {
     setActiveStep(0);
     setSelectedChargingType(null);
-    setSelectedSlot(null);
+    setSelectedPort(null);
     setSelectedDateTime(null);
     setAgreeTerms(false);
     setLoading(false);
@@ -229,6 +256,22 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
     setResultMessage("");
     onClose();
   };
+
+  // Accessibility: when dialog opens, blur any currently focused element
+  // to avoid aria-hidden warnings where a focused element is hidden from
+  // assistive technology. MUI Dialog will manage focus internally.
+  React.useEffect(() => {
+    if (open) {
+      try {
+        const active = document.activeElement;
+        if (active && typeof active.blur === "function") {
+          active.blur();
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }, [open]);
 
   const renderStepContent = () => {
     switch (activeStep) {
@@ -273,13 +316,13 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
                             justifyContent: "space-between",
                           }}
                         >
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 2,
-                            }}
-                          >
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 2,
+                              }}
+                            >
                             <Box
                               sx={{
                                 width: 56,
@@ -305,18 +348,19 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
                                 <FlashOn fontSize="large" />
                               )}
                             </Box>
-                            <Box>
+                            <Box sx={{ textAlign: "left", width: '100%' }}>
                               <Typography variant="h6" fontWeight="bold">
                                 {type.name}
                               </Typography>
                               <Typography
                                 variant="body2"
                                 color="text.secondary"
+                                sx={{ textAlign: "left" }}
                               >
-                                {type.power} kW • {type.type} • {type.voltage}V
+                                {type.power} kW • {type.type}
                               </Typography>
                               <Chip
-                                label={`${type.availableCount} cổng sẵn sàng`}
+                                label={`${type.availableCount} cổng đang sẵn sàng`}
                                 size="small"
                                 color={
                                   type.availableCount > 0
@@ -339,7 +383,7 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
                               variant="caption"
                               color="text.secondary"
                             >
-                              Giá điện
+                              Giá sạc
                             </Typography>
                           </Box>
                         </Box>
@@ -364,24 +408,24 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
                   Đã chọn: {selectedChargingType.name}
                   <Typography variant="body2" sx={{ mt: 0.5 }}>
                     Giá: {selectedChargingType.rate?.toLocaleString()} VNĐ/kWh •
-                    Số cổng trống: {getAvailableSlotsForType().length}
+                    Số cổng trống: {getAvailablePortsForType().length}
                   </Typography>
                 </Alert>
                 <Grid container spacing={2}>
-                  {getSlotsForType().map((slot, index) => {
-                    const isAvailable = slot.status === "available";
-                    const isOccupied = slot.status === "occupied";
-                    const isMaintenance = slot.status === "maintenance";
+                  {getPortsForType().map((port, index) => {
+                    const isAvailable = port.status === "available";
+                    const isOccupied = port.status === "occupied";
+                    const isMaintenance = port.status === "maintenance";
 
                     // Create unique key with fallback
-                    const uniqueKey = `${slot.postId || "post"}-${
-                      slot.id || index
-                    }-${slot.postName || ""}-${index}`;
+                    const uniqueKey = `${port.poleId || "pole"}-${
+                      port.id || index
+                    }-${port.poleName || ""}-${index}`;
 
                     return (
                       <Grid item xs={12} sm={6} key={uniqueKey}>
                         <ButtonBase
-                          onClick={() => isAvailable && handleSlotSelect(slot)}
+                          onClick={() => isAvailable && handlePortSelect(port)}
                           disabled={!isAvailable}
                           sx={{ width: "100%", borderRadius: 1 }}
                         >
@@ -389,9 +433,9 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
                             sx={{
                               width: "100%",
                               cursor: isAvailable ? "pointer" : "not-allowed",
-                              border: selectedSlot?.id === slot.id ? 2 : 1,
+                              border: selectedPort?.id === port.id ? 2 : 1,
                               borderColor:
-                                selectedSlot?.id === slot.id
+                                selectedPort?.id === port.id
                                   ? "primary.main"
                                   : "divider",
                               opacity: isAvailable ? 1 : 0.6,
@@ -409,16 +453,16 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
                                   justifyContent: "space-between",
                                 }}
                               >
-                                <Box sx={{ flex: 1 }}>
+                                <Box sx={{ flex: 1, textAlign: "left" }}>
                                   <Typography variant="h6" fontWeight="bold">
-                                    {slot.postName} - Cổng {slot.id}
+                                    {formatPoleLabel(port.poleName)} — Cổng {port.portNumber || port.id}
                                   </Typography>
                                   <Typography
                                     variant="body2"
                                     color="text.secondary"
                                   >
-                                    {slot.connectorType} • {slot.power}kW •{" "}
-                                    {slot.type}
+                                    {port.connectorType} • {port.power}kW •{" "}
+                                    {port.type}
                                   </Typography>
                                   <Box
                                     sx={{
@@ -431,7 +475,7 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
                                     <Chip
                                       label={
                                         isAvailable
-                                          ? "Sẵn sàng"
+                                          ? "Đang sẵn sàng"
                                           : isOccupied
                                           ? "Đang sử dụng"
                                           : isMaintenance
@@ -451,15 +495,15 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
                                       sx={{ height: 20, fontSize: "0.7rem" }}
                                     />
                                   </Box>
-                                  {isMaintenance && slot.lastMaintenance && (
+                                  {isMaintenance && port.lastMaintenance && (
                                     <Typography
                                       variant="caption"
                                       color="error.main"
                                       sx={{ display: "block", mt: 0.5 }}
                                     >
-                                      Bảo trì từ:{" "}
+                                      Bảo trì từ: {" "}
                                       {new Date(
-                                        slot.lastMaintenance
+                                        port.lastMaintenance
                                       ).toLocaleString("vi-VN", {
                                         day: "2-digit",
                                         month: "2-digit",
@@ -502,15 +546,15 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
                     );
                   })}
                 </Grid>
-                {getSlotsForType().length === 0 && (
+                {getPortsForType().length === 0 && (
                   <Alert severity="warning" sx={{ mt: 2 }}>
                     Loại sạc này chưa có cổng nào được cấu hình.
                   </Alert>
                 )}
-                {getSlotsForType().length > 0 &&
-                  getAvailableSlotsForType().length === 0 && (
+                {getPortsForType().length > 0 &&
+                  getAvailablePortsForType().length === 0 && (
                     <Alert severity="warning" sx={{ mt: 2 }}>
-                      Tất cả {getSlotsForType().length} cổng của loại này đang
+                      Tất cả {getPortsForType().length} cổng của loại này đang
                       bận hoặc bảo trì. Vui lòng chọn loại sạc khác.
                     </Alert>
                   )}
@@ -525,10 +569,10 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
             <Typography variant="h6" gutterBottom>
               Chọn thời gian sạc
             </Typography>
-            {selectedSlot && (
+            {selectedPort && (
               <>
                 <Alert severity="success" sx={{ mb: 2 }}>
-                  Đã chọn: Cổng {selectedSlot.id} ({selectedSlot.connectorType})
+                  Đã chọn: {formatPoleLabel(selectedPort?.poleName)} — Cổng {selectedPort?.portNumber || selectedPort?.id} ({selectedPort.connectorType})
                 </Alert>
                 <ChargingDateTimePicker
                   station={station}
@@ -603,7 +647,7 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
                         Cổng sạc:
                       </Typography>
                       <Typography variant="body1" fontWeight="medium">
-                        {selectedSlot?.postName} - Cổng {selectedSlot?.id}
+                        {formatPoleLabel(selectedPort?.poleName)} — Cổng {selectedPort?.portNumber || selectedPort?.id}
                       </Typography>
                     </Grid>
                     <Grid item xs={6}>
@@ -611,7 +655,7 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
                         Đầu cắm:
                       </Typography>
                       <Typography variant="body1" fontWeight="medium">
-                        {selectedSlot?.connectorType}
+                        {selectedPort?.connectorType}
                       </Typography>
                     </Grid>
                     <Grid item xs={6}>
@@ -626,7 +670,7 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
                     </Grid>
                     <Grid item xs={6}>
                       <Typography variant="body2" color="text.secondary">
-                        Giá điện:
+                        Giá sạc:
                       </Typography>
                       <Typography
                         variant="body1"
@@ -669,7 +713,7 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
       case 0:
         return selectedChargingType !== null;
       case 1:
-        return selectedSlot !== null;
+        return selectedPort !== null;
       case 2:
         return (
           selectedDateTime !== null &&

@@ -204,7 +204,7 @@ const CustomerDashboard = () => {
       >
         <Box>
           <Typography variant="h4" fontWeight="bold" gutterBottom>
-            ChÃ o má»«ng trá»Ÿ láº¡i, {user?.profile?.firstName || 'TÃ i xáº¿'}! âš¡
+            Chào mừng trở lại, {user?.profile?.firstName || 'Tài xế'}! ✨
           </Typography>
           <Typography variant="body1" color="text.secondary">
             Your electric journey dashboard - Let's charge up your day!
@@ -403,7 +403,7 @@ const CustomerDashboard = () => {
                     {co2Saved}
                   </Typography>
                   <Typography variant="body2" sx={{ opacity: 0.8 }}>
-                    kg COâ‚‚ Saved
+                    kg CO₂ Saved
                   </Typography>
                 </Box>
               </Box>
@@ -519,7 +519,7 @@ const CustomerDashboard = () => {
                                     sx={{ fontSize: 14, color: "warning.main" }}
                                   />
                                   <Typography variant="caption">
-                                    {booking.rating || "ÄÃ¡nh giÃ¡ phiÃªn nÃ y"}
+                                    {booking.rating || "Đánh giá phiên này"}
                                   </Typography>
                                 </Box>
                               )}
@@ -679,9 +679,9 @@ const CustomerDashboard = () => {
                   {user?.profile?.firstName?.charAt(0) || 'N'}
                 </Avatar>
                 <Box>
-                  <Typography variant="subtitle1" fontWeight="medium">
-                    {user?.profile ? `${user.profile.firstName} ${user.profile.lastName}` : 'KhÃ¡ch hÃ ng'}
-                  </Typography>
+                                  <Typography variant="subtitle1" fontWeight="medium">
+                          {user?.profile ? `${user.profile.firstName} ${user.profile.lastName}` : 'Khách hàng'}
+                        </Typography>
                   <Typography variant="body2" color="text.secondary">
                     {user?.email}
                   </Typography>

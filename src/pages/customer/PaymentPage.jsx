@@ -97,7 +97,7 @@ const PaymentPage = () => {
             <Box sx={{ mb: 4 }}>
                 <Typography variant="h4" fontWeight="bold" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <Payment sx={{ fontSize: 40, color: 'primary.main' }} />
-                    💳 Thanh toán
+                     Thanh toán
                 </Typography>
                 <Typography variant="body1" color="text.secondary">
                     Quản lý phương thức thanh toán và theo dõi lịch sử giao dịch

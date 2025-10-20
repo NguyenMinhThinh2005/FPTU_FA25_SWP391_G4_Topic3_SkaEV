@@ -275,10 +275,24 @@ const StationMapLeaflet = ({ stations, onStationSelect }) => {
     };
 
     const handleCenterOnUser = () => {
-        if (userLocation) {
-            // This will be handled by the map component
+        if (userLocation && mapRef.current) {
+            // Clear any selected station or drawn route
             setSelectedStation(null);
             setShowRoute(false);
+
+            try {
+                // Prefer setView with a sensible zoom (keep current zoom if already > 13)
+                const currentZoom = typeof mapRef.current.getZoom === 'function' ? mapRef.current.getZoom() : 13;
+                const targetZoom = Math.max(currentZoom, 13);
+                mapRef.current.setView([userLocation.lat, userLocation.lng], targetZoom, { animate: true });
+            } catch (err) {
+                // Fallback to panTo
+                try {
+                    mapRef.current.panTo([userLocation.lat, userLocation.lng]);
+                } catch (e) {
+                    console.error('Unable to center map on user location:', e);
+                }
+            }
         }
     };
 
@@ -480,9 +494,7 @@ const StationMapLeaflet = ({ stations, onStationSelect }) => {
                     boxShadow: 4,
                     bgcolor: 'rgba(255,255,255,0.95)'
                 }}>
-                    <Typography variant="subtitle2" fontWeight="bold" gutterBottom sx={{ mb: 1.5 }}>
-                        📍 Chú thích
-                    </Typography>
+
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                             <Box sx={{

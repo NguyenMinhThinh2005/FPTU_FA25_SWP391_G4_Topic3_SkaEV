@@ -364,7 +364,7 @@ const HomePage = () => {
       {/* CTA Section */}
       <Container maxWidth="lg" sx={{ py: 8, textAlign: "center" }}>
         <Typography variant="h4" fontWeight="bold" gutterBottom>
-          Sẵn sàng bắt đầu hành trình xe điện?
+          Đang sẵn sàng bắt đầu hành trình xe điện?
         </Typography>
         <Typography variant="h6" color="text.secondary" sx={{ mb: 4 }}>
           Tham gia cùng hàng nghìn tài xế xe điện đang sử dụng mạng lưới sạc
@@ -403,7 +403,7 @@ const HomePage = () => {
               SkaEV
             </Typography>
             <Typography variant="body2" color="grey.400">
-              © 2024 SkaEV. Nền tảng quản lý sạc xe điện thông minh - Phát triển
+              © 2025 SkaEV. Nền tảng quản lý sạc xe điện thông minh - Phát triển
               bởi FPTU SWP391
             </Typography>
           </Box>

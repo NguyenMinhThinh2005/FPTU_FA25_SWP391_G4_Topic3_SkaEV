@@ -153,7 +153,7 @@ try {
         Write-Host ""
         Write-Host "   📊 Mong đợi: 16 Tables, 15 Stored Procedures" -ForegroundColor Cyan
     } else {
-        Write-Host "⚠️  Không thể verify database (có thể do database chưa sẵn sàng)" -ForegroundColor Yellow
+    Write-Host "⚠️  Không thể verify database (có thể do database đang sẵn sàng)" -ForegroundColor Yellow
     }
 } catch {
     Write-Host "⚠️  Lỗi khi verify: $_" -ForegroundColor Yellow
@@ -180,7 +180,7 @@ Write-Host "  2. Chạy: cd SkaEV.API && dotnet build" -ForegroundColor Gray
 Write-Host "  3. Chạy: dotnet run" -ForegroundColor Gray
 Write-Host "  4. Truy cập Swagger: https://localhost:5001/swagger" -ForegroundColor Gray
 Write-Host ""
-Write-Host "✅ Database sẵn sàng sử dụng!" -ForegroundColor Green
+Write-Host "✅ Database đang sẵn sàng sử dụng!" -ForegroundColor Green
 Write-Host ""
 
 # Hỏi có muốn mở SSMS không

@@ -27,36 +27,27 @@ class StationDataService {
             0
           );
 
-          // Calculate slots from chargingPosts with validation
-          let totalSlots = 0;
-          let occupiedSlots = 0;
-          let chargingPostsCount = 0;
+          // Calculate ports from poles with validation
+          let totalPorts = 0;
+          let occupiedPorts = 0;
+          let polesCount = 0;
 
-          if (
-            station.charging?.chargingPosts &&
-            Array.isArray(station.charging.chargingPosts)
-          ) {
-            station.charging.chargingPosts.forEach((post) => {
-              if (post.totalSlots && typeof post.totalSlots === "number") {
-                totalSlots += post.totalSlots;
-                chargingPostsCount++;
+          if (station.charging?.poles && Array.isArray(station.charging.poles)) {
+            station.charging.poles.forEach((pole) => {
+              if (pole.ports && Array.isArray(pole.ports)) {
+                totalPorts += pole.ports.length;
+                polesCount++;
 
-                if (
-                  post.availableSlots &&
-                  typeof post.availableSlots === "number"
-                ) {
-                  occupiedSlots += Math.max(
-                    0,
-                    post.totalSlots - post.availableSlots
-                  );
-                }
+                pole.ports.forEach((port) => {
+                  if (port.status === "occupied") occupiedPorts += 1;
+                });
               }
             });
           }
 
           const utilization =
-            totalSlots > 0
-              ? Math.min(100, (occupiedSlots / totalSlots) * 100)
+            totalPorts > 0
+              ? Math.min(100, (occupiedPorts / totalPorts) * 100)
               : 0;
 
           return {
@@ -64,12 +55,12 @@ class StationDataService {
             bookingsCount: stationBookings.length,
             revenue: Math.max(0, revenue),
             utilization: Math.round(utilization * 100) / 100, // Round to 2 decimal places
-            totalSlots,
-            occupiedSlots: Math.max(0, occupiedSlots),
-            availableSlots: Math.max(0, totalSlots - occupiedSlots),
-            chargingPostsCount,
+            totalPorts,
+            occupiedPorts: Math.max(0, occupiedPorts),
+            availablePorts: Math.max(0, totalPorts - occupiedPorts),
+            polesCount,
             // Performance indicators
-            revenuePerSlot: totalSlots > 0 ? revenue / totalSlots : 0,
+            revenuePerPort: totalPorts > 0 ? revenue / totalPorts : 0,
             averageSessionValue:
               stationBookings.length > 0 ? revenue / stationBookings.length : 0,
             lastUpdated: new Date().toISOString(),
@@ -84,10 +75,10 @@ class StationDataService {
             bookingsCount: 0,
             revenue: 0,
             utilization: 0,
-            totalSlots: 0,
-            occupiedSlots: 0,
-            availableSlots: 0,
-            chargingPostsCount: 0,
+            totalPorts: 0,
+            occupiedPorts: 0,
+            availablePorts: 0,
+            polesCount: 0,
             error: "Calculation failed",
           };
         }
@@ -196,9 +187,7 @@ class StationDataService {
         activities.push({
           id: `booking-${booking.id}-${index}`,
           type: "booking",
-          message: `New booking at ${
-            station?.name || "Unknown Station"
-          } - Charging Post ${booking.chargingPost?.name || "A"}`,
+          message: `Đặt chỗ mới tại ${station?.name || "Không rõ"} - Trụ ${booking.port?.poleName || booking.chargingPost?.name || "A"}`,
           time: timeText,
           severity:
             booking.status === "completed"
@@ -236,24 +225,24 @@ class StationDataService {
     if (!station.name) errors.push("Station name is required");
     if (!station.location?.address) warnings.push("Station address is missing");
 
-    if (station.charging?.chargingPosts) {
-      if (!Array.isArray(station.charging.chargingPosts)) {
-        errors.push("ChargingPosts should be an array");
+    if (station.charging?.poles) {
+      if (!Array.isArray(station.charging.poles)) {
+        errors.push("poles should be an array");
       } else {
-        station.charging.chargingPosts.forEach((post, index) => {
-          if (!post.id) errors.push(`Charging post ${index} missing ID`);
-          if (typeof post.totalSlots !== "number")
-            errors.push(`Charging post ${index} invalid totalSlots`);
-          if (typeof post.availableSlots !== "number")
-            errors.push(`Charging post ${index} invalid availableSlots`);
-          if (post.availableSlots > post.totalSlots)
-            warnings.push(
-              `Charging post ${index} has more available slots than total`
-            );
+        station.charging.poles.forEach((pole, index) => {
+          if (!pole.id) errors.push(`Pole ${index} missing ID`);
+          const portsCount = pole.totalPorts || (pole.ports || []).length;
+          if (typeof portsCount !== 'number' || portsCount < 0)
+            errors.push(`Pole ${index} invalid total ports count`);
+          const available = typeof pole.availablePorts === 'number' ? pole.availablePorts : (pole.ports || []).filter(p=>p.status==='available').length;
+          if (typeof available !== 'number')
+            errors.push(`Pole ${index} invalid availablePorts`);
+          if (available > portsCount)
+            warnings.push(`Pole ${index} has more available ports than total`);
         });
       }
     } else {
-      warnings.push("Station has no charging posts data");
+      warnings.push("Station has no poles data");
     }
 
     return {

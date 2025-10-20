@@ -188,7 +188,7 @@ const StationManagement = () => {
       newErrors.totalPorts = "Tổng số cổng sạc nhanh và tiêu chuẩn phải bằng tổng số cổng";
     }
     if (stationForm.availableSlots > stationForm.totalPorts) {
-      newErrors.availableSlots = "Số slot có sẵn không được vượt quá tổng số cổng";
+      newErrors.availableSlots = "Số cổng có sẵn không được vượt quá tổng số cổng";
     }
     if (stationForm.pricePerKwh < 0) newErrors.pricePerKwh = "Giá mỗi kWh không được âm";
     
@@ -656,7 +656,7 @@ const StationManagement = () => {
               <Grid item xs={12}>
                 <TextField
                   fullWidth
-                  label="Slot có sẵn"
+                  label="Cổng có sẵn"
                   type="number"
                   value={stationForm.availableSlots}
                   onChange={(e) => {

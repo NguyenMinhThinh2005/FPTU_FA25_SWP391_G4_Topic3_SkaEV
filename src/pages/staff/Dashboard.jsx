@@ -54,8 +54,8 @@ const StaffDashboard = () => {
   const [detailsDialog, setDetailsDialog] = useState(false);
   const [maintenanceDialog, setMaintenanceDialog] = useState(false);
   const [maintenanceForm, setMaintenanceForm] = useState({
-    chargingPost: "",
-    slot: "",
+    pole: "",
+    port: "",
     issue: "",
     notes: "",
   });
@@ -73,44 +73,46 @@ const StaffDashboard = () => {
   const [successMessage, setSuccessMessage] = useState("");
   const [showSuccess, setShowSuccess] = useState(false);
 
-  // Calculate overall statistics từ chargingPosts
+  // Calculate overall statistics from poles/ports
   const calculateStationStats = (stations) => {
-    let totalPosts = 0;
-    let activePosts = 0;
-    let maintenancePosts = 0;
-    let offlinePosts = 0;
-    let totalSlots = 0;
-    let occupiedSlots = 0;
+    let totalPoles = 0;
+    let activePoles = 0;
+    let maintenancePoles = 0;
+    let offlinePoles = 0;
+    let totalPorts = 0;
+    let occupiedPorts = 0;
 
     stations.forEach((station) => {
-      station.chargingPosts.forEach((post) => {
-        totalPosts++;
-        totalSlots += post.totalSlots;
-        occupiedSlots += post.totalSlots - post.availableSlots;
+      (station.charging?.poles || []).forEach((pole) => {
+        totalPoles++;
+        const portsCount = pole.totalPorts || (pole.ports || []).length;
+        totalPorts += portsCount;
+        const available = typeof pole.availablePorts === 'number' ? pole.availablePorts : (pole.ports || []).filter(p=>p.status==='available').length;
+        occupiedPorts += Math.max(0, portsCount - available);
 
-        switch (post.status) {
+        switch (pole.status) {
           case "active":
           case "occupied":
-            activePosts++;
+            activePoles++;
             break;
           case "maintenance":
-            maintenancePosts++;
+            maintenancePoles++;
             break;
           case "offline":
-            offlinePosts++;
+            offlinePoles++;
             break;
         }
       });
     });
 
     return {
-      totalPosts,
-      activePosts,
-      maintenancePosts,
-      offlinePosts,
-      totalSlots,
-      occupiedSlots,
-      availableSlots: totalSlots - occupiedSlots,
+      totalPoles,
+      activePoles,
+      maintenancePoles,
+      offlinePoles,
+      totalPorts,
+      occupiedPorts,
+      availablePorts: totalPorts - occupiedPorts,
     };
   };
 
@@ -198,7 +200,7 @@ const StaffDashboard = () => {
           Staff Dashboard ⚡
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          Monitor and manage charging stations, posts, and slots
+          Monitor and manage charging stations, poles (trụ), and ports (cổng)
         </Typography>
       </Box>
 
@@ -258,16 +260,16 @@ const StaffDashboard = () => {
                 </Avatar>
                 <Box>
                   <Typography variant="h4" fontWeight="bold">
-                    {stats.totalPosts}
+                    {stats.totalPoles}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    Charging Posts
+                    Trụ sạc (Poles)
                   </Typography>
                 </Box>
               </Box>
               <LinearProgress
                 variant="determinate"
-                value={(stats.activePosts / stats.totalPosts) * 100}
+                value={(stats.activePoles / Math.max(1, stats.totalPoles)) * 100}
                 sx={{ height: 8, borderRadius: 4 }}
               />
               <Typography
@@ -275,9 +277,9 @@ const StaffDashboard = () => {
                 color="text.secondary"
                 sx={{ mt: 1 }}
               >
-                {stats.activePosts} active, {stats.maintenancePosts}{" "}
-                maintenance, {stats.offlinePosts} offline • {stats.totalSlots}{" "}
-                total slots
+                {stats.activePoles} active, {stats.maintenancePoles}{" "}
+                maintenance, {stats.offlinePoles} offline • {stats.totalPorts}{" "}
+                total ports
               </Typography>
             </CardContent>
           </Card>
@@ -296,16 +298,16 @@ const StaffDashboard = () => {
                     fontWeight="bold"
                     color="success.main"
                   >
-                    {stats.availableSlots}
+                    {stats.availablePorts}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    Slot có sẵn
+                    Cổng có sẵn (Available Ports)
                   </Typography>
                 </Box>
               </Box>
               <Chip
                 label={`${(
-                  (stats.availableSlots / stats.totalSlots) *
+                  (stats.availablePorts / Math.max(1, stats.totalPorts)) *
                   100
                 ).toFixed(1)}% Available`}
                 color="success"
@@ -480,17 +482,17 @@ const StaffDashboard = () => {
                                 gap: 1,
                               }}
                             >
-                              <ElectricCar
-                                sx={{ fontSize: 16, color: "primary.main" }}
-                              />
-                              <Typography variant="body2">
-                                {station.chargingPosts.length} posts,{" "}
-                                {station.chargingPosts.reduce(
-                                  (sum, post) => sum + post.totalSlots,
-                                  0
-                                )}{" "}
-                                slots
-                              </Typography>
+                                        <ElectricCar
+                                          sx={{ fontSize: 16, color: "primary.main" }}
+                                        />
+                                        <Typography variant="body2">
+                                          {station.charging?.poles?.length || 0} trụ,{" "}
+                                          {(station.charging?.poles || []).reduce(
+                                            (sum, pole) => sum + (pole.totalPorts || (pole.ports || []).length),
+                                            0
+                                          )}{" "}
+                                          cổng
+                                        </Typography>
                             </Box>
                             <Box
                               sx={{
@@ -527,29 +529,29 @@ const StaffDashboard = () => {
                                 color="text.secondary"
                               >
                                 Available:{" "}
-                                {station.chargingPosts.reduce(
-                                  (sum, post) => sum + post.availableSlots,
+                                {station.charging?.poles?.reduce(
+                                  (sum, pole) =>
+                                    sum + (pole.availablePorts ?? (pole.ports || []).filter(p=>p.status==='available').length),
                                   0
                                 )}
                                 /
-                                {station.chargingPosts.reduce(
-                                  (sum, post) => sum + post.totalSlots,
+                                {station.charging?.poles?.reduce(
+                                  (sum, pole) => sum + (pole.totalPorts ?? (pole.ports || []).length),
                                   0
                                 )}
                               </Typography>
                               <LinearProgress
                                 variant="determinate"
                                 value={
-                                  (station.chargingPosts.reduce(
-                                    (sum, post) =>
-                                      sum +
-                                      (post.totalSlots - post.availableSlots),
+                                  (station.charging?.poles?.reduce(
+                                    (sum, pole) =>
+                                      sum + ((pole.totalPorts ?? (pole.ports || []).length) - (pole.availablePorts ?? (pole.ports || []).filter(p=>p.status==='available').length)),
                                     0
                                   ) /
-                                    station.chargingPosts.reduce(
-                                      (sum, post) => sum + post.totalSlots,
+                                    Math.max(1, station.charging?.poles?.reduce(
+                                      (sum, pole) => sum + (pole.totalPorts ?? (pole.ports || []).length),
                                       0
-                                    )) *
+                                    ))) *
                                   100
                                 }
                                 sx={{ width: 60, height: 4 }}
@@ -562,12 +564,10 @@ const StaffDashboard = () => {
                             />
                             <Chip
                               label={`${
-                                station.chargingPosts.filter(
-                                  (p) =>
-                                    p.status === "active" ||
-                                    p.status === "occupied"
+                                station.charging?.poles?.filter(
+                                  (p) => p.status === "active" || p.status === "occupied"
                                 ).length
-                              } active posts`}
+                              } active poles`}
                               color="success"
                               size="small"
                             />
@@ -656,12 +656,11 @@ const StaffDashboard = () => {
                 <Divider sx={{ my: 2 }} />
 
                 <Typography variant="subtitle2" gutterBottom>
-                  Charging Posts Status
+                  Trạng thái Trụ & Cổng
                 </Typography>
-                {selectedStationForDetail.chargingPosts.map((post) => (
-                  <Box key={post.id} sx={{ fontSize: "0.875rem", mb: 1 }}>
-                    • {post.name}: {post.availableSlots}/{post.totalSlots}{" "}
-                    available ({post.status})
+                {selectedStationForDetail.charging?.poles?.map((pole) => (
+                    <Box key={pole.id} sx={{ fontSize: "0.875rem", mb: 1 }}>
+                    • Trụ {pole.name}: {pole.availablePorts ?? (pole.ports || []).filter(p=>p.status==='available').length}/{pole.totalPorts ?? (pole.ports || []).length} cổng trống ({pole.status})
                   </Box>
                 ))}
 
@@ -729,7 +728,7 @@ const StaffDashboard = () => {
                   size="small"
                 >
                   <Typography variant="caption" fontWeight="bold">
-                    {alert.station} - {alert.chargingPost}
+                    {alert.station} - Trụ: {alert.pole || alert.chargingPost}
                   </Typography>
                   <Typography variant="caption" display="block">
                     {alert.message}
@@ -757,36 +756,36 @@ const StaffDashboard = () => {
           Schedule Maintenance: {actionDialog.station?.name}
         </DialogTitle>
         <DialogContent>
-          <Typography variant="body2" sx={{ mb: 2 }}>
-            Schedule maintenance for charging posts and equipment.
+            <Typography variant="body2" sx={{ mb: 2 }}>
+            Schedule maintenance for poles and ports.
           </Typography>
           <FormControl fullWidth sx={{ mb: 2 }}>
-            <InputLabel>Charging Post</InputLabel>
+            <InputLabel>Pole</InputLabel>
             <Select
-              value={maintenanceForm.chargingPost}
+              value={maintenanceForm.pole}
               onChange={(e) =>
                 setMaintenanceForm({
                   ...maintenanceForm,
-                  chargingPost: e.target.value,
+                  pole: e.target.value,
                 })
               }
             >
-              {actionDialog.station?.chargingPosts?.map((post) => (
-                <MenuItem key={post.id} value={post.id}>
-                  {post.name} ({post.type} - {post.power}kW)
+              {actionDialog.station?.charging?.poles?.map((pole) => (
+                <MenuItem key={pole.id} value={pole.id}>
+                  {pole.name} ({pole.type} - {pole.power}kW)
                 </MenuItem>
               ))}
             </Select>
           </FormControl>
           <TextField
             fullWidth
-            label="Slot ID"
-            value={maintenanceForm.slot}
+            label="Port ID"
+            value={maintenanceForm.port}
             onChange={(e) =>
-              setMaintenanceForm({ ...maintenanceForm, slot: e.target.value })
+              setMaintenanceForm({ ...maintenanceForm, port: e.target.value })
             }
             sx={{ mb: 2 }}
-            placeholder="e.g., Slot 1, Slot 2, All slots"
+            placeholder="e.g., Port 1, Port 2, All ports"
           />
           <TextField
             fullWidth

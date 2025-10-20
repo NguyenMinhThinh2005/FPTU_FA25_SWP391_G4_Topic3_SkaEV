@@ -7,7 +7,8 @@ import useAuthStore from "../store/authStore";
  * Sử dụng function này trong tất cả các components cần data
  */
 export const useMasterDataSync = () => {
-  const { user } = useAuthStore();
+  // user not currently used here; keep auth store access for future uses
+  useAuthStore();
   const { bookingHistory, getBookingStats } = useBookingStore();
 
   // Return unified stats

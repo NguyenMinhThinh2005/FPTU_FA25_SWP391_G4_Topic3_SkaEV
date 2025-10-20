@@ -798,4 +798,4 @@ ALTER TABLE bookings ADD CONSTRAINT chk_positive_amounts
 
 ---
 
-**Tổng kết:** Database design này bao phủ 100% dữ liệu mock hiện tại, sẵn sàng cho production với PostgreSQL 16.
+**Tổng kết:** Database design này bao phủ 100% dữ liệu mock hiện tại, đang sẵn sàng cho production với PostgreSQL 16.

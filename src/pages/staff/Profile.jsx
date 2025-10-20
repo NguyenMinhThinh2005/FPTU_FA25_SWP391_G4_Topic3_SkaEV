@@ -46,7 +46,7 @@ const StaffProfile = () => {
     employeeId: "ST001",
     department: "Vận hành",
     position: "Kỹ thuật viên trạm sạc",
-    joinDate: "2024-01-15",
+    joinDate: "2025-01-15",
     location: "Hà Nội",
     avatar: "/api/placeholder/150/150",
   });
@@ -93,7 +93,7 @@ const StaffProfile = () => {
     {
       name: "Chứng chỉ an toàn điện",
       issuer: "Hội đồng an toàn",
-      expiry: "2024-12-30",
+      expiry: "2025-12-30",
       status: "expiring",
     },
     {

@@ -1,7 +1,6 @@
 ﻿import { useState, useEffect, useMemo, useCallback } from 'react';
 import useStationStore from '../store/stationStore';
 import useBookingStore from '../store/bookingStore';
-import { mockData } from '../data/mockData';
 import StationDataService from '../services/stationDataService';
 
 /**
@@ -87,25 +86,40 @@ export const useStaffDashboard = () => {
     if (!stationsLoading && !bookingsLoading) {
       initializeStaffData();
     }
-  }, [stations, bookings, stationsLoading, bookingsLoading, currentStaff.assignedStations, selectedStation]);
+  }, [stations, bookings, stationsLoading, bookingsLoading, currentStaff.assignedStations, selectedStation, generateStaffNotifications]);
 
   // Generate staff-specific notifications
   const generateStaffNotifications = useCallback((assignedStations) => {
     const newNotifications = [];
     
     assignedStations.forEach(station => {
-      // Check for low battery charging posts
-      station.chargingPosts?.forEach(post => {
-        if (post.batteryLevel && post.batteryLevel < 20) {
+      // Check for low battery on poles/ports
+      station.charging?.poles?.forEach(pole => {
+        // if pole-level batteryLevel (rare) check it
+        if (pole.batteryLevel && pole.batteryLevel < 20) {
           newNotifications.push({
-            id: `low-battery-${post.id}`,
+            id: `low-battery-pole-${pole.id}`,
             type: 'warning',
-            message: `Charging post ${post.name} has low battery (${post.batteryLevel}%)`,
+            message: `Pole ${pole.name} has low battery (${pole.batteryLevel}%)`,
             stationId: station.id,
             timestamp: new Date().toISOString(),
             priority: 'high',
           });
         }
+
+        // Check ports under pole
+        (pole.ports || []).forEach(port => {
+          if (port.batteryLevel && port.batteryLevel < 20) {
+            newNotifications.push({
+              id: `low-battery-port-${port.id}`,
+              type: 'warning',
+              message: `Port ${port.id} on ${pole.name} has low battery (${port.batteryLevel}%)`,
+              stationId: station.id,
+              timestamp: new Date().toISOString(),
+              priority: 'high',
+            });
+          }
+        });
       });
       
       // Check for maintenance alerts
@@ -163,9 +177,10 @@ export const useStaffDashboard = () => {
           return bookingDate.toDateString() === today.toDateString();
         }).length,
         activeCharging: assignedStations.reduce((total, station) => {
-          return total + (station.chargingPosts?.filter(post => 
-            post.status === 'charging'
-          ).length || 0);
+          const activeOnStation = (station.charging?.poles || []).reduce((s, pole) => {
+            return s + ((pole.ports || []).filter(port => port.status === 'charging').length || 0);
+          }, 0);
+          return total + activeOnStation;
         }, 0),
         pendingMaintenance: assignedStations.filter(s => s.status === 'maintenance').length,
         totalRevenue: assignedBookings.reduce((total, booking) => total + booking.totalCost, 0),
@@ -245,15 +260,15 @@ export const useStaffDashboard = () => {
     setNotifications(prev => prev.filter(notif => notif.id !== notificationId));
   }, []);
 
-  const handleEmergencyStop = useCallback((stationId, postId) => {
+  const handleEmergencyStop = useCallback((stationId, poleId) => {
     try {
-      console.log(`Emergency stop triggered for station ${stationId}, post ${postId}`);
+      console.log(`Emergency stop triggered for station ${stationId}, pole ${poleId}`);
       
       // In real app, this would send emergency stop command to hardware
       const notification = {
         id: `emergency-${Date.now()}`,
         type: 'error',
-        message: `Emergency stop activated for charging post ${postId}`,
+        message: `Emergency stop activated for pole ${poleId}`,
         stationId,
         timestamp: new Date().toISOString(),
         priority: 'critical',

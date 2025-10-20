@@ -34,10 +34,10 @@ const useBookingStore = create(
                 compatible: bookingData.connector.compatible,
               }
             : null,
-          slot: bookingData.slot
+          port: bookingData.port
             ? {
-                id: bookingData.slot.id,
-                location: bookingData.slot.location,
+                id: bookingData.port.id,
+                location: bookingData.port.location,
               }
             : null,
           bookingTime: bookingData.bookingTime,

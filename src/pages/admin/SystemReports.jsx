@@ -166,9 +166,7 @@ const AdminSystemReports = () => {
                 <MenuItem value="lastyear">Năm qua</MenuItem>
               </Select>
             </FormControl>
-            <Button startIcon={<Download />} onClick={handleExportReport}>
-              Xuất báo cáo
-            </Button>
+            
             <Button
               startIcon={<Refresh />}
               onClick={() => window.location.reload()}

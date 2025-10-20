@@ -48,7 +48,7 @@ import { formatCurrency } from "../../utils/helpers";
 import useBookingStore from "../../store/bookingStore";
 
 const PaymentHistory = () => {
-    const [selectedMonth, setSelectedMonth] = useState("2024-09");
+    const [selectedMonth, setSelectedMonth] = useState("2025-09");
     const [selectedPayment, setSelectedPayment] = useState(null);
     const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
     const { bookingHistory, initializeMockData } = useBookingStore();
@@ -91,7 +91,7 @@ const PaymentHistory = () => {
     const subscriptionPayments = [
         {
             id: "PAY-002",
-            date: "2024-09-25",
+            date: "2025-09-25",
             amount: 89000,
             method: "Visa ****1234",
             methodIcon: <CreditCard />,
@@ -105,7 +105,7 @@ const PaymentHistory = () => {
                 startTime: "09:15",
                 endTime: "09:43"
             },
-            invoiceNumber: "INV-2024-09-002",
+            invoiceNumber: "INV-2025-09-002",
             taxInfo: {
                 subtotal: 81000,
                 tax: 8100,
@@ -114,7 +114,7 @@ const PaymentHistory = () => {
         },
         {
             id: "PAY-003",
-            date: "2024-09-22",
+            date: "2025-09-22",
             amount: 245000,
             method: "MoMo Wallet",
             methodIcon: <AccountBalanceWallet />,
@@ -123,11 +123,11 @@ const PaymentHistory = () => {
             session: null,
             subscription: {
                 packageName: "Gói Tiết kiệm",
-                period: "09/2024",
+                period: "09/2025",
                 sessions: 25,
                 discount: "10%"
             },
-            invoiceNumber: "INV-2024-09-003",
+            invoiceNumber: "INV-2025-09-003",
             taxInfo: {
                 subtotal: 222727,
                 tax: 22273,
@@ -136,7 +136,7 @@ const PaymentHistory = () => {
         },
         {
             id: "PAY-004",
-            date: "2024-09-20",
+            date: "2025-09-20",
             amount: 178000,
             method: "Banking Transfer",
             methodIcon: <LocalAtm />,
@@ -150,7 +150,7 @@ const PaymentHistory = () => {
                 startTime: "16:20",
                 endTime: "17:12"
             },
-            invoiceNumber: "INV-2024-09-004",
+            invoiceNumber: "INV-2025-09-004",
             taxInfo: {
                 subtotal: 161818,
                 tax: 16182,
@@ -159,7 +159,7 @@ const PaymentHistory = () => {
         },
         {
             id: "PAY-SUB-001",
-            date: "2024-09-01",
+            date: "2025-09-01",
             amount: 199000,
             method: "Banking Transfer",
             methodIcon: <LocalAtm />,
@@ -168,11 +168,11 @@ const PaymentHistory = () => {
             session: null,
             subscription: {
                 packageName: "Gói Tiết kiệm",
-                period: "09/2024",
+                period: "09/2025",
                 sessions: 20,
                 discount: "15%"
             },
-            invoiceNumber: "INV-2024-09-SUB-001",
+            invoiceNumber: "INV-2025-09-SUB-001",
             taxInfo: {
                 subtotal: 180909,
                 tax: 18091,
@@ -306,14 +306,12 @@ const PaymentHistory = () => {
                             label="Tháng"
                             onChange={(e) => setSelectedMonth(e.target.value)}
                         >
-                            <MenuItem value="2024-09">Tháng 9/2024</MenuItem>
-                            <MenuItem value="2024-08">Tháng 8/2024</MenuItem>
-                            <MenuItem value="2024-07">Tháng 7/2024</MenuItem>
+                            <MenuItem value="2025-09">Tháng 9/2025</MenuItem>
+                            <MenuItem value="2025-08">Tháng 8/2025</MenuItem>
+                            <MenuItem value="2025-07">Tháng 7/2025</MenuItem>
                         </Select>
                     </FormControl>
-                    <Button variant="outlined" startIcon={<Download />}>
-                        Xuất báo cáo
-                    </Button>
+
                 </Box>
             </Box>
 

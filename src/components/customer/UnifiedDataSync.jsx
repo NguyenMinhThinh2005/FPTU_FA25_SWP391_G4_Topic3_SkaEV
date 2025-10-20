@@ -5,8 +5,8 @@ import useCustomerStore from '../../store/customerStore';
 import useVehicleStore from '../../store/vehicleStore';
 
 /**
- * UnifiedDataSync - Äáº£m báº£o táº¥t cáº£ dá»¯ liá»‡u customer Ä‘á»“ng bá»™
- * Component nÃ y cháº¡y trong background Ä‘á»ƒ sync data giá»¯a cÃ¡c store
+ * UnifiedDataSync - Đảm bảo tất cả dữ liệu customer đồng bộ
+ * Component này chạy trong background để đồng bộ dữ liệu giữa các store
  */
 const UnifiedDataSync = ({ children }) => {
     const { user } = useAuthStore();
@@ -16,12 +16,12 @@ const UnifiedDataSync = ({ children }) => {
 
     useEffect(() => {
         if (user && !initialized) {
-            console.log('ðŸ”„ Starting unified data synchronization...');
+            console.log('Starting unified data synchronization...');
 
             // 1. Initialize booking data first (base data)
             if (bookingHistory.length === 0) {
-                console.log('ðŸ“Š Initializing booking data...');
-                            }
+                console.log('Initializing booking data...');
+            }
 
             // 2. Sync all other stores
             syncAllStores();
@@ -50,7 +50,7 @@ const UnifiedDataSync = ({ children }) => {
             initializeWithUserData(mockUserData);
             setInitialized(true);
 
-            console.log('âœ… Unified data sync completed');
+            console.log('Unified data sync completed');
         }
     }, [user, initialized, bookingHistory.length, syncAllStores, initializeWithUserData, setInitialized]);
 
@@ -58,7 +58,7 @@ const UnifiedDataSync = ({ children }) => {
     useEffect(() => {
         if (initialized && bookingHistory.length > 0) {
             const stats = getBookingStats();
-            console.log('ðŸ“ˆ Current booking stats:', {
+            console.log('Current booking stats:', {
                 total: stats.total,
                 completed: stats.completed,
                 totalAmount: stats.totalAmount,
