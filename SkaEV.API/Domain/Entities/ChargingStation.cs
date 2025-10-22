@@ -19,6 +19,7 @@ public class ChargingStation
     public string Status { get; set; } = "active"; // active, inactive, maintenance
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? DeletedAt { get; set; }
 
     // Navigation properties
     public ICollection<ChargingPost> ChargingPosts { get; set; } = new List<ChargingPost>();

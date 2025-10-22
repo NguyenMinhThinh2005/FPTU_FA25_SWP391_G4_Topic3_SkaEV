@@ -72,8 +72,10 @@ public class SkaEVDbContext : DbContext
             entity.Property(e => e.IsActive).HasColumnName("is_active").IsRequired();
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").IsRequired();
             entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").IsRequired();
+            entity.Property(e => e.DeletedAt).HasColumnName("deleted_at");
 
             entity.HasIndex(e => e.Email).IsUnique();
+            entity.HasQueryFilter(e => e.DeletedAt == null); // Global query filter for soft delete
         });
 
         // UserProfile configuration
@@ -112,6 +114,7 @@ public class SkaEVDbContext : DbContext
             entity.Property(e => e.IsPrimary).HasColumnName("is_primary");
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").IsRequired();
             entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").IsRequired();
+            entity.Property(e => e.DeletedAt).HasColumnName("deleted_at");
 
             entity.HasOne(e => e.User)
                 .WithMany(u => u.Vehicles)
@@ -119,6 +122,7 @@ public class SkaEVDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
 
             entity.HasIndex(e => e.LicensePlate).IsUnique();
+            entity.HasQueryFilter(e => e.DeletedAt == null); // Global query filter for soft delete
         });
 
         // ChargingStation configuration
@@ -140,6 +144,9 @@ public class SkaEVDbContext : DbContext
             entity.Property(e => e.Status).HasColumnName("status").HasMaxLength(50).IsRequired();
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").IsRequired();
             entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").IsRequired();
+            entity.Property(e => e.DeletedAt).HasColumnName("deleted_at");
+
+            entity.HasQueryFilter(e => e.DeletedAt == null); // Global query filter for soft delete
         });
 
         // ChargingPost configuration
@@ -203,8 +210,11 @@ public class SkaEVDbContext : DbContext
             entity.Property(e => e.EstimatedDuration).HasColumnName("estimated_duration");
             entity.Property(e => e.QrCodeId).HasColumnName("qr_code_id");
             entity.Property(e => e.CancellationReason).HasColumnName("cancellation_reason").HasMaxLength(500);
+            entity.Property(e => e.CreatedBy).HasColumnName("created_by");
+            entity.Property(e => e.UpdatedBy).HasColumnName("updated_by");
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").IsRequired();
             entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").IsRequired();
+            entity.Property(e => e.DeletedAt).HasColumnName("deleted_at");
 
             entity.HasOne(e => e.User)
                 .WithMany(u => u.Bookings)
@@ -225,6 +235,8 @@ public class SkaEVDbContext : DbContext
                 .WithMany(s => s.Bookings)
                 .HasForeignKey(e => e.StationId)
                 .OnDelete(DeleteBehavior.NoAction);
+
+            entity.HasQueryFilter(e => e.DeletedAt == null); // Global query filter for soft delete
         });
 
         // SocTracking configuration
@@ -433,11 +445,14 @@ public class SkaEVDbContext : DbContext
             entity.Property(e => e.IsActive).HasColumnName("is_active");
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").IsRequired();
             entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").IsRequired();
+            entity.Property(e => e.DeletedAt).HasColumnName("deleted_at");
 
             entity.HasOne(e => e.User)
                 .WithMany()
                 .HasForeignKey(e => e.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasQueryFilter(e => e.DeletedAt == null); // Global query filter for soft delete
         });
 
         // Payment configuration
@@ -454,6 +469,8 @@ public class SkaEVDbContext : DbContext
             entity.Property(e => e.TransactionId).HasColumnName("transaction_id").HasMaxLength(255);
             entity.Property(e => e.ProcessedByStaffId).HasColumnName("processed_by_staff_id");
             entity.Property(e => e.ProcessedAt).HasColumnName("processed_at");
+            entity.Property(e => e.RefundDate).HasColumnName("refund_date");
+            entity.Property(e => e.Notes).HasColumnName("notes");
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").IsRequired();
 
             entity.HasOne(e => e.Invoice)
