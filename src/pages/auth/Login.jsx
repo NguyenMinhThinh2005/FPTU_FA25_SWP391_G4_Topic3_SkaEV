@@ -13,8 +13,9 @@ import {
   Chip,
   Link,
   IconButton,
+  InputAdornment,
 } from "@mui/material";
-import { ElectricCar, Login, Google, Phone } from "@mui/icons-material";
+import { ElectricCar, Login, Google, Phone, Visibility, VisibilityOff } from "@mui/icons-material";
 import { useNavigate, Link as RouterLink } from "react-router-dom";
 import useAuthStore from "../../store/authStore";
 import { authAPI } from "../../services/api";
@@ -30,6 +31,8 @@ const LoginPage = () => {
     email: "",
     password: "",
   });
+
+  const [showPassword, setShowPassword] = useState(false);
 
   const [socialLoading, setSocialLoading] = useState({
     google: false,
@@ -239,11 +242,25 @@ const LoginPage = () => {
                 fullWidth
                 label={getText("auth.password")}
                 name="password"
-                type="password"
+                type={showPassword ? "text" : "password"}
                 value={formData.password}
                 onChange={handleInputChange}
                 required
                 disabled={loading}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        onClick={() => setShowPassword(!showPassword)}
+                        edge="end"
+                        disabled={loading}
+                        aria-label="toggle password visibility"
+                      >
+                        {showPassword ? <VisibilityOff /> : <Visibility />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
               />
             </Box>
 
