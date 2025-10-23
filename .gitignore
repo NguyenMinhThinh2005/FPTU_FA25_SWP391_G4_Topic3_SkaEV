@@ -34,3 +34,6 @@ SkaEV.API/logs/
 
 # Environment
 .env.local
+
+# Backend settings - each developer has their own connection string
+SkaEV.API/appsettings.Development.json
