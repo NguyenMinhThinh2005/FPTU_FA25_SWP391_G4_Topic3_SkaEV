@@ -82,7 +82,8 @@ import BookingModal from "../../components/customer/BookingModal";
 import RatingModal from "../../components/customer/RatingModal";
 
 const ChargingFlow = () => {
-  const { currentBooking, chargingSession, resetFlowState } = useBookingStore();
+  const { currentBooking, chargingSession, resetFlowState, completeBooking } =
+    useBookingStore();
   const { stations, initializeData, filters, updateFilters, loading } =
     useStationStore();
 
@@ -137,7 +138,12 @@ const ChargingFlow = () => {
 
   // Combined filter for stations based on search text and connector types
   const filteredStations = React.useMemo(() => {
-    console.log("🔍 FILTER START - Query:", searchQuery, "| Connector:", filters.connectorTypes);
+    console.log(
+      "🔍 FILTER START - Query:",
+      searchQuery,
+      "| Connector:",
+      filters.connectorTypes
+    );
     console.log("📊 Stations array:", stations);
 
     try {
@@ -168,24 +174,32 @@ const ChargingFlow = () => {
           if (!station) return false;
 
           // Normalize and search in station name
-          const matchesName = station.name && normalize(station.name).includes(query);
+          const matchesName =
+            station.name && normalize(station.name).includes(query);
 
           // Search in city
           const matchesCity =
-            station.location && station.location.city && normalize(station.location.city).includes(query);
+            station.location &&
+            station.location.city &&
+            normalize(station.location.city).includes(query);
 
           // Search in address
           const matchesAddress =
-            station.location && station.location.address && normalize(station.location.address).includes(query);
+            station.location &&
+            station.location.address &&
+            normalize(station.location.address).includes(query);
 
           // Search in landmarks
           const matchesLandmarks =
             station.location &&
             station.location.landmarks &&
             Array.isArray(station.location.landmarks) &&
-            station.location.landmarks.some((landmark) => landmark && normalize(landmark).includes(query));
+            station.location.landmarks.some(
+              (landmark) => landmark && normalize(landmark).includes(query)
+            );
 
-          const isMatch = matchesName || matchesCity || matchesAddress || matchesLandmarks;
+          const isMatch =
+            matchesName || matchesCity || matchesAddress || matchesLandmarks;
           if (isMatch) {
             console.log("✅ Text match:", station.name);
           }
@@ -218,17 +232,25 @@ const ChargingFlow = () => {
           );
 
           if (hasMatchingConnector) {
-            console.log("✅ Connector match in array:", station.name, stationConnectors);
+            console.log(
+              "✅ Connector match in array:",
+              station.name,
+              stationConnectors
+            );
             return true;
           }
 
           // Check poles/ports if connectorTypes not available
           if (station.charging.poles && Array.isArray(station.charging.poles)) {
-            const hasInPoles = station.charging.poles.some((pole) =>
-              pole &&
-              pole.ports &&
-              Array.isArray(pole.ports) &&
-              pole.ports.some((port) => port && connectorFilters.includes(port.connectorType))
+            const hasInPoles = station.charging.poles.some(
+              (pole) =>
+                pole &&
+                pole.ports &&
+                Array.isArray(pole.ports) &&
+                pole.ports.some(
+                  (port) =>
+                    port && connectorFilters.includes(port.connectorType)
+                )
             );
             if (hasInPoles) {
               console.log("✅ Connector match in poles:", station.name);
@@ -240,7 +262,11 @@ const ChargingFlow = () => {
           return false;
         });
 
-        console.log("🔌 After connector filter:", stationList.length, "stations");
+        console.log(
+          "🔌 After connector filter:",
+          stationList.length,
+          "stations"
+        );
       }
 
       console.log("✅ FINAL RESULT:", stationList.length, "stations");
@@ -257,7 +283,9 @@ const ChargingFlow = () => {
           station.charging.poles.forEach((pole) => {
             const ports = pole.ports || [];
             totalPorts += ports.length;
-            availablePorts += ports.filter((port) => port.status === "available").length;
+            availablePorts += ports.filter(
+              (port) => port.status === "available"
+            ).length;
           });
 
           return {
@@ -509,12 +537,18 @@ const ChargingFlow = () => {
                   {/* Connector Type Filter */}
                   <Grid item xs={12} sm={6} md={3}>
                     <FormControl fullWidth>
-                      <InputLabel id="connector-label">Loại cổng sạc</InputLabel>
+                      <InputLabel id="connector-label">
+                        Loại cổng sạc
+                      </InputLabel>
                       <Select
                         labelId="connector-label"
                         id="connector-select"
                         label="Loại cổng sạc"
-                        value={Array.isArray(filters.connectorTypes) ? (filters.connectorTypes[0] || "") : (filters.connectorTypes || "")}
+                        value={
+                          Array.isArray(filters.connectorTypes)
+                            ? filters.connectorTypes[0] || ""
+                            : filters.connectorTypes || ""
+                        }
                         onChange={(e) => {
                           const value = e.target.value;
                           console.log("🔌 Connector type changed:", value);
@@ -1192,6 +1226,15 @@ const ChargingFlow = () => {
                     bookingId: currentBookingData?.id,
                   };
                   setCompletedSession(sessionEndData);
+
+                  // 🚀 Call API to complete booking
+                  if (currentBookingData?.id) {
+                    console.log(
+                      "📤 Calling completeBooking API with data:",
+                      sessionEndData
+                    );
+                    completeBooking(currentBookingData.id, sessionEndData);
+                  }
 
                   // Thông báo hoàn thành sạc
                   notificationService.notifyChargingCompleted({

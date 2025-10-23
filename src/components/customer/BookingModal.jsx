@@ -98,7 +98,8 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
             pole.type === "AC"
               ? station.charging.pricing.acRate
               : pole.power >= 150
-              ? station.charging.pricing.dcFastRate || station.charging.pricing.dcRate
+              ? station.charging.pricing.dcFastRate ||
+                station.charging.pricing.dcRate
               : station.charging.pricing.dcRate,
           availableCount: 0,
         });
@@ -207,9 +208,19 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
         scheduledTime: selectedDateTime?.scheduledTime
           ? selectedDateTime.scheduledTime.toISOString()
           : null,
+        // Add SOC data
+        initialSOC: 20, // Default value, should come from vehicle
+        targetSOC: 80, // Default value, should come from user input
+        estimatedDuration: 60, // Default 60 minutes
       };
 
-  const booking = createBooking(bookingData);
+      // Call async createBooking - it will now call API
+      const booking = await createBooking(bookingData);
+
+      if (!booking) {
+        throw new Error("Failed to create booking");
+      }
+
       setBookingResult("success");
 
       // Success message for scheduled booking
@@ -316,13 +327,13 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
                             justifyContent: "space-between",
                           }}
                         >
-                            <Box
-                              sx={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 2,
-                              }}
-                            >
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 2,
+                            }}
+                          >
                             <Box
                               sx={{
                                 width: 56,
@@ -348,7 +359,7 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
                                 <FlashOn fontSize="large" />
                               )}
                             </Box>
-                            <Box sx={{ textAlign: "left", width: '100%' }}>
+                            <Box sx={{ textAlign: "left", width: "100%" }}>
                               <Typography variant="h6" fontWeight="bold">
                                 {type.name}
                               </Typography>
@@ -455,7 +466,8 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
                               >
                                 <Box sx={{ flex: 1, textAlign: "left" }}>
                                   <Typography variant="h6" fontWeight="bold">
-                                    {formatPoleLabel(port.poleName)} — Cổng {port.portNumber || port.id}
+                                    {formatPoleLabel(port.poleName)} — Cổng{" "}
+                                    {port.portNumber || port.id}
                                   </Typography>
                                   <Typography
                                     variant="body2"
@@ -501,7 +513,7 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
                                       color="error.main"
                                       sx={{ display: "block", mt: 0.5 }}
                                     >
-                                      Bảo trì từ: {" "}
+                                      Bảo trì từ:{" "}
                                       {new Date(
                                         port.lastMaintenance
                                       ).toLocaleString("vi-VN", {
@@ -572,7 +584,9 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
             {selectedPort && (
               <>
                 <Alert severity="success" sx={{ mb: 2 }}>
-                  Đã chọn: {formatPoleLabel(selectedPort?.poleName)} — Cổng {selectedPort?.portNumber || selectedPort?.id} ({selectedPort.connectorType})
+                  Đã chọn: {formatPoleLabel(selectedPort?.poleName)} — Cổng{" "}
+                  {selectedPort?.portNumber || selectedPort?.id} (
+                  {selectedPort.connectorType})
                 </Alert>
                 <ChargingDateTimePicker
                   station={station}
@@ -647,7 +661,8 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
                         Cổng sạc:
                       </Typography>
                       <Typography variant="body1" fontWeight="medium">
-                        {formatPoleLabel(selectedPort?.poleName)} — Cổng {selectedPort?.portNumber || selectedPort?.id}
+                        {formatPoleLabel(selectedPort?.poleName)} — Cổng{" "}
+                        {selectedPort?.portNumber || selectedPort?.id}
                       </Typography>
                     </Grid>
                     <Grid item xs={6}>

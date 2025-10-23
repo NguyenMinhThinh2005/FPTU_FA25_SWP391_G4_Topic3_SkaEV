@@ -1,5 +1,6 @@
 ﻿import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { bookingsAPI } from "../services/api";
 
 const useBookingStore = create(
   persist(
@@ -14,8 +15,18 @@ const useBookingStore = create(
       error: null,
 
       // Actions
-      createBooking: (bookingData) => {
-        // Clean data to avoid circular references
+      createBooking: async (bookingData) => {
+        // API is enabled - database has sp_create_booking stored procedure
+        const ENABLE_API = true; // Database is ready with stored procedure
+
+        console.log(
+          "📝 Creating booking (API " +
+            (ENABLE_API ? "ENABLED" : "DISABLED") +
+            "):",
+          bookingData
+        );
+
+        // Create local booking data
         const cleanData = {
           stationId: bookingData.stationId,
           stationName: bookingData.stationName,
@@ -43,29 +54,74 @@ const useBookingStore = create(
           bookingTime: bookingData.bookingTime,
           scannedAt: bookingData.scannedAt,
           autoStart: bookingData.autoStart,
-          bookingDate: new Date().toISOString().split("T")[0], // Add booking date
-          // Scheduling information
+          bookingDate: new Date().toISOString().split("T")[0],
           schedulingType: bookingData.schedulingType || "immediate",
           scheduledDateTime: bookingData.scheduledDateTime,
           scheduledDate: bookingData.scheduledDate,
           scheduledTime: bookingData.scheduledTime,
         };
 
-        const booking = {
+        let booking = {
           ...cleanData,
           id: `BOOK${Date.now()}`,
           status:
-            cleanData.schedulingType === "scheduled" ? "scheduled" : "pending", // pending = waiting for QR scan
+            cleanData.schedulingType === "scheduled" ? "scheduled" : "pending",
           createdAt: new Date().toISOString(),
           estimatedArrival:
             cleanData.schedulingType === "scheduled"
               ? cleanData.scheduledDateTime
-              : new Date(Date.now() + 15 * 60 * 1000).toISOString(), // 15 minutes from now for immediate
-          qrScanned: false, // Add QR scan tracking
-          chargingStarted: false, // Add charging start tracking
+              : new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+          qrScanned: false,
+          chargingStarted: false,
         };
 
-        // Initialize SOC tracking for this booking
+        // Try API if enabled
+        if (ENABLE_API) {
+          try {
+            set({ loading: true, error: null });
+
+            const apiPayload = {
+              stationId: parseInt(bookingData.stationId) || 1,
+              slotId: 3, // Use actual slot ID from database (slot_id=3,4,5 are available)
+              vehicleId: 5, // Use actual vehicle ID from database (user has vehicle_id=5,6)
+              scheduledStartTime:
+                bookingData.scheduledDateTime || new Date().toISOString(),
+              estimatedArrival:
+                bookingData.scheduledDateTime ||
+                new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+              estimatedDuration: parseInt(bookingData.estimatedDuration) || 60,
+              schedulingType:
+                bookingData.schedulingType === "scheduled"
+                  ? "scheduled"
+                  : "immediate",
+              targetSoc: bookingData.targetSOC || 80,
+            };
+
+            console.log("📤 API Payload:", apiPayload);
+            const response = await bookingsAPI.create(apiPayload);
+            console.log("✅ API Response:", response);
+
+            // Merge API response
+            booking = {
+              ...booking,
+              id: response.bookingId || response.id || booking.id,
+              apiId: response.bookingId || response.id,
+              status: response.status || booking.status,
+              createdAt: response.createdAt || booking.createdAt,
+            };
+
+            set({ loading: false });
+          } catch (error) {
+            console.error(
+              "❌ API Error:",
+              error.response?.data || error.message
+            );
+            set({ loading: false, error: error.message });
+            console.warn("⚠️ Using local booking as fallback");
+          }
+        }
+
+        // Save to store
         set((state) => ({
           bookings: [...state.bookings, booking],
           bookingHistory: [...state.bookingHistory, booking],
@@ -73,16 +129,17 @@ const useBookingStore = create(
           socTracking: {
             ...state.socTracking,
             [booking.id]: {
-              initialSOC: null,
-              currentSOC: null,
-              targetSOC: null,
-              lastUpdated: null,
+              initialSOC: bookingData.initialSOC || null,
+              currentSOC: bookingData.initialSOC || null,
+              targetSOC: bookingData.targetSOC || null,
+              lastUpdated: new Date().toISOString(),
               chargingRate: null,
               estimatedTimeToTarget: null,
             },
           },
         }));
 
+        console.log("✅ Booking created:", booking.id);
         return booking;
       },
 
@@ -120,9 +177,22 @@ const useBookingStore = create(
         }));
       },
 
-      cancelBooking: (bookingId, reason = "User cancelled") => {
-        const booking = get().bookings.find((b) => b.id === bookingId);
-        if (booking) {
+      cancelBooking: async (bookingId, reason = "User cancelled") => {
+        try {
+          const booking = get().bookings.find((b) => b.id === bookingId);
+          if (booking && booking.apiId) {
+            console.log("📤 Cancelling booking via API:", booking.apiId);
+            await bookingsAPI.cancel(booking.apiId, reason);
+            console.log("✅ Booking cancelled via API");
+          }
+
+          get().updateBookingStatus(bookingId, "cancelled", {
+            cancellationReason: reason,
+            cancelledAt: new Date().toISOString(),
+          });
+        } catch (error) {
+          console.error("❌ Error cancelling booking via API:", error);
+          // Still update local state even if API fails
           get().updateBookingStatus(bookingId, "cancelled", {
             cancellationReason: reason,
             cancelledAt: new Date().toISOString(),
@@ -130,11 +200,50 @@ const useBookingStore = create(
         }
       },
 
-      completeBooking: (bookingId, sessionData) => {
-        get().updateBookingStatus(bookingId, "completed", {
-          ...sessionData,
-          completedAt: new Date().toISOString(),
-        });
+      completeBooking: async (bookingId, sessionData) => {
+        try {
+          const booking = get().bookings.find((b) => b.id === bookingId);
+
+          // Backend now allows customer to complete their own booking
+          const ENABLE_COMPLETE_API = true;
+
+          if (booking && booking.apiId && ENABLE_COMPLETE_API) {
+            console.log(
+              "📤 Completing booking via API:",
+              booking.apiId,
+              sessionData
+            );
+
+            // Prepare payload matching backend CompleteChargingDto
+            const completePayload = {
+              finalSoc: sessionData.finalSOC || sessionData.currentSOC || 80,
+              totalEnergyKwh: sessionData.energyDelivered || 0,
+              unitPrice: sessionData.chargingRate || 8500,
+            };
+
+            console.log("📤 Complete API Payload:", completePayload);
+
+            // Call API to complete charging
+            await bookingsAPI.complete(booking.apiId, completePayload);
+            console.log("✅ Booking completed via API");
+          } else if (booking && booking.apiId) {
+            console.log("⚠️ Complete API skipped - requires staff/admin role");
+          }
+
+          // Update local state with session data
+          get().updateBookingStatus(bookingId, "completed", {
+            ...sessionData,
+            completedAt: new Date().toISOString(),
+          });
+        } catch (error) {
+          console.error("❌ Error completing booking via API:", error);
+          console.error("❌ Error details:", error.response?.data);
+          // Still update local state even if API fails
+          get().updateBookingStatus(bookingId, "completed", {
+            ...sessionData,
+            completedAt: new Date().toISOString(),
+          });
+        }
       },
 
       // New method for QR code scanning
@@ -160,31 +269,44 @@ const useBookingStore = create(
         return booking;
       },
 
-      startCharging: (bookingId) => {
-        const state = get();
-        const booking = state.bookings.find((b) => b.id === bookingId);
+      startCharging: async (bookingId) => {
+        try {
+          const state = get();
+          const booking = state.bookings.find((b) => b.id === bookingId);
 
-        if (!booking || !booking.qrScanned) {
-          throw new Error("Must scan QR code before starting charging");
+          if (!booking || !booking.qrScanned) {
+            throw new Error("Must scan QR code before starting charging");
+          }
+
+          // Call API to start charging if we have API ID
+          if (booking.apiId) {
+            console.log("📤 Starting charging via API:", booking.apiId);
+            // Note: Backend requires staff/admin role for this endpoint
+            // await bookingsAPI.start(booking.apiId);
+            console.log("⚠️ Skipping API call (requires staff role)");
+          }
+
+          const chargingSession = {
+            bookingId,
+            startTime: new Date().toISOString(),
+            status: "active",
+            sessionId: `SESSION${Date.now()}`,
+          };
+
+          set((state) => ({
+            ...state,
+            chargingSession,
+          }));
+
+          get().updateBookingStatus(bookingId, "charging", {
+            chargingStartedAt: new Date().toISOString(),
+            chargingStarted: true,
+            sessionId: chargingSession.sessionId,
+          });
+        } catch (error) {
+          console.error("❌ Error starting charging:", error);
+          throw error;
         }
-
-        const chargingSession = {
-          bookingId,
-          startTime: new Date().toISOString(),
-          status: "active",
-          sessionId: `SESSION${Date.now()}`,
-        };
-
-        set((state) => ({
-          ...state,
-          chargingSession,
-        }));
-
-        get().updateBookingStatus(bookingId, "charging", {
-          chargingStartedAt: new Date().toISOString(),
-          chargingStarted: true,
-          sessionId: chargingSession.sessionId,
-        });
       },
 
       // New SOC tracking methods
