@@ -30,16 +30,34 @@ builder.Services.AddControllers()
 // Configure Database
 builder.Services.AddDbContext<SkaEVDbContext>(options =>
 {
-    options.UseSqlServer(
-        builder.Configuration.GetConnectionString("DefaultConnection"),
-        sqlOptions =>
-        {
-            sqlOptions.UseNetTopologySuite(); // For spatial data (geography type)
-            sqlOptions.EnableRetryOnFailure(
-                maxRetryCount: 5,
-                maxRetryDelay: TimeSpan.FromSeconds(30),
-                errorNumbersToAdd: null);
-        });
+    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+
+    if (string.IsNullOrWhiteSpace(connectionString))
+    {
+        throw new InvalidOperationException("DefaultConnection string is not configured.");
+    }
+
+    var normalized = connectionString.Trim();
+    var isSqlite = normalized.Contains(".db", StringComparison.OrdinalIgnoreCase) ||
+                   normalized.StartsWith("Data Source=", StringComparison.OrdinalIgnoreCase);
+
+    if (isSqlite)
+    {
+        options.UseSqlite(connectionString);
+    }
+    else
+    {
+        options.UseSqlServer(
+            connectionString,
+            sqlOptions =>
+            {
+                sqlOptions.UseNetTopologySuite();
+                sqlOptions.EnableRetryOnFailure(
+                    maxRetryCount: 5,
+                    maxRetryDelay: TimeSpan.FromSeconds(30),
+                    errorNumbersToAdd: null);
+            });
+    }
 });
 
 // Configure JWT Authentication

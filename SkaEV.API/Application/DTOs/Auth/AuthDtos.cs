@@ -1,4 +1,4 @@
-namespace SkaEV.API.Application.DTOs.Auth;
+﻿namespace SkaEV.API.Application.DTOs.Auth;
 
 public class LoginRequestDto
 {
@@ -21,8 +21,8 @@ public class RegisterRequestDto
     public string Email { get; set; } = string.Empty;
     public string Password { get; set; } = string.Empty;
     public string FullName { get; set; } = string.Empty;
-    public string? PhoneNumber { get; set; }
-    public string Role { get; set; } = "customer";
+    public string PhoneNumber { get; set; } = string.Empty;
+    public string Role { get; set; } = string.Empty;
 }
 
 public class RegisterResponseDto

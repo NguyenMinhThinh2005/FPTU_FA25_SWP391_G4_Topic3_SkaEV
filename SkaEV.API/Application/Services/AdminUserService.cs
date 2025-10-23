@@ -117,7 +117,7 @@ public class AdminUserService : IAdminUserService
         var user = new User
         {
             Email = createDto.Email,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(createDto.Password),
+            PasswordHash = createDto.Password,
             FullName = createDto.FullName,
             PhoneNumber = createDto.PhoneNumber,
             Role = createDto.Role,
@@ -256,7 +256,7 @@ public class AdminUserService : IAdminUserService
 
         // Generate temporary password
         var tempPassword = GenerateTemporaryPassword();
-        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(tempPassword);
+    user.PasswordHash = tempPassword;
         user.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();

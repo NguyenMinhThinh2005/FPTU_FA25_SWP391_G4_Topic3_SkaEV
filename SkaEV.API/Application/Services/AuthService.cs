@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -6,7 +6,6 @@ using System.Text;
 using SkaEV.API.Infrastructure.Data;
 using SkaEV.API.Domain.Entities;
 using SkaEV.API.Application.DTOs.Auth;
-using BCrypt.Net;
 
 namespace SkaEV.API.Application.Services;
 
@@ -33,7 +32,7 @@ public class AuthService : IAuthService
         var user = await _context.Users
             .FirstOrDefaultAsync(u => u.Email == request.Email && u.IsActive);
 
-        if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+        if (user == null || user.PasswordHash != request.Password)
         {
             return null;
         }
@@ -54,18 +53,35 @@ public class AuthService : IAuthService
 
     public async Task<RegisterResponseDto> RegisterAsync(RegisterRequestDto request)
     {
-        // Check if email already exists
+        // === VALIDATION (FIX LỖI 500) ===
+
+        // 1. Kiểm tra trường FullName (NOT NULL)
+     
+
+        // 2. Kiểm tra trường Role (NOT NULL)
+        if (string.IsNullOrWhiteSpace(request.Role))
+        {
+            throw new InvalidOperationException("Role is required");
+        }
+
+        // 3. Kiểm tra ràng buộc CHECK của Role (dựa theo script database của bạn)
+        var validRoles = new[] { "admin", "staff", "customer" };
+        if (!validRoles.Contains(request.Role.ToLower()))
+        {
+            throw new InvalidOperationException("Invalid role specified. Must be 'admin', 'staff', or 'customer'.");
+        }
+
+        // 4. Kiểm tra Email (code cũ của bạn)
         if (await _context.Users.AnyAsync(u => u.Email == request.Email))
         {
             throw new InvalidOperationException("Email already registered");
         }
 
-        var passwordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
-
+        // === TẠO USER ===
         var user = new User
         {
             Email = request.Email,
-            PasswordHash = passwordHash,
+            PasswordHash = request.Password, // (Giữ nguyên theo yêu cầu)
             FullName = request.FullName,
             PhoneNumber = request.PhoneNumber,
             Role = request.Role,
@@ -75,17 +91,22 @@ public class AuthService : IAuthService
         };
 
         _context.Users.Add(user);
-        await _context.SaveChangesAsync();
+
+        // === TỐI ƯU HÓA NHỎ ===
+        // Bạn nên tạo UserProfile ngay và chỉ gọi SaveChangesAsync 1 lần.
+        // Việc này đảm bảo cả hai (User và Profile) hoặc cùng thành công, hoặc cùng thất bại (Transaction).
 
         // Create user profile
         var profile = new UserProfile
         {
-            UserId = user.UserId,
+            User = user, // Gán thẳng object, EF Core sẽ tự hiểu UserId
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
 
         _context.UserProfiles.Add(profile);
+
+        // Chỉ gọi SaveChanges 1 lần ở cuối
         await _context.SaveChangesAsync();
 
         return new RegisterResponseDto

@@ -28,7 +28,7 @@ BEGIN
     INSERT INTO users (email, password_hash, full_name, phone_number, role, is_active, created_at, updated_at)
     VALUES (
         'nguyenvanan@gmail.com',
-        '$2a$11$XKzZvR8v8Y8QGJhVQh5DkuVYKw5Z8ZqYZ8ZqYZ8ZqYZ8ZqYZ8Zq', -- BCrypt hash of "Customer123!"
+    'Customer123!', -- Plain password for local testing
         N'Nguyễn Văn An',
         '+84 901 234 567',
         'Customer',
@@ -62,7 +62,7 @@ BEGIN
     INSERT INTO users (email, password_hash, full_name, phone_number, role, is_active, created_at, updated_at)
     VALUES (
         'tranthib@gmail.com',
-        '$2a$11$XKzZvR8v8Y8QGJhVQh5DkuVYKw5Z8ZqYZ8ZqYZ8ZqYZ8ZqYZ8Zq',
+    'Customer123!',
         N'Trần Thị Bình',
         '+84 902 345 678',
         'Customer',
@@ -95,7 +95,7 @@ BEGIN
     INSERT INTO users (email, password_hash, full_name, phone_number, role, is_active, created_at, updated_at)
     VALUES (
         'leminhcuong@gmail.com',
-        '$2a$11$XKzZvR8v8Y8QGJhVQh5DkuVYKw5Z8ZqYZ8ZqYZ8ZqYZ8ZqYZ8Zq',
+    'Customer123!',
         N'Lê Minh Cường',
         '+84 903 456 789',
         'Customer',
@@ -128,7 +128,7 @@ BEGIN
     INSERT INTO users (email, password_hash, full_name, phone_number, role, is_active, created_at, updated_at)
     VALUES (
         'phamthuha@gmail.com',
-        '$2a$11$XKzZvR8v8Y8QGJhVQh5DkuVYKw5Z8ZqYZ8ZqYZ8ZqYZ8ZqYZ8Zq',
+    'Customer123!',
         N'Phạm Thu Hà',
         '+84 904 567 890',
         'Customer',
@@ -161,7 +161,7 @@ BEGIN
     INSERT INTO users (email, password_hash, full_name, phone_number, role, is_active, created_at, updated_at)
     VALUES (
         'hoangvanduc@gmail.com',
-        '$2a$11$XKzZvR8v8Y8QGJhVQh5DkuVYKw5Z8ZqYZ8ZqYZ8ZqYZ8ZqYZ8Zq',
+    'Customer123!',
         N'Hoàng Văn Đức',
         '+84 905 678 901',
         'Customer',
@@ -200,7 +200,7 @@ BEGIN
     INSERT INTO users (email, password_hash, full_name, phone_number, role, is_active, created_at, updated_at)
     VALUES (
         'staff.nguyen@skaev.com',
-        '$2a$11$StaffHashStaffHashStaffHashStaffHashStaffHashStaffHash', -- "Staff123!"
+    'Staff123!', -- Plain password for local testing
         N'Nguyễn Văn Nhân Viên',
         '+84 911 111 111',
         'Staff',
@@ -224,7 +224,7 @@ BEGIN
     INSERT INTO users (email, password_hash, full_name, phone_number, role, is_active, created_at, updated_at)
     VALUES (
         'staff.tran@skaev.com',
-        '$2a$11$StaffHashStaffHashStaffHashStaffHashStaffHashStaffHash',
+    'Staff123!',
         N'Trần Văn Kỹ Thuật',
         '+84 911 222 222',
         'Staff',
@@ -255,7 +255,7 @@ BEGIN
     INSERT INTO users (email, password_hash, full_name, phone_number, role, is_active, created_at, updated_at)
     VALUES (
         'admin@skaev.com',
-        '$2a$11$AdminHashAdminHashAdminHashAdminHashAdminHashAdminHash', -- "Admin123!"
+    'Admin123!', -- Plain password for local testing
         N'Quản Trị Viên Hệ Thống',
         '+84 900 000 000',
         'Admin',
