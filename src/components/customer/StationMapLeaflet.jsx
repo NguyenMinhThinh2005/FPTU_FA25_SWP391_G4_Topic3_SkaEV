@@ -179,6 +179,7 @@ const StationMapLeaflet = ({ stations, onStationSelect }) => {
     const [nearbyBounds, setNearbyBounds] = useState(null);
     const [nearbyStations, setNearbyStations] = useState([]);
     const [showUserPopup, setShowUserPopup] = useState(false);
+    const [findNearbyError, setFindNearbyError] = useState(null);
 
     const FitBoundsRunner = ({ bounds }) => {
         const map = useMap();
@@ -218,16 +219,25 @@ const StationMapLeaflet = ({ stations, onStationSelect }) => {
 
     // Find nearby stations and fit bounds to include user + those stations
     const handleFindNearby = (options = { maxResults: 5, maxDistanceMeters: 5000 }) => {
+        setFindNearbyError(null);
         console.log('🔎 Find nearby clicked', { userLocation, stations });
         if (!userLocation) {
+            setFindNearbyError('Không xác định được vị trí của bạn.');
             console.warn('No user location available yet');
             return;
         }
         const validStations = stations
             .map(s => ({ station: s, coords: getStationCoords(s) }))
-            .filter(x => x.coords && x.coords.lat != null && x.coords.lng != null);
+            .filter(x => {
+                const valid = x.coords && x.coords.lat != null && x.coords.lng != null && !isNaN(x.coords.lat) && !isNaN(x.coords.lng);
+                if (!valid) {
+                    console.warn('Trạm bị loại khỏi nearby do thiếu hoặc sai lat/lng:', x.station, x.coords);
+                }
+                return valid;
+            });
 
         if (validStations.length === 0) {
+            setFindNearbyError('Không có trạm nào có vị trí hợp lệ để tìm gần bạn.');
             console.warn('No valid station coordinates to search nearby');
             return;
         }
@@ -240,10 +250,16 @@ const StationMapLeaflet = ({ stations, onStationSelect }) => {
 
         withDistance.sort((a, b) => a.distance - b.distance);
 
-    const nearby = withDistance.filter(x => x.distance <= options.maxDistanceMeters).slice(0, options.maxResults);
+        const nearby = withDistance.filter(x => x.distance <= options.maxDistanceMeters).slice(0, options.maxResults);
         // if none within maxDistance, take top N
         const result = nearby.length ? nearby : withDistance.slice(0, options.maxResults);
-    console.log('Nearby stations selected:', result.map(r => ({ id: r.station.id, distance: Math.round(r.distance) })));
+        console.log('Nearby stations selected:', result.map(r => ({ id: r.station.id, distance: Math.round(r.distance), coords: r.coords })));
+        // Log user location
+        console.log('User location:', userLocation);
+        // Log all nearby station coords
+        result.forEach((r, idx) => {
+            console.log(`Nearby[${idx}]:`, r.station.name, r.coords);
+        });
 
         const boundsLatLngs = [ [userLocation.lat, userLocation.lng], ...result.map(r => [r.coords.lat, r.coords.lng]) ];
         // Set nearby stations and bounds; FitBoundsRunner (child) will perform fit when MapContainer is ready
@@ -591,6 +607,11 @@ const StationMapLeaflet = ({ stations, onStationSelect }) => {
                             </IconButton>
                         </span>
                     </Tooltip>
+                )}
+                {findNearbyError && (
+                    <Alert severity="error" sx={{ position: 'absolute', top: 130, right: 10, zIndex: 1500, minWidth: 260 }}>
+                        {findNearbyError}
+                    </Alert>
                 )}
 
                 {/* Legend */}
