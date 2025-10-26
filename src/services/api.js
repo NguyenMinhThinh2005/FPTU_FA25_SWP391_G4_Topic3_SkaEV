@@ -178,27 +178,27 @@ export const bookingsAPI = {
 
 export const usersAPI = {
   getAll: (params) => {
-    return axiosInstance.get("/users", { params });
+    return axiosInstance.get("/admin/users", { params });
   },
 
   getById: (id) => {
-    return axiosInstance.get(`/users/${id}`);
+    return axiosInstance.get(`/admin/users/${id}`);
   },
 
   create: (userData) => {
-    return axiosInstance.post("/users", userData);
+    return axiosInstance.post("/admin/users", userData);
   },
 
   update: (id, userData) => {
-    return axiosInstance.put(`/users/${id}`, userData);
+    return axiosInstance.put(`/admin/users/${id}`, userData);
   },
 
   delete: (id) => {
-    return axiosInstance.delete(`/users/${id}`);
+    return axiosInstance.delete(`/admin/users/${id}`);
   },
 
   changePassword: (passwordData) => {
-    return axiosInstance.post("/users/change-password", passwordData);
+    return axiosInstance.post("/admin/users/change-password", passwordData);
   },
 };
 

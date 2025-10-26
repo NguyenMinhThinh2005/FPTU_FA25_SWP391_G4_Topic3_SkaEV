@@ -71,31 +71,31 @@ const UserManagement = () => {
 
   const openEdit = (user) => {
     setEditUser(user);
+    const [firstName = "", lastName = ""] = (user.fullName || "").split(" ", 2);
     setForm({
       email: user.email,
-      firstName: user.profile?.firstName || "",
-      lastName: user.profile?.lastName || "",
-      phone: user.profile?.phone || "",
+      firstName: firstName,
+      lastName: lastName,
+      phone: user.phoneNumber || "",
       role: user.role,
     });
     setDialogOpen(true);
   };
 
   const handleSave = () => {
+    const fullName = `${form.firstName} ${form.lastName}`.trim();
     if (editUser) {
-      updateUser(editUser.id, {
+      updateUser(editUser.userId, {
         email: form.email,
-        firstName: form.firstName,
-        lastName: form.lastName,
-        phone: form.phone,
-        role: form.role,
+        fullName: fullName,
+        phoneNumber: form.phone,
       });
     } else {
       addUser({
         email: form.email,
-        firstName: form.firstName,
-        lastName: form.lastName,
-        phone: form.phone,
+        password: "Temp123!",
+        fullName: fullName,
+        phoneNumber: form.phone,
         role: form.role,
       });
     }
@@ -165,23 +165,23 @@ const UserManagement = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {filteredUsers.map((u) => (
-                  <TableRow key={u.id} hover>
+                {filteredUsers.map((u, index) => (
+                  <TableRow key={u.userId || `user-${index}`} hover>
                     <TableCell>
                       <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-                        <Avatar src={u.profile?.avatar}>{(u.profile?.firstName || "?")[0]}</Avatar>
+                        <Avatar src={u.avatarUrl}>{(u.fullName || u.email || "?")[0].toUpperCase()}</Avatar>
                         <Box>
                           <Typography variant="subtitle2" fontWeight="medium">
-                            {u.profile?.firstName} {u.profile?.lastName}
+                            {u.fullName || "Chưa có tên"}
                           </Typography>
                           <Typography variant="caption" color="text.secondary">
-                            {u.id}
+                            ID: {u.userId}
                           </Typography>
                         </Box>
                       </Box>
                     </TableCell>
                     <TableCell>{u.email}</TableCell>
-                    <TableCell>{u.profile?.phone || "-"}</TableCell>
+                    <TableCell>{u.phoneNumber || "-"}</TableCell>
                     <TableCell align="center">
                       <Chip
                         label={u.role}
@@ -194,7 +194,19 @@ const UserManagement = () => {
                       <IconButton size="small" onClick={() => openEdit(u)}>
                         <Edit />
                       </IconButton>
-                      <IconButton size="small" color="error" onClick={() => deleteUser(u.id)}>
+                      <IconButton 
+                        size="small" 
+                        color="error" 
+                        onClick={() => {
+                          if (!u.userId) {
+                            alert("Không thể xóa: thiếu User ID");
+                            return;
+                          }
+                          if (window.confirm(`Bạn có chắc muốn xóa user ${u.fullName || u.email}?`)) {
+                            deleteUser(u.userId);
+                          }
+                        }}
+                      >
                         <Delete />
                       </IconButton>
                     </TableCell>
