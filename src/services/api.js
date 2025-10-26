@@ -18,7 +18,8 @@ const axiosInstance = axios.create({
 // Request interceptor - Add auth token to requests
 axiosInstance.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem("token");
+    // Try sessionStorage first (used by authStore), fallback to localStorage
+    const token = sessionStorage.getItem("token") || localStorage.getItem("token");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -43,13 +44,14 @@ axiosInstance.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        const refreshToken = localStorage.getItem("refreshToken");
+        const refreshToken = sessionStorage.getItem("refreshToken") || localStorage.getItem("refreshToken");
         if (refreshToken) {
           const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {
             refreshToken,
           });
 
           const { token } = response.data;
+          sessionStorage.setItem("token", token);
           localStorage.setItem("token", token);
 
           // Retry original request with new token
@@ -58,6 +60,8 @@ axiosInstance.interceptors.response.use(
         }
       } catch (refreshError) {
         // Refresh failed - logout user
+        sessionStorage.removeItem("token");
+        sessionStorage.removeItem("refreshToken");
         localStorage.removeItem("token");
         localStorage.removeItem("refreshToken");
         window.location.href = "/login";
@@ -196,27 +200,52 @@ export const bookingsAPI = {
 
 export const usersAPI = {
   getAll: (params) => {
-    return axiosInstance.get("/users", { params });
+    return axiosInstance.get("/admin/adminusers", { params });
   },
 
   getById: (id) => {
-    return axiosInstance.get(`/users/${id}`);
+    return axiosInstance.get(`/admin/adminusers/${id}`);
   },
 
   create: (userData) => {
-    return axiosInstance.post("/users", userData);
+    return axiosInstance.post("/admin/adminusers", userData);
   },
 
   update: (id, userData) => {
-    return axiosInstance.put(`/users/${id}`, userData);
+    return axiosInstance.put(`/admin/adminusers/${id}`, userData);
   },
 
   delete: (id) => {
-    return axiosInstance.delete(`/users/${id}`);
+    return axiosInstance.delete(`/admin/adminusers/${id}`);
   },
 
   changePassword: (passwordData) => {
     return axiosInstance.post("/users/change-password", passwordData);
+  },
+  
+  // Additional admin user endpoints
+  updateRole: (id, roleData) => {
+    return axiosInstance.patch(`/admin/adminusers/${id}/role`, roleData);
+  },
+  
+  activate: (id) => {
+    return axiosInstance.patch(`/admin/adminusers/${id}/activate`);
+  },
+  
+  deactivate: (id, reason) => {
+    return axiosInstance.patch(`/admin/adminusers/${id}/deactivate`, { reason });
+  },
+  
+  resetPassword: (id) => {
+    return axiosInstance.post(`/admin/adminusers/${id}/reset-password`);
+  },
+  
+  getActivity: (id) => {
+    return axiosInstance.get(`/admin/adminusers/${id}/activity`);
+  },
+  
+  getStatistics: () => {
+    return axiosInstance.get("/admin/adminusers/statistics");
   },
 };
 

@@ -18,13 +18,14 @@ const useUserStore = create(
         set({ loading: true, error: null });
         try {
           const response = await usersAPI.getAll();
-          if (response.success && response.data) {
-            const users = Array.isArray(response.data) ? response.data : response.data.users || [];
+          // Backend returns: { data: [...], pagination: {...} }
+          if (response && response.data) {
+            const users = Array.isArray(response.data) ? response.data : [];
             console.log("Users loaded from API:", users.length);
             set({ users, loading: false });
             return { success: true, data: users };
           } else {
-            throw new Error(response.message || "Cannot load users");
+            throw new Error("Invalid response format");
           }
         } catch (error) {
           const errorMessage = error.message || "Error loading users";
@@ -40,21 +41,18 @@ const useUserStore = create(
           const userData = {
             email: data.email,
             password: data.password || "Temp123!",
+            fullName: `${data.firstName || ""} ${data.lastName || ""}`.trim(),
+            phoneNumber: data.phone || "",
             role: data.role || "customer",
-            firstName: data.firstName || "",
-            lastName: data.lastName || "",
-            phone: data.phone || "",
-            avatar: data.avatar || "",
-            permissions: data.permissions || [],
-            business: data.business || null,
           };
           const response = await usersAPI.create(userData);
-          if (response.success && response.data) {
-            const newUser = response.data;
+          // Backend returns created user directly
+          if (response) {
+            const newUser = response;
             set((s) => ({ users: [newUser, ...s.users], loading: false }));
             return { success: true, data: newUser };
           } else {
-            throw new Error(response.message || "Cannot create user");
+            throw new Error("Cannot create user");
           }
         } catch (error) {
           const errorMessage = error.message || "Error creating user";
@@ -67,13 +65,27 @@ const useUserStore = create(
       updateUser: async (userId, updates) => {
         set({ loading: true, error: null });
         try {
-          const response = await usersAPI.update(userId, updates);
-          if (response.success && response.data) {
-            const updatedUser = response.data;
-            set((s) => ({ users: s.users.map((u) => u.id === userId ? updatedUser : u), loading: false }));
+          const updateData = {
+            email: updates.email,
+            fullName: updates.firstName && updates.lastName 
+              ? `${updates.firstName} ${updates.lastName}`.trim()
+              : undefined,
+            phoneNumber: updates.phone,
+            role: updates.role,
+          };
+          // Remove undefined fields
+          Object.keys(updateData).forEach(key => 
+            updateData[key] === undefined && delete updateData[key]
+          );
+          
+          const response = await usersAPI.update(userId, updateData);
+          // Backend returns updated user directly
+          if (response) {
+            const updatedUser = response;
+            set((s) => ({ users: s.users.map((u) => u.userId === userId ? updatedUser : u), loading: false }));
             return { success: true, data: updatedUser };
           } else {
-            throw new Error(response.message || "Cannot update user");
+            throw new Error("Cannot update user");
           }
         } catch (error) {
           const errorMessage = error.message || "Error updating user";
@@ -86,13 +98,10 @@ const useUserStore = create(
       deleteUser: async (userId) => {
         set({ loading: true, error: null });
         try {
-          const response = await usersAPI.delete(userId);
-          if (response.success) {
-            set((s) => ({ users: s.users.filter((u) => u.id !== userId), loading: false }));
-            return { success: true };
-          } else {
-            throw new Error(response.message || "Cannot delete user");
-          }
+          await usersAPI.delete(userId);
+          // Backend returns 204 No Content on success
+          set((s) => ({ users: s.users.filter((u) => u.userId !== userId), loading: false }));
+          return { success: true };
         } catch (error) {
           const errorMessage = error.message || "Error deleting user";
           console.error("Delete user error:", errorMessage);
@@ -101,13 +110,13 @@ const useUserStore = create(
         }
       },
 
-      getUserById: (userId) => get().users.find((u) => u.id === userId),
+      getUserById: (userId) => get().users.find((u) => u.userId === userId),
       getUsersByRole: (role) => get().users.filter((u) => u.role === role),
       searchUsers: (query = "") => {
         const q = query.toLowerCase();
         return get().users.filter((u) => {
-          const name = `${u.firstName || ""} ${u.lastName || ""}`.toLowerCase();
-          return u.email?.toLowerCase().includes(q) || name.includes(q) || (u.phone || "").includes(query);
+          const name = (u.fullName || "").toLowerCase();
+          return u.email?.toLowerCase().includes(q) || name.includes(q) || (u.phoneNumber || "").includes(query);
         });
       },
       setRole: (userId, role) => get().updateUser(userId, { role }),

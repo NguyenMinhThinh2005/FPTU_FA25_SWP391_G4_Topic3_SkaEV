@@ -12,7 +12,7 @@ const UnifiedDataSync = ({ children }) => {
     const { user } = useAuthStore();
     const { bookingHistory, getBookingStats } = useBookingStore();
     const { syncAllStores, initialized, setInitialized } = useCustomerStore();
-    const { initializeWithUserData } = useVehicleStore();
+    const { initializeData } = useVehicleStore();
 
     useEffect(() => {
         if (user && !initialized) {
@@ -26,33 +26,14 @@ const UnifiedDataSync = ({ children }) => {
             // 2. Sync all other stores
             syncAllStores();
 
-            // 3. Initialize vehicle data with user profile
-            const mockUserData = {
-                id: user.id,
-                profile: {
-                    firstName: user.profile?.firstName || 'John',
-                    lastName: user.profile?.lastName || 'Doe',
-                    email: user.email,
-                    phone: user.profile?.phone || '+84987654321',
-                    verified: true},
-                vehicle: {
-                    make: 'VinFast',
-                    model: 'VF e34',
-                    year: 2024,
-                    batteryCapacity: 42.0,
-                    chargingType: ['AC Type 2', 'DC CCS']},
-                preferences: {
-                    maxDistance: 15,
-                    preferredPayment: 'e-wallet',
-                    priceRange: [6000, 12000]}
-            };
-
-            initializeWithUserData(mockUserData);
+            // 3. Initialize vehicle data
+            initializeData();
+            
             setInitialized(true);
 
             console.log('Unified data sync completed');
         }
-    }, [user, initialized, bookingHistory.length, syncAllStores, initializeWithUserData, setInitialized]);
+    }, [user, initialized, bookingHistory.length, syncAllStores, initializeData, setInitialized]);
 
     // Debug: Log current stats to verify data sync
     useEffect(() => {
