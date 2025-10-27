@@ -327,6 +327,58 @@ export const vehiclesAPI = {
   },
 };
 
+// QR Code API
+export const qrCodesAPI = {
+  // Generate QR code for instant charging
+  generate: (generateData) => {
+    return axiosInstance.post("/qrcodes/generate", generateData);
+  },
+
+  // Get QR code by ID
+  getById: (id) => {
+    return axiosInstance.get(`/qrcodes/${id}`);
+  },
+
+  // Get my active QR codes
+  getMyQRCodes: () => {
+    return axiosInstance.get("/qrcodes/my-qrcodes");
+  },
+
+  // Validate QR code (Staff only)
+  validate: (qrCodeData) => {
+    return axiosInstance.post("/qrcodes/validate", { qrCodeData });
+  },
+
+  // Use QR code to start charging (Staff only)
+  use: (id, useData) => {
+    return axiosInstance.post(`/qrcodes/${id}/use`, useData);
+  },
+
+  // Cancel/revoke QR code
+  cancel: (id) => {
+    return axiosInstance.delete(`/qrcodes/${id}`);
+  },
+
+  // Get QR code image
+  getImage: (id) => {
+    return axiosInstance.get(`/qrcodes/${id}/image`, { responseType: 'blob' });
+  },
+};
+
+// Charging Session API (via Bookings)
+export const chargingAPI = {
+  // Start charging session
+  startCharging: (bookingId) => {
+    return axiosInstance.post(`/bookings/${bookingId}/start-charging`);
+  },
+
+  // Complete charging session
+  completeCharging: (bookingId, completeData) => {
+    // completeData: { finalSoc, totalEnergyKwh, unitPrice }
+    return axiosInstance.post(`/bookings/${bookingId}/complete`, completeData);
+  },
+};
+
 // Health check
 export const healthAPI = {
   check: () => {

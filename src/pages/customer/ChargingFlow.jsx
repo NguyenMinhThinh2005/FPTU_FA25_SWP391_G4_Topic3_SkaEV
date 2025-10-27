@@ -45,6 +45,7 @@ import useStationStore from "../../store/stationStore";
 import { formatCurrency } from "../../utils/helpers";
 import StationMapLeaflet from "../../components/customer/StationMapLeaflet";
 import notificationService from "../../services/notificationService";
+import { qrCodesAPI, chargingAPI } from "../../services/api";
 
 // Helper function to normalize Vietnamese text for search
 const normalize = (text) => {
@@ -462,55 +463,124 @@ const ChargingFlow = () => {
     }));
   };
 
-  const handleQRScan = (result) => {
+  const handleQRScan = async (result) => {
     console.log("📱 QR Scan triggered with result:", result);
 
-    // Allow QR scan even without booking for demo purposes
-    if (!currentBookingData) {
-      console.warn("No booking data - proceeding with demo mode");
-      // Create a temporary booking for demo
-      setCurrentBookingData({
-        id: "DEMO-" + Date.now(),
-        stationId: "ST-001",
-        stationName: "Trạm demo",
-        scheduledDateTime: new Date(),
-      });
+    try {
+      // For customer demo, skip API validation (API requires Staff role)
+      // In production, Staff would scan and validate
+      console.log("⚠️ Customer mode - skipping API validation (requires Staff role)");
+      console.log("✅ QR code accepted in demo mode:", result);
+
+      // Update booking with QR scan info
+      if (currentBooking) {
+        bookingStore.setState({
+          currentBooking: {
+            ...currentBooking,
+            qrScanned: true,
+            scannedAt: new Date().toISOString(),
+          }
+        });
+      }
+
+      setScanResult(result);
+      setFlowStep(3); // Move to connect step
+      setQrScanOpen(false);
+
+      notificationService.success("Quét mã QR thành công!");
+      console.log("✅ QR Scanned successfully, moving to step 3");
+    } catch (error) {
+      console.error("❌ Error scanning QR code:", error);
+      console.warn("⚠️ Continuing with demo mode anyway");
+      
+      // Continue with demo mode even if there's an error
+      setScanResult(result);
+      setFlowStep(3);
+      setQrScanOpen(false);
     }
-
-    setScanResult(result);
-    setFlowStep(3); // Move to connect step
-    setQrScanOpen(false);
-
-    console.log("✅ QR Scanned successfully, moving to step 3");
   };
 
-  const handleStartCharging = () => {
-    if (!currentBookingData || !scanResult) {
-      console.error("Missing booking data or QR scan result");
+  const handleStartCharging = async () => {
+    if (!currentBooking || !scanResult) {
+      console.error("❌ Missing booking data or QR scan result");
+      alert("Thiếu thông tin booking hoặc mã QR");
       return;
     }
 
-    const now = new Date();
-    setChargingStartTime(now);
-    setFlowStep(4); // Move to charging step
+    try {
+      console.log("🔌 Starting charging session for booking:", currentBooking.id || currentBooking.apiId);
+      
+      // Try to call API to start charging session (may fail with 403 if not Staff)
+      const bookingId = currentBooking.apiId || currentBooking.id;
+      
+      try {
+        const response = await chargingAPI.startCharging(bookingId);
+        console.log("✅ Charging session started via API:", response);
+        
+        // Create charging session from API response
+        const newChargingSession = {
+          sessionId: response.sessionId || `SESSION-${Date.now()}`,
+          bookingId: bookingId,
+          startTime: new Date(),
+          stationId: currentBooking.stationId,
+          stationName: currentBooking.stationName,
+          chargerType: currentBooking.chargerType,
+          status: 'active',
+        };
+        
+        bookingStore.setState({ chargingSession: newChargingSession });
+      } catch (apiError) {
+        // If API fails (403 or other), continue with demo mode
+        console.warn("⚠️ API call failed (may require Staff role), continuing with demo mode:", apiError.message);
+        
+        // Create demo charging session
+        const demoSession = {
+          sessionId: `DEMO-SESSION-${Date.now()}`,
+          bookingId: bookingId,
+          startTime: new Date(),
+          stationId: currentBooking.stationId,
+          stationName: currentBooking.stationName,
+          chargerType: currentBooking.chargerType,
+          status: 'active-demo',
+        };
+        
+        bookingStore.setState({ chargingSession: demoSession });
+        console.log("📊 Demo charging session created:", demoSession);
+      }
 
-    // Initialize session data with real values
-    setSessionData((prev) => ({
-      ...prev,
-      startTime: now,
-      currentSOC: 25, // Starting battery level
-      energyDelivered: 0,
-      currentCost: 0,
-    }));
+      const now = new Date();
+      setChargingStartTime(now);
+      setFlowStep(4); // Move to charging step
 
-    // Thông báo bắt đầu sạc
-    notificationService.notifyChargingStarted({
-      stationName: selectedStation?.name || "Trạm sạc",
-      currentSOC: 25,
-    });
+      // Update booking status
+      bookingStore.setState({
+        currentBooking: {
+          ...currentBooking,
+          chargingStarted: true,
+          status: 'in-progress',
+        }
+      });
 
-    console.log("⚡ Charging started for station:", selectedStation?.name);
-    console.log("📊 Booking data:", currentBookingData);
+      // Initialize session data
+      setSessionData((prev) => ({
+        ...prev,
+        startTime: now,
+        currentSOC: 25, // Starting battery level
+        energyDelivered: 0,
+        currentCost: 0,
+      }));
+
+      // Notify charging started
+      notificationService.notifyChargingStarted({
+        stationName: currentBooking.stationName || "Trạm sạc",
+        currentSOC: 25,
+      });
+
+      console.log("⚡ Charging started successfully");
+    } catch (error) {
+      console.error("❌ Error starting charging:", error);
+      alert(error.message || "Lỗi khi bắt đầu sạc");
+    }
   };
 
   // Use sessionData for consistent state management
@@ -1296,7 +1366,7 @@ const ChargingFlow = () => {
                     transform: "translateY(0) scale(0.98)",
                   },
                 }}
-                onClick={() => {
+                onClick={async () => {
                   if (!chargingStartTime) {
                     console.error("No charging session to stop");
                     return;
@@ -1316,16 +1386,48 @@ const ChargingFlow = () => {
                   };
                   setCompletedSession(sessionEndData);
 
-                  // 🚀 Call API to complete booking
-                  if (currentBookingData?.id) {
-                    console.log(
-                      "📤 Calling completeBooking API with data:",
-                      sessionEndData
-                    );
-                    completeBooking(currentBookingData.id, sessionEndData);
+                  // 🚀 Call API to complete charging session
+                  const bookingId = currentBooking?.apiId || currentBooking?.id || currentBookingData?.id;
+                  if (bookingId) {
+                    try {
+                      console.log("📤 Calling completeCharging API with booking ID:", bookingId);
+                      console.log("� Session data:", {
+                        finalSoc: currentSOC,
+                        totalEnergyKwh: sessionData.energyDelivered,
+                        unitPrice: selectedStation?.chargers?.[0]?.powerKw || 3500,
+                      });
+
+                      const response = await chargingAPI.completeCharging(bookingId, {
+                        finalSoc: currentSOC,
+                        totalEnergyKwh: sessionData.energyDelivered,
+                        unitPrice: selectedStation?.chargers?.[0]?.powerKw || 3500,
+                      });
+
+                      console.log("✅ Charging session completed via API:", response);
+                      
+                      // Update charging session status
+                      if (chargingSession) {
+                        bookingStore.setState({
+                          chargingSession: {
+                            ...chargingSession,
+                            status: 'completed',
+                            endTime: new Date(),
+                            totalEnergy: sessionData.energyDelivered,
+                            totalCost: sessionData.currentCost,
+                          }
+                        });
+                      }
+                    } catch (error) {
+                      console.error("❌ Error completing charging via API:", error);
+                      // Continue with local completion even if API fails
+                      console.warn("⚠️ Continuing with local session completion");
+                    }
+
+                    // Also call bookingStore completeBooking for local state
+                    completeBooking(bookingId, sessionEndData);
                   }
 
-                  // Thông báo hoàn thành sạc
+                  // Notify charging completed
                   notificationService.notifyChargingCompleted({
                     energyDelivered: sessionData.energyDelivered,
                     finalSOC: currentSOC,
