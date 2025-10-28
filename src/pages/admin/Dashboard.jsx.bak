@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+﻿import React, { useState } from "react";
 import {
   Box,
   Typography,
@@ -66,7 +66,7 @@ import { STATION_STATUS, USER_ROLES } from "../../utils/constants";
 const AdminDashboard = () => {
   const navigate = useNavigate();
   useAuthStore();
-  const { stations, fetchStations } = useStationStore();
+  const { stations } = useStationStore();
   const { bookingHistory } = useBookingStore();
   const [_anchorEl, _setAnchorEl] = useState(null);
   const [_openStationDialog, setOpenStationDialog] = useState(false);
@@ -84,12 +84,6 @@ const AdminDashboard = () => {
   });
   const [successMessage, setSuccessMessage] = useState("");
   const [showSuccess, setShowSuccess] = useState(false);
-
-  // Fetch stations on component mount
-  useEffect(() => {
-    console.log("🔄 Admin Dashboard mounted - fetching stations...");
-    fetchStations();
-  }, [fetchStations]);
 
   // System Overview Stats
   const totalStations = stations.length;
@@ -236,7 +230,7 @@ const AdminDashboard = () => {
       active: { label: "Hoạt động", color: "success" },
       inactive: { label: "Không hoạt động", color: "error" },
       maintenance: { label: "Bảo trì", color: "warning" },
-      construction: { label: "Đang xây dựng", color: "info" },
+      construction: { label: "Construction", color: "info" },
     };
 
     const config = configs[status] || configs.inactive;
@@ -276,7 +270,14 @@ const AdminDashboard = () => {
           </Typography>
         </Box>
         <Box sx={{ display: "flex", gap: 2 }}>
-          {/* Removed "Thêm trạm sạc" button */}
+
+          <Button
+            variant="contained"
+            startIcon={<Add />}
+            onClick={() => navigate("/admin/stations/new")}
+          >
+            Thêm trạm sạc
+          </Button>
         </Box>
       </Box>
 
@@ -299,7 +300,7 @@ const AdminDashboard = () => {
             <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
-                placeholder="Tìm kiếm trạm theo tên hoặc địa điểm..."
+                placeholder="Search stations by name or location..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 InputProps={{
@@ -313,16 +314,16 @@ const AdminDashboard = () => {
             {/* Status Filter */}
             <Grid item xs={12} md={3}>
               <FormControl fullWidth>
-                <InputLabel>Trạng thái trạm</InputLabel>
+                <InputLabel>Station Status</InputLabel>
                 <Select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
                 >
-                  <MenuItem value="all">Tất cả</MenuItem>
-                  <MenuItem value="active">Hoạt động</MenuItem>
-                  <MenuItem value="inactive">Không hoạt động</MenuItem>
-                  <MenuItem value="maintenance">Bảo trì</MenuItem>
-                  <MenuItem value="construction">Đang xây dựng</MenuItem>
+                  <MenuItem value="all">All Status</MenuItem>
+                  <MenuItem value="active">Active</MenuItem>
+                  <MenuItem value="inactive">Inactive</MenuItem>
+                  <MenuItem value="maintenance">Maintenance</MenuItem>
+                  <MenuItem value="construction">Construction</MenuItem>
                 </Select>
               </FormControl>
             </Grid>
@@ -330,7 +331,7 @@ const AdminDashboard = () => {
             {/* Results Count */}
             <Grid item xs={12} md={3}>
               <Typography variant="body2" color="text.secondary">
-                Tìm thấy {filteredStations.length} trạm
+                {filteredStations.length} stations found
               </Typography>
             </Grid>
           </Grid>
@@ -356,7 +357,7 @@ const AdminDashboard = () => {
                     {totalStations}
                   </Typography>
                   <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                    Tổng số trạm
+                    Total Stations
                   </Typography>
                   <Typography variant="caption" sx={{ opacity: 0.8 }}>
                     {activeStations} hoạt động
@@ -384,10 +385,10 @@ const AdminDashboard = () => {
                     {totalUsers}
                   </Typography>
                   <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                    Tổng người dùng
+                    Total Users
                   </Typography>
                   <Typography variant="caption" sx={{ opacity: 0.8 }}>
-                    +12 tuần này
+                    +12 this week
                   </Typography>
                 </Box>
               </Box>
@@ -415,7 +416,7 @@ const AdminDashboard = () => {
                     Phiên hoạt động
                   </Typography>
                   <Typography variant="caption" sx={{ opacity: 0.8 }}>
-                    {todayBookings} hôm nay
+                    {todayBookings} today
                   </Typography>
                 </Box>
               </Box>
@@ -440,10 +441,10 @@ const AdminDashboard = () => {
                     {formatCurrency(totalRevenue)}
                   </Typography>
                   <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                    Tổng doanh thu
+                    Total Revenue
                   </Typography>
                   <Typography variant="caption" sx={{ opacity: 0.8 }}>
-                    +18% so với tháng trước
+                    +18% vs last month
                   </Typography>
                 </Box>
               </Box>
@@ -458,7 +459,7 @@ const AdminDashboard = () => {
           <Card>
             <CardContent>
               <Typography variant="h6" gutterBottom>
-                Tìm thấy {filteredStations.length} trạm
+                {filteredStations.length} Stations Found
               </Typography>
 
               <Box sx={{ maxHeight: 600, overflowY: "auto" }}>
@@ -527,7 +528,7 @@ const AdminDashboard = () => {
                             />
                             <Typography variant="body2" color="text.secondary">
                               {station.location.address} •{" "}
-                              {getDistanceToStation(station)}km từ trung tâm
+                              {getDistanceToStation(station)}km from center
                             </Typography>
                           </Box>
 
@@ -564,7 +565,7 @@ const AdminDashboard = () => {
                                 sx={{ fontSize: 16, color: "success.main" }}
                               />
                               <Typography variant="body2">
-                                {formatCurrency(station.revenue)} doanh thu
+                                {formatCurrency(station.revenue)} revenue
                               </Typography>
                             </Box>
                           </Box>
@@ -587,7 +588,7 @@ const AdminDashboard = () => {
                                 variant="caption"
                                 color="text.secondary"
                               >
-                                Tỷ lệ sử dụng: {station.utilization.toFixed(0)}%
+                                Utilization: {station.utilization.toFixed(0)}%
                               </Typography>
                               <LinearProgress
                                 variant="determinate"
@@ -596,21 +597,50 @@ const AdminDashboard = () => {
                               />
                             </Box>
                             <Chip
-                              label={`${station.bookingsCount} phiên`}
+                              label={`${station.bookingsCount} sessions`}
                               size="small"
                               variant="outlined"
                             />
                             <Chip
                               label={`${
                                 station.totalSlots - station.occupiedSlots
-                              } khả dụng`}
+                              } available`}
                               color="success"
                               size="small"
                             />
                           </Box>
                         </Box>
 
-                        {/* Removed Manage and Maintenance buttons */}
+                        <Box
+                          sx={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 1,
+                          }}
+                        >
+                          <Button
+                            variant="contained"
+                            size="small"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleStationAction("edit", station);
+                            }}
+                            startIcon={<Edit />}
+                          >
+                            Manage
+                          </Button>
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleStationAction("maintenance", station);
+                            }}
+                            startIcon={<Settings />}
+                          >
+                            Maintenance
+                          </Button>
+                        </Box>
                       </Box>
                     </Paper>
                   </Box>
@@ -656,17 +686,17 @@ const AdminDashboard = () => {
                 </Box>
 
                 <Typography variant="body2" color="text.secondary" gutterBottom>
-                  Khoảng cách: {getDistanceToStation(selectedStationForDetail)}km
-                  từ trung tâm
+                  Distance: {getDistanceToStation(selectedStationForDetail)}km
+                  from center
                 </Typography>
 
                 <Divider sx={{ my: 2 }} />
 
                 <Typography variant="subtitle2" gutterBottom>
-                  Thông tin trạm
+                  Station Information
                 </Typography>
                 <Box sx={{ fontSize: "0.875rem", mb: 1 }}>
-                  • Trạng thái: {selectedStationForDetail.status}
+                  • Status: {selectedStationForDetail.status}
                 </Box>
                 <Box sx={{ fontSize: "0.875rem", mb: 1 }}>
                   • Trụ: {selectedStationForDetail.chargingPostsCount}
@@ -681,30 +711,60 @@ const AdminDashboard = () => {
                 <Divider sx={{ my: 2 }} />
 
                 <Typography variant="subtitle2" gutterBottom>
-                  Hiệu suất
+                  Performance
                 </Typography>
                 <Box sx={{ fontSize: "0.875rem", mb: 1 }}>
-                  • Tỷ lệ sử dụng:{" "}
+                  • Utilization:{" "}
                   {selectedStationForDetail.utilization.toFixed(1)}%
                 </Box>
                 <Box sx={{ fontSize: "0.875rem", mb: 1 }}>
-                  • Phiên: {selectedStationForDetail.bookingsCount}
+                  • Sessions: {selectedStationForDetail.bookingsCount}
                 </Box>
                 <Box sx={{ fontSize: "0.875rem", mb: 1 }}>
-                  • Doanh thu: {formatCurrency(selectedStationForDetail.revenue)}
+                  • Revenue: {formatCurrency(selectedStationForDetail.revenue)}
                 </Box>
 
-                {/* Removed Manage Station and Schedule Maintenance buttons */}
+                <Box
+                  sx={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 1,
+                    mt: 2,
+                  }}
+                >
+                  <Button
+                    fullWidth
+                    variant="contained"
+                    onClick={() =>
+                      handleStationAction("edit", selectedStationForDetail)
+                    }
+                  >
+                    Manage Station
+                  </Button>
+                  <Button
+                    fullWidth
+                    variant="outlined"
+                    onClick={() =>
+                      handleStationAction(
+                        "maintenance",
+                        selectedStationForDetail
+                      )
+                    }
+                  >
+                    Schedule Maintenance
+                  </Button>
+                </Box>
               </CardContent>
             </Card>
           ) : (
             <Card>
               <CardContent>
                 <Typography variant="h6" gutterBottom>
-                  Chọn một trạm
+                  Select a Station
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Chọn trạm từ danh sách để xem thông tin chi tiết.
+                  Choose a station from the list to see detailed information and
+                  management options.
                 </Typography>
               </CardContent>
             </Card>
@@ -714,7 +774,7 @@ const AdminDashboard = () => {
           <Card sx={{ mt: 3 }}>
             <CardContent>
               <Typography variant="h6" fontWeight="bold" gutterBottom>
-                Thao tác nhanh
+                Quick Actions
               </Typography>
 
               <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
@@ -724,7 +784,7 @@ const AdminDashboard = () => {
                   fullWidth
                   onClick={() => navigate("/admin/analytics")}
                 >
-                  Xem phân tích
+                  View Analytics
                 </Button>
                 <Button
                   variant="outlined"
@@ -732,7 +792,7 @@ const AdminDashboard = () => {
                   fullWidth
                   onClick={() => navigate("/admin/users")}
                 >
-                  Quản lý người dùng
+                  Manage Users
                 </Button>
                 <Button
                   variant="outlined"
@@ -740,9 +800,16 @@ const AdminDashboard = () => {
                   fullWidth
                   onClick={() => navigate("/admin/stations")}
                 >
-                  Quản lý trạm
+                  Manage Stations
                 </Button>
-                
+                <Button
+                  variant="outlined"
+                  startIcon={<Settings />}
+                  fullWidth
+                  onClick={() => navigate("/admin/settings")}
+                >
+                  System Settings
+                </Button>
               </Box>
             </CardContent>
           </Card>
