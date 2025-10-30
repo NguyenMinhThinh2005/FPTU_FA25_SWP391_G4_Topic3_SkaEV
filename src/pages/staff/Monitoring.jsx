@@ -1,0 +1,536 @@
+/* eslint-disable */
+import React, { useState, useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import {
+  Box,
+  Typography,
+  Card,
+  CardContent,
+  Grid,
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Alert,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Chip,
+  IconButton,
+  Snackbar,
+  Stack,
+  LinearProgress,
+} from "@mui/material";
+import {
+  Warning,
+  Add,
+  ArrowBack,
+  CloudUpload,
+  CheckCircle,
+  Error,
+  PowerOff,
+  Build,
+} from "@mui/icons-material";
+
+const Monitoring = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [connectors, setConnectors] = useState([]);
+  const [incidents, setIncidents] = useState([]);
+  const [reportDialog, setReportDialog] = useState(false);
+  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
+  const [reportForm, setReportForm] = useState({
+    connectorId: "",
+    incidentType: "",
+    priority: "medium",
+    description: "",
+    attachments: [],
+  });
+
+  const incidentTypes = [
+    { value: "hardware", label: "Lỗi Phần cứng Thiết bị" },
+    { value: "software", label: "Lỗi Phần mềm/Giao tiếp" },
+    { value: "physical", label: "Hư hỏng Vật lý/Thiên tai" },
+    { value: "electrical", label: "Vấn đề về Điện" },
+    { value: "other", label: "Lỗi Khác" },
+  ];
+
+  const priorityLevels = [
+    { value: "low", label: "Thấp", color: "success" },
+    { value: "medium", label: "Trung bình", color: "warning" },
+    { value: "high", label: "Cao", color: "error" },
+  ];
+
+  useEffect(() => {
+    loadMonitoringData();
+    // Handle navigation state
+    if (location.state?.action === "report" && location.state?.connectorId) {
+      setReportForm({ ...reportForm, connectorId: location.state.connectorId });
+      setReportDialog(true);
+    }
+  }, [location.state]);
+
+  const loadMonitoringData = () => {
+    // Mock connector status data
+    const mockConnectors = [
+      {
+        id: "CON-01",
+        type: "AC",
+        maxPower: 22,
+        status: "online",
+        operationalStatus: "Available",
+        voltage: 230,
+        current: 0,
+        temperature: 28,
+      },
+      {
+        id: "CON-02",
+        type: "AC",
+        maxPower: 22,
+        status: "online",
+        operationalStatus: "Charging",
+        voltage: 230,
+        current: 32,
+        temperature: 35,
+      },
+      {
+        id: "CON-03",
+        type: "DC",
+        maxPower: 50,
+        status: "online",
+        operationalStatus: "Available",
+        voltage: 400,
+        current: 0,
+        temperature: 26,
+      },
+      {
+        id: "CON-04",
+        type: "DC",
+        maxPower: 50,
+        status: "offline",
+        operationalStatus: "Faulted",
+        voltage: 0,
+        current: 0,
+        temperature: 0,
+      },
+    ];
+
+    // Mock incident reports
+    const mockIncidents = [
+      {
+        id: "INC-001",
+        connectorId: "CON-04",
+        type: "hardware",
+        typeLabel: "Lỗi Phần cứng Thiết bị",
+        priority: "high",
+        description: "Cáp sạc bị đứt, không thể kết nối với xe",
+        status: "pending",
+        statusLabel: "Mới",
+        reportedAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
+        reportedBy: "Nguyễn Văn A",
+      },
+      {
+        id: "INC-002",
+        connectorId: "CON-02",
+        type: "software",
+        typeLabel: "Lỗi Phần mềm/Giao tiếp",
+        priority: "medium",
+        description: "Màn hình đôi khi không hiển thị trạng thái sạc",
+        status: "in_progress",
+        statusLabel: "Đang xử lý",
+        reportedAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+        reportedBy: "Nguyễn Văn A",
+      },
+    ];
+
+    setConnectors(mockConnectors);
+    setIncidents(mockIncidents);
+  };
+
+  const handleSubmitReport = async () => {
+    if (!reportForm.connectorId || !reportForm.incidentType || !reportForm.description) {
+      setSnackbar({ open: true, message: "Vui lòng điền đầy đủ thông tin", severity: "error" });
+      return;
+    }
+
+    try {
+      // TODO: API call to submit incident report
+      setSnackbar({
+        open: true,
+        message: "Đã gửi báo cáo sự cố thành công!",
+        severity: "success",
+      });
+      setReportDialog(false);
+      setReportForm({
+        connectorId: "",
+        incidentType: "",
+        priority: "medium",
+        description: "",
+        attachments: [],
+      });
+      loadMonitoringData();
+    } catch (error) {
+      setSnackbar({ open: true, message: "Lỗi gửi báo cáo", severity: "error" });
+    }
+  };
+
+  const handleFileUpload = (event) => {
+    const files = Array.from(event.target.files);
+    setReportForm({ ...reportForm, attachments: files });
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case "online":
+        return "success";
+      case "offline":
+        return "error";
+      default:
+        return "warning";
+    }
+  };
+
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case "Available":
+        return <CheckCircle color="success" />;
+      case "Charging":
+        return <Build color="primary" />;
+      case "Faulted":
+        return <Error color="error" />;
+      case "Unavailable":
+        return <PowerOff color="disabled" />;
+      default:
+        return <Warning color="warning" />;
+    }
+  };
+
+  const onlineConnectors = connectors.filter((c) => c.status === "online").length;
+  const offlineConnectors = connectors.filter((c) => c.status === "offline").length;
+  const availableConnectors = connectors.filter((c) => c.operationalStatus === "Available").length;
+  const chargingConnectors = connectors.filter((c) => c.operationalStatus === "Charging").length;
+  const faultedConnectors = connectors.filter((c) => c.operationalStatus === "Faulted").length;
+
+  return (
+    <Box>
+      {/* Header */}
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+        <Box>
+          <Typography variant="h4" fontWeight="bold" gutterBottom>
+            Theo dõi & Báo cáo Sự cố
+          </Typography>
+          <Typography variant="body1" color="text.secondary">
+            Giám sát tình trạng điểm sạc và báo cáo sự cố kỹ thuật
+          </Typography>
+        </Box>
+        <Stack direction="row" spacing={2}>
+          <Button variant="contained" startIcon={<Add />} onClick={() => setReportDialog(true)}>
+            Báo cáo sự cố
+          </Button>
+          <Button startIcon={<ArrowBack />} onClick={() => navigate("/staff/dashboard")}>
+            Quay lại
+          </Button>
+        </Stack>
+      </Box>
+
+      {/* Statistics */}
+      <Grid container spacing={3} mb={3}>
+        <Grid item xs={12} sm={6} md={2.4}>
+          <Card>
+            <CardContent>
+              <Typography variant="h5" fontWeight="bold" color="success.main">
+                {onlineConnectors}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Điểm sạc Online
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} sm={6} md={2.4}>
+          <Card>
+            <CardContent>
+              <Typography variant="h5" fontWeight="bold" color="error.main">
+                {offlineConnectors}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Điểm sạc Offline
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} sm={6} md={2.4}>
+          <Card>
+            <CardContent>
+              <Typography variant="h5" fontWeight="bold" color="success.main">
+                {availableConnectors}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Đang Rảnh
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} sm={6} md={2.4}>
+          <Card>
+            <CardContent>
+              <Typography variant="h5" fontWeight="bold" color="primary.main">
+                {chargingConnectors}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Đang Sạc
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} sm={6} md={2.4}>
+          <Card>
+            <CardContent>
+              <Typography variant="h5" fontWeight="bold" color="error.main">
+                {faultedConnectors}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Lỗi/Bảo trì
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+
+      {/* Connector Status Table */}
+      <Typography variant="h5" fontWeight={600} mb={2}>
+        Tình trạng Điểm sạc
+      </Typography>
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <TableContainer component={Paper}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Mã điểm sạc</TableCell>
+                  <TableCell>Loại</TableCell>
+                  <TableCell>Công suất</TableCell>
+                  <TableCell align="center">Trạng thái Kỹ thuật</TableCell>
+                  <TableCell align="center">Trạng thái Hoạt động</TableCell>
+                  <TableCell align="right">Điện áp (V)</TableCell>
+                  <TableCell align="right">Dòng điện (A)</TableCell>
+                  <TableCell align="right">Nhiệt độ (°C)</TableCell>
+                  <TableCell align="center">Thao tác</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {connectors.map((connector) => (
+                  <TableRow key={connector.id} hover>
+                    <TableCell fontWeight={600}>{connector.id}</TableCell>
+                    <TableCell>{connector.type}</TableCell>
+                    <TableCell>{connector.maxPower} kW</TableCell>
+                    <TableCell align="center">
+                      <Chip
+                        label={connector.status === "online" ? "Online" : "Offline"}
+                        color={getStatusColor(connector.status)}
+                        size="small"
+                      />
+                    </TableCell>
+                    <TableCell align="center">
+                      <Chip
+                        icon={getStatusIcon(connector.operationalStatus)}
+                        label={connector.operationalStatus}
+                        size="small"
+                        variant="outlined"
+                      />
+                    </TableCell>
+                    <TableCell align="right">{connector.voltage}</TableCell>
+                    <TableCell align="right">{connector.current}</TableCell>
+                    <TableCell align="right">
+                      <Box display="flex" alignItems="center" justifyContent="flex-end" gap={1}>
+                        {connector.temperature}
+                        {connector.temperature > 40 && (
+                          <Warning fontSize="small" color="warning" />
+                        )}
+                      </Box>
+                    </TableCell>
+                    <TableCell align="center">
+                      {connector.status === "offline" && (
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          color="warning"
+                          startIcon={<Warning />}
+                          onClick={() => {
+                            setReportForm({ ...reportForm, connectorId: connector.id });
+                            setReportDialog(true);
+                          }}
+                        >
+                          Báo cáo
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </CardContent>
+      </Card>
+
+      {/* Incident Reports History */}
+      <Typography variant="h5" fontWeight={600} mb={2}>
+        Lịch sử Báo cáo Sự cố
+      </Typography>
+      <Card>
+        <CardContent>
+          <TableContainer component={Paper}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Mã sự cố</TableCell>
+                  <TableCell>Điểm sạc</TableCell>
+                  <TableCell>Loại sự cố</TableCell>
+                  <TableCell>Mô tả</TableCell>
+                  <TableCell align="center">Ưu tiên</TableCell>
+                  <TableCell align="center">Trạng thái</TableCell>
+                  <TableCell>Báo cáo bởi</TableCell>
+                  <TableCell>Thời gian</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {incidents.map((incident) => (
+                  <TableRow key={incident.id} hover>
+                    <TableCell fontWeight={600}>{incident.id}</TableCell>
+                    <TableCell>{incident.connectorId}</TableCell>
+                    <TableCell>{incident.typeLabel}</TableCell>
+                    <TableCell>{incident.description}</TableCell>
+                    <TableCell align="center">
+                      <Chip
+                        label={priorityLevels.find((p) => p.value === incident.priority)?.label}
+                        color={priorityLevels.find((p) => p.value === incident.priority)?.color}
+                        size="small"
+                      />
+                    </TableCell>
+                    <TableCell align="center">
+                      <Chip label={incident.statusLabel} size="small" variant="outlined" />
+                    </TableCell>
+                    <TableCell>{incident.reportedBy}</TableCell>
+                    <TableCell>{incident.reportedAt.toLocaleString("vi-VN")}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </CardContent>
+      </Card>
+
+      {/* Report Incident Dialog */}
+      <Dialog open={reportDialog} onClose={() => setReportDialog(false)} maxWidth="md" fullWidth>
+        <DialogTitle>Tạo Báo cáo Sự cố Mới</DialogTitle>
+        <DialogContent>
+          <Box sx={{ pt: 2 }}>
+            <Grid container spacing={2}>
+              <Grid item xs={12} md={6}>
+                <FormControl fullWidth required>
+                  <InputLabel>Điểm sạc Ảnh hưởng</InputLabel>
+                  <Select
+                    value={reportForm.connectorId}
+                    label="Điểm sạc Ảnh hưởng"
+                    onChange={(e) => setReportForm({ ...reportForm, connectorId: e.target.value })}
+                  >
+                    {connectors.map((c) => (
+                      <MenuItem key={c.id} value={c.id}>
+                        {c.id} - {c.type} {c.maxPower}kW
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <FormControl fullWidth required>
+                  <InputLabel>Loại Sự cố</InputLabel>
+                  <Select
+                    value={reportForm.incidentType}
+                    label="Loại Sự cố"
+                    onChange={(e) => setReportForm({ ...reportForm, incidentType: e.target.value })}
+                  >
+                    {incidentTypes.map((type) => (
+                      <MenuItem key={type.value} value={type.value}>
+                        {type.label}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12}>
+                <FormControl fullWidth required>
+                  <InputLabel>Mức độ Ưu tiên</InputLabel>
+                  <Select
+                    value={reportForm.priority}
+                    label="Mức độ Ưu tiên"
+                    onChange={(e) => setReportForm({ ...reportForm, priority: e.target.value })}
+                  >
+                    {priorityLevels.map((level) => (
+                      <MenuItem key={level.value} value={level.value}>
+                        {level.label}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  required
+                  multiline
+                  rows={4}
+                  label="Mô tả Chi tiết"
+                  placeholder="Mô tả rõ ràng vấn đề và các bước đã thử khắc phục (nếu có)"
+                  value={reportForm.description}
+                  onChange={(e) => setReportForm({ ...reportForm, description: e.target.value })}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <Button variant="outlined" component="label" startIcon={<CloudUpload />}>
+                  Tải lên Hình ảnh/Video
+                  <input type="file" hidden multiple accept="image/*,video/*" onChange={handleFileUpload} />
+                </Button>
+                {reportForm.attachments.length > 0 && (
+                  <Typography variant="caption" color="text.secondary" sx={{ ml: 2 }}>
+                    {reportForm.attachments.length} file đã chọn
+                  </Typography>
+                )}
+              </Grid>
+            </Grid>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setReportDialog(false)}>Hủy</Button>
+          <Button variant="contained" color="warning" startIcon={<Warning />} onClick={handleSubmitReport}>
+            Gửi Báo cáo
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Snackbar */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+      >
+        <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+    </Box>
+  );
+};
+
+export default Monitoring;

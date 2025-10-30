@@ -216,7 +216,7 @@ const StaffProfile = () => {
                   {workStats.totalStationsManaged}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Stations Managed
+                  Trạm quản lý
                 </Typography>
               </Box>
             </Grid>
@@ -226,7 +226,7 @@ const StaffProfile = () => {
                   {workStats.maintenanceCompleted}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Maintenance Completed
+                  Bảo trì hoàn thành
                 </Typography>
               </Box>
             </Grid>
@@ -236,7 +236,7 @@ const StaffProfile = () => {
                   {workStats.averageResponseTime}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Avg Response Time
+                  Thời gian phản hồi TB
                 </Typography>
               </Box>
             </Grid>
@@ -246,7 +246,7 @@ const StaffProfile = () => {
                   {workStats.satisfactionRating}/5
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Customer Rating
+                  Đánh giá khách hàng
                 </Typography>
               </Box>
             </Grid>
@@ -257,9 +257,9 @@ const StaffProfile = () => {
       {/* Tabs */}
       <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
         <Tabs value={tabValue} onChange={handleTabChange}>
-          <Tab label="Personal Info" />
-          <Tab label="Work Details" />
-          <Tab label="Activity Log" />
+          <Tab label="Thông tin cá nhân" />
+          <Tab label="Chi tiết công việc" />
+          <Tab label="Nhật ký hoạt động" />
         </Tabs>
       </Box>
 
@@ -268,13 +268,13 @@ const StaffProfile = () => {
         <Card>
           <CardContent>
             <Typography variant="h6" fontWeight="bold" gutterBottom>
-              Personal Information
+              Thông tin cá nhân
             </Typography>
             <Grid container spacing={3}>
               <Grid item xs={12} sm={6}>
                   <TextField
                     fullWidth
-                    label="First Name"
+                    label="Họ"
                     value={profileData.firstName}
                     onChange={(e) =>
                       handleProfileChange("firstName", e.target.value)
@@ -285,7 +285,7 @@ const StaffProfile = () => {
               <Grid item xs={12} sm={6}>
                   <TextField
                     fullWidth
-                    label="Last Name"
+                    label="Tên"
                     value={profileData.lastName}
                     onChange={(e) =>
                       handleProfileChange("lastName", e.target.value)
@@ -311,7 +311,7 @@ const StaffProfile = () => {
               <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
-                  label="Phone"
+                  label="Số điện thoại"
                   value={profileData.phone}
                   onChange={(e) => handleProfileChange("phone", e.target.value)}
                   disabled={!editMode}
@@ -325,7 +325,7 @@ const StaffProfile = () => {
               <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
-                  label="Location"
+                  label="Địa điểm"
                   value={profileData.location}
                   onChange={(e) =>
                     handleProfileChange("location", e.target.value)
@@ -341,7 +341,7 @@ const StaffProfile = () => {
               <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
-                  label="Join Date"
+                  label="Ngày vào làm"
                   value={profileData.joinDate}
                   disabled
                   InputProps={{
@@ -362,11 +362,11 @@ const StaffProfile = () => {
             <Card>
               <CardContent>
                 <Typography variant="h6" fontWeight="bold" gutterBottom>
-                  Work Information
+                  Thông tin công việc
                 </Typography>
                 <Box sx={{ mb: 2 }}>
                   <Typography variant="subtitle2" color="text.secondary">
-                    Employee ID
+                    Mã nhân viên
                   </Typography>
                   <Typography variant="body1">
                     {profileData.employeeId}
@@ -374,7 +374,7 @@ const StaffProfile = () => {
                 </Box>
                 <Box sx={{ mb: 2 }}>
                   <Typography variant="subtitle2" color="text.secondary">
-                    Department
+                    Phòng ban
                   </Typography>
                   <Typography variant="body1">
                     {profileData.department}
@@ -382,7 +382,7 @@ const StaffProfile = () => {
                 </Box>
                 <Box sx={{ mb: 2 }}>
                   <Typography variant="subtitle2" color="text.secondary">
-                    Position
+                    Chức vụ
                   </Typography>
                   <Typography variant="body1">
                     {profileData.position}
@@ -390,7 +390,7 @@ const StaffProfile = () => {
                 </Box>
                 <Box>
                   <Typography variant="subtitle2" color="text.secondary">
-                    Work Location
+                    Địa điểm làm việc
                   </Typography>
                   <Typography variant="body1">
                     {profileData.location}
@@ -404,18 +404,26 @@ const StaffProfile = () => {
             <Card>
               <CardContent>
                 <Typography variant="h6" fontWeight="bold" gutterBottom>
-                  Certifications
+                  Chứng chỉ
                 </Typography>
                 <List>
                   {certifications.map((cert, index) => (
                     <ListItem key={index} divider>
                       <ListItemText
                         primary={cert.name}
-                        secondary={`${cert.issuer} • Expires: ${cert.expiry}`}
+                        secondary={`${cert.issuer} • Hết hạn: ${cert.expiry}`}
                       />
                       <ListItemSecondaryAction>
                         <Chip
-                          label={cert.status}
+                          label={
+                            cert.status === "active"
+                              ? "Còn hiệu lực"
+                              : cert.status === "expiring"
+                              ? "Sắp hết hạn"
+                              : cert.status === "expired"
+                              ? "Đã hết hạn"
+                              : cert.status
+                          }
                           color={getCertificationColor(cert.status)}
                           size="small"
                         />
@@ -433,7 +441,7 @@ const StaffProfile = () => {
         <Card>
           <CardContent>
             <Typography variant="h6" fontWeight="bold" gutterBottom>
-              Recent Activity
+              Hoạt động gần đây
             </Typography>
             <List>
               {recentActivities.map((activity) => (
@@ -453,7 +461,15 @@ const StaffProfile = () => {
                   />
                   <ListItemSecondaryAction>
                     <Chip
-                      label={activity.status}
+                      label={
+                        activity.status === "success"
+                          ? "Thành công"
+                          : activity.status === "info"
+                          ? "Thông tin"
+                          : activity.status === "warning"
+                          ? "Cảnh báo"
+                          : activity.status
+                      }
                       color={getActivityColor(activity.status)}
                       size="small"
                     />

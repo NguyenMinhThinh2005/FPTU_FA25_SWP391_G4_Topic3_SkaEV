@@ -61,17 +61,22 @@ const Sidebar = ({ open, onClose }) => {
       case "staff":
         return [
           {
-            text: getText("nav.dashboard"),
+            text: "Tổng quan Trạm sạc",
             icon: <Dashboard />,
             path: "/staff/dashboard",
           },
           {
-            text: getText("nav.stationManagement"),
-            icon: <LocationOn />,
-            path: "/staff/stations",
+            text: "Quản lý Phiên sạc",
+            icon: <ElectricCar />,
+            path: "/staff/charging-sessions",
           },
           {
-            text: getText("nav.profile"),
+            text: "Theo dõi & Báo cáo",
+            icon: <LocationOn />,
+            path: "/staff/monitoring",
+          },
+          {
+            text: "Tài khoản",
             icon: <Person />,
             path: "/staff/profile",
           },

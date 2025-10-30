@@ -40,7 +40,8 @@ import ChargingHabitsAnalysis from "./pages/customer/ChargingHabitsAnalysis";
 
 // Staff Pages
 import StaffDashboard from "./pages/staff/Dashboard";
-import StaffStationManagement from "./pages/staff/StationManagement";
+import ChargingSessions from "./pages/staff/ChargingSessions";
+import Monitoring from "./pages/staff/Monitoring";
 import StaffProfile from "./pages/staff/Profile";
 
 // Admin Pages
@@ -177,7 +178,8 @@ function App() {
                 }
               >
                 <Route path="dashboard" element={<StaffDashboard />} />
-                <Route path="stations" element={<StaffStationManagement />} />
+                <Route path="charging-sessions" element={<ChargingSessions />} />
+                <Route path="monitoring" element={<Monitoring />} />
                 <Route path="profile" element={<StaffProfile />} />
                 <Route index element={<Navigate to="dashboard" replace />} />
               </Route>

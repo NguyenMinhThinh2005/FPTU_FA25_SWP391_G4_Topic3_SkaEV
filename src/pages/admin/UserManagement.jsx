@@ -31,8 +31,9 @@ import {
   Tooltip,
   CircularProgress,
 } from "@mui/material";
-import { Search, Add, Edit, Delete, People, Shield, SwapHoriz, CheckCircle, Warning } from "@mui/icons-material";
+import { Search, Add, Edit, Delete, People, Shield, SwapHoriz, CheckCircle, Warning, LocationOn, AdminPanelSettings } from "@mui/icons-material";
 import useUserStore from "../../store/userStore";
+import useStationStore from "../../store/stationStore";
 
 const roleOptions = [
   { value: "admin", label: "Admin", icon: <Shield />, color: "primary" },
@@ -42,14 +43,18 @@ const roleOptions = [
 
 const UserManagement = () => {
   const { users, addUser, updateUser, deleteUser, fetchUsers, loading } = useUserStore();
+  const { stations, fetchStations } = useStationStore();
   const [query, setQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [roleDialogOpen, setRoleDialogOpen] = useState(false);
+  const [stationAssignDialogOpen, setStationAssignDialogOpen] = useState(false);
   const [editUser, setEditUser] = useState(null);
   const [userToDelete, setUserToDelete] = useState(null);
   const [userToChangeRole, setUserToChangeRole] = useState(null);
+  const [userToAssignStations, setUserToAssignStations] = useState(null);
+  const [selectedStations, setSelectedStations] = useState([]);
   const [newRole, setNewRole] = useState("");
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
   const [form, setForm] = useState({
@@ -60,10 +65,11 @@ const UserManagement = () => {
     role: "customer",
   });
 
-  // Fetch users on component mount
+  // Fetch users and stations on component mount
   useEffect(() => {
     console.log("UserManagement mounted, fetching users...");
     fetchUsers();
+    fetchStations();
   }, []);
 
   const filteredUsers = useMemo(() => {
@@ -196,6 +202,44 @@ const UserManagement = () => {
     } catch (error) {
       setSnackbar({ open: true, message: error.message || "Có lỗi xảy ra", severity: "error" });
     }
+  };
+
+  const openStationAssignDialog = (user) => {
+    setUserToAssignStations(user);
+    // Load current assigned stations for this user (mock for now, will be from API)
+    setSelectedStations(user.assignedStationIds || []);
+    setStationAssignDialogOpen(true);
+  };
+
+  const handleAssignStations = async () => {
+    if (!userToAssignStations) return;
+    
+    try {
+      // TODO: Call API to assign stations to staff
+      // const result = await updateUser(userToAssignStations.userId, { assignedStationIds: selectedStations });
+      
+      setSnackbar({ 
+        open: true, 
+        message: `Đã phân công ${selectedStations.length} trạm sạc cho ${userToAssignStations.fullName}`, 
+        severity: "success" 
+      });
+      setStationAssignDialogOpen(false);
+      setUserToAssignStations(null);
+      setSelectedStations([]);
+      
+      // Refresh users list
+      fetchUsers();
+    } catch (error) {
+      setSnackbar({ open: true, message: error.message || "Có lỗi xảy ra", severity: "error" });
+    }
+  };
+
+  const toggleStationSelection = (stationId) => {
+    setSelectedStations(prev => 
+      prev.includes(stationId) 
+        ? prev.filter(id => id !== stationId)
+        : [...prev, stationId]
+    );
   };
 
   const getRoleChip = (role) => {
@@ -343,6 +387,13 @@ const UserManagement = () => {
                               <Edit />
                             </IconButton>
                           </Tooltip>
+                          {u.role === "staff" && (
+                            <Tooltip title="Phân quyền trạm sạc">
+                              <IconButton size="small" color="success" onClick={() => openStationAssignDialog(u)}>
+                                <LocationOn />
+                              </IconButton>
+                            </Tooltip>
+                          )}
                           <Tooltip title="Thay đổi vai trò">
                             <IconButton size="small" color="warning" onClick={() => openRoleDialog(u)}>
                               <SwapHoriz />
@@ -485,6 +536,103 @@ const UserManagement = () => {
           <Button onClick={() => setRoleDialogOpen(false)}>Hủy</Button>
           <Button variant="contained" onClick={handleChangeRole}>
             Xác nhận
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Station Assignment Dialog */}
+      <Dialog 
+        open={stationAssignDialogOpen} 
+        onClose={() => setStationAssignDialogOpen(false)} 
+        maxWidth="md" 
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <AdminPanelSettings color="success" />
+            Phân quyền trạm sạc cho nhân viên
+          </Box>
+        </DialogTitle>
+        <DialogContent dividers>
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="body2" color="text.secondary" gutterBottom>
+              Nhân viên: <strong>{userToAssignStations?.fullName}</strong>
+            </Typography>
+            <Typography variant="body2" color="text.secondary" gutterBottom>
+              Email: <strong>{userToAssignStations?.email}</strong>
+            </Typography>
+            <Chip 
+              label={`Đã chọn: ${selectedStations.length} trạm`} 
+              color="primary" 
+              size="small" 
+              sx={{ mt: 1 }}
+            />
+          </Box>
+
+          <Typography variant="subtitle2" gutterBottom sx={{ mt: 2, mb: 1 }}>
+            Chọn trạm sạc được phân công:
+          </Typography>
+
+          {stations.length === 0 ? (
+            <Alert severity="info">Chưa có trạm sạc nào trong hệ thống</Alert>
+          ) : (
+            <Grid container spacing={2}>
+              {stations.map((station) => (
+                <Grid item xs={12} sm={6} key={station.stationId}>
+                  <Card 
+                    variant="outlined"
+                    sx={{ 
+                      cursor: 'pointer',
+                      border: selectedStations.includes(station.stationId) ? 2 : 1,
+                      borderColor: selectedStations.includes(station.stationId) ? 'success.main' : 'divider',
+                      bgcolor: selectedStations.includes(station.stationId) ? 'success.50' : 'transparent',
+                      transition: 'all 0.2s',
+                      '&:hover': {
+                        borderColor: 'success.main',
+                        transform: 'translateY(-2px)',
+                        boxShadow: 2
+                      }
+                    }}
+                    onClick={() => toggleStationSelection(station.stationId)}
+                  >
+                    <CardContent>
+                      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                        <Box sx={{ flex: 1 }}>
+                          <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
+                            {station.name}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <LocationOn fontSize="inherit" />
+                            {station.address}
+                          </Typography>
+                          <Box sx={{ mt: 1 }}>
+                            <Chip 
+                              label={`${station.totalChargers || 0} bộ sạc`} 
+                              size="small" 
+                              variant="outlined"
+                            />
+                          </Box>
+                        </Box>
+                        {selectedStations.includes(station.stationId) && (
+                          <CheckCircle color="success" />
+                        )}
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setStationAssignDialogOpen(false)}>Hủy</Button>
+          <Button 
+            variant="contained" 
+            onClick={handleAssignStations}
+            disabled={selectedStations.length === 0}
+            startIcon={<CheckCircle />}
+          >
+            Xác nhận phân quyền
           </Button>
         </DialogActions>
       </Dialog>

@@ -1,20 +1,20 @@
 {
   "format": 1,
   "restore": {
-    "d:\\FPT_University\\FPTU_StudySource\\term5\\SWP391\\Project\\SkaEV_SWP_Project\\SkaEV.API\\SkaEV.API.csproj": {}
+    "D:\\llll\\ky5\\SWP\\prj1\\FPTU_FA25_SWP391_G4_Topic3_SkaEV\\SkaEV.API\\SkaEV.API.csproj": {}
   },
   "projects": {
-    "d:\\FPT_University\\FPTU_StudySource\\term5\\SWP391\\Project\\SkaEV_SWP_Project\\SkaEV.API\\SkaEV.API.csproj": {
+    "D:\\llll\\ky5\\SWP\\prj1\\FPTU_FA25_SWP391_G4_Topic3_SkaEV\\SkaEV.API\\SkaEV.API.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "d:\\FPT_University\\FPTU_StudySource\\term5\\SWP391\\Project\\SkaEV_SWP_Project\\SkaEV.API\\SkaEV.API.csproj",
+        "projectUniqueName": "D:\\llll\\ky5\\SWP\\prj1\\FPTU_FA25_SWP391_G4_Topic3_SkaEV\\SkaEV.API\\SkaEV.API.csproj",
         "projectName": "SkaEV.API",
-        "projectPath": "d:\\FPT_University\\FPTU_StudySource\\term5\\SWP391\\Project\\SkaEV_SWP_Project\\SkaEV.API\\SkaEV.API.csproj",
-        "packagesPath": "C:\\Users\\thinhpro\\.nuget\\packages\\",
-        "outputPath": "d:\\FPT_University\\FPTU_StudySource\\term5\\SWP391\\Project\\SkaEV_SWP_Project\\SkaEV.API\\obj\\",
+        "projectPath": "D:\\llll\\ky5\\SWP\\prj1\\FPTU_FA25_SWP391_G4_Topic3_SkaEV\\SkaEV.API\\SkaEV.API.csproj",
+        "packagesPath": "C:\\Users\\datth\\.nuget\\packages\\",
+        "outputPath": "D:\\llll\\ky5\\SWP\\prj1\\FPTU_FA25_SWP391_G4_Topic3_SkaEV\\SkaEV.API\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "C:\\Users\\thinhpro\\AppData\\Roaming\\NuGet\\NuGet.Config"
+          "C:\\Users\\datth\\AppData\\Roaming\\NuGet\\NuGet.Config"
         ],
         "originalTargetFrameworks": [
           "net9.0"

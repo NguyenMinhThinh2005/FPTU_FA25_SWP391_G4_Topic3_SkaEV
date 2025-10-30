@@ -1,840 +1,492 @@
-﻿/* eslint-disable */
+/* eslint-disable */
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Box,
   Grid,
+  Typography,
   Card,
   CardContent,
-  Typography,
   Button,
-  Chip,
-  IconButton,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
   Alert,
-  LinearProgress,
-  Avatar,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Paper,
+  AlertTitle,
+  Chip,
   Divider,
-  Snackbar,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemIcon,
-  Container,
   Stack,
 } from "@mui/material";
 import {
-  Dashboard as DashboardIcon,
   ElectricCar,
-  LocationOn,
+  BatteryChargingFull,
   Warning,
   CheckCircle,
   Build,
+  PowerOff,
   Refresh,
-  Add,
-  Visibility,
-  Edit,
-  Search,
-  Settings,
+  Notifications,
+  Error,
+  Bolt,
+  AccessTime,
   MonetizationOn,
-  PowerSettingsNew,
 } from "@mui/icons-material";
 
-// TODO: Fetch from backend API instead of mock data
 const StaffDashboard = () => {
-  const [stations, setStations] = useState([]);
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [stationInfo, setStationInfo] = useState(null);
+  const [connectors, setConnectors] = useState([]);
+  const [dailyStats, setDailyStats] = useState({
+    revenue: 0,
+    completedSessions: 0,
+    energyConsumed: 0,
+  });
   const [alerts, setAlerts] = useState([]);
-  const [selectedStation, setSelectedStation] = useState(null);
-  const [detailsDialog, setDetailsDialog] = useState(false);
-  const [maintenanceDialog, setMaintenanceDialog] = useState(false);
-  const [maintenanceForm, setMaintenanceForm] = useState({
-    pole: "",
-    port: "",
-    issue: "",
-    notes: "",
-  });
 
-  // New states for driver-like flow
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [selectedStationForDetail, setSelectedStationForDetail] =
-    useState(null);
-  const [actionDialog, setActionDialog] = useState({
-    open: false,
-    type: "",
-    station: null,
-  });
-  const [successMessage, setSuccessMessage] = useState("");
-  const [showSuccess, setShowSuccess] = useState(false);
+  // Mock data - TODO: Replace with API
+  const mockStationInfo = {
+    id: 1,
+    name: "Trạm sạc FPT Complex",
+    address: "Lô E2a-7, D1, KCN Cao, Q9, HCM",
+    staffName: "Nguyễn Văn A",
+  };
 
-  // Calculate overall statistics from poles/ports
-  const calculateStationStats = (stations) => {
-    let totalPoles = 0;
-    let activePoles = 0;
-    let maintenancePoles = 0;
-    let offlinePoles = 0;
-    let totalPorts = 0;
-    let occupiedPorts = 0;
+  const mockConnectors = [
+    {
+      id: "CON-01",
+      stationId: 1,
+      type: "AC",
+      maxPower: 22,
+      status: "Available",
+      statusLabel: "Rảnh",
+      statusColor: "success",
+      currentSession: null,
+    },
+    {
+      id: "CON-02",
+      stationId: 1,
+      type: "AC",
+      maxPower: 22,
+      status: "Charging",
+      statusLabel: "Đang sạc",
+      statusColor: "primary",
+      currentSession: {
+        id: "SES-001",
+        startTime: new Date(Date.now() - 45 * 60 * 1000),
+        energyConsumed: 15.5,
+        estimatedCost: 77500,
+        vehicleSOC: 65,
+      },
+    },
+    {
+      id: "CON-03",
+      stationId: 1,
+      type: "DC",
+      maxPower: 50,
+      status: "Available",
+      statusLabel: "Rảnh",
+      statusColor: "success",
+      currentSession: null,
+    },
+    {
+      id: "CON-04",
+      stationId: 1,
+      type: "DC",
+      maxPower: 50,
+      status: "Faulted",
+      statusLabel: "Lỗi",
+      statusColor: "error",
+      currentSession: null,
+    },
+  ];
 
-    stations.forEach((station) => {
-      (station.charging?.poles || []).forEach((pole) => {
-        totalPoles++;
-        const portsCount = pole.totalPorts || (pole.ports || []).length;
-        totalPorts += portsCount;
-        const available = typeof pole.availablePorts === 'number' ? pole.availablePorts : (pole.ports || []).filter(p=>p.status==='available').length;
-        occupiedPorts += Math.max(0, portsCount - available);
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
 
-        switch (pole.status) {
-          case "active":
-          case "occupied":
-            activePoles++;
-            break;
-          case "maintenance":
-            maintenancePoles++;
-            break;
-          case "offline":
-            offlinePoles++;
-            break;
-        }
+  const loadDashboardData = async () => {
+    setLoading(true);
+    try {
+      // TODO: API calls
+      setStationInfo(mockStationInfo);
+      setConnectors(mockConnectors);
+      setActiveSessions(
+        mockConnectors.filter((c) => c.currentSession).map((c) => c.currentSession)
+      );
+
+      // Mock daily statistics
+      setDailyStats({
+        revenue: 2850000, // VNĐ
+        completedSessions: 12,
+        energyConsumed: 285.5, // kWh
       });
-    });
 
-    return {
-      totalPoles,
-      activePoles,
-      maintenancePoles,
-      offlinePoles,
-      totalPorts,
-      occupiedPorts,
-      availablePorts: totalPorts - occupiedPorts,
-    };
-  };
-
-  const stats = calculateStationStats(stations);
-  const totalRevenue = stations.reduce(
-    (sum, station) => sum + station.dailyRevenue,
-    0
-  );
-  const totalSessions = stations.reduce(
-    (sum, station) => sum + station.dailySessions,
-    0
-  );
-
-  // Filter stations based on search and status like driver flow
-  const filteredStations = stations.filter((station) => {
-    const matchesSearch =
-      station.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      station.location.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus =
-      statusFilter === "all" || station.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
-
-  // Handle station actions like driver flow
-  const handleStationAction = (action, station) => {
-    if (action === "view") {
-      setSelectedStationForDetail(station);
-    } else if (action === "maintenance") {
-      setActionDialog({ open: true, type: "maintenance", station });
+      // Mock alerts
+      const mockAlerts = [
+        {
+          id: 1,
+          type: "warning",
+          message: "Điểm sạc CON-04 đang Offline",
+          timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
+        },
+        {
+          id: 2,
+          type: "info",
+          message: "Phiên sạc SES-096 chưa thanh toán",
+          timestamp: new Date(Date.now() - 90 * 60 * 1000),
+        },
+      ];
+      setAlerts(mockAlerts);
+    } catch (error) {
+      console.error("Error loading dashboard:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleActionComplete = (actionType, stationName) => {
-    setSuccessMessage(
-      `${actionType} completed successfully for ${stationName}!`
-    );
-    setShowSuccess(true);
-    setActionDialog({ open: false, type: "", station: null });
-    setMaintenanceDialog(false);
-  };
-
-  const getDistanceToStation = (station) => {
-    // Mock distance calculation for staff view
-    return (Math.random() * 5 + 0.5).toFixed(1);
-  };
-
-  const getStatusColor = (status) => {
+  const getStatusIcon = (status) => {
     switch (status) {
-      case "operational":
-        return "success";
-      case "warning":
-        return "warning";
-      case "error":
-        return "error";
+      case "Available":
+        return <CheckCircle color="success" />;
+      case "Charging":
+        return <BatteryChargingFull color="primary" />;
+      case "Faulted":
+        return <Warning color="error" />;
+      case "Unavailable":
+        return <PowerOff color="disabled" />;
       default:
-        return "default";
+        return <Build color="warning" />;
     }
   };
 
-  const getPriorityColor = (priority) => {
-    switch (priority) {
-      case "high":
-        return "error";
-      case "medium":
-        return "warning";
-      case "low":
-        return "info";
-      default:
-        return "default";
-    }
-  };
-
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat("vi-VN", {
-      style: "currency",
-      currency: "VND",
-    }).format(amount);
-  };
+  // Statistics
+  const totalConnectors = connectors.length;
+  const availableConnectors = connectors.filter((c) => c.status === "Available").length;
+  const chargingConnectors = connectors.filter((c) => c.status === "Charging").length;
+  const faultedConnectors = connectors.filter((c) => c.status === "Faulted").length;
+  const onlineConnectors = connectors.filter((c) => c.status === "Available" || c.status === "Charging").length;
+  const offlineConnectors = connectors.filter((c) => c.status === "Faulted" || c.status === "Unavailable").length;
 
   return (
-    <Container maxWidth="lg" sx={{ py: 3 }}>
+    <Box>
       {/* Header */}
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" fontWeight="bold" gutterBottom>
-          Bảng điều khiển Nhân viên
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          Giám sát và quản lý trạm sạc, trụ sạc và cổng sạc
-        </Typography>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+        <Box>
+          <Typography variant="h4" fontWeight="bold" gutterBottom>
+            Quản lý Trạm sạc
+          </Typography>
+          <Typography variant="body1" color="text.secondary">
+            {stationInfo?.name} - {stationInfo?.address}
+          </Typography>
+        </Box>
+        <Button variant="outlined" startIcon={<Refresh />} onClick={loadDashboardData}>
+          Làm mới
+        </Button>
       </Box>
 
-      {/* Search & Filters */}
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Grid container spacing={3} alignItems="center">
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                placeholder="Tìm kiếm trạm theo tên hoặc địa điểm..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                InputProps={{
-                  startAdornment: (
-                    <Search sx={{ mr: 1, color: "text.secondary" }} />
-                  ),
-                }}
-              />
-            </Grid>
+      {/* Staff Info Alert */}
+      {stationInfo && (
+        <Alert severity="info" icon={<ElectricCar />} sx={{ mb: 3 }}>
+          Nhân viên: <strong>{stationInfo.staffName}</strong> - Trạm:{" "}
+          <strong>{stationInfo.name}</strong>
+        </Alert>
+      )}
 
-            <Grid item xs={12} md={3}>
-              <FormControl fullWidth>
-                <InputLabel>Trạng thái trạm</InputLabel>
-                <Select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                >
-                  <MenuItem value="all">Tất cả</MenuItem>
-                  <MenuItem value="operational">Hoạt động</MenuItem>
-                  <MenuItem value="warning">Cảnh báo</MenuItem>
-                  <MenuItem value="error">Lỗi</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-
-            <Grid item xs={12} md={3}>
-              <Typography variant="body2" color="text.secondary">
-                Tìm thấy {filteredStations.length} trạm
-              </Typography>
-            </Grid>
-          </Grid>
-        </CardContent>
-      </Card>
-
-      {/* Overview Statistics */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={6} md={3}>
+      {/* Statistics Cards */}
+      <Grid container spacing={3} mb={3}>
+        <Grid item xs={12} sm={6} md={3}>
           <Card>
-            <CardContent sx={{ textAlign: "center" }}>
-              <Avatar
-                sx={{
-                  bgcolor: "primary.main",
-                  mx: "auto",
-                  mb: 2,
-                  width: 56,
-                  height: 56,
-                }}
-              >
-                <ElectricCar />
-              </Avatar>
-              <Typography variant="h4" fontWeight="bold">
-                {stats.totalPoles}
-              </Typography>
-              <Typography variant="body2" color="text.secondary" gutterBottom>
-                Trụ sạc
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                {stats.activePoles} hoạt động • {stats.totalPorts} cổng
-              </Typography>
+            <CardContent>
+              <Box display="flex" alignItems="center" gap={2}>
+                <ElectricCar color="primary" sx={{ fontSize: 40 }} />
+                <Box>
+                  <Typography variant="h4" fontWeight="bold">
+                    {totalConnectors}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Tổng điểm sạc
+                  </Typography>
+                </Box>
+              </Box>
             </CardContent>
           </Card>
         </Grid>
-
-        <Grid item xs={6} md={3}>
+        <Grid item xs={12} sm={6} md={3}>
           <Card>
-            <CardContent sx={{ textAlign: "center" }}>
-              <Avatar
-                sx={{
-                  bgcolor: "success.main",
-                  mx: "auto",
-                  mb: 2,
-                  width: 56,
-                  height: 56,
-                }}
-              >
-                <CheckCircle />
-              </Avatar>
-              <Typography variant="h4" fontWeight="bold" color="success.main">
-                {stats.availablePorts}
-              </Typography>
-              <Typography variant="body2" color="text.secondary" gutterBottom>
-                Cổng có sẵn
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                {((stats.availablePorts / Math.max(1, stats.totalPorts)) * 100).toFixed(1)}% khả dụng
-              </Typography>
+            <CardContent>
+              <Box display="flex" alignItems="center" gap={2}>
+                <CheckCircle color="success" sx={{ fontSize: 40 }} />
+                <Box>
+                  <Typography variant="h4" fontWeight="bold" color="success.main">
+                    {onlineConnectors}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Điểm sạc Online
+                  </Typography>
+                </Box>
+              </Box>
             </CardContent>
           </Card>
         </Grid>
-
-        <Grid item xs={6} md={3}>
+        <Grid item xs={12} sm={6} md={3}>
           <Card>
-            <CardContent sx={{ textAlign: "center" }}>
-              <Avatar
-                sx={{
-                  bgcolor: "info.main",
-                  mx: "auto",
-                  mb: 2,
-                  width: 56,
-                  height: 56,
-                }}
-              >
-                <MonetizationOn />
-              </Avatar>
-              <Typography variant="h4" fontWeight="bold">
-                {formatCurrency(totalRevenue)}
-              </Typography>
-              <Typography variant="body2" color="text.secondary" gutterBottom>
-                Doanh thu hôm nay
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                {totalSessions} phiên sạc
-              </Typography>
+            <CardContent>
+              <Box display="flex" alignItems="center" gap={2}>
+                <PowerOff color="error" sx={{ fontSize: 40 }} />
+                <Box>
+                  <Typography variant="h4" fontWeight="bold" color="error.main">
+                    {offlineConnectors}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Điểm sạc Offline
+                  </Typography>
+                </Box>
+              </Box>
             </CardContent>
           </Card>
         </Grid>
-
-        <Grid item xs={6} md={3}>
+        <Grid item xs={12} sm={6} md={3}>
           <Card>
-            <CardContent sx={{ textAlign: "center" }}>
-              <Avatar
-                sx={{
-                  bgcolor: "warning.main",
-                  mx: "auto",
-                  mb: 2,
-                  width: 56,
-                  height: 56,
-                }}
-              >
-                <Warning />
-              </Avatar>
-              <Typography variant="h4" fontWeight="bold" color="warning.main">
-                {alerts.filter((a) => a.priority === "high").length}
-              </Typography>
-              <Typography variant="body2" color="text.secondary" gutterBottom>
-                Cảnh báo ưu tiên cao
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                {alerts.length} tổng cảnh báo
-              </Typography>
+            <CardContent>
+              <Box display="flex" alignItems="center" gap={2}>
+                <BatteryChargingFull color="primary" sx={{ fontSize: 40 }} />
+                <Box>
+                  <Typography variant="h4" fontWeight="bold" color="primary.main">
+                    {chargingConnectors}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Đang sạc
+                  </Typography>
+                </Box>
+              </Box>
             </CardContent>
           </Card>
         </Grid>
       </Grid>
 
-      {/* Station List & Details - Driver-like flow */}
-      <Grid container spacing={3}>
-        {/* Station List */}
-        <Grid item xs={12} md={8}>
-          <Card>
+      {/* Daily Statistics */}
+      <Typography variant="h5" fontWeight={600} mb={2}>
+        Thống kê nhanh trong ngày
+      </Typography>
+      <Grid container spacing={3} mb={3}>
+        <Grid item xs={12} md={4}>
+          <Card sx={{ bgcolor: "success.50" }}>
             <CardContent>
-              <Box
-                sx={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  mb: 2,
-                }}
-              >
-                <Typography variant="h6" gutterBottom>
-                  {filteredStations.length} Stations Found
-                </Typography>
-                <Button
-                  startIcon={<Refresh />}
-                  onClick={() => window.location.reload()}
-                >
-                  Refresh
-                </Button>
-              </Box>
-
-              <Box sx={{ maxHeight: 600, overflowY: "auto" }}>
-                {filteredStations.map((station, index) => (
-                  <Box key={station.id}>
-                    <Paper
-                      sx={{
-                        p: 2,
-                        mb: 2,
-                        border:
-                          selectedStationForDetail?.id === station.id ? 2 : 1,
-                        borderColor:
-                          selectedStationForDetail?.id === station.id
-                            ? "primary.main"
-                            : "divider",
-                        "&:hover": {
-                          backgroundColor: "grey.50",
-                          cursor: "pointer",
-                        },
-                      }}
-                      onClick={() => setSelectedStationForDetail(station)}
-                    >
-                      <Box
-                        sx={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 2,
-                          mb: 2,
-                        }}
-                      >
-                        <Avatar
-                          sx={{
-                            bgcolor: "success.main",
-                            width: 60,
-                            height: 60,
-                          }}
-                        >
-                          <LocationOn />
-                        </Avatar>
-
-                        <Box sx={{ flexGrow: 1 }}>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "start",
-                              mb: 1,
-                            }}
-                          >
-                            <Typography variant="h6" fontWeight="bold">
-                              {station.name}
-                            </Typography>
-                            <Chip
-                              label={station.status}
-                              color={getStatusColor(station.status)}
-                              size="small"
-                            />
-                          </Box>
-
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 1,
-                              mb: 1,
-                            }}
-                          >
-                            <LocationOn
-                              sx={{ fontSize: 16, color: "text.secondary" }}
-                            />
-                            <Typography variant="body2" color="text.secondary">
-                              {station.location} •{" "}
-                              {getDistanceToStation(station)}km away
-                            </Typography>
-                          </Box>
-
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 3,
-                              mb: 1,
-                            }}
-                          >
-                            <Box
-                              sx={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 1,
-                              }}
-                            >
-                                        <ElectricCar
-                                          sx={{ fontSize: 16, color: "primary.main" }}
-                                        />
-                                        <Typography variant="body2">
-                                          {station.charging?.poles?.length || 0} trụ,{" "}
-                                          {(station.charging?.poles || []).reduce(
-                                            (sum, pole) => sum + (pole.totalPorts || (pole.ports || []).length),
-                                            0
-                                          )}{" "}
-                                          cổng
-                                        </Typography>
-                            </Box>
-                            <Box
-                              sx={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 1,
-                              }}
-                            >
-                              <MonetizationOn
-                                sx={{ fontSize: 16, color: "success.main" }}
-                              />
-                              <Typography variant="body2">
-                                {formatCurrency(station.dailyRevenue)} revenue
-                              </Typography>
-                            </Box>
-                          </Box>
-
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 2,
-                            }}
-                          >
-                            <Box
-                              sx={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 1,
-                              }}
-                            >
-                              <Typography
-                                variant="caption"
-                                color="text.secondary"
-                              >
-                                Available:{" "}
-                                {station.charging?.poles?.reduce(
-                                  (sum, pole) =>
-                                    sum + (pole.availablePorts ?? (pole.ports || []).filter(p=>p.status==='available').length),
-                                  0
-                                )}
-                                /
-                                {station.charging?.poles?.reduce(
-                                  (sum, pole) => sum + (pole.totalPorts ?? (pole.ports || []).length),
-                                  0
-                                )}
-                              </Typography>
-                              <LinearProgress
-                                variant="determinate"
-                                value={
-                                  (station.charging?.poles?.reduce(
-                                    (sum, pole) =>
-                                      sum + ((pole.totalPorts ?? (pole.ports || []).length) - (pole.availablePorts ?? (pole.ports || []).filter(p=>p.status==='available').length)),
-                                    0
-                                  ) /
-                                    Math.max(1, station.charging?.poles?.reduce(
-                                      (sum, pole) => sum + (pole.totalPorts ?? (pole.ports || []).length),
-                                      0
-                                    ))) *
-                                  100
-                                }
-                                sx={{ width: 60, height: 4 }}
-                              />
-                            </Box>
-                            <Chip
-                              label={`${station.dailySessions} sessions`}
-                              size="small"
-                              variant="outlined"
-                            />
-                            <Chip
-                              label={`${
-                                station.charging?.poles?.filter(
-                                  (p) => p.status === "active" || p.status === "occupied"
-                                ).length
-                              } active poles`}
-                              color="success"
-                              size="small"
-                            />
-                          </Box>
-                        </Box>
-
-                        <Box
-                          sx={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: 1,
-                          }}
-                        >
-                          <Button
-                            variant="contained"
-                            size="small"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleStationAction("view", station);
-                            }}
-                            startIcon={<Visibility />}
-                          >
-                            Giám sát
-                          </Button>
-                          <Button
-                            variant="outlined"
-                            size="small"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleStationAction("maintenance", station);
-                            }}
-                            startIcon={<Build />}
-                          >
-                            Bảo trì
-                          </Button>
-                        </Box>
-                      </Box>
-                    </Paper>
-                  </Box>
-                ))}
+              <Box display="flex" alignItems="center" gap={2}>
+                <MonetizationOn sx={{ fontSize: 40, color: "success.main" }} />
+                <Box>
+                  <Typography variant="h5" fontWeight="bold" color="success.main">
+                    {dailyStats.revenue.toLocaleString()} ₫
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Doanh thu hôm nay
+                  </Typography>
+                </Box>
               </Box>
             </CardContent>
           </Card>
         </Grid>
-
-        {/* Station Details & Alerts Panel */}
         <Grid item xs={12} md={4}>
-          {selectedStationForDetail ? (
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  {selectedStationForDetail.name}
-                </Typography>
-
-                <Box sx={{ mb: 2 }}>
-                  <Avatar
-                    sx={{
-                      width: "100%",
-                      height: 120,
-                      borderRadius: 2,
-                      bgcolor: "success.main",
-                    }}
-                  >
-                    <LocationOn sx={{ fontSize: 40 }} />
-                  </Avatar>
+          <Card sx={{ bgcolor: "primary.50" }}>
+            <CardContent>
+              <Box display="flex" alignItems="center" gap={2}>
+                <AccessTime sx={{ fontSize: 40, color: "primary.main" }} />
+                <Box>
+                  <Typography variant="h5" fontWeight="bold" color="primary.main">
+                    {dailyStats.completedSessions}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Phiên sạc hoàn thành
+                  </Typography>
                 </Box>
-
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    color: "text.secondary",
-                    fontSize: "0.875rem",
-                    mb: 1,
-                  }}
-                >
-                  <LocationOn sx={{ fontSize: 16, mr: 0.5 }} />
-                  {selectedStationForDetail.location}
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} md={4}>
+          <Card sx={{ bgcolor: "warning.50" }}>
+            <CardContent>
+              <Box display="flex" alignItems="center" gap={2}>
+                <Bolt sx={{ fontSize: 40, color: "warning.main" }} />
+                <Box>
+                  <Typography variant="h5" fontWeight="bold" color="warning.main">
+                    {dailyStats.energyConsumed.toFixed(1)} kWh
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Năng lượng tiêu thụ
+                  </Typography>
                 </Box>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
 
-                <Typography variant="body2" color="text.secondary" gutterBottom>
-                  Khoảng cách: {getDistanceToStation(selectedStationForDetail)}km
-                </Typography>
-
-                <Divider sx={{ my: 2 }} />
-
-                <Typography variant="subtitle2" gutterBottom>
-                  Trạng thái Trụ & Cổng
-                </Typography>
-                {selectedStationForDetail.charging?.poles?.map((pole) => (
-                    <Box key={pole.id} sx={{ fontSize: "0.875rem", mb: 1 }}>
-                    • Trụ {pole.name}: {pole.availablePorts ?? (pole.ports || []).filter(p=>p.status==='available').length}/{pole.totalPorts ?? (pole.ports || []).length} cổng trống ({pole.status})
-                  </Box>
-                ))}
-
-                <Divider sx={{ my: 2 }} />
-
-                <Typography variant="subtitle2" gutterBottom>
-                  Hiệu suất hôm nay
-                </Typography>
-                <Box sx={{ fontSize: "0.875rem", mb: 1 }}>
-                  • Doanh thu:{" "}
-                  {formatCurrency(selectedStationForDetail.dailyRevenue)}
-                </Box>
-                <Box sx={{ fontSize: "0.875rem", mb: 1 }}>
-                  • Phiên sạc: {selectedStationForDetail.dailySessions}
-                </Box>
-
-                <Box
-                  sx={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 1,
-                    mt: 2,
-                  }}
-                >
-                  <Button
-                    fullWidth
-                    variant="contained"
-                    onClick={() =>
-                      handleStationAction(
-                        "maintenance",
-                        selectedStationForDetail
-                      )
+      {/* Alerts & Notifications */}
+      {alerts.length > 0 && (
+        <>
+          <Typography variant="h5" fontWeight={600} mb={2}>
+            Cảnh báo & Thông báo
+          </Typography>
+          <Card sx={{ mb: 3 }}>
+            <CardContent>
+              <Stack spacing={2}>
+                {alerts.map((alert) => (
+                  <Alert
+                    key={alert.id}
+                    severity={alert.type}
+                    action={
+                      <Button
+                        size="small"
+                        onClick={() =>
+                          alert.type === "warning"
+                            ? navigate("/staff/monitoring")
+                            : navigate("/staff/charging-sessions")
+                        }
+                      >
+                        Xem
+                      </Button>
                     }
                   >
-                    Lên lịch bảo trì
-                  </Button>
-                </Box>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Chọn một trạm
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Chọn trạm từ danh sách để xem thông tin chi tiết và thực hiện bảo trì
-                </Typography>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Quick Alerts */}
-          <Card sx={{ mt: 3 }}>
-            <CardContent>
-              <Typography variant="h6" fontWeight="bold" gutterBottom>
-                Cảnh báo ưu tiên
-              </Typography>
-              {alerts.slice(0, 3).map((alert) => (
-                <Alert
-                  key={alert.id}
-                  severity={getPriorityColor(alert.priority)}
-                  sx={{ mb: 1 }}
-                  size="small"
-                >
-                  <Typography variant="caption" fontWeight="bold">
-                    {alert.station} - Trụ: {alert.pole || alert.chargingPost}
-                  </Typography>
-                  <Typography variant="caption" display="block">
-                    {alert.message}
-                  </Typography>
-                </Alert>
-              ))}
-              <Button variant="outlined" fullWidth size="small" sx={{ mt: 1 }}>
-                Xem tất cả cảnh báo
-              </Button>
+                    <Typography variant="body2">{alert.message}</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {alert.timestamp.toLocaleString("vi-VN")}
+                    </Typography>
+                  </Alert>
+                ))}
+              </Stack>
             </CardContent>
           </Card>
-        </Grid>
+        </>
+      )}
+
+      {/* Connectors by Status - Horizontal Layout */}
+      <Typography variant="h5" fontWeight={600} mb={2} mt={4}>
+        Danh sách Điểm sạc
+      </Typography>
+      <Grid container spacing={3}>
+        {/* Available Connectors Column */}
+        {connectors.filter((c) => c.status === "Available").length > 0 && (
+          <Grid item xs={12} md={4}>
+            <Typography variant="h6" fontWeight={600} mb={2} color="success.main">
+              🟢 Rảnh
+            </Typography>
+            <Stack spacing={2}>
+              {connectors
+                .filter((c) => c.status === "Available")
+                .map((connector) => (
+                  <Card
+                    key={connector.id}
+                    sx={{
+                      border: 2,
+                      borderColor: "success.light",
+                    }}
+                  >
+                    <CardContent>
+                      <Box display="flex" justifyContent="space-between" alignItems="start">
+                        <Box>
+                          <Typography variant="h6" fontWeight="bold">
+                            {connector.id}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {connector.type} - {connector.maxPower} kW
+                          </Typography>
+                        </Box>
+                        <Chip
+                          icon={getStatusIcon(connector.status)}
+                          label={connector.statusLabel}
+                          color={connector.statusColor}
+                          size="small"
+                        />
+                      </Box>
+                    </CardContent>
+                  </Card>
+                ))}
+            </Stack>
+          </Grid>
+        )}
+
+        {/* Charging Connectors Column */}
+        {connectors.filter((c) => c.status === "Charging").length > 0 && (
+          <Grid item xs={12} md={4}>
+            <Typography variant="h6" fontWeight={600} mb={2} color="primary.main">
+              🔵 Đang hoạt động
+            </Typography>
+            <Stack spacing={2}>
+              {connectors
+                .filter((c) => c.status === "Charging")
+                .map((connector) => (
+                  <Card
+                    key={connector.id}
+                    sx={{
+                      border: 2,
+                      borderColor: "primary.main",
+                    }}
+                  >
+                    <CardContent>
+                      <Box display="flex" justifyContent="space-between" alignItems="start">
+                        <Box>
+                          <Typography variant="h6" fontWeight="bold">
+                            {connector.id}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {connector.type} - {connector.maxPower} kW
+                          </Typography>
+                        </Box>
+                        <Chip
+                          icon={getStatusIcon(connector.status)}
+                          label={connector.statusLabel}
+                          color={connector.statusColor}
+                          size="small"
+                        />
+                      </Box>
+                    </CardContent>
+                  </Card>
+                ))}
+            </Stack>
+          </Grid>
+        )}
+
+        {/* Faulted/Unavailable Connectors Column */}
+        {connectors.filter((c) => c.status === "Faulted" || c.status === "Unavailable").length > 0 && (
+          <Grid item xs={12} md={4}>
+            <Typography variant="h6" fontWeight={600} mb={2} color="error.main">
+              🔴 Báo lỗi
+            </Typography>
+            <Stack spacing={2}>
+              {connectors
+                .filter((c) => c.status === "Faulted" || c.status === "Unavailable")
+                .map((connector) => (
+                  <Card
+                    key={connector.id}
+                    sx={{
+                      border: 2,
+                      borderColor: "error.main",
+                    }}
+                  >
+                    <CardContent>
+                      <Box display="flex" justifyContent="space-between" alignItems="start">
+                        <Box>
+                          <Typography variant="h6" fontWeight="bold">
+                            {connector.id}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {connector.type} - {connector.maxPower} kW
+                          </Typography>
+                        </Box>
+                        <Chip
+                          icon={getStatusIcon(connector.status)}
+                          label={connector.statusLabel}
+                          color={connector.statusColor}
+                          size="small"
+                        />
+                      </Box>
+                    </CardContent>
+                  </Card>
+                ))}
+            </Stack>
+          </Grid>
+        )}
       </Grid>
-
-      {/* Action Dialogs - Driver-like flow */}
-      <Dialog
-        open={actionDialog.open && actionDialog.type === "maintenance"}
-        onClose={() =>
-          setActionDialog({ open: false, type: "", station: null })
-        }
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>
-          Lên lịch bảo trì: {actionDialog.station?.name}
-        </DialogTitle>
-        <DialogContent>
-            <Typography variant="body2" sx={{ mb: 2 }}>
-            Lên lịch bảo trì cho trụ và cổng sạc
-          </Typography>
-          <FormControl fullWidth sx={{ mb: 2 }}>
-            <InputLabel>Trụ</InputLabel>
-            <Select
-              value={maintenanceForm.pole}
-              onChange={(e) =>
-                setMaintenanceForm({
-                  ...maintenanceForm,
-                  pole: e.target.value,
-                })
-              }
-            >
-              {actionDialog.station?.charging?.poles?.map((pole) => (
-                <MenuItem key={pole.id} value={pole.id}>
-                  {pole.name} ({pole.type} - {pole.power}kW)
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <TextField
-            fullWidth
-            label="Mã cổng"
-            value={maintenanceForm.port}
-            onChange={(e) =>
-              setMaintenanceForm({ ...maintenanceForm, port: e.target.value })
-            }
-            sx={{ mb: 2 }}
-            placeholder="Ví dụ: Cổng 1, Cổng 2, Tất cả cổng"
-          />
-          <TextField
-            fullWidth
-            label="Mô tả sự cố"
-            value={maintenanceForm.issue}
-            onChange={(e) =>
-              setMaintenanceForm({ ...maintenanceForm, issue: e.target.value })
-            }
-            sx={{ mb: 2 }}
-          />
-          <TextField
-            fullWidth
-            multiline
-            rows={3}
-            label="Ghi chú thêm"
-            value={maintenanceForm.notes}
-            onChange={(e) =>
-              setMaintenanceForm({ ...maintenanceForm, notes: e.target.value })
-            }
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={() =>
-              setActionDialog({ open: false, type: "", station: null })
-            }
-          >
-            Hủy
-          </Button>
-          <Button
-            variant="contained"
-            onClick={() =>
-              handleActionComplete(
-                "Maintenance scheduling",
-                actionDialog.station?.name
-              )
-            }
-          >
-            Lên lịch bảo trì
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Success Snackbar - Driver-like flow */}
-      <Snackbar
-        open={showSuccess}
-        autoHideDuration={4000}
-        onClose={() => setShowSuccess(false)}
-        anchorOrigin={{ vertical: "top", horizontal: "center" }}
-      >
-        <Alert
-          onClose={() => setShowSuccess(false)}
-          severity="success"
-          variant="filled"
-          sx={{ width: "100%" }}
-        >
-          {successMessage}
-        </Alert>
-      </Snackbar>
-    </Container>
+    </Box>
   );
 };
 
