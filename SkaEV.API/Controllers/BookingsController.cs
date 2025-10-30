@@ -155,14 +155,32 @@ public class BookingsController : ControllerBase
     }
 
     /// <summary>
-    /// Start charging session (Staff only)
+    /// Start charging session (Customer can start their own booking, Staff/Admin can start any)
     /// </summary>
     [HttpPut("{id}/start")]
-    [Authorize(Roles = "staff,admin")]
+    [Authorize]
     public async Task<IActionResult> StartCharging(int id)
     {
         try
         {
+            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+            var userRole = User.FindFirst(ClaimTypes.Role)!.Value;
+            
+            // Check if user owns this booking (unless they are staff/admin)
+            if (userRole != "admin" && userRole != "staff")
+            {
+                var booking = await _bookingService.GetBookingByIdAsync(id);
+                if (booking == null)
+                {
+                    return NotFound(new { message = "Booking not found" });
+                }
+                
+                if (booking.UserId != userId)
+                {
+                    return Forbid();
+                }
+            }
+            
             var success = await _bookingService.StartChargingAsync(id);
             if (!success)
             {

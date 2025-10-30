@@ -104,8 +104,9 @@ const useBookingStore = create(
             // Merge API response
             booking = {
               ...booking,
-              id: response.bookingId || response.id || booking.id,
-              apiId: response.bookingId || response.id,
+              id: response.bookingId || response.id, // Use numeric ID from API
+              bookingCode: booking.id, // Keep BOOK... string as code for display
+              apiId: response.bookingId || response.id, // Keep for backward compatibility
               status: response.status || booking.status,
               createdAt: response.createdAt || booking.createdAt,
             };
@@ -204,8 +205,9 @@ const useBookingStore = create(
         try {
           const booking = get().bookings.find((b) => b.id === bookingId);
 
-          // Backend now allows customer to complete their own booking
-          const ENABLE_COMPLETE_API = true;
+          // API call should be done by caller (ChargingFlow), not here
+          // This method only updates local state
+          const ENABLE_COMPLETE_API = false; // Disabled - caller handles API
 
           if (booking && booking.apiId && ENABLE_COMPLETE_API) {
             console.log(

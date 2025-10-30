@@ -469,7 +469,9 @@ const ChargingFlow = () => {
     try {
       // For customer demo, skip API validation (API requires Staff role)
       // In production, Staff would scan and validate
-      console.log("⚠️ Customer mode - skipping API validation (requires Staff role)");
+      console.log(
+        "⚠️ Customer mode - skipping API validation (requires Staff role)"
+      );
       console.log("✅ QR code accepted in demo mode:", result);
 
       // Update booking with QR scan info
@@ -479,7 +481,7 @@ const ChargingFlow = () => {
             ...currentBooking,
             qrScanned: true,
             scannedAt: new Date().toISOString(),
-          }
+          },
         });
       }
 
@@ -492,7 +494,7 @@ const ChargingFlow = () => {
     } catch (error) {
       console.error("❌ Error scanning QR code:", error);
       console.warn("⚠️ Continuing with demo mode anyway");
-      
+
       // Continue with demo mode even if there's an error
       setScanResult(result);
       setFlowStep(3);
@@ -508,15 +510,20 @@ const ChargingFlow = () => {
     }
 
     try {
-      console.log("🔌 Starting charging session for booking:", currentBooking.id || currentBooking.apiId);
-      
+      console.log(
+        "🔌 Starting charging session for booking:",
+        currentBooking.id,
+        currentBooking
+      );
+
       // Try to call API to start charging session (may fail with 403 if not Staff)
-      const bookingId = currentBooking.apiId || currentBooking.id;
-      
+      // Use numeric ID from API response, not the BOOK... string
+      const bookingId = currentBooking.id;
+
       try {
         const response = await chargingAPI.startCharging(bookingId);
         console.log("✅ Charging session started via API:", response);
-        
+
         // Create charging session from API response
         const newChargingSession = {
           sessionId: response.sessionId || `SESSION-${Date.now()}`,
@@ -525,14 +532,17 @@ const ChargingFlow = () => {
           stationId: currentBooking.stationId,
           stationName: currentBooking.stationName,
           chargerType: currentBooking.chargerType,
-          status: 'active',
+          status: "active",
         };
-        
+
         bookingStore.setState({ chargingSession: newChargingSession });
       } catch (apiError) {
         // If API fails (403 or other), continue with demo mode
-        console.warn("⚠️ API call failed (may require Staff role), continuing with demo mode:", apiError.message);
-        
+        console.warn(
+          "⚠️ API call failed (may require Staff role), continuing with demo mode:",
+          apiError.message
+        );
+
         // Create demo charging session
         const demoSession = {
           sessionId: `DEMO-SESSION-${Date.now()}`,
@@ -541,9 +551,9 @@ const ChargingFlow = () => {
           stationId: currentBooking.stationId,
           stationName: currentBooking.stationName,
           chargerType: currentBooking.chargerType,
-          status: 'active-demo',
+          status: "active-demo",
         };
-        
+
         bookingStore.setState({ chargingSession: demoSession });
         console.log("📊 Demo charging session created:", demoSession);
       }
@@ -557,8 +567,8 @@ const ChargingFlow = () => {
         currentBooking: {
           ...currentBooking,
           chargingStarted: true,
-          status: 'in-progress',
-        }
+          status: "in-progress",
+        },
       });
 
       // Initialize session data
@@ -1387,40 +1397,58 @@ const ChargingFlow = () => {
                   setCompletedSession(sessionEndData);
 
                   // 🚀 Call API to complete charging session
-                  const bookingId = currentBooking?.apiId || currentBooking?.id || currentBookingData?.id;
+                  // Use numeric ID from API response, not the BOOK... string
+                  const bookingId =
+                    currentBooking?.id || currentBookingData?.id;
                   if (bookingId) {
                     try {
-                      console.log("📤 Calling completeCharging API with booking ID:", bookingId);
+                      console.log(
+                        "📤 Calling completeCharging API with booking ID:",
+                        bookingId
+                      );
                       console.log("� Session data:", {
                         finalSoc: currentSOC,
                         totalEnergyKwh: sessionData.energyDelivered,
-                        unitPrice: selectedStation?.chargers?.[0]?.powerKw || 3500,
+                        unitPrice:
+                          selectedStation?.chargers?.[0]?.powerKw || 3500,
                       });
 
-                      const response = await chargingAPI.completeCharging(bookingId, {
-                        finalSoc: currentSOC,
-                        totalEnergyKwh: sessionData.energyDelivered,
-                        unitPrice: selectedStation?.chargers?.[0]?.powerKw || 3500,
-                      });
+                      const response = await chargingAPI.completeCharging(
+                        bookingId,
+                        {
+                          finalSoc: currentSOC,
+                          totalEnergyKwh: sessionData.energyDelivered,
+                          unitPrice:
+                            selectedStation?.chargers?.[0]?.powerKw || 3500,
+                        }
+                      );
 
-                      console.log("✅ Charging session completed via API:", response);
-                      
+                      console.log(
+                        "✅ Charging session completed via API:",
+                        response
+                      );
+
                       // Update charging session status
                       if (chargingSession) {
                         bookingStore.setState({
                           chargingSession: {
                             ...chargingSession,
-                            status: 'completed',
+                            status: "completed",
                             endTime: new Date(),
                             totalEnergy: sessionData.energyDelivered,
                             totalCost: sessionData.currentCost,
-                          }
+                          },
                         });
                       }
                     } catch (error) {
-                      console.error("❌ Error completing charging via API:", error);
+                      console.error(
+                        "❌ Error completing charging via API:",
+                        error
+                      );
                       // Continue with local completion even if API fails
-                      console.warn("⚠️ Continuing with local session completion");
+                      console.warn(
+                        "⚠️ Continuing with local session completion"
+                      );
                     }
 
                     // Also call bookingStore completeBooking for local state

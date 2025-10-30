@@ -19,7 +19,8 @@ const axiosInstance = axios.create({
 axiosInstance.interceptors.request.use(
   (config) => {
     // Try sessionStorage first (used by authStore), fallback to localStorage
-    const token = sessionStorage.getItem("token") || localStorage.getItem("token");
+    const token =
+      sessionStorage.getItem("token") || localStorage.getItem("token");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -44,7 +45,9 @@ axiosInstance.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        const refreshToken = sessionStorage.getItem("refreshToken") || localStorage.getItem("refreshToken");
+        const refreshToken =
+          sessionStorage.getItem("refreshToken") ||
+          localStorage.getItem("refreshToken");
         if (refreshToken) {
           const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {
             refreshToken,
@@ -222,28 +225,30 @@ export const usersAPI = {
   changePassword: (passwordData) => {
     return axiosInstance.post("/users/change-password", passwordData);
   },
-  
+
   // Additional admin user endpoints
   updateRole: (id, roleData) => {
     return axiosInstance.patch(`/admin/adminusers/${id}/role`, roleData);
   },
-  
+
   activate: (id) => {
     return axiosInstance.patch(`/admin/adminusers/${id}/activate`);
   },
-  
+
   deactivate: (id, reason) => {
-    return axiosInstance.patch(`/admin/adminusers/${id}/deactivate`, { reason });
+    return axiosInstance.patch(`/admin/adminusers/${id}/deactivate`, {
+      reason,
+    });
   },
-  
+
   resetPassword: (id) => {
     return axiosInstance.post(`/admin/adminusers/${id}/reset-password`);
   },
-  
+
   getActivity: (id) => {
     return axiosInstance.get(`/admin/adminusers/${id}/activity`);
   },
-  
+
   getStatistics: () => {
     return axiosInstance.get("/admin/adminusers/statistics");
   },
@@ -361,7 +366,7 @@ export const qrCodesAPI = {
 
   // Get QR code image
   getImage: (id) => {
-    return axiosInstance.get(`/qrcodes/${id}/image`, { responseType: 'blob' });
+    return axiosInstance.get(`/qrcodes/${id}/image`, { responseType: "blob" });
   },
 };
 
@@ -369,13 +374,13 @@ export const qrCodesAPI = {
 export const chargingAPI = {
   // Start charging session
   startCharging: (bookingId) => {
-    return axiosInstance.post(`/bookings/${bookingId}/start-charging`);
+    return axiosInstance.put(`/bookings/${bookingId}/start`);
   },
 
   // Complete charging session
   completeCharging: (bookingId, completeData) => {
     // completeData: { finalSoc, totalEnergyKwh, unitPrice }
-    return axiosInstance.post(`/bookings/${bookingId}/complete`, completeData);
+    return axiosInstance.put(`/bookings/${bookingId}/complete`, completeData);
   },
 };
 
