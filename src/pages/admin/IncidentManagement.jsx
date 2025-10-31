@@ -30,7 +30,6 @@ import {
   Snackbar,
   Stack,
   Divider,
-  Avatar,
   Tab,
   Tabs,
 } from "@mui/material";
@@ -153,11 +152,23 @@ const IncidentManagement = () => {
 
   const handleOpenResponse = (incident) => {
     setSelectedIncident(incident);
-    setResponseForm({
-      decision: "",
-      instructions: "",
-      notes: "",
-    });
+    
+    // Nếu đã có phản hồi rồi, load dữ liệu cũ vào form để có thể chỉnh sửa
+    if (incident.adminResponse) {
+      setResponseForm({
+        decision: incident.adminResponse.decision,
+        instructions: incident.adminResponse.instructions,
+        notes: incident.adminResponse.notes || "",
+      });
+    } else {
+      // Nếu chưa có phản hồi, reset form
+      setResponseForm({
+        decision: "",
+        instructions: "",
+        notes: "",
+      });
+    }
+    
     setResponseDialog(true);
   };
 
@@ -169,6 +180,7 @@ const IncidentManagement = () => {
 
     try {
       // TODO: API call to submit admin response
+      // Sau khi gửi phản hồi, trạng thái vẫn là "Đang xử lý" (không tự động chuyển sang "Hoàn thành")
       const newStatus = responseForm.decision === "approve" ? "in_progress" : "rejected";
       
       setIncidents(incidents.map(inc => 
@@ -190,12 +202,12 @@ const IncidentManagement = () => {
 
       setSnackbar({
         open: true,
-        message: "Đã gửi quyết định xử lý thành công!",
+        message: "Đã gửi phản hồi thành công!",
         severity: "success",
       });
       setResponseDialog(false);
     } catch (error) {
-      setSnackbar({ open: true, message: "Lỗi gửi quyết định", severity: "error" });
+      setSnackbar({ open: true, message: "Lỗi gửi phản hồi", severity: "error" });
     }
   };
 
@@ -371,9 +383,9 @@ const IncidentManagement = () => {
                   <TableCell>Điểm sạc</TableCell>
                   <TableCell>Loại sự cố</TableCell>
                   <TableCell>Mức độ</TableCell>
-                  <TableCell>Người báo cáo</TableCell>
                   <TableCell>Thời gian</TableCell>
                   <TableCell align="center">Trạng thái</TableCell>
+                  <TableCell>Phản hồi</TableCell>
                   <TableCell align="center">Thao tác</TableCell>
                 </TableRow>
               </TableHead>
@@ -402,19 +414,6 @@ const IncidentManagement = () => {
                       />
                     </TableCell>
                     <TableCell>
-                      <Box display="flex" alignItems="center" gap={1}>
-                        <Avatar sx={{ width: 32, height: 32, fontSize: 14 }}>
-                          {incident.reportedBy[0]}
-                        </Avatar>
-                        <Box>
-                          <Typography variant="body2">{incident.reportedBy}</Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {incident.reporterRole} - {incident.reporterId}
-                          </Typography>
-                        </Box>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
                       <Typography variant="body2">
                         {incident.reportedAt.toLocaleString("vi-VN", {
                           day: "2-digit",
@@ -431,15 +430,24 @@ const IncidentManagement = () => {
                         size="small"
                       />
                     </TableCell>
-                    <TableCell align="center">
-                      <Stack direction="row" spacing={1} justifyContent="center">
+                    <TableCell>
+                      {incident.adminResponse ? (
                         <Button
-                          variant="outlined"
+                          variant="text"
                           size="small"
                           onClick={() => handleViewDetail(incident)}
                         >
-                          Xem
+                          Xem chi tiết
                         </Button>
+                      ) : (
+                        <Typography variant="body2" color="text.secondary" fontStyle="italic">
+                          Chưa có phản hồi
+                        </Typography>
+                      )}
+                    </TableCell>
+                    <TableCell align="center">
+                      <Stack direction="row" spacing={1} justifyContent="center">
+                        {/* Chưa có phản hồi - Hiển thị nút Phản hồi */}
                         {incident.status === "pending" && (
                           <Button
                             variant="contained"
@@ -447,18 +455,30 @@ const IncidentManagement = () => {
                             color="primary"
                             onClick={() => handleOpenResponse(incident)}
                           >
-                            Xử lý
+                            Phản hồi
                           </Button>
                         )}
-                        {incident.status === "in_progress" && (
-                          <Button
-                            variant="contained"
-                            size="small"
-                            color="success"
-                            onClick={() => handleMarkResolved(incident.id)}
-                          >
-                            Hoàn thành
-                          </Button>
+                        
+                        {/* Đã phản hồi nhưng chưa hoàn thành - Hiển thị 2 nút */}
+                        {incident.status === "in_progress" && incident.adminResponse && (
+                          <>
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              color="primary"
+                              onClick={() => handleOpenResponse(incident)}
+                            >
+                              Phản hồi lại
+                            </Button>
+                            <Button
+                              variant="contained"
+                              size="small"
+                              color="success"
+                              onClick={() => handleMarkResolved(incident.id)}
+                            >
+                              Hoàn thành
+                            </Button>
+                          </>
                         )}
                       </Stack>
                     </TableCell>
@@ -578,7 +598,7 @@ const IncidentManagement = () => {
       {/* Response Dialog */}
       <Dialog open={responseDialog} onClose={() => setResponseDialog(false)} maxWidth="md" fullWidth>
         <DialogTitle>
-          Đưa ra Quyết định Xử lý - {selectedIncident?.id}
+          {selectedIncident?.adminResponse ? "Chỉnh sửa Phản hồi" : "Đưa ra Quyết định Xử lý"} - {selectedIncident?.id}
         </DialogTitle>
         <DialogContent dividers>
           {selectedIncident && (
@@ -642,7 +662,7 @@ const IncidentManagement = () => {
             onClick={handleSubmitResponse}
             color={responseForm.decision === "approve" ? "primary" : "error"}
           >
-            Gửi Quyết định
+            {selectedIncident?.adminResponse ? "Cập nhật Phản hồi" : "Gửi Phản hồi"}
           </Button>
         </DialogActions>
       </Dialog>
