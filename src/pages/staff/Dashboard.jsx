@@ -360,6 +360,10 @@ const StaffDashboard = () => {
                       bgcolor: cardBgColor,
                       border: 2,
                       borderColor: borderColor,
+                      height: '100%', // Chiều cao 100% của Grid item
+                      minHeight: 180, // Chiều cao tối thiểu cố định
+                      display: 'flex',
+                      flexDirection: 'column',
                       transition: "all 0.3s",
                       "&:hover": {
                         boxShadow: 4,
@@ -367,7 +371,7 @@ const StaffDashboard = () => {
                       },
                     }}
                   >
-                    <CardContent>
+                    <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
                       <Box display="flex" alignItems="center" justifyContent="space-between" mb={1}>
                         <Typography variant="h5" fontWeight="bold" color={textColor}>
                           {connector.id}

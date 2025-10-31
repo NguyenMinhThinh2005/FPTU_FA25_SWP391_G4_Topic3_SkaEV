@@ -30,8 +30,11 @@ import {
   Alert,
   Tooltip,
   CircularProgress,
+  Tab,
+  Tabs,
+  Divider,
 } from "@mui/material";
-import { Search, Add, Edit, Delete, People, Shield, SwapHoriz, CheckCircle, Warning, LocationOn, AdminPanelSettings } from "@mui/icons-material";
+import { Search, Add, Edit, Delete, People, Shield, SwapHoriz, CheckCircle, Warning, LocationOn, AdminPanelSettings, Work, Badge, Phone, Email, Person, CalendarToday } from "@mui/icons-material";
 import useUserStore from "../../store/userStore";
 import useStationStore from "../../store/stationStore";
 
@@ -50,6 +53,8 @@ const UserManagement = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [roleDialogOpen, setRoleDialogOpen] = useState(false);
   const [stationAssignDialogOpen, setStationAssignDialogOpen] = useState(false);
+  const [staffEditDialogOpen, setStaffEditDialogOpen] = useState(false); // Dialog chỉnh sửa Staff
+  const [staffEditTab, setStaffEditTab] = useState(0); // Tab trong Staff edit dialog
   const [editUser, setEditUser] = useState(null);
   const [userToDelete, setUserToDelete] = useState(null);
   const [userToChangeRole, setUserToChangeRole] = useState(null);
@@ -383,7 +388,34 @@ const UserManagement = () => {
                         </TableCell>
                         <TableCell align="center">
                           <Tooltip title="Chỉnh sửa">
-                            <IconButton size="small" color="primary" onClick={() => openEdit(u)}>
+                            <IconButton 
+                              size="small" 
+                              color="primary" 
+                              onClick={() => {
+                                if (u.role === "staff") {
+                                  // Mở dialog đặc biệt cho Staff
+                                  setEditUser(u);
+                                  setForm({
+                                    ...form,
+                                    email: u.email,
+                                    firstName: u.fullName?.split(" ")[0] || "",
+                                    lastName: u.fullName?.split(" ").slice(1).join(" ") || "",
+                                    phone: u.phoneNumber || "",
+                                    role: u.role,
+                                    employeeId: u.employeeId || "",
+                                    department: u.department || "",
+                                    position: u.position || "",
+                                    joinDate: u.joinDate || "",
+                                    location: u.location || "Hà Nội",
+                                  });
+                                  setStaffEditTab(0);
+                                  setStaffEditDialogOpen(true);
+                                } else {
+                                  // Mở dialog bình thường cho Customer/Admin
+                                  openEdit(u);
+                                }
+                              }}
+                            >
                               <Edit />
                             </IconButton>
                           </Tooltip>
@@ -454,21 +486,6 @@ const UserManagement = () => {
                 value={form.phone}
                 onChange={(e) => setForm({ ...form, phone: e.target.value })}
               />
-            </Grid>
-            <Grid item xs={12}>
-              <FormControl fullWidth required>
-                <InputLabel>Vai trò *</InputLabel>
-                <Select value={form.role} label="Vai trò *" onChange={(e) => setForm({ ...form, role: e.target.value })}>
-                  {roleOptions.map((r) => (
-                    <MenuItem key={r.value} value={r.value}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        {r.icon}
-                        {r.label}
-                      </Box>
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
             </Grid>
             {!editUser && (
               <Grid item xs={12}>
@@ -633,6 +650,228 @@ const UserManagement = () => {
             startIcon={<CheckCircle />}
           >
             Xác nhận phân quyền
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Dialog chỉnh sửa Staff - Giống trang Profile */}
+      <Dialog 
+        open={staffEditDialogOpen} 
+        onClose={() => setStaffEditDialogOpen(false)} 
+        maxWidth="md" 
+        fullWidth
+      >
+        <DialogTitle>
+          Quản lý thông tin cá nhân và cài đặt công việc
+        </DialogTitle>
+        <DialogContent dividers>
+          {/* Header Card với Avatar và Stats */}
+          <Card sx={{ mb: 3, bgcolor: 'primary.50' }}>
+            <CardContent>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                <Avatar sx={{ width: 100, height: 100, mr: 3, bgcolor: 'primary.main', fontSize: 40 }}>
+                  {(form.firstName || 'N')[0].toUpperCase()}
+                </Avatar>
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="h5" fontWeight="bold">
+                    {form.firstName} {form.lastName}
+                  </Typography>
+                  <Typography variant="body1" color="text.secondary" gutterBottom>
+                    {form.position || 'Kỹ thuật viên trạm sạc'} • {form.department || 'Vận hành'}
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+                    <Chip icon={<Badge />} label={`ID: ${form.employeeId || 'ST001'}`} size="small" color="primary" />
+                    <Chip icon={<LocationOn />} label={form.location || 'Hà Nội'} size="small" color="info" />
+                  </Box>
+                </Box>
+              </Box>
+
+              {/* Stats Row */}
+              <Grid container spacing={2}>
+                <Grid item xs={3}>
+                  <Box sx={{ textAlign: 'center', p: 1.5, bgcolor: 'white', borderRadius: 1 }}>
+                    <Typography variant="h5" fontWeight="bold" color="success.main">8</Typography>
+                    <Typography variant="caption" color="text.secondary">Trạm quản lý</Typography>
+                  </Box>
+                </Grid>
+                <Grid item xs={3}>
+                  <Box sx={{ textAlign: 'center', p: 1.5, bgcolor: 'white', borderRadius: 1 }}>
+                    <Typography variant="h5" fontWeight="bold" color="primary.main">45</Typography>
+                    <Typography variant="caption" color="text.secondary">Bảo trì hoàn thành</Typography>
+                  </Box>
+                </Grid>
+                <Grid item xs={3}>
+                  <Box sx={{ textAlign: 'center', p: 1.5, bgcolor: 'white', borderRadius: 1 }}>
+                    <Typography variant="h5" fontWeight="bold" color="info.main">12m</Typography>
+                    <Typography variant="caption" color="text.secondary">Thời gian phản hồi TB</Typography>
+                  </Box>
+                </Grid>
+                <Grid item xs={3}>
+                  <Box sx={{ textAlign: 'center', p: 1.5, bgcolor: 'white', borderRadius: 1 }}>
+                    <Typography variant="h5" fontWeight="bold" color="warning.main">4.8/5</Typography>
+                    <Typography variant="caption" color="text.secondary">Đánh giá khách hàng</Typography>
+                  </Box>
+                </Grid>
+              </Grid>
+            </CardContent>
+          </Card>
+
+          {/* Tabs */}
+          <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+            <Tabs value={staffEditTab} onChange={(e, v) => setStaffEditTab(v)}>
+              <Tab label="THÔNG TIN CÁ NHÂN & CÔNG VIỆC" />
+              <Tab label="NHẬT KÝ HOẠT ĐỘNG" />
+            </Tabs>
+          </Box>
+
+          {/* Tab 0: Thông tin cá nhân & Công việc */}
+          {staffEditTab === 0 && (
+            <Box>
+              {/* Phần Thông tin cá nhân */}
+              <Typography variant="h6" fontWeight="bold" gutterBottom>
+                Thông tin cá nhân
+              </Typography>
+              <Grid container spacing={2} sx={{ mb: 3 }}>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    label="Họ"
+                    value={form.firstName}
+                    onChange={(e) => setForm({ ...form, firstName: e.target.value })}
+                    InputProps={{
+                      startAdornment: <Person sx={{ mr: 1, color: 'text.secondary' }} />
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    label="Tên"
+                    value={form.lastName}
+                    onChange={(e) => setForm({ ...form, lastName: e.target.value })}
+                    InputProps={{
+                      startAdornment: <Person sx={{ mr: 1, color: 'text.secondary' }} />
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    label="Email"
+                    value={form.email}
+                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                    InputProps={{
+                      startAdornment: <Email sx={{ mr: 1, color: 'text.secondary' }} />
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    label="Số điện thoại"
+                    value={form.phone}
+                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                    InputProps={{
+                      startAdornment: <Phone sx={{ mr: 1, color: 'text.secondary' }} />
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    label="Địa điểm"
+                    value={form.location}
+                    onChange={(e) => setForm({ ...form, location: e.target.value })}
+                    InputProps={{
+                      startAdornment: <LocationOn sx={{ mr: 1, color: 'text.secondary' }} />
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    label="Ngày vào làm"
+                    type="date"
+                    value={form.joinDate}
+                    onChange={(e) => setForm({ ...form, joinDate: e.target.value })}
+                    InputLabelProps={{ shrink: true }}
+                    InputProps={{
+                      startAdornment: <CalendarToday sx={{ mr: 1, color: 'text.secondary' }} />
+                    }}
+                  />
+                </Grid>
+              </Grid>
+
+              {/* Divider */}
+              <Divider sx={{ my: 3 }}>
+                <Chip label="Chi tiết công việc" icon={<Work />} />
+              </Divider>
+
+              {/* Phần Chi tiết công việc */}
+              <Typography variant="h6" fontWeight="bold" gutterBottom>
+                Chi tiết công việc
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    label="Mã nhân viên"
+                    value={form.employeeId}
+                    onChange={(e) => setForm({ ...form, employeeId: e.target.value })}
+                    InputProps={{
+                      startAdornment: <Badge sx={{ mr: 1, color: 'text.secondary' }} />
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    label="Phòng ban"
+                    value={form.department}
+                    onChange={(e) => setForm({ ...form, department: e.target.value })}
+                    InputProps={{
+                      startAdornment: <Work sx={{ mr: 1, color: 'text.secondary' }} />
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="Chức vụ"
+                    value={form.position}
+                    onChange={(e) => setForm({ ...form, position: e.target.value })}
+                    InputProps={{
+                      startAdornment: <Work sx={{ mr: 1, color: 'text.secondary' }} />
+                    }}
+                  />
+                </Grid>
+              </Grid>
+            </Box>
+          )}
+
+          {/* Tab 1: Nhật ký hoạt động */}
+          {staffEditTab === 1 && (
+            <Box>
+              <Typography variant="h6" fontWeight="bold" gutterBottom>
+                Hoạt động gần đây
+              </Typography>
+              <Alert severity="info" sx={{ mt: 2 }}>
+                Chức năng nhật ký hoạt động đang được phát triển.
+              </Alert>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setStaffEditDialogOpen(false)}>Hủy</Button>
+          <Button 
+            variant="contained" 
+            onClick={() => {
+              // TODO: Save staff info
+              handleSaveUser();
+              setStaffEditDialogOpen(false);
+            }}
+          >
+            Lưu thay đổi
           </Button>
         </DialogActions>
       </Dialog>

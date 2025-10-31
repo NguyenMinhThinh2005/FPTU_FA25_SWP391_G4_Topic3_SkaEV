@@ -257,8 +257,7 @@ const StaffProfile = () => {
       {/* Tabs */}
       <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
         <Tabs value={tabValue} onChange={handleTabChange}>
-          <Tab label="Thông tin cá nhân" />
-          <Tab label="Chi tiết công việc" />
+          <Tab label="Thông tin cá nhân & Công việc" />
           <Tab label="Nhật ký hoạt động" />
         </Tabs>
       </Box>
@@ -351,93 +350,62 @@ const StaffProfile = () => {
                   }}
                 />
               </Grid>
+
+              {/* Phần Chi tiết công việc - GỘP VÀO ĐÂY */}
+              <Grid item xs={12} sx={{ mt: 2 }}>
+                <Divider />
+                <Typography variant="h6" fontWeight="bold" gutterBottom sx={{ mt: 2 }}>
+                  Chi tiết công việc
+                </Typography>
+              </Grid>
+              
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Mã nhân viên"
+                  value={profileData.employeeId}
+                  disabled
+                  InputProps={{
+                    startAdornment: (
+                      <Badge sx={{ mr: 1, color: "text.secondary" }} />
+                    ),
+                  }}
+                />
+              </Grid>
+              
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Phòng ban"
+                  value={profileData.department}
+                  disabled
+                  InputProps={{
+                    startAdornment: (
+                      <Work sx={{ mr: 1, color: "text.secondary" }} />
+                    ),
+                  }}
+                />
+              </Grid>
+              
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Chức vụ"
+                  value={profileData.position}
+                  disabled
+                  InputProps={{
+                    startAdornment: (
+                      <Work sx={{ mr: 1, color: "text.secondary" }} />
+                    ),
+                  }}
+                />
+              </Grid>
             </Grid>
           </CardContent>
         </Card>
       )}
 
       {tabValue === 1 && (
-        <Grid container spacing={3}>
-          <Grid item xs={12} md={6}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" fontWeight="bold" gutterBottom>
-                  Thông tin công việc
-                </Typography>
-                <Box sx={{ mb: 2 }}>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    Mã nhân viên
-                  </Typography>
-                  <Typography variant="body1">
-                    {profileData.employeeId}
-                  </Typography>
-                </Box>
-                <Box sx={{ mb: 2 }}>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    Phòng ban
-                  </Typography>
-                  <Typography variant="body1">
-                    {profileData.department}
-                  </Typography>
-                </Box>
-                <Box sx={{ mb: 2 }}>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    Chức vụ
-                  </Typography>
-                  <Typography variant="body1">
-                    {profileData.position}
-                  </Typography>
-                </Box>
-                <Box>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    Địa điểm làm việc
-                  </Typography>
-                  <Typography variant="body1">
-                    {profileData.location}
-                  </Typography>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid item xs={12} md={6}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" fontWeight="bold" gutterBottom>
-                  Chứng chỉ
-                </Typography>
-                <List>
-                  {certifications.map((cert, index) => (
-                    <ListItem key={index} divider>
-                      <ListItemText
-                        primary={cert.name}
-                        secondary={`${cert.issuer} • Hết hạn: ${cert.expiry}`}
-                      />
-                      <ListItemSecondaryAction>
-                        <Chip
-                          label={
-                            cert.status === "active"
-                              ? "Còn hiệu lực"
-                              : cert.status === "expiring"
-                              ? "Sắp hết hạn"
-                              : cert.status === "expired"
-                              ? "Đã hết hạn"
-                              : cert.status
-                          }
-                          color={getCertificationColor(cert.status)}
-                          size="small"
-                        />
-                      </ListItemSecondaryAction>
-                    </ListItem>
-                  ))}
-                </List>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
-      )}
-
-      {tabValue === 2 && (
         <Card>
           <CardContent>
             <Typography variant="h6" fontWeight="bold" gutterBottom>
