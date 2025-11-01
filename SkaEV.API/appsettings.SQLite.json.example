@@ -8,8 +8,7 @@
     }
   },
   "ConnectionStrings": {
-    "DefaultConnection": "Server=ADMIN-PC\\MSSQLSERVER01;Database=SkaEV_DB;Trusted_Connection=True;TrustServerCertificate=True;MultipleActiveResultSets=true"
-
+    "DefaultConnection": "Server=YOUR_SERVER_NAME\\YOUR_INSTANCE;Database=SkaEV_DB;Trusted_Connection=True;TrustServerCertificate=True;MultipleActiveResultSets=true"
   },
   "JwtSettings": {
     "SecretKey": "SkaEV_Secret_Key_2025_Change_This_In_Production_Environment_12345678",
@@ -41,9 +40,3 @@
   },
   "AllowedHosts": "*"
 }
-
-
-
-
-
-

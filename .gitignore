@@ -42,9 +42,15 @@ SkaEV.API/logs/
 SkaEV.API/appsettings.Development.json
 SkaEV.API/appsettings.json
 SkaEV.API/appsettings.*.json
-!SkaEV.API/appsettings.Development.json.example
 !SkaEV.API/appsettings.template.json
-!SkaEV.API/appsettings.*.example
+
+# PowerShell scripts - may contain machine-specific paths
+*.ps1
+!*.example.ps1
+
+# Batch files - may contain machine-specific paths
+*.bat
+!*.example.bat
 
 # Database scripts that are machine-specific
 database/delete_users_*.sql
