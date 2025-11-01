@@ -48,6 +48,8 @@ const Monitoring = () => {
   const [connectors, setConnectors] = useState([]);
   const [incidents, setIncidents] = useState([]);
   const [reportDialog, setReportDialog] = useState(false);
+  const [detailDialog, setDetailDialog] = useState(false);
+  const [selectedIncident, setSelectedIncident] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
   const [reportForm, setReportForm] = useState({
     connectorId: "",
@@ -134,10 +136,10 @@ const Monitoring = () => {
         typeLabel: "Lỗi Phần cứng Thiết bị",
         priority: "high",
         description: "Cáp sạc bị đứt, không thể kết nối với xe",
-        status: "pending",
-        statusLabel: "Mới",
+        status: "completed",
+        statusLabel: "Hoàn thành",
         reportedAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
-        reportedBy: "Nguyễn Văn A",
+        adminResponse: "Đã thay cáp mới và kiểm tra hoạt động bình thường",
       },
       {
         id: "INC-002",
@@ -149,7 +151,7 @@ const Monitoring = () => {
         status: "in_progress",
         statusLabel: "Đang xử lý",
         reportedAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
-        reportedBy: "Nguyễn Văn A",
+        adminResponse: null,
       },
     ];
 
@@ -187,6 +189,11 @@ const Monitoring = () => {
   const handleFileUpload = (event) => {
     const files = Array.from(event.target.files);
     setReportForm({ ...reportForm, attachments: files });
+  };
+
+  const handleViewDetail = (incident) => {
+    setSelectedIncident(incident);
+    setDetailDialog(true);
   };
 
   const getStatusColor = (status) => {
@@ -399,7 +406,7 @@ const Monitoring = () => {
                   <TableCell>Mô tả</TableCell>
                   <TableCell align="center">Ưu tiên</TableCell>
                   <TableCell align="center">Trạng thái</TableCell>
-                  <TableCell>Báo cáo bởi</TableCell>
+                  <TableCell>Phản hồi</TableCell>
                   <TableCell>Thời gian</TableCell>
                 </TableRow>
               </TableHead>
@@ -418,9 +425,28 @@ const Monitoring = () => {
                       />
                     </TableCell>
                     <TableCell align="center">
-                      <Chip label={incident.statusLabel} size="small" variant="outlined" />
+                      <Chip 
+                        label={incident.statusLabel} 
+                        color={incident.status === "completed" ? "success" : "warning"}
+                        size="small" 
+                      />
                     </TableCell>
-                    <TableCell>{incident.reportedBy}</TableCell>
+                    <TableCell>
+                      {incident.adminResponse ? (
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          color="primary"
+                          onClick={() => handleViewDetail(incident)}
+                        >
+                          Xem chi tiết
+                        </Button>
+                      ) : (
+                        <Typography variant="body2" color="text.secondary" fontStyle="italic">
+                          Chưa có phản hồi
+                        </Typography>
+                      )}
+                    </TableCell>
                     <TableCell>{incident.reportedAt.toLocaleString("vi-VN")}</TableCell>
                   </TableRow>
                 ))}
@@ -515,6 +541,91 @@ const Monitoring = () => {
           <Button variant="contained" color="warning" startIcon={<Warning />} onClick={handleSubmitReport}>
             Gửi Báo cáo
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Detail Dialog */}
+      <Dialog open={detailDialog} onClose={() => setDetailDialog(false)} maxWidth="md" fullWidth>
+        <DialogTitle>
+          <Box display="flex" justifyContent="space-between" alignItems="center">
+            <Typography variant="h6" fontWeight="bold">
+              Chi tiết Báo cáo Sự cố - {selectedIncident?.id}
+            </Typography>
+            <IconButton onClick={() => setDetailDialog(false)}>
+              <Warning />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        <DialogContent dividers>
+          {selectedIncident && (
+            <Box>
+              {/* Thông tin báo cáo */}
+              <Card sx={{ mb: 2, bgcolor: "grey.50" }}>
+                <CardContent>
+                  <Typography variant="h6" fontWeight="bold" gutterBottom color="primary">
+                    Thông tin Báo cáo
+                  </Typography>
+                  <Grid container spacing={2}>
+                    <Grid item xs={6}>
+                      <Typography variant="caption" color="text.secondary">Mã sự cố:</Typography>
+                      <Typography variant="body1" fontWeight={600}>{selectedIncident.id}</Typography>
+                    </Grid>
+                    <Grid item xs={6}>
+                      <Typography variant="caption" color="text.secondary">Điểm sạc:</Typography>
+                      <Typography variant="body1" fontWeight={600}>{selectedIncident.connectorId}</Typography>
+                    </Grid>
+                    <Grid item xs={6}>
+                      <Typography variant="caption" color="text.secondary">Loại sự cố:</Typography>
+                      <Typography variant="body1">{selectedIncident.typeLabel}</Typography>
+                    </Grid>
+                    <Grid item xs={6}>
+                      <Typography variant="caption" color="text.secondary">Mức độ ưu tiên:</Typography>
+                      <Chip
+                        label={priorityLevels.find((p) => p.value === selectedIncident.priority)?.label}
+                        color={priorityLevels.find((p) => p.value === selectedIncident.priority)?.color}
+                        size="small"
+                      />
+                    </Grid>
+                    <Grid item xs={12}>
+                      <Typography variant="caption" color="text.secondary">Mô tả:</Typography>
+                      <Typography variant="body1">{selectedIncident.description}</Typography>
+                    </Grid>
+                    <Grid item xs={6}>
+                      <Typography variant="caption" color="text.secondary">Trạng thái:</Typography>
+                      <Chip 
+                        label={selectedIncident.statusLabel} 
+                        color={selectedIncident.status === "completed" ? "success" : "warning"}
+                        size="small" 
+                      />
+                    </Grid>
+                    <Grid item xs={6}>
+                      <Typography variant="caption" color="text.secondary">Thời gian báo cáo:</Typography>
+                      <Typography variant="body1">
+                        {selectedIncident.reportedAt.toLocaleString("vi-VN")}
+                      </Typography>
+                    </Grid>
+                  </Grid>
+                </CardContent>
+              </Card>
+
+              {/* Phản hồi của Admin */}
+              {selectedIncident.adminResponse && (
+                <Card sx={{ bgcolor: "success.50" }}>
+                  <CardContent>
+                    <Typography variant="h6" fontWeight="bold" gutterBottom color="success.main">
+                      Phản hồi từ Admin
+                    </Typography>
+                    <Alert severity="success" sx={{ mt: 1 }}>
+                      <Typography variant="body1">{selectedIncident.adminResponse}</Typography>
+                    </Alert>
+                  </CardContent>
+                </Card>
+              )}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDetailDialog(false)}>Đóng</Button>
         </DialogActions>
       </Dialog>
 

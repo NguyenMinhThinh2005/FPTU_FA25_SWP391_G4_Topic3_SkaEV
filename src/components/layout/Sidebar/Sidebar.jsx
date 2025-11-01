@@ -20,6 +20,7 @@ import {
   Analytics,
   People,
   ElectricCar,
+  Warning,
 } from "@mui/icons-material";
 import { useNavigate, useLocation } from "react-router-dom";
 import useAuthStore from "../../../store/authStore";
@@ -55,6 +56,11 @@ const Sidebar = ({ open, onClose }) => {
             text: getText("nav.userManagement"),
             icon: <People />,
             path: "/admin/users",
+          },
+          {
+            text: "Quản lý Báo cáo Sự cố",
+            icon: <Warning />,
+            path: "/admin/incidents",
           },
         ];
 

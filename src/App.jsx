@@ -49,6 +49,7 @@ import AdminDashboard from "./pages/admin/Dashboard";
 import UserManagement from "./pages/admin/UserManagement";
 import AdvancedAnalytics from "./pages/admin/AdvancedAnalytics";
 import AdminStationManagement from "./pages/admin/StationManagement";
+import IncidentManagement from "./pages/admin/IncidentManagement";
 
 // Create React Query client
 const queryClient = new QueryClient({
@@ -197,6 +198,7 @@ function App() {
                 <Route path="analytics" element={<AdvancedAnalytics />} />
                 <Route path="stations" element={<AdminStationManagement />} />
                 <Route path="users" element={<UserManagement />} />
+                <Route path="incidents" element={<IncidentManagement />} />
                 <Route index element={<Navigate to="dashboard" replace />} />
               </Route>
 

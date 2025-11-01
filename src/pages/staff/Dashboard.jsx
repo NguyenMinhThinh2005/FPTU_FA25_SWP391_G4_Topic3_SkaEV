@@ -41,7 +41,7 @@ const StaffDashboard = () => {
   });
   const [alerts, setAlerts] = useState([]);
 
-  // Mock data - TODO: Replace with API
+  // Mock data - TODO: Thay thế bằng API thực tế
   const mockStationInfo = {
     id: 1,
     name: "Trạm sạc FPT Complex",
@@ -105,18 +105,18 @@ const StaffDashboard = () => {
   const loadDashboardData = async () => {
     setLoading(true);
     try {
-      // TODO: API calls
+      // TODO: Thay thế bằng API call thực tế
+      // const response = await fetch(`/api/staff/dashboard`);
+      // const data = await response.json();
+      
       setStationInfo(mockStationInfo);
       setConnectors(mockConnectors);
-      setActiveSessions(
-        mockConnectors.filter((c) => c.currentSession).map((c) => c.currentSession)
-      );
 
       // Mock daily statistics
       setDailyStats({
-        revenue: 2850000, // VNĐ
+        revenue: 2850000,
         completedSessions: 12,
-        energyConsumed: 285.5, // kWh
+        energyConsumed: 285.5,
       });
 
       // Mock alerts
@@ -190,128 +190,77 @@ const StaffDashboard = () => {
         </Alert>
       )}
 
-      {/* Statistics Cards */}
+      {/* Statistics Cards - THAY THẾ VÀ SẮP XẾP LẠI CÁC CHỈ SỐ */}
       <Grid container spacing={3} mb={3}>
+        {/* Doanh thu hôm nay */}
         <Grid item xs={12} sm={6} md={3}>
           <Card>
             <CardContent>
               <Box display="flex" alignItems="center" gap={2}>
-                <ElectricCar color="primary" sx={{ fontSize: 40 }} />
-                <Box>
-                  <Typography variant="h4" fontWeight="bold">
-                    {totalConnectors}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Tổng điểm sạc
-                  </Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box display="flex" alignItems="center" gap={2}>
-                <CheckCircle color="success" sx={{ fontSize: 40 }} />
+                <MonetizationOn color="success" sx={{ fontSize: 40 }} />
                 <Box>
                   <Typography variant="h4" fontWeight="bold" color="success.main">
-                    {onlineConnectors}
+                    {dailyStats.revenue.toLocaleString()}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    Điểm sạc Online
+                    Doanh thu hôm nay (VNĐ)
                   </Typography>
                 </Box>
               </Box>
             </CardContent>
           </Card>
         </Grid>
+
+        {/* Phiên hoàn thành */}
         <Grid item xs={12} sm={6} md={3}>
           <Card>
             <CardContent>
               <Box display="flex" alignItems="center" gap={2}>
-                <PowerOff color="error" sx={{ fontSize: 40 }} />
-                <Box>
-                  <Typography variant="h4" fontWeight="bold" color="error.main">
-                    {offlineConnectors}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Điểm sạc Offline
-                  </Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box display="flex" alignItems="center" gap={2}>
-                <BatteryChargingFull color="primary" sx={{ fontSize: 40 }} />
+                <CheckCircle color="primary" sx={{ fontSize: 40 }} />
                 <Box>
                   <Typography variant="h4" fontWeight="bold" color="primary.main">
-                    {chargingConnectors}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Đang sạc
-                  </Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
-
-      {/* Daily Statistics */}
-      <Typography variant="h5" fontWeight={600} mb={2}>
-        Thống kê nhanh trong ngày
-      </Typography>
-      <Grid container spacing={3} mb={3}>
-        <Grid item xs={12} md={4}>
-          <Card sx={{ bgcolor: "success.50" }}>
-            <CardContent>
-              <Box display="flex" alignItems="center" gap={2}>
-                <MonetizationOn sx={{ fontSize: 40, color: "success.main" }} />
-                <Box>
-                  <Typography variant="h5" fontWeight="bold" color="success.main">
-                    {dailyStats.revenue.toLocaleString()} ₫
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Doanh thu hôm nay
-                  </Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} md={4}>
-          <Card sx={{ bgcolor: "primary.50" }}>
-            <CardContent>
-              <Box display="flex" alignItems="center" gap={2}>
-                <AccessTime sx={{ fontSize: 40, color: "primary.main" }} />
-                <Box>
-                  <Typography variant="h5" fontWeight="bold" color="primary.main">
                     {dailyStats.completedSessions}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    Phiên sạc hoàn thành
+                    Phiên hoàn thành
                   </Typography>
                 </Box>
               </Box>
             </CardContent>
           </Card>
         </Grid>
-        <Grid item xs={12} md={4}>
-          <Card sx={{ bgcolor: "warning.50" }}>
+
+        {/* Năng lượng tiêu thụ */}
+        <Grid item xs={12} sm={6} md={3}>
+          <Card>
             <CardContent>
               <Box display="flex" alignItems="center" gap={2}>
-                <Bolt sx={{ fontSize: 40, color: "warning.main" }} />
+                <Bolt color="warning" sx={{ fontSize: 40 }} />
                 <Box>
-                  <Typography variant="h5" fontWeight="bold" color="warning.main">
-                    {dailyStats.energyConsumed.toFixed(1)} kWh
+                  <Typography variant="h4" fontWeight="bold" color="warning.main">
+                    {dailyStats.energyConsumed.toFixed(1)}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    Năng lượng tiêu thụ
+                    Năng lượng tiêu thụ (kWh)
+                  </Typography>
+                </Box>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Số lượng Xe đang sạc - Thay thế "Tích hợp bình chỗ sạc" */}
+        <Grid item xs={12} sm={6} md={3}>
+          <Card>
+            <CardContent>
+              <Box display="flex" alignItems="center" gap={2}>
+                <BatteryChargingFull color="info" sx={{ fontSize: 40 }} />
+                <Box>
+                  <Typography variant="h4" fontWeight="bold" color="info.main">
+                    {chargingConnectors}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Số lượng Xe đang sạc
                   </Typography>
                 </Box>
               </Box>
@@ -320,172 +269,140 @@ const StaffDashboard = () => {
         </Grid>
       </Grid>
 
-      {/* Alerts & Notifications */}
-      {alerts.length > 0 && (
-        <>
-          <Typography variant="h5" fontWeight={600} mb={2}>
-            Cảnh báo & Thông báo
-          </Typography>
-          <Card sx={{ mb: 3 }}>
-            <CardContent>
-              <Stack spacing={2}>
-                {alerts.map((alert) => (
-                  <Alert
-                    key={alert.id}
-                    severity={alert.type}
-                    action={
-                      <Button
-                        size="small"
-                        onClick={() =>
-                          alert.type === "warning"
-                            ? navigate("/staff/monitoring")
-                            : navigate("/staff/charging-sessions")
+      {/* THÊM PHẦN BÁO LỖI - Đặt thẻ Báo lỗi */}
+      <Typography variant="h5" fontWeight={600} mb={2}>
+        Báo lỗi
+      </Typography>
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          {alerts.length === 0 ? (
+            <Alert severity="success" icon={<CheckCircle />}>
+              Không có lỗi nào. Tất cả điểm sạc đang hoạt động bình thường.
+            </Alert>
+          ) : (
+            <Stack spacing={2}>
+              {alerts.map((alert) => (
+                <Alert
+                  key={alert.id}
+                  severity={alert.type}
+                  icon={alert.type === "warning" ? <Warning /> : alert.type === "error" ? <Error /> : <Notifications />}
+                  action={
+                    <Button
+                      size="small"
+                      onClick={() => {
+                        // Điểm sạc Offline (hiện tại là 1) và Điểm sạc có lỗi/Cảnh báo
+                        if (alert.type === "warning" && alert.message.includes("Offline")) {
+                          navigate("/staff/monitoring");
+                        } else {
+                          navigate("/staff/charging-sessions");
                         }
-                      >
-                        Xem
-                      </Button>
-                    }
-                  >
-                    <Typography variant="body2">{alert.message}</Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {alert.timestamp.toLocaleString("vi-VN")}
-                    </Typography>
-                  </Alert>
-                ))}
-              </Stack>
-            </CardContent>
-          </Card>
-        </>
-      )}
+                      }}
+                    >
+                      Chi tiết
+                    </Button>
+                  }
+                >
+                  <AlertTitle sx={{ fontWeight: 600 }}>
+                    {alert.type === "warning" ? "Cảnh báo" : alert.type === "error" ? "Lỗi" : "Thông báo"}
+                  </AlertTitle>
+                  <Typography variant="body2">{alert.message}</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {alert.timestamp.toLocaleString("vi-VN")}
+                  </Typography>
+                </Alert>
+              ))}
+            </Stack>
+          )}
+        </CardContent>
+      </Card>
 
-      {/* Connectors by Status - Horizontal Layout */}
-      <Typography variant="h5" fontWeight={600} mb={2} mt={4}>
+      {/* DANH SÁCH ĐIỂM SẠC - Góp thành một danh sách duy nhất và dùng ký hiệu trực quan */}
+      <Typography variant="h5" fontWeight={600} mb={2}>
         Danh sách Điểm sạc
       </Typography>
-      <Grid container spacing={3}>
-        {/* Available Connectors Column */}
-        {connectors.filter((c) => c.status === "Available").length > 0 && (
-          <Grid item xs={12} md={4}>
-            <Typography variant="h6" fontWeight={600} mb={2} color="success.main">
-              🟢 Rảnh
-            </Typography>
-            <Stack spacing={2}>
-              {connectors
-                .filter((c) => c.status === "Available")
-                .map((connector) => (
-                  <Card
-                    key={connector.id}
-                    sx={{
-                      border: 2,
-                      borderColor: "success.light",
-                    }}
-                  >
-                    <CardContent>
-                      <Box display="flex" justifyContent="space-between" alignItems="start">
-                        <Box>
-                          <Typography variant="h6" fontWeight="bold">
-                            {connector.id}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {connector.type} - {connector.maxPower} kW
-                          </Typography>
-                        </Box>
-                        <Chip
-                          icon={getStatusIcon(connector.status)}
-                          label={connector.statusLabel}
-                          color={connector.statusColor}
-                          size="small"
-                        />
-                      </Box>
-                    </CardContent>
-                  </Card>
-                ))}
-            </Stack>
-          </Grid>
-        )}
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Liệt kê tất cả các Điểm sạc (CON-01, CON-02, CON-03, CON-04) theo thứ tự và sử dụng{" "}
+            <strong>màu sắc/biểu tượng lớn hơn</strong> để thể hiện trạng thái (Xanh lá – Rảnh, Xanh dương = Đang sạc, 
+            Đỏ = Lỗi/Offline).
+          </Typography>
+          <Grid container spacing={2}>
+            {connectors.map((connector) => {
+              // Xác định màu và biểu tượng dựa trên status
+              let cardBgColor = "white";
+              let borderColor = "grey.300";
+              let icon = getStatusIcon(connector.status);
+              let statusText = connector.statusLabel;
+              let textColor = "text.primary";
 
-        {/* Charging Connectors Column */}
-        {connectors.filter((c) => c.status === "Charging").length > 0 && (
-          <Grid item xs={12} md={4}>
-            <Typography variant="h6" fontWeight={600} mb={2} color="primary.main">
-              🔵 Đang hoạt động
-            </Typography>
-            <Stack spacing={2}>
-              {connectors
-                .filter((c) => c.status === "Charging")
-                .map((connector) => (
-                  <Card
-                    key={connector.id}
-                    sx={{
-                      border: 2,
-                      borderColor: "primary.main",
-                    }}
-                  >
-                    <CardContent>
-                      <Box display="flex" justifyContent="space-between" alignItems="start">
-                        <Box>
-                          <Typography variant="h6" fontWeight="bold">
-                            {connector.id}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {connector.type} - {connector.maxPower} kW
-                          </Typography>
-                        </Box>
-                        <Chip
-                          icon={getStatusIcon(connector.status)}
-                          label={connector.statusLabel}
-                          color={connector.statusColor}
-                          size="small"
-                        />
-                      </Box>
-                    </CardContent>
-                  </Card>
-                ))}
-            </Stack>
-          </Grid>
-        )}
+              if (connector.status === "Available") {
+                cardBgColor = "success.50";
+                borderColor = "success.main";
+                statusText = "🟢 Rảnh";
+                textColor = "success.main";
+              } else if (connector.status === "Charging") {
+                cardBgColor = "primary.50";
+                borderColor = "primary.main";
+                statusText = "🔵 Đang sạc";
+                textColor = "primary.main";
+              } else if (connector.status === "Faulted" || connector.status === "Unavailable") {
+                cardBgColor = "error.50";
+                borderColor = "error.main";
+                statusText = "🔴 Lỗi/Offline";
+                textColor = "error.main";
+              }
 
-        {/* Faulted/Unavailable Connectors Column */}
-        {connectors.filter((c) => c.status === "Faulted" || c.status === "Unavailable").length > 0 && (
-          <Grid item xs={12} md={4}>
-            <Typography variant="h6" fontWeight={600} mb={2} color="error.main">
-              🔴 Báo lỗi
-            </Typography>
-            <Stack spacing={2}>
-              {connectors
-                .filter((c) => c.status === "Faulted" || c.status === "Unavailable")
-                .map((connector) => (
+              return (
+                <Grid item xs={12} sm={6} md={3} key={connector.id}>
                   <Card
-                    key={connector.id}
                     sx={{
+                      bgcolor: cardBgColor,
                       border: 2,
-                      borderColor: "error.main",
+                      borderColor: borderColor,
+                      height: '100%', // Chiều cao 100% của Grid item
+                      minHeight: 180, // Chiều cao tối thiểu cố định
+                      display: 'flex',
+                      flexDirection: 'column',
+                      transition: "all 0.3s",
+                      "&:hover": {
+                        boxShadow: 4,
+                        transform: "translateY(-4px)",
+                      },
                     }}
                   >
-                    <CardContent>
-                      <Box display="flex" justifyContent="space-between" alignItems="start">
-                        <Box>
-                          <Typography variant="h6" fontWeight="bold">
-                            {connector.id}
+                    <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
+                      <Box display="flex" alignItems="center" justifyContent="space-between" mb={1}>
+                        <Typography variant="h5" fontWeight="bold" color={textColor}>
+                          {connector.id}
+                        </Typography>
+                        <Box sx={{ fontSize: 40 }}>{icon}</Box>
+                      </Box>
+                      <Typography variant="body2" color="text.secondary" gutterBottom>
+                        {connector.type} - {connector.maxPower} kW
+                      </Typography>
+                      <Divider sx={{ my: 1 }} />
+                      <Typography variant="subtitle1" fontWeight={600} color={textColor}>
+                        {statusText}
+                      </Typography>
+                      {connector.currentSession && (
+                        <Box mt={1}>
+                          <Typography variant="body2" color="text.secondary">
+                            Phiên: {connector.currentSession.id}
                           </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {connector.type} - {connector.maxPower} kW
+                          <Typography variant="body2" color="text.secondary">
+                            SOC: {connector.currentSession.vehicleSOC}%
                           </Typography>
                         </Box>
-                        <Chip
-                          icon={getStatusIcon(connector.status)}
-                          label={connector.statusLabel}
-                          color={connector.statusColor}
-                          size="small"
-                        />
-                      </Box>
+                      )}
                     </CardContent>
                   </Card>
-                ))}
-            </Stack>
+                </Grid>
+              );
+            })}
           </Grid>
-        )}
-      </Grid>
+        </CardContent>
+      </Card>
     </Box>
   );
 };
