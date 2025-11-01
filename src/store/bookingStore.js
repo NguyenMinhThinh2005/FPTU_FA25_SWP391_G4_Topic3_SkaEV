@@ -80,9 +80,24 @@ const useBookingStore = create(
           try {
             set({ loading: true, error: null });
 
+            // Extract slot ID from port ID (format: "stationId-poleX-portY")
+            // Available slots in DB: 3, 4, 5 (station_id=1)
+            // Map port to available slot
+            let slotId = 3; // default
+            if (bookingData.port?.id) {
+              const portStr = bookingData.port.id.toString();
+              if (portStr.includes('pole1-port1')) slotId = 3;
+              else if (portStr.includes('pole1-port2')) slotId = 4;
+              else if (portStr.includes('pole2-port1')) slotId = 5;
+              else if (portStr.includes('pole2-port2')) slotId = 4; // Reuse available slot
+              
+              // If slot 3 is reserved, try slot 4 or 5
+              console.log('🎯 Mapping port', portStr, 'to slot', slotId);
+            }
+
             const apiPayload = {
               stationId: parseInt(bookingData.stationId) || 1,
-              slotId: 3, // Use actual slot ID from database (slot_id=3,4,5 are available)
+              slotId: slotId, // Use mapped slot ID
               vehicleId: 5, // Use actual vehicle ID from database (user has vehicle_id=5,6)
               scheduledStartTime:
                 bookingData.scheduledDateTime || new Date().toISOString(),

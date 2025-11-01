@@ -321,6 +321,10 @@ const FindStations = () => {
                           <Avatar
                             src={getStationImage(station)}
                             sx={{ width: 60, height: 60 }}
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="60" height="60"%3E%3Crect fill="%231379FF" width="60" height="60"/%3E%3Ctext fill="white" x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="12"%3EStation%3C/text%3E%3C/svg%3E';
+                            }}
                           >
                             <ElectricCar />
                           </Avatar>
@@ -451,6 +455,10 @@ const FindStations = () => {
                   component="img"
                   src={getStationImage(selectedStation)}
                   alt={selectedStation.name}
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="200"%3E%3Crect fill="%231379FF" width="400" height="200"/%3E%3Ctext fill="white" x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="20"%3ECharging Station%3C/text%3E%3C/svg%3E';
+                  }}
                   sx={{
                     width: "100%",
                     height: 200,

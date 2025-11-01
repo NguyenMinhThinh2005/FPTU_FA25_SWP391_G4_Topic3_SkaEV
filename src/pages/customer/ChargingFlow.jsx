@@ -21,7 +21,6 @@ import {
   DialogActions,
   List,
   ListItem,
-  ListItemText,
   ListItemIcon,
   Avatar,
   TextField,
@@ -42,7 +41,7 @@ import {
 } from "@mui/icons-material";
 import useBookingStore from "../../store/bookingStore";
 import useStationStore from "../../store/stationStore";
-import { formatCurrency } from "../../utils/helpers";
+import { formatCurrency, calculateDistance } from "../../utils/helpers";
 import StationMapLeaflet from "../../components/customer/StationMapLeaflet";
 import notificationService from "../../services/notificationService";
 import { qrCodesAPI, chargingAPI } from "../../services/api";
@@ -124,6 +123,10 @@ const ChargingFlow = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStation, setSelectedStation] = useState(null);
   const [viewMode, setViewMode] = useState("list"); // 'list' or 'map'
+  const [userLocation, setUserLocation] = useState({
+    lat: 10.8231, // Default to Ho Chi Minh City (HCMC)
+    lng: 106.6297,
+  });
 
   // Khôi phục currentBooking, chargingSession, flowStep từ sessionStorage khi mount (KHÔNG reset flowStep về 0 tự động)
   useEffect(() => {
@@ -373,8 +376,11 @@ const ChargingFlow = () => {
       if (stationList.length > 0) {
         console.log("   Stations:", stationList.map((s) => s.name).join(", "));
       }
-      // Add stats to each station
+      // Add stats and distance to each station
       stationList = stationList.map((station) => {
+        let updatedStation = { ...station };
+        
+        // Add stats if not present
         if (!station.stats && station.charging?.poles) {
           let totalPorts = 0;
           let availablePorts = 0;
@@ -385,28 +391,70 @@ const ChargingFlow = () => {
               (port) => port.status === "available"
             ).length;
           });
-          return {
-            ...station,
-            stats: {
-              total: totalPorts,
-              available: availablePorts,
-              occupied: totalPorts - availablePorts,
-            },
+          updatedStation.stats = {
+            total: totalPorts,
+            available: availablePorts,
+            occupied: totalPorts - availablePorts,
           };
         }
-        return station;
+        
+        // Calculate distance from user location
+        if (userLocation && station.location?.coordinates) {
+          const distance = calculateDistance(
+            userLocation.lat,
+            userLocation.lng,
+            station.location.coordinates.lat,
+            station.location.coordinates.lng
+          );
+          updatedStation.distanceFromUser = distance;
+        }
+        
+        return updatedStation;
       });
+      
+      // Sort by distance (ascending order) - nearest stations first
+      stationList.sort((a, b) => {
+        if (a.distanceFromUser !== undefined && b.distanceFromUser !== undefined) {
+          return a.distanceFromUser - b.distanceFromUser;
+        }
+        return 0;
+      });
+      
+      console.log("📍 Stations sorted by distance:", stationList.map(s => `${s.name} (${s.distanceFromUser?.toFixed(1)}km)`));
+      
       return stationList;
     } catch (error) {
       console.error("❌ Error filtering stations:", error);
       return [];
     }
-  }, [searchQuery, filters.connectorTypes, stations]);
+  }, [searchQuery, filters.connectorTypes, stations, userLocation]);
 
   useEffect(() => {
     console.log("🚀 ChargingFlow mounted - initializing data");
     initializeData();
   }, [initializeData]);
+
+  // Get user location
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const newLocation = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          };
+          console.log("📍 User location updated:", newLocation);
+          setUserLocation(newLocation);
+        },
+        (error) => {
+          console.warn("⚠️ Location access denied, using default location:", error);
+          // Keep default location (HCMC)
+        }
+      );
+    } else {
+      console.warn("⚠️ Geolocation not supported, using default location");
+    }
+  }, []);
 
   // Reset flow step to 0 if no active booking or charging session
   // Đã loại bỏ auto-reset flowStep về 0 khi mất currentBooking/changingSession để giữ đúng trạng thái flow khi quay lại
@@ -671,85 +719,40 @@ const ChargingFlow = () => {
               }}
             >
               <CardContent sx={{ p: 3 }}>
-                <Grid container spacing={2.5} alignItems="center">
-                  {/* Search Input - wider on desktop so it pushes filter to the right */}
-                  <Grid item xs={12} md={9}>
-                    <TextField
-                      fullWidth
-                      placeholder="Tìm kiếm theo vị trí, tên trạm..."
-                      value={searchQuery}
-                      onChange={(e) => {
-                        const newValue = e.target.value;
-                        console.log("⌨️ TextField onChange:", newValue);
-                        setSearchQuery(newValue);
-                      }}
-                      InputProps={{
-                        startAdornment: (
-                          <Search sx={{ mr: 1, color: "text.secondary" }} />
-                        ),
-                      }}
-                      sx={{
-                        "& .MuiOutlinedInput-root": {
-                          borderRadius: 2,
-                          backgroundColor: "grey.50",
-                          "&:hover": {
-                            backgroundColor: "white",
-                          },
-                          "&.Mui-focused": {
-                            backgroundColor: "white",
-                          },
-                        },
-                      }}
-                    />
-                  </Grid>
-
-                  {/* Connector Type Filter */}
-                  <Grid item xs={12} sm={6} md={3}>
-                    <FormControl fullWidth>
-                      <InputLabel id="connector-label">
-                        Loại cổng sạc
-                      </InputLabel>
-                      <Select
-                        labelId="connector-label"
-                        id="connector-select"
-                        label="Loại cổng sạc"
-                        value={
-                          Array.isArray(filters.connectorTypes)
-                            ? filters.connectorTypes[0] || ""
-                            : filters.connectorTypes || ""
-                        }
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          console.log("🔌 Connector type changed:", value);
-                          // Store single string (or empty) in filters
-                          updateFilters({ connectorTypes: value || "" });
-                        }}
-                        renderValue={(selected) => (selected ? selected : null)}
-                        sx={{
-                          borderRadius: 2,
-                          backgroundColor: "grey.50",
-                          "&:hover": {
-                            backgroundColor: "white",
-                          },
-                          "&.Mui-focused": {
-                            backgroundColor: "white",
-                          },
-                        }}
-                      >
-                        <MenuItem value="">
-                          <em>Tất cả loại cổng</em>
-                        </MenuItem>
-                        {Object.values(CONNECTOR_TYPES).map((type) => (
-                          <MenuItem key={type} value={type}>
-                            {type}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                  </Grid>
-
-                  {/* View Mode removed — always show map */}
-                </Grid>
+                {/* Search Input - Full Width */}
+                <TextField
+                  fullWidth
+                  placeholder="Tìm kiếm theo tên trạm, địa chỉ, khu vực..."
+                  value={searchQuery}
+                  onChange={(e) => {
+                    const newValue = e.target.value;
+                    console.log("⌨️ TextField onChange:", newValue);
+                    setSearchQuery(newValue);
+                  }}
+                  InputProps={{
+                    startAdornment: (
+                      <Search sx={{ mr: 1, color: "text.secondary", fontSize: 24 }} />
+                    ),
+                  }}
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      borderRadius: 3,
+                      backgroundColor: "grey.50",
+                      fontSize: "1rem",
+                      "&:hover": {
+                        backgroundColor: "white",
+                        boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+                      },
+                      "&.Mui-focused": {
+                        backgroundColor: "white",
+                        boxShadow: "0 4px 12px rgba(0,0,0,0.12)",
+                      },
+                    },
+                    "& .MuiOutlinedInput-input": {
+                      padding: "16px 14px",
+                    },
+                  }}
+                />
               </CardContent>
             </Card>
           </Grid>
@@ -774,6 +777,141 @@ const ChargingFlow = () => {
                   stations={filteredStations}
                   onStationSelect={handleStationSelect}
                 />
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Stations List with Distance and Ranking */}
+          <Grid item xs={12}>
+            <Card>
+              <CardContent>
+                <Typography
+                  variant="h6"
+                  gutterBottom
+                  sx={{
+                    fontWeight: "bold",
+                    color: "black",
+                    mb: 2,
+                  }}
+                >
+                  📍 Danh sách trạm ({filteredStations.length})
+                </Typography>
+                <List>
+                  {filteredStations.map((station, index) => {
+                    const isAvailable = station.stats?.available > 0;
+                    return (
+                      <ListItem
+                        key={station.id}
+                        onClick={() => handleStationSelect(station)}
+                        sx={{
+                          borderRadius: 2,
+                          mb: 1,
+                          border: 1,
+                          borderColor: "divider",
+                          cursor: "pointer",
+                          "&:hover": {
+                            backgroundColor: "grey.50",
+                            borderColor: "primary.main",
+                          },
+                        }}
+                      >
+                        {/* Station Number Badge */}
+                        <Box
+                          sx={{
+                            minWidth: 40,
+                            height: 40,
+                            borderRadius: "50%",
+                            backgroundColor: "primary.main",
+                            color: "white",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontWeight: "bold",
+                            fontSize: "1.1rem",
+                            mr: 2,
+                            flexShrink: 0,
+                          }}
+                        >
+                          {index + 1}
+                        </Box>
+
+                        <ListItemIcon sx={{ minWidth: 'auto', mr: 2 }}>
+                          <Avatar
+                            src={getStationImage(station)}
+                            sx={{ width: 50, height: 50 }}
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="50" height="50"%3E%3Crect fill="%231379FF" width="50" height="50"/%3E%3Ctext fill="white" x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="10"%3EStation%3C/text%3E%3C/svg%3E';
+                            }}
+                          >
+                            <ElectricCar />
+                          </Avatar>
+                        </ListItemIcon>
+
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          {/* Tên trạm và badges */}
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5, flexWrap: "wrap" }}>
+                            <Typography variant="body1" fontWeight="bold" sx={{ mr: 1 }}>
+                              {station.name}
+                            </Typography>
+                            {station.distanceFromUser !== undefined && (
+                              <Chip
+                                label={`Cách ${station.distanceFromUser.toFixed(1)} km`}
+                                size="small"
+                                color="primary"
+                                variant="outlined"
+                                sx={{ fontWeight: "bold" }}
+                              />
+                            )}
+                            <Chip
+                              label={isAvailable ? "Còn chỗ" : "Đầy"}
+                              size="small"
+                              color={isAvailable ? "success" : "error"}
+                            />
+                          </Box>
+
+                          {/* Thông tin chi tiết */}
+                          <Box>
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mb: 0.5 }}>
+                              <LocationOn sx={{ fontSize: 14, color: "text.secondary" }} />
+                              <Typography variant="body2" color="text.secondary">
+                                {station.location?.address}
+                              </Typography>
+                            </Box>
+                            <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+                              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                                <Speed sx={{ fontSize: 14, color: "text.secondary" }} />
+                                <Typography variant="body2" color="text.secondary">
+                                  Tối đa {station.charging?.maxPower || 0}kW
+                                </Typography>
+                              </Box>
+                              <Typography variant="body2" color="text.secondary">
+                                ⚡ {station.stats?.available || 0}/{station.stats?.total || 0} cổng trống
+                              </Typography>
+                              {station.operatingHours && (
+                                <Typography variant="body2" color="text.secondary">
+                                  🕐 {formatOperatingHours(station.operatingHours)}
+                                </Typography>
+                              )}
+                            </Box>
+                          </Box>
+                        </Box>
+
+                        <Button
+                          variant="contained"
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleStationSelect(station);
+                          }}
+                          sx={{ ml: 2, flexShrink: 0 }}
+                        >
+                          Đặt ngay
+                        </Button>
+                      </ListItem>
+                    );
+                  })}
+                </List>
               </CardContent>
             </Card>
           </Grid>
