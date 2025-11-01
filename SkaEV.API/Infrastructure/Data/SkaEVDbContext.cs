@@ -29,6 +29,7 @@ public class SkaEVDbContext : DbContext
     public DbSet<StationStaff> StationStaff { get; set; }
     public DbSet<PaymentMethod> PaymentMethods { get; set; }
     public DbSet<Payment> Payments { get; set; }
+    public DbSet<ServicePlan> ServicePlans { get; set; }
 
     // DbSets - Views (read-only)
     public DbSet<UserCostReport> UserCostReports { get; set; }
@@ -58,6 +59,7 @@ public class SkaEVDbContext : DbContext
         modelBuilder.Entity<Review>().ToTable("reviews");
         modelBuilder.Entity<PricingRule>().ToTable("pricing_rules");
         modelBuilder.Entity<StationStaff>().ToTable("station_staff");
+        modelBuilder.Entity<ServicePlan>().ToTable("service_plans");
 
         // User configuration
         modelBuilder.Entity<User>(entity =>
@@ -496,6 +498,29 @@ public class SkaEVDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.ProcessedByStaffId)
                 .OnDelete(DeleteBehavior.NoAction);
+        });
+
+        // ServicePlan configuration
+        modelBuilder.Entity<ServicePlan>(entity =>
+        {
+            entity.HasKey(e => e.PlanId);
+            entity.Property(e => e.PlanId).HasColumnName("plan_id");
+            entity.Property(e => e.PlanName).HasColumnName("plan_name").HasMaxLength(100).IsRequired();
+            entity.Property(e => e.PlanType).HasColumnName("plan_type").HasMaxLength(50).IsRequired();
+            entity.Property(e => e.Description).HasColumnName("description");
+            entity.Property(e => e.PricePerKwh).HasColumnName("price_per_kwh").HasColumnType("decimal(10,2)").IsRequired();
+            entity.Property(e => e.MonthlyFee).HasColumnName("monthly_fee").HasColumnType("decimal(10,2)");
+            entity.Property(e => e.DiscountPercentage).HasColumnName("discount_percentage").HasColumnType("decimal(5,2)");
+            entity.Property(e => e.MaxPowerKw).HasColumnName("max_power_kw").HasColumnType("decimal(10,2)");
+            entity.Property(e => e.PriorityAccess).HasColumnName("priority_access");
+            entity.Property(e => e.FreeCancellation).HasColumnName("free_cancellation");
+            entity.Property(e => e.Features).HasColumnName("features");
+            entity.Property(e => e.IsActive).HasColumnName("is_active");
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at").IsRequired();
+            entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").IsRequired();
+            entity.Property(e => e.DeletedAt).HasColumnName("deleted_at");
+
+            entity.HasQueryFilter(e => e.DeletedAt == null); // Global query filter for soft delete
         });
 
         // Configure Views (read-only, no keys needed)

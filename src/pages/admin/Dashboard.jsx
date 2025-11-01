@@ -61,15 +61,15 @@ import {
 import { useNavigate } from "react-router-dom";
 import useAuthStore from "../../store/authStore";
 import useStationStore from "../../store/stationStore";
-import useBookingStore from "../../store/bookingStore";
 import { formatCurrency } from "../../utils/helpers";
 import { STATION_STATUS, USER_ROLES } from "../../utils/constants";
+import reportsAPI from "../../services/api/reportsAPI";
+import staffAPI from "../../services/api/staffAPI";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
   useAuthStore();
   const { stations, fetchStations } = useStationStore();
-  const { bookingHistory } = useBookingStore();
   const [_anchorEl, _setAnchorEl] = useState(null);
   const [_openStationDialog, setOpenStationDialog] = useState(false);
   const [_selectedStation, _setSelectedStation] = useState(null);
@@ -87,66 +87,91 @@ const AdminDashboard = () => {
   const [successMessage, setSuccessMessage] = useState("");
   const [showSuccess, setShowSuccess] = useState(false);
 
-  // Fetch stations on component mount
+  // Real-time stats from API
+  const [dashboardStats, setDashboardStats] = useState({
+    totalRevenue: 0,
+    totalBookings: 0,
+    todayBookings: 0,
+    todayRevenue: 0,
+    totalEnergy: 0,
+    activeChargingSessions: 0,
+    totalUsers: 0,
+  });
+  const [stationPerformance, setStationPerformance] = useState([]);
+  const [_loading, setLoading] = useState(true);
+
+  // Fetch stations and stats on component mount
   useEffect(() => {
-    console.log("🔄 Admin Dashboard mounted - fetching stations...");
-    fetchStations();
+    console.log("🔄 Admin Dashboard mounted - fetching data...");
+    const loadDashboardData = async () => {
+      try {
+        setLoading(true);
+        
+        // Fetch stations
+        await fetchStations();
+        
+        // Fetch real stats from API
+        const stats = await reportsAPI.getDashboardSummary();
+        console.log("✅ Dashboard stats from API:", stats);
+        
+        // Fetch active sessions
+        const activeSessions = await staffAPI.getActiveSessions();
+        
+        setDashboardStats({
+          totalRevenue: stats.totalRevenue || 0,
+          totalBookings: stats.totalBookings || 0,
+          todayBookings: stats.todayBookings || 0,
+          todayRevenue: stats.todayRevenue || 0,
+          totalEnergy: stats.totalEnergy || 0,
+          activeChargingSessions: activeSessions?.length || 0,
+          totalUsers: stats.totalUsers || 0, // TODO: Add to backend
+        });
+        
+        setLoading(false);
+      } catch (error) {
+        console.error("❌ Error loading dashboard data:", error);
+        setLoading(false);
+      }
+    };
+    
+    loadDashboardData();
   }, [fetchStations]);
 
-  // System Overview Stats
-  const totalStations = stations.length;
-  const activeStations = stations.filter((s) => s.status === "active").length;
-  const totalUsers = 0; // TODO: Fetch from user management API
-  
-  const todayBookings = bookingHistory.filter(
-    (b) => new Date(b.createdAt).toDateString() === new Date().toDateString()
-  ).length;
-  const totalRevenue = bookingHistory.reduce(
-    (sum, b) => sum + (b.totalAmount || 0),
-    0
-  );
-  const activeChargingSessions = bookingHistory.filter(
-    (b) => b.status === "in_progress"
-  ).length;
+  // Calculate station performance from stations data
+  useEffect(() => {
+    if (stations.length > 0) {
+      const performance = stations.map((station) => {
+        // Calculate utilization from poles/ports
+        let totalPorts = 0;
+        let occupiedPorts = 0;
 
-      // Station Performance với poles/ports structure
-  const stationPerformance = stations
-    .map((station) => {
-      const stationBookings = bookingHistory.filter(
-        (b) => b.stationId === station.id
-      );
-      const revenue = stationBookings.reduce(
-        (sum, b) => sum + (b.totalAmount || 0),
-        0
-      );
+        if (station.charging?.poles) {
+          station.charging.poles.forEach((pole) => {
+            const ports = pole.totalPorts || (pole.ports || []).length;
+            totalPorts += ports;
+            const available = typeof pole.availablePorts === 'number' 
+              ? pole.availablePorts 
+              : (pole.ports || []).filter(p => p.status === 'available').length;
+            occupiedPorts += Math.max(0, ports - available);
+          });
+        }
 
-      // Tính utilization từ poles/ports
-      let totalPorts = 0;
-      let occupiedPorts = 0;
+        const utilization = totalPorts > 0 ? (occupiedPorts / totalPorts) * 100 : 0;
 
-      if (station.charging?.poles) {
-        station.charging.poles.forEach((pole) => {
-          const ports = pole.totalPorts || (pole.ports || []).length;
-          totalPorts += ports;
-          const available = typeof pole.availablePorts === 'number' ? pole.availablePorts : (pole.ports || []).filter(p=>p.status==='available').length;
-          occupiedPorts += Math.max(0, ports - available);
-        });
-      }
-
-      const utilization =
-        totalPorts > 0 ? (occupiedPorts / totalPorts) * 100 : 0;
-
-      return {
-        ...station,
-        bookingsCount: stationBookings.length,
-        revenue,
-        utilization,
-        totalSlots: totalPorts,
-        occupiedSlots: occupiedPorts,
-        chargingPostsCount: station.charging?.poles?.length || 0,
-      };
-    })
-    .sort((a, b) => b.revenue - a.revenue);
+        return {
+          ...station,
+          bookingsCount: 0, // Will be updated from API if needed
+          revenue: 0, // Will be updated from API if needed
+          utilization,
+          totalSlots: totalPorts,
+          occupiedSlots: occupiedPorts,
+          chargingPostsCount: station.charging?.poles?.length || 0,
+        };
+      });
+      
+      setStationPerformance(performance);
+    }
+  }, [stations]);
 
   // Filter stations based on search and status like driver flow
   const filteredStations = stationPerformance.filter((station) => {
@@ -161,7 +186,7 @@ const AdminDashboard = () => {
   });
 
   // Handle station actions like driver flow
-  const handleStationAction = (action, station) => {
+  const _handleStationAction = (action, station) => {
     console.log(`${action} station:`, station.name);
     if (action === "view") {
       setSelectedStationForDetail(station);
@@ -338,13 +363,13 @@ const AdminDashboard = () => {
                 <LocationOn />
               </Avatar>
               <Typography variant="h4" fontWeight="bold">
-                {totalStations}
+                {stations.length}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Tổng số trạm
               </Typography>
               <Typography variant="caption" color="text.secondary">
-                {activeStations} hoạt động
+                {stations.filter((s) => s.status === "active").length} hoạt động
               </Typography>
             </CardContent>
           </Card>
@@ -365,13 +390,13 @@ const AdminDashboard = () => {
                 <People />
               </Avatar>
               <Typography variant="h4" fontWeight="bold">
-                {totalUsers}
+                {dashboardStats.totalUsers || 0}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Tổng người dùng
               </Typography>
               <Typography variant="caption" color="text.secondary">
-                +12 tuần này
+                {dashboardStats.totalBookings || 0} bookings
               </Typography>
             </CardContent>
           </Card>
@@ -392,13 +417,13 @@ const AdminDashboard = () => {
                 <ElectricCar />
               </Avatar>
               <Typography variant="h4" fontWeight="bold">
-                {activeChargingSessions}
+                {dashboardStats.activeChargingSessions}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Phiên hoạt động
               </Typography>
               <Typography variant="caption" color="text.secondary">
-                {todayBookings} hôm nay
+                {dashboardStats.todayBookings} hôm nay
               </Typography>
             </CardContent>
           </Card>
@@ -419,13 +444,13 @@ const AdminDashboard = () => {
                 <MonetizationOn />
               </Avatar>
               <Typography variant="h4" fontWeight="bold">
-                {formatCurrency(totalRevenue)}
+                {formatCurrency(dashboardStats.totalRevenue)}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Tổng doanh thu
               </Typography>
               <Typography variant="caption" color="text.secondary">
-                +18% so với tháng trước
+                {formatCurrency(dashboardStats.todayRevenue)} hôm nay
               </Typography>
             </CardContent>
           </Card>

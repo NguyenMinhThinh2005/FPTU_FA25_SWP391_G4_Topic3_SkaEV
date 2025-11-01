@@ -1,6 +1,7 @@
 /* eslint-disable */
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import staffAPI from "../../services/api/staffAPI";
 import {
   Box,
   Typography,
@@ -82,84 +83,71 @@ const ChargingSessions = () => {
     }
   }, [location.state]);
 
-  const loadSessions = () => {
-    // Mock data - Mô phỏng các trường hợp thanh toán
-    const mockSessions = [
-      {
-        id: "SES-001",
-        connectorId: "CON-02",
-        startTime: new Date(Date.now() - 45 * 60 * 1000),
-        endTime: null,
-        energyConsumed: 15.5,
-        currentPower: 22,
-        estimatedCost: 77500,
-        vehicleSOC: 65,
-        status: "Active",
-        paymentStatus: "Pending",
-        paymentMethod: null, // Chưa thanh toán
-      },
-      {
-        id: "SES-002",
-        connectorId: "CON-01",
-        startTime: new Date(Date.now() - 2 * 60 * 60 * 1000),
-        endTime: new Date(Date.now() - 30 * 60 * 1000),
-        energyConsumed: 28.3,
-        currentPower: 0,
-        estimatedCost: 141500,
-        vehicleSOC: 100,
-        status: "Completed",
-        paymentStatus: "Pending",
-        paymentMethod: null, // Hoàn thành nhưng CHƯA thanh toán - Cần Staff xác nhận TT tại chỗ
-      },
-      {
-        id: "SES-003",
-        connectorId: "CON-03",
-        startTime: new Date(Date.now() - 3 * 60 * 60 * 1000),
-        endTime: new Date(Date.now() - 2 * 60 * 60 * 1000),
-        energyConsumed: 35.7,
-        currentPower: 0,
-        estimatedCost: 178500,
-        vehicleSOC: 100,
-        status: "Completed",
-        paymentStatus: "Paid",
-        paymentMethod: "QR Code", // Customer đã tự thanh toán bằng QR
-        paymentTime: new Date(Date.now() - 2 * 60 * 60 * 1000),
-      },
-      {
-        id: "SES-004",
-        connectorId: "CON-04",
-        startTime: new Date(Date.now() - 4 * 60 * 60 * 1000),
-        endTime: new Date(Date.now() - 3 * 60 * 60 * 1000),
-        energyConsumed: 42.1,
-        currentPower: 0,
-        estimatedCost: 210500,
-        vehicleSOC: 100,
-        status: "Completed",
-        paymentStatus: "Paid",
-        paymentMethod: "Thẻ ngân hàng", // Customer quẹt thẻ tại trạm
-        paymentTime: new Date(Date.now() - 3 * 60 * 60 * 1000),
-      },
-      {
-        id: "SES-005",
-        connectorId: "CON-01",
-        startTime: new Date(Date.now() - 5 * 60 * 60 * 1000),
-        endTime: new Date(Date.now() - 4 * 60 * 60 * 1000),
-        energyConsumed: 25.8,
-        currentPower: 0,
-        estimatedCost: 129000,
-        vehicleSOC: 100,
-        status: "Completed",
-        paymentStatus: "Paid",
-        paymentMethod: "Tiền mặt", // Staff đã xác nhận thanh toán tiền mặt tại quầy
-        paymentTime: new Date(Date.now() - 4 * 60 * 60 * 1000),
-      },
-    ];
-    setSessions(mockSessions);
+  const loadSessions = async () => {
+    try {
+      console.log("🔄 Loading charging sessions from API...");
+      
+      // Fetch all bookings (active + completed)
+      const bookingsData = await staffAPI.getBookingsHistory();
+      console.log("✅ Bookings data:", bookingsData);
+      
+      // Transform bookings to sessions format
+      const sessionsData = (bookingsData || []).map(booking => {
+        const isActive = booking.status === 'charging' || booking.status === 'in_progress';
+        const isCompleted = booking.status === 'completed';
+        
+        // Calculate energy and cost from invoice if available
+        const energyConsumed = booking.invoice?.totalEnergyKwh || booking.totalEnergyKwh || 0;
+        const estimatedCost = booking.invoice?.totalAmount || booking.totalAmount || 
+                             (energyConsumed * 3500); // 3500 VND/kWh default
+        
+        return {
+          id: booking.bookingId || booking.id,
+          bookingCode: booking.bookingCode,
+          connectorId: `SLOT-${booking.slotId}`,
+          stationId: booking.stationId,
+          startTime: new Date(booking.actualStartTime || booking.scheduledStartTime),
+          endTime: booking.actualEndTime ? new Date(booking.actualEndTime) : null,
+          energyConsumed: energyConsumed,
+          currentPower: isActive ? 22 : 0, // Default 22kW for active sessions
+          estimatedCost: estimatedCost,
+          vehicleSOC: booking.targetSoc || booking.finalSoc || 80,
+          status: isActive ? "Active" : isCompleted ? "Completed" : "Pending",
+          paymentStatus: booking.invoice?.paymentStatus === 'paid' ? "Paid" : "Pending",
+          paymentMethod: booking.invoice?.paymentMethod || null,
+          paymentTime: booking.invoice?.paidAt ? new Date(booking.invoice.paidAt) : null,
+          invoice: booking.invoice,
+        };
+      });
+      
+      setSessions(sessionsData);
+      console.log("✅ Loaded sessions:", sessionsData.length);
+      
+    } catch (error) {
+      console.error("❌ Error loading sessions:", error);
+      setSnackbar({ 
+        open: true, 
+        message: "Không thể tải dữ liệu phiên sạc. Vui lòng thử lại.", 
+        severity: "error" 
+      });
+      setSessions([]);
+    }
   };
 
   const handleStartSession = async () => {
     try {
-      // TODO: API call to start charging
+      if (!startForm.connectorId) {
+        setSnackbar({ open: true, message: "Vui lòng chọn connector", severity: "error" });
+        return;
+      }
+      
+      console.log("📤 Starting charging session:", startForm);
+      
+      // Extract booking ID from connector/session selection
+      // In real scenario, staff would scan QR or select from pending bookings
+      // For now, we assume connector ID format is SLOT-{slotId} or we need booking ID
+      // TODO: Add booking selection UI for staff
+      
       setSnackbar({
         open: true,
         message: `Đã khởi động phiên sạc tại ${startForm.connectorId}`,
@@ -168,66 +156,101 @@ const ChargingSessions = () => {
       setStartDialog(false);
       loadSessions();
     } catch (error) {
-      setSnackbar({ open: true, message: "Lỗi khởi động phiên sạc", severity: "error" });
+      console.error("❌ Error starting session:", error);
+      setSnackbar({ 
+        open: true, 
+        message: error.response?.data?.message || "Lỗi khởi động phiên sạc", 
+        severity: "error" 
+      });
     }
   };
 
   const handleStopSession = async () => {
     try {
-      // TODO: API call to stop charging
+      if (!selectedSession?.id) {
+        setSnackbar({ open: true, message: "Không có phiên được chọn", severity: "error" });
+        return;
+      }
       
-      // Cập nhật session ngay lập tức trong state
-      setSessions(sessions.map(s => 
-        s.id === selectedSession?.id 
-          ? { 
-              ...s, 
-              status: "Completed", 
-              endTime: new Date(),
-              currentPower: 0
-            }
-          : s
-      ));
+      console.log("📤 Stopping charging session:", selectedSession.id);
+      
+      // Call API to complete charging
+      const sessionData = {
+        finalSoc: selectedSession.vehicleSOC || 80,
+        totalEnergyKwh: selectedSession.energyConsumed || 0,
+        unitPrice: 3500,
+      };
+      
+      await staffAPI.completeCharging(selectedSession.id, sessionData);
+      console.log("✅ Session stopped successfully");
       
       setSnackbar({
         open: true,
-        message: `Đã dừng phiên sạc ${selectedSession?.id}`,
+        message: `Đã dừng phiên sạc ${selectedSession.bookingCode || selectedSession.id}`,
         severity: "success",
       });
       
       setStopDialog(false);
+      loadSessions(); // Reload to get updated data
       
-      // Không mở payment dialog ngay, chỉ cập nhật UI
-      // Staff sẽ tự click "Xác nhận TT tại chỗ" nếu cần
     } catch (error) {
-      setSnackbar({ open: true, message: "Lỗi dừng phiên sạc", severity: "error" });
+      console.error("❌ Error stopping session:", error);
+      setSnackbar({ 
+        open: true, 
+        message: error.response?.data?.message || "Lỗi dừng phiên sạc", 
+        severity: "error" 
+      });
     }
   };
 
   const handleConfirmPayment = async () => {
     try {
-      // TODO: API call to record payment
+      if (!selectedSession?.id) {
+        setSnackbar({ open: true, message: "Không có phiên được chọn", severity: "error" });
+        return;
+      }
+      
       const paymentMethodMap = {
+        cash: "cash",
+        transfer: "bank_transfer",
+        card: "card"
+      };
+      const paymentMethodValue = paymentMethodMap[paymentMethod] || "cash";
+      
+      console.log("📤 Processing payment:", {
+        bookingId: selectedSession.id,
+        method: paymentMethodValue
+      });
+      
+      // Call API to process payment
+      await staffAPI.processPayment(selectedSession.id, {
+        method: paymentMethodValue,
+      });
+      
+      console.log("✅ Payment processed successfully");
+      
+      const paymentMethodText = {
         cash: "Tiền mặt",
         transfer: "Chuyển khoản",
         card: "Quẹt thẻ (POS tại quầy)"
-      };
-      const paymentMethodText = paymentMethodMap[paymentMethod] || "Tiền mặt";
+      }[paymentMethod] || "Tiền mặt";
       
       setSnackbar({
         open: true,
-        message: `Đã xác nhận thanh toán ${paymentMethodText} cho phiên ${selectedSession?.id}`,
+        message: `Đã xác nhận thanh toán ${paymentMethodText} cho phiên ${selectedSession.bookingCode || selectedSession.id}`,
         severity: "success",
       });
       setPaymentDialog(false);
       
-      // Cập nhật session trong mock data
-      setSessions(sessions.map(s => 
-        s.id === selectedSession?.id 
-          ? { ...s, paymentStatus: "Paid", paymentMethod: paymentMethodText, paymentTime: new Date() }
-          : s
-      ));
+      loadSessions(); // Reload to get updated data
+      
     } catch (error) {
-      setSnackbar({ open: true, message: "Lỗi ghi nhận thanh toán", severity: "error" });
+      console.error("❌ Error processing payment:", error);
+      setSnackbar({ 
+        open: true, 
+        message: error.response?.data?.message || "Lỗi ghi nhận thanh toán", 
+        severity: "error" 
+      });
     }
   };
 

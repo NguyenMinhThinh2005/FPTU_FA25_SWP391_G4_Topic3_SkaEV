@@ -217,4 +217,60 @@ public class AdminReportsController : ControllerBase
             return StatusCode(500, new { message = "An error occurred" });
         }
     }
+
+    /// <summary>
+    /// Get peak hours analysis
+    /// </summary>
+    [HttpGet("peak-hours")]
+    public async Task<IActionResult> GetPeakHoursAnalysis(
+        [FromQuery] int? stationId = null,
+        [FromQuery] string? dateRange = "last30days")
+    {
+        try
+        {
+            var peakHours = await _reportService.GetPeakHoursAnalysisAsync(stationId, dateRange);
+            return Ok(new { success = true, data = peakHours });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting peak hours analysis");
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
+    }
+
+    /// <summary>
+    /// Get system health metrics
+    /// </summary>
+    [HttpGet("system-health")]
+    public async Task<IActionResult> GetSystemHealth()
+    {
+        try
+        {
+            var health = await _reportService.GetSystemHealthAsync();
+            return Ok(new { success = true, data = health });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting system health");
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
+    }
+
+    /// <summary>
+    /// Get user growth analytics
+    /// </summary>
+    [HttpGet("user-growth")]
+    public async Task<IActionResult> GetUserGrowth([FromQuery] string? dateRange = "last30days")
+    {
+        try
+        {
+            var growth = await _reportService.GetUserGrowthAsync(dateRange);
+            return Ok(new { success = true, data = growth });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting user growth");
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
+    }
 }

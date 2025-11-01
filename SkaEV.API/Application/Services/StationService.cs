@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Data.SqlClient;
 using SkaEV.API.Infrastructure.Data;
 using SkaEV.API.Application.DTOs.Stations;
+using SkaEV.API.Application.DTOs.Slots;
 using Newtonsoft.Json;
 
 namespace SkaEV.API.Application.Services;
@@ -14,6 +15,7 @@ public interface IStationService
     Task<StationDto> CreateStationAsync(CreateStationDto dto);
     Task<bool> UpdateStationAsync(int stationId, UpdateStationDto dto);
     Task<bool> DeleteStationAsync(int stationId);
+    Task<List<SlotDetailDto>> GetStationSlotsDetailsAsync(int stationId);
 }
 
 public class StationService : IStationService
@@ -200,5 +202,37 @@ public class StationService : IStationService
         _context.ChargingStations.Remove(station);
         await _context.SaveChangesAsync();
         return true;
+    }
+
+    public async Task<List<SlotDetailDto>> GetStationSlotsDetailsAsync(int stationId)
+    {
+        var slotsQuery = from slot in _context.ChargingSlots
+                         join post in _context.ChargingPosts on slot.PostId equals post.PostId
+                         where post.StationId == stationId
+                         join booking in _context.Bookings on slot.CurrentBookingId equals booking.BookingId into bookings
+                         from booking in bookings.DefaultIfEmpty()
+                         join user in _context.Users on booking.UserId equals user.UserId into users
+                         from user in users.DefaultIfEmpty()
+                         join socTracking in _context.SocTrackings on booking.BookingId equals socTracking.BookingId into socTrackings
+                         from latestSoc in socTrackings.OrderByDescending(s => s.Timestamp).Take(1).DefaultIfEmpty()
+                         select new SlotDetailDto
+                         {
+                             SlotId = slot.SlotId,
+                             PostId = post.PostId,
+                             PostNumber = post.PostNumber,
+                             SlotNumber = slot.SlotNumber,
+                             ConnectorType = slot.ConnectorType,
+                             MaxPower = slot.MaxPower,
+                             Status = slot.Status,
+                             CurrentBookingId = slot.CurrentBookingId,
+                             CurrentPowerUsage = latestSoc != null ? latestSoc.Power : null,
+                             CurrentSoc = latestSoc != null ? latestSoc.CurrentSoc : null,
+                             CurrentUserName = user != null ? user.FullName : null,
+                             BookingStartTime = booking != null ? booking.ActualStartTime : null,
+                             CreatedAt = slot.CreatedAt,
+                             UpdatedAt = slot.UpdatedAt
+                         };
+
+        return await slotsQuery.ToListAsync();
     }
 }

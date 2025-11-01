@@ -1,6 +1,7 @@
 /* eslint-disable */
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import staffAPI from "../../services/api/staffAPI";
 import {
   Box,
   Typography,
@@ -82,81 +83,78 @@ const Monitoring = () => {
     }
   }, [location.state]);
 
-  const loadMonitoringData = () => {
-    // Mock connector status data
-    const mockConnectors = [
-      {
-        id: "CON-01",
-        type: "AC",
-        maxPower: 22,
-        status: "online",
-        operationalStatus: "Available",
-        voltage: 230,
-        current: 0,
-        temperature: 28,
-      },
-      {
-        id: "CON-02",
-        type: "AC",
-        maxPower: 22,
-        status: "online",
-        operationalStatus: "Charging",
-        voltage: 230,
-        current: 32,
-        temperature: 35,
-      },
-      {
-        id: "CON-03",
-        type: "DC",
-        maxPower: 50,
-        status: "online",
-        operationalStatus: "Available",
-        voltage: 400,
-        current: 0,
-        temperature: 26,
-      },
-      {
-        id: "CON-04",
-        type: "DC",
-        maxPower: 50,
-        status: "offline",
-        operationalStatus: "Faulted",
-        voltage: 0,
-        current: 0,
-        temperature: 0,
-      },
-    ];
-
-    // Mock incident reports
-    const mockIncidents = [
-      {
-        id: "INC-001",
-        connectorId: "CON-04",
-        type: "hardware",
-        typeLabel: "Lỗi Phần cứng Thiết bị",
-        priority: "high",
-        description: "Cáp sạc bị đứt, không thể kết nối với xe",
-        status: "completed",
-        statusLabel: "Hoàn thành",
-        reportedAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
-        adminResponse: "Đã thay cáp mới và kiểm tra hoạt động bình thường",
-      },
-      {
-        id: "INC-002",
-        connectorId: "CON-02",
-        type: "software",
-        typeLabel: "Lỗi Phần mềm/Giao tiếp",
-        priority: "medium",
-        description: "Màn hình đôi khi không hiển thị trạng thái sạc",
-        status: "in_progress",
-        statusLabel: "Đang xử lý",
-        reportedAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
-        adminResponse: null,
-      },
-    ];
-
-    setConnectors(mockConnectors);
-    setIncidents(mockIncidents);
+  const loadMonitoringData = async () => {
+    try {
+      console.log("🔄 Loading monitoring data from API...");
+      
+      // Fetch stations with slots (connectors)
+      const stationsData = await staffAPI.getStationsStatus();
+      console.log("✅ Stations data:", stationsData);
+      
+      // Transform stations to connectors format
+      const connectorsData = [];
+      if (stationsData && Array.isArray(stationsData)) {
+        stationsData.forEach(station => {
+          // Get slots from charging structure
+          if (station.charging?.poles) {
+            station.charging.poles.forEach((pole, poleIndex) => {
+              if (pole.ports) {
+                pole.ports.forEach((port, portIndex) => {
+                  connectorsData.push({
+                    id: `${station.id}-P${poleIndex + 1}-${portIndex + 1}`,
+                    stationId: station.id,
+                    stationName: station.name,
+                    type: pole.connectorType || "AC",
+                    maxPower: pole.maxPower || 22,
+                    status: port.status === "available" ? "online" : "offline",
+                    operationalStatus: port.status === "available" ? "Available" : 
+                                     port.status === "charging" ? "Charging" : "Faulted",
+                    voltage: port.status === "available" ? 230 : 0,
+                    current: port.status === "charging" ? 32 : 0,
+                    temperature: port.status === "available" ? 28 : 0,
+                  });
+                });
+              }
+            });
+          }
+        });
+      }
+      
+      // Fetch issues/incidents
+      const issuesData = await staffAPI.getAllIssues();
+      console.log("✅ Issues data:", issuesData);
+      
+      // Transform issues to incidents format
+      const incidentsData = (issuesData || []).map(issue => ({
+        id: issue.issueId || issue.id,
+        connectorId: issue.stationId ? `${issue.stationId}-connector` : "Unknown",
+        type: issue.category || "other",
+        typeLabel: issue.title || issue.category,
+        priority: issue.priority || "medium",
+        description: issue.description,
+        status: issue.status === "resolved" ? "completed" : 
+                issue.status === "in_progress" ? "in_progress" : "pending",
+        statusLabel: issue.status === "resolved" ? "Hoàn thành" :
+                    issue.status === "in_progress" ? "Đang xử lý" : "Chờ xử lý",
+        reportedAt: new Date(issue.reportedAt || issue.createdAt),
+        adminResponse: issue.resolution,
+      }));
+      
+      setConnectors(connectorsData);
+      setIncidents(incidentsData);
+      
+    } catch (error) {
+      console.error("❌ Error loading monitoring data:", error);
+      setSnackbar({ 
+        open: true, 
+        message: "Không thể tải dữ liệu. Sử dụng dữ liệu mẫu.", 
+        severity: "warning" 
+      });
+      
+      // Fallback to empty data
+      setConnectors([]);
+      setIncidents([]);
+    }
   };
 
   const handleSubmitReport = async () => {
@@ -166,7 +164,34 @@ const Monitoring = () => {
     }
 
     try {
-      // TODO: API call to submit incident report
+      console.log("📤 Submitting issue report:", reportForm);
+      
+      // Extract station ID from connector ID (format: "stationId-P1-1")
+      const stationId = parseInt(reportForm.connectorId.split('-')[0]) || 1;
+      
+      // Create issue via API
+      const issueData = {
+        stationId: stationId,
+        title: incidentTypes.find(t => t.value === reportForm.incidentType)?.label || "Sự cố",
+        description: reportForm.description,
+        priority: reportForm.priority,
+        category: reportForm.incidentType,
+      };
+      
+      const result = await staffAPI.createIssue(issueData);
+      console.log("✅ Issue created:", result);
+      
+      // Upload attachments if any
+      if (reportForm.attachments.length > 0 && result.issueId) {
+        for (const file of reportForm.attachments) {
+          try {
+            await staffAPI.uploadAttachment(result.issueId, file);
+          } catch (err) {
+            console.warn("⚠️ Failed to upload attachment:", err);
+          }
+        }
+      }
+      
       setSnackbar({
         open: true,
         message: "Đã gửi báo cáo sự cố thành công!",
@@ -182,7 +207,12 @@ const Monitoring = () => {
       });
       loadMonitoringData();
     } catch (error) {
-      setSnackbar({ open: true, message: "Lỗi gửi báo cáo", severity: "error" });
+      console.error("❌ Error submitting report:", error);
+      setSnackbar({ 
+        open: true, 
+        message: error.response?.data?.message || "Lỗi gửi báo cáo", 
+        severity: "error" 
+      });
     }
   };
 

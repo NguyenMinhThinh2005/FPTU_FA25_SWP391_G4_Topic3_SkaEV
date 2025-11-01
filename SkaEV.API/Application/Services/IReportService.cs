@@ -19,6 +19,9 @@ public interface IReportService
     Task<IEnumerable<StationPerformanceDto>> GetStationPerformanceAsync(int? stationId = null);
     Task<AdminDashboardDto> GetAdminDashboardAsync();
     Task<IEnumerable<PaymentMethodStatsDto>> GetPaymentMethodsStatsAsync();
+    Task<object> GetPeakHoursAnalysisAsync(int? stationId = null, string? dateRange = "last30days");
+    Task<IEnumerable<object>> GetSystemHealthAsync();
+    Task<IEnumerable<object>> GetUserGrowthAsync(string? dateRange = "last30days");
 
     // Export
     Task<string> ExportRevenueReportToCsvAsync(int? stationId = null, int? year = null, int? month = null);
