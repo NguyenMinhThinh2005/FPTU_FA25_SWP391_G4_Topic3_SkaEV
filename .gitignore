@@ -43,6 +43,8 @@ SkaEV.API/appsettings.Development.json
 SkaEV.API/appsettings.json
 SkaEV.API/appsettings.*.json
 !SkaEV.API/appsettings.template.json
+!SkaEV.API/appsettings.*.example
+!SkaEV.API/*.example.json
 
 # PowerShell scripts - may contain machine-specific paths
 *.ps1
@@ -69,4 +71,16 @@ database/temp_*.sql
 # Test/temp files
 .azure/*.md
 !.azure/README.md
->>>>>>> 1340a20aa8658470e6ab5295d3f488069e58bc28
+
+# Temporary documentation files (work in progress)
+*_TEST_*.md
+*_DEBUG_*.md
+*_GUIDE_*.md
+COMPLETE_ACCOUNT_LIST.md
+SYSTEM_STATUS_REPORT.md
+
+# Keep important docs
+!README.md
+!SETUP*.md
+!API_*.md
+!INTEGRATION*.md

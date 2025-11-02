@@ -273,7 +273,7 @@ const IncidentManagement = () => {
       {/* Header */}
       <Box sx={{ mb: 4 }}>
         <Typography variant="h4" fontWeight="bold" gutterBottom>
-          Quản lý Báo cáo Sự cố
+          Quản lý báo cáo sự cố
         </Typography>
         <Typography variant="body1" color="text.secondary">
           Xử lý các báo cáo từ nhân viên và đưa ra quyết định xử lý

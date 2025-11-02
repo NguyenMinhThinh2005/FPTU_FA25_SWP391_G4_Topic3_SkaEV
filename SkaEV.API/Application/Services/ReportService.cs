@@ -192,28 +192,82 @@ public class ReportService : IReportService
 
     public async Task<IEnumerable<StationPerformanceDto>> GetStationPerformanceAsync(int? stationId = null)
     {
-        var query = _context.StationPerformances.AsQueryable();
-
-        if (stationId.HasValue)
-            query = query.Where(p => p.StationId == stationId.Value);
-
-        var performance = await query
-            .OrderByDescending(p => p.CurrentOccupancyPercent)
-            .ToListAsync();
-
-        return performance.Select(p => new StationPerformanceDto
+        try
         {
-            StationId = p.StationId,
-            StationName = p.StationName,
-            Location = p.Location,
-            TotalPosts = p.TotalPosts,
-            StationStatus = p.StationStatus,
-            ActiveSessions = p.ActiveSessions,
-            SlotsInUse = p.SlotsInUse,
-            CurrentOccupancyPercent = p.CurrentOccupancyPercent,
-            TodayTotalSessions = p.TodayTotalSessions,
-            RevenueLast24h = p.RevenueLast24h
-        });
+            // Try using the view first
+            var query = _context.StationPerformances.AsQueryable();
+
+            if (stationId.HasValue)
+                query = query.Where(p => p.StationId == stationId.Value);
+
+            var performance = await query
+                .OrderByDescending(p => p.CurrentOccupancyPercent)
+                .ToListAsync();
+
+            return performance.Select(p => new StationPerformanceDto
+            {
+                StationId = p.StationId,
+                StationName = p.StationName,
+                Location = p.Location,
+                TotalPosts = p.TotalPosts,
+                StationStatus = p.StationStatus,
+                ActiveSessions = p.ActiveSessions,
+                SlotsInUse = p.SlotsInUse,
+                CurrentOccupancyPercent = p.CurrentOccupancyPercent,
+                TodayTotalSessions = p.TodayTotalSessions,
+                RevenueLast24h = p.RevenueLast24h
+            });
+        }
+        catch
+        {
+            // Fallback: Calculate manually if view doesn't exist
+            var today = DateTime.Today;
+            var stationsQuery = _context.ChargingStations.AsQueryable();
+
+            if (stationId.HasValue)
+                stationsQuery = stationsQuery.Where(s => s.StationId == stationId.Value);
+
+            var stations = await stationsQuery.ToListAsync();
+            var performance = new List<StationPerformanceDto>();
+
+            foreach (var station in stations)
+            {
+                // Get total slots through ChargingPosts relationship
+                var totalSlots = await _context.ChargingSlots
+                    .CountAsync(s => s.ChargingPost.StationId == station.StationId);
+
+                var slotsInUse = await _context.ChargingSlots
+                    .CountAsync(s => s.ChargingPost.StationId == station.StationId && s.Status != "available");
+
+                var activeSessions = await _context.Bookings
+                    .CountAsync(b => b.StationId == station.StationId && b.Status == "in_progress");
+
+                var todaySessions = await _context.Bookings
+                    .CountAsync(b => b.StationId == station.StationId && b.CreatedAt >= today);
+
+                var revenue24h = await _context.Invoices
+                    .Where(i => i.CreatedAt >= today.AddDays(-1) &&
+                               i.PaymentStatus == "paid" &&
+                               _context.Bookings.Any(b => b.BookingId == i.BookingId && b.StationId == station.StationId))
+                    .SumAsync(i => (decimal?)i.TotalAmount) ?? 0;
+
+                performance.Add(new StationPerformanceDto
+                {
+                    StationId = station.StationId,
+                    StationName = station.StationName,
+                    Location = $"{station.Address}, {station.City}",
+                    TotalPosts = totalSlots,
+                    StationStatus = station.Status,
+                    ActiveSessions = activeSessions,
+                    SlotsInUse = slotsInUse,
+                    CurrentOccupancyPercent = totalSlots > 0 ? (decimal)slotsInUse / totalSlots * 100 : 0,
+                    TodayTotalSessions = todaySessions,
+                    RevenueLast24h = revenue24h
+                });
+            }
+
+            return performance.OrderByDescending(p => p.CurrentOccupancyPercent);
+        }
     }
 
     public async Task<AdminDashboardDto> GetAdminDashboardAsync()
@@ -291,7 +345,8 @@ public class ReportService : IReportService
                     where b.ActualStartTime >= startDate && b.ActualStartTime <= endDate
                     && b.ActualStartTime.HasValue
                     && (stationId == null || b.StationId == stationId)
-                    group b by b.ActualStartTime.Value.Hour into g
+                    let hour = b.ActualStartTime!.Value.Hour
+                    group b by hour into g
                     select new
                     {
                         hour = g.Key,

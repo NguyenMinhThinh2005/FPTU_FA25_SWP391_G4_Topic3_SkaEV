@@ -58,7 +58,7 @@ const Sidebar = ({ open, onClose }) => {
             path: "/admin/users",
           },
           {
-            text: "Quản lý Báo cáo Sự cố",
+            text: "Quản lý báo cáo sự cố",
             icon: <Warning />,
             path: "/admin/incidents",
           },

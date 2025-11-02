@@ -69,8 +69,6 @@ const AdvancedAnalytics = () => {
     setError(null);
     
     try {
-      console.log("🔄 Fetching analytics data for:", timeRange);
-      
       const currentDate = new Date();
       const currentYear = currentDate.getFullYear();
       const currentMonth = currentDate.getMonth() + 1;
@@ -86,8 +84,6 @@ const AdvancedAnalytics = () => {
       } else if (timeRange === "12m") {
         params = { year: currentYear };
       }
-
-      console.log("📅 API params:", params);
 
       // Fetch data in parallel
       const [
@@ -106,91 +102,18 @@ const AdvancedAnalytics = () => {
         }),
       ]);
 
-      console.log("💰 Revenue response:", revenueResponse);
-      console.log("⚡ Usage response:", usageResponse);
-      console.log("🏆 Performance response:", performanceResponse);
-      console.log("📊 Peak hours response:", peakHoursResponse);
-
       setRevenueData(revenueResponse.data || []);
       setUsageData(usageResponse.data || []);
       setStationPerformanceData(performanceResponse.data || []);
       setPeakHoursData(peakHoursResponse.data?.hourlyUsage || []);
       
-      console.log("✅ Data loaded successfully");
-      console.log("📈 Revenue items:", revenueResponse.data?.length || 0);
-      console.log("📊 Usage items:", usageResponse.data?.length || 0);
-      
     } catch (err) {
       console.error("Error fetching analytics data:", err);
-      console.log("📊 Using fallback mock data for demo");
-      
-      // Fallback to mock data for demo purposes
-      setError("Đang sử dụng dữ liệu mẫu để demo. API backend chưa có dữ liệu thực.");
-      
-      // Generate mock data based on time range
-      const mockRevenue = generateMockRevenueData(timeRange);
-      const mockUsage = generateMockUsageData(timeRange);
-      const mockPerformance = generateMockStationPerformance();
-      const mockPeakHours = generateMockPeakHours();
-      
-      setRevenueData(mockRevenue);
-      setUsageData(mockUsage);
-      setStationPerformanceData(mockPerformance);
-      setPeakHoursData(mockPeakHours);
+      setError("Không thể tải dữ liệu phân tích. Vui lòng thử lại.");
     } finally {
       setLoading(false);
     }
   }, [timeRange]);
-
-  // Mock data generators
-  const generateMockRevenueData = (range) => {
-    const dataPoints = range === "7d" ? 7 : range === "30d" ? 4 : range === "90d" ? 3 : 12;
-    return Array.from({ length: dataPoints }, (_, i) => ({
-      stationId: i + 1,
-      stationName: `Trạm sạc ${i + 1}`,
-      month: new Date().getMonth() + 1,
-      year: new Date().getFullYear(),
-      totalRevenue: Math.floor(Math.random() * 5000000) + 2000000,
-      totalEnergySoldKwh: Math.floor(Math.random() * 1000) + 500,
-      totalTransactions: Math.floor(Math.random() * 150) + 50,
-    }));
-  };
-
-  const generateMockUsageData = (range) => {
-    const dataPoints = range === "7d" ? 7 : range === "30d" ? 4 : range === "90d" ? 3 : 12;
-    return Array.from({ length: dataPoints }, (_, i) => ({
-      stationId: i + 1,
-      stationName: `Trạm sạc ${i + 1}`,
-      month: new Date().getMonth() + 1,
-      year: new Date().getFullYear(),
-      completedSessions: Math.floor(Math.random() * 120) + 40,
-      totalBookings: Math.floor(Math.random() * 150) + 60,
-      utilizationRatePercent: Math.random() * 40 + 60, // 60-100%
-    }));
-  };
-
-  const generateMockStationPerformance = () => {
-    const types = ["DC Fast", "AC Level 2", "Ultra Fast"];
-    return Array.from({ length: 10 }, (_, i) => ({
-      stationId: i + 1,
-      stationName: `Trạm sạc ${i + 1}`,
-      chargingType: types[i % types.length],
-      totalRevenue: Math.floor(Math.random() * 8000000) + 3000000,
-      totalEnergyDelivered: Math.floor(Math.random() * 2000) + 800,
-      completedSessions: Math.floor(Math.random() * 200) + 100,
-      utilizationRate: Math.random() * 30 + 70, // 70-100%
-      status: i < 8 ? "active" : "inactive",
-    }));
-  };
-
-  const generateMockPeakHours = () => {
-    return Array.from({ length: 24 }, (_, hour) => ({
-      hour,
-      sessionCount: hour >= 7 && hour <= 19 
-        ? Math.floor(Math.random() * 80) + 40 
-        : Math.floor(Math.random() * 30) + 10,
-    }));
-  };
 
   useEffect(() => {
     fetchAnalyticsData();
@@ -369,11 +292,7 @@ const AdvancedAnalytics = () => {
 
       {/* Error Alert */}
       {error && (
-        <Alert 
-          severity="warning" 
-          sx={{ mb: 3 }} 
-          onClose={() => setError(null)}
-        >
+        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
           {error}
         </Alert>
       )}
@@ -516,73 +435,32 @@ const AdvancedAnalytics = () => {
               <Typography variant="h6" fontWeight="bold" gutterBottom>
                 Xu hướng doanh thu & phiên sạc ({getTimeRangeLabel()})
               </Typography>
-              <Box sx={{ height: 350 }}>
+              <Box sx={{ height: 300 }}>
                 {getRevenueChartData().length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart 
-                      data={getRevenueChartData()}
-                      margin={{ top: 10, right: 30, left: 0, bottom: 5 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                      <XAxis 
-                        dataKey="dateLabel" 
-                        angle={-15}
-                        textAnchor="end"
-                        height={60}
-                        tick={{ fontSize: 12 }}
-                      />
-                      <YAxis 
-                        yAxisId="left" 
-                        orientation="left"
-                        tickFormatter={(value) => `${(value / 1000000).toFixed(1)}M`}
-                        tick={{ fontSize: 12 }}
-                        label={{ 
-                          value: 'Doanh thu (VNĐ)', 
-                          angle: -90, 
-                          position: 'insideLeft',
-                          style: { textAnchor: 'middle', fontSize: 12, fill: '#666' }
-                        }}
-                      />
-                      <YAxis 
-                        yAxisId="right" 
-                        orientation="right"
-                        tick={{ fontSize: 12 }}
-                        label={{ 
-                          value: 'Số phiên sạc', 
-                          angle: 90, 
-                          position: 'insideRight',
-                          style: { textAnchor: 'middle', fontSize: 12, fill: '#666' }
-                        }}
-                      />
-                      <RechartsTooltip 
-                        formatter={formatTooltipValue}
-                        contentStyle={{ 
-                          backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                          border: '1px solid #ddd',
-                          borderRadius: '8px',
-                          padding: '10px'
-                        }}
-                      />
-                      <Legend 
-                        wrapperStyle={{ paddingTop: '10px' }}
-                        iconType="rect"
-                      />
+                    <ComposedChart data={getRevenueChartData()}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="dateLabel" />
+                      <YAxis yAxisId="left" orientation="left" />
+                      <YAxis yAxisId="right" orientation="right" />
+                      <RechartsTooltip formatter={formatTooltipValue} />
+                      <Legend />
                       <Area
                         yAxisId="left"
                         type="monotone"
                         dataKey="revenue"
                         fill={colors.primary}
-                        fillOpacity={0.2}
+                        fillOpacity={0.3}
                         stroke={colors.primary}
-                        strokeWidth={3}
-                        name="Doanh thu"
+                        strokeWidth={2}
+                        name="Doanh thu (VND)"
                       />
                       <Bar
                         yAxisId="right"
                         dataKey="sessions"
                         fill={colors.secondary}
-                        name="Số phiên sạc"
-                        radius={[4, 4, 0, 0]}
+                        name="Phiên sạc"
+                        opacity={0.8}
                       />
                     </ComposedChart>
                   </ResponsiveContainer>
@@ -611,11 +489,11 @@ const AdvancedAnalytics = () => {
                         data={getRevenueByType()}
                         cx="50%"
                         cy="50%"
-                        labelLine={true}
-                        label={({ percent }) =>
-                          `${(percent * 100).toFixed(1)}%`
+                        labelLine={false}
+                        label={({ name, percent }) =>
+                          `${name} (${(percent * 100).toFixed(0)}%)`
                         }
-                        outerRadius={90}
+                        outerRadius={80}
                         fill="#8884d8"
                         dataKey="value"
                       >
@@ -626,18 +504,7 @@ const AdvancedAnalytics = () => {
                           />
                         ))}
                       </Pie>
-                      <RechartsTooltip 
-                        formatter={(value, name, props) => [
-                          formatCurrency(value),
-                          props.payload.name
-                        ]} 
-                      />
-                      <Legend 
-                        layout="horizontal" 
-                        verticalAlign="bottom" 
-                        align="center"
-                        wrapperStyle={{ paddingTop: "20px" }}
-                      />
+                      <RechartsTooltip formatter={(value) => formatCurrency(value)} />
                     </PieChart>
                   </ResponsiveContainer>
                 ) : (
@@ -660,36 +527,24 @@ const AdvancedAnalytics = () => {
               <Typography variant="h6" fontWeight="bold" gutterBottom>
                 Phân bố sử dụng theo giờ trong ngày
               </Typography>
-              <Box sx={{ height: 320 }}>
+              <Box sx={{ height: 300 }}>
                 {peakHoursData.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart 
-                      data={peakHoursData}
-                      margin={{ top: 10, right: 20, left: 0, bottom: 5 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <BarChart data={peakHoursData}>
+                      <CartesianGrid strokeDasharray="3 3" />
                       <XAxis 
                         dataKey="hour" 
                         tickFormatter={(hour) => `${hour}h`}
-                        tick={{ fontSize: 12 }}
-                        interval={1}
                       />
-                      <YAxis tick={{ fontSize: 12 }} />
+                      <YAxis />
                       <RechartsTooltip 
-                        labelFormatter={(hour) => `Khung giờ ${hour}:00 - ${hour}:59`}
-                        formatter={(value) => [value, "Số phiên sạc"]}
-                        contentStyle={{ 
-                          backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                          border: '1px solid #ddd',
-                          borderRadius: '8px',
-                          padding: '10px'
-                        }}
+                        labelFormatter={(hour) => `${hour}:00 - ${hour}:59`}
+                        formatter={(value) => [`${value} phiên`, "Số phiên sạc"]}
                       />
                       <Bar
                         dataKey="sessionCount"
                         fill={colors.info}
-                        name="Số phiên sạc"
-                        radius={[4, 4, 0, 0]}
+                        name="Phiên sạc"
                       />
                     </BarChart>
                   </ResponsiveContainer>
@@ -710,59 +565,22 @@ const AdvancedAnalytics = () => {
               <Typography variant="h6" fontWeight="bold" gutterBottom>
                 Năng lượng & Tỷ lệ sử dụng ({getTimeRangeLabel()})
               </Typography>
-              <Box sx={{ height: 320 }}>
+              <Box sx={{ height: 300 }}>
                 {getSessionsChartData().length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart 
-                      data={getSessionsChartData()}
-                      margin={{ top: 10, right: 30, left: 0, bottom: 5 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                      <XAxis 
-                        dataKey="dateLabel" 
-                        angle={-15}
-                        textAnchor="end"
-                        height={60}
-                        tick={{ fontSize: 12 }}
-                      />
-                      <YAxis 
-                        yAxisId="left"
-                        tick={{ fontSize: 12 }}
-                        label={{ 
-                          value: 'Phiên hoàn thành', 
-                          angle: -90, 
-                          position: 'insideLeft',
-                          style: { textAnchor: 'middle', fontSize: 12, fill: '#666' }
-                        }}
-                      />
-                      <YAxis 
-                        yAxisId="right" 
-                        orientation="right"
-                        tickFormatter={(value) => `${value.toFixed(0)}%`}
-                        tick={{ fontSize: 12 }}
-                        label={{ 
-                          value: 'Tỷ lệ sử dụng (%)', 
-                          angle: 90, 
-                          position: 'insideRight',
-                          style: { textAnchor: 'middle', fontSize: 12, fill: '#666' }
-                        }}
-                      />
-                      <RechartsTooltip 
-                        formatter={formatTooltipValue}
-                        contentStyle={{ 
-                          backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                          border: '1px solid #ddd',
-                          borderRadius: '8px',
-                          padding: '10px'
-                        }}
-                      />
-                      <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                    <ComposedChart data={getSessionsChartData()}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="dateLabel" />
+                      <YAxis yAxisId="left" />
+                      <YAxis yAxisId="right" orientation="right" />
+                      <RechartsTooltip formatter={formatTooltipValue} />
+                      <Legend />
                       <Bar
                         yAxisId="left"
                         dataKey="sessions"
                         fill={colors.success}
+                        fillOpacity={0.8}
                         name="Phiên hoàn thành"
-                        radius={[4, 4, 0, 0]}
                       />
                       <Line
                         yAxisId="right"
@@ -771,7 +589,6 @@ const AdvancedAnalytics = () => {
                         stroke={colors.warning}
                         strokeWidth={3}
                         name="Tỷ lệ sử dụng (%)"
-                        dot={{ r: 4 }}
                       />
                     </ComposedChart>
                   </ResponsiveContainer>

@@ -347,7 +347,7 @@ const StationManagement = () => {
                     }
                   </Typography>
                   <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                    Trạm hoạt động
+                    Trạm đang hoạt động
                   </Typography>
                 </Box>
               </Box>
@@ -375,7 +375,7 @@ const StationManagement = () => {
                     )}
                   </Typography>
                   <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                    Tổng số cổng
+                    Tổng số cổng khả dụng
                   </Typography>
                 </Box>
               </Box>
@@ -405,7 +405,7 @@ const StationManagement = () => {
                     )}
                   </Typography>
                   <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                    Doanh thu tháng
+                    Doanh thu hôm nay
                   </Typography>
                 </Box>
               </Box>
@@ -646,7 +646,7 @@ const StationManagement = () => {
                     label="Trạng thái"
                     onChange={(e) => setStationForm({ ...stationForm, status: e.target.value })}
                   >
-                    <MenuItem value="active">Hoạt động</MenuItem>
+                    <MenuItem value="active">Đang hoạt động</MenuItem>
                     <MenuItem value="maintenance">Bảo trì</MenuItem>
                     <MenuItem value="offline">Ngoại tuyến</MenuItem>
                   </Select>
