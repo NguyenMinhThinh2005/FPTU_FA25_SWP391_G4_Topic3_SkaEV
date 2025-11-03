@@ -163,9 +163,10 @@ public class StationsController : ControllerBase
 
     /// <summary>
     /// Get station slots details with power and status
+    /// Public endpoint - customers need this to see available charging ports
     /// </summary>
     [HttpGet("{id}/slots")]
-    [Authorize(Roles = "admin,staff")]
+    [AllowAnonymous]
     public async Task<IActionResult> GetStationSlots(int id)
     {
         try

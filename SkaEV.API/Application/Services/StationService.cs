@@ -16,6 +16,8 @@ public interface IStationService
     Task<bool> UpdateStationAsync(int stationId, UpdateStationDto dto);
     Task<bool> DeleteStationAsync(int stationId);
     Task<List<SlotDetailDto>> GetStationSlotsDetailsAsync(int stationId);
+    Task<List<SlotDetailDto>> GetAvailableSlotsAsync(int stationId);
+    Task<List<SlotDetailDto>> GetAvailablePostsAsync(int stationId);
 }
 
 public class StationService : IStationService
@@ -234,5 +236,17 @@ public class StationService : IStationService
                          };
 
         return await slotsQuery.ToListAsync();
+    }
+
+    public async Task<List<SlotDetailDto>> GetAvailableSlotsAsync(int stationId)
+    {
+        // Return all slots (same as GetStationSlotsDetailsAsync)
+        return await GetStationSlotsDetailsAsync(stationId);
+    }
+
+    public async Task<List<SlotDetailDto>> GetAvailablePostsAsync(int stationId)
+    {
+        // Return all slots grouped by posts (same as slots for now)
+        return await GetStationSlotsDetailsAsync(stationId);
     }
 }
