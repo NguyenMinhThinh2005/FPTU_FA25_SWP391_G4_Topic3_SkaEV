@@ -100,6 +100,44 @@ public class StationsController : ControllerBase
     }
 
     /// <summary>
+    /// Get available charging slots for a station
+    /// </summary>
+    [HttpGet("{stationId}/slots")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetAvailableSlots(int stationId)
+    {
+        try
+        {
+            var slots = await _stationService.GetAvailableSlotsAsync(stationId);
+            return Ok(new { data = slots, count = slots.Count });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting slots for station {StationId}", stationId);
+            return StatusCode(500, new { message = "An error occurred" });
+        }
+    }
+
+    /// <summary>
+    /// Get available charging posts (with nested slots) for a station
+    /// </summary>
+    [HttpGet("{stationId}/posts")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetAvailablePosts(int stationId)
+    {
+        try
+        {
+            var posts = await _stationService.GetAvailablePostsAsync(stationId);
+            return Ok(new { data = posts, count = posts.Count });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting posts for station {StationId}", stationId);
+            return StatusCode(500, new { message = "An error occurred" });
+        }
+    }
+
+    /// <summary>
     /// Update station (Admin/Staff only)
     /// </summary>
     [HttpPut("{id}")]

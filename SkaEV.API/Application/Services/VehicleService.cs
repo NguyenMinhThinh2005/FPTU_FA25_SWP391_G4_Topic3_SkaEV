@@ -142,7 +142,7 @@ public class VehicleService : IVehicleService
         await _context.SaveChangesAsync();
     }
 
-    private VehicleDto MapToDto(Vehicle vehicle)
+    private static VehicleDto MapToDto(Vehicle vehicle)
     {
         return new VehicleDto
         {

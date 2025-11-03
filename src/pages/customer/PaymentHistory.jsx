@@ -76,7 +76,7 @@ const PaymentHistory = () => {
             const randomMethod = paymentMethods[Math.floor(Math.random() * paymentMethods.length)];
 
             return {
-                id: `PAY-${booking.id ? booking.id.replace('BOOK', '') : Date.now()}`,
+                id: `PAY-${booking.id || Date.now()}`,
                 date: booking.bookingDate || new Date().toISOString().split('T')[0],
                 amount: totalCost,
                 method: randomMethod.name,
@@ -94,7 +94,7 @@ const PaymentHistory = () => {
                     energyCost: energyCost,
                     parkingFee: parkingFee
                 },
-                invoiceNumber: `INV-${(booking.bookingDate || '2025-09-01').replace(/-/g, '')}-${(booking.id || 'BOOK001').slice(-3)}`,
+                invoiceNumber: `INV-${(booking.bookingDate || '2025-09-01').replace(/-/g, '')}-${String(booking.id || 1).padStart(3, '0')}`,
                 taxInfo: {
                     subtotal: Math.round(totalCost / 1.1),
                     tax: Math.round(totalCost * 0.1),

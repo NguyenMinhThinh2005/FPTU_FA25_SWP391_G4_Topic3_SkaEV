@@ -146,6 +146,14 @@ export const stationsAPI = {
     return axiosInstance.get(`/stations/${id}/availability`);
   },
 
+  getAvailableSlots: (stationId) => {
+    return axiosInstance.get(`/stations/${stationId}/slots`);
+  },
+
+  getAvailablePosts: (stationId) => {
+    return axiosInstance.get(`/stations/${stationId}/posts`);
+  },
+
   create: (stationData) => {
     return axiosInstance.post("/stations", stationData);
   },
@@ -174,8 +182,9 @@ export const bookingsAPI = {
     return axiosInstance.get(`/bookings/${id}`);
   },
 
-  getUserBookings: () => {
-    return axiosInstance.get("/bookings/my-bookings");
+  getUserBookings: (params = {}) => {
+    // Backend GET /bookings returns user's own bookings (auth required)
+    return axiosInstance.get("/bookings", { params });
   },
 
   create: (bookingData) => {
@@ -188,6 +197,11 @@ export const bookingsAPI = {
 
   cancel: (id, reason) => {
     return axiosInstance.post(`/bookings/${id}/cancel`, { reason });
+  },
+
+  start: (id) => {
+    // Start charging session
+    return axiosInstance.put(`/bookings/${id}/start`);
   },
 
   complete: (id, completeData) => {
@@ -312,7 +326,7 @@ export const vehiclesAPI = {
   },
 
   getUserVehicles: () => {
-    return axiosInstance.get("/vehicles/my-vehicles");
+    return axiosInstance.get("/vehicles"); // GET /api/vehicles returns user's vehicles
   },
 
   create: (vehicleData) => {
