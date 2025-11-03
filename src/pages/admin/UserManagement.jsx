@@ -34,7 +34,7 @@ import {
   Tabs,
   Divider,
 } from "@mui/material";
-import { Search, Add, Edit, Delete, People, Shield, SwapHoriz, CheckCircle, Warning, LocationOn, AdminPanelSettings, Work, Badge, Phone, Email, Person, CalendarToday } from "@mui/icons-material";
+import { Search, Add, Edit, Delete, People, Shield, SwapHoriz, CheckCircle, Warning, LocationOn, AdminPanelSettings, Work, Badge, Phone, Email, Person, CalendarToday, Visibility } from "@mui/icons-material";
 import useUserStore from "../../store/userStore";
 import useStationStore from "../../store/stationStore";
 
@@ -45,7 +45,7 @@ const roleOptions = [
 ];
 
 const UserManagement = () => {
-  const { users, addUser, updateUser, deleteUser, fetchUsers, loading } = useUserStore();
+  const { users, addUser, updateUser, deleteUser, changeUserRole, fetchUsers, loading } = useUserStore();
   const { stations, fetchStations } = useStationStore();
   const [query, setQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
@@ -66,6 +66,7 @@ const UserManagement = () => {
     lastName: "",
     phone: "",
     role: "customer",
+    password: "", // Thêm trường password
   });
 
   // Fetch users and stations on component mount
@@ -99,7 +100,7 @@ const UserManagement = () => {
 
   const openCreate = () => {
     setEditUser(null);
-    setForm({ email: "", firstName: "", lastName: "", phone: "", role: "customer" });
+    setForm({ email: "", firstName: "", lastName: "", phone: "", role: "customer", password: "" });
     setDialogOpen(true);
   };
 
@@ -133,6 +134,14 @@ const UserManagement = () => {
       return;
     }
 
+    // Validate password for new users
+    if (!editUser) {
+      if (!form.password || form.password.length < 6) {
+        setSnackbar({ open: true, message: "Mật khẩu phải có ít nhất 6 ký tự", severity: "error" });
+        return;
+      }
+    }
+
     try {
       if (editUser) {
         const result = await updateUser(editUser.userId, {
@@ -156,11 +165,11 @@ const UserManagement = () => {
           lastName: form.lastName,
           phone: form.phone,
           role: form.role,
-          password: "Temp123!", // Default password
+          password: form.password, // Sử dụng password từ form
         });
         
         if (result.success) {
-          setSnackbar({ open: true, message: "Tạo người dùng thành công! Mật khẩu mặc định: Temp123!", severity: "success" });
+          setSnackbar({ open: true, message: `Tạo người dùng thành công! Mật khẩu: ${form.password}`, severity: "success" });
           setDialogOpen(false);
         } else {
           setSnackbar({ open: true, message: result.error || "Lỗi tạo người dùng", severity: "error" });
@@ -193,12 +202,15 @@ const UserManagement = () => {
     if (!userToChangeRole || !newRole) return;
     
     try {
-      const result = await updateUser(userToChangeRole.userId, { role: newRole });
+      const result = await changeUserRole(userToChangeRole.userId, newRole);
       
       if (result.success) {
         setSnackbar({ open: true, message: `Đã thay đổi vai trò thành ${newRole}`, severity: "success" });
         setRoleDialogOpen(false);
         setUserToChangeRole(null);
+        setNewRole("");
+        // Refresh users list to ensure UI is updated
+        await fetchUsers();
       } else {
         setSnackbar({ open: true, message: result.error || "Lỗi thay đổi vai trò", severity: "error" });
       }
@@ -513,11 +525,31 @@ const UserManagement = () => {
               />
             </Grid>
             {!editUser && (
-              <Grid item xs={12}>
-                <Alert severity="info" icon={<CheckCircle />}>
-                  Mật khẩu mặc định: <strong>Temp123!</strong>
-                </Alert>
-              </Grid>
+              <>
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="Mật khẩu *"
+                    type="password"
+                    value={form.password}
+                    onChange={(e) => setForm({ ...form, password: e.target.value })}
+                    required
+                    helperText="Tối thiểu 6 ký tự. Ví dụ: Temp123!"
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <Visibility />
+                        </InputAdornment>
+                      ),
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <Alert severity="info" icon={<CheckCircle />}>
+                    Bạn có thể đặt mật khẩu tùy chỉnh hoặc sử dụng mật khẩu mẫu: <strong>Temp123!</strong>
+                  </Alert>
+                </Grid>
+              </>
             )}
           </Grid>
         </DialogContent>
