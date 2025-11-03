@@ -171,6 +171,11 @@ export const stationsAPI = {
       params: { q: searchQuery },
     });
   },
+
+  // Get station slots (poles/ports) with real-time status
+  getStationSlots: (stationId) => {
+    return axiosInstance.get(`/stations/${stationId}/slots`);
+  },
 };
 
 export const bookingsAPI = {

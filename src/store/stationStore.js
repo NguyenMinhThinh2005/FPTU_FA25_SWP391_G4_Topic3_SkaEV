@@ -3,56 +3,116 @@ import { stationsAPI } from "../services/api";
 import { calculateDistance } from "../utils/helpers";
 
 // Transform API response to frontend format
-const transformStationData = (apiStation) => {
+const transformStationData = (apiStation, slotsData = null) => {
   try {
     // API may still provide legacy totals named 'totalPosts' / 'availablePosts'.
     // Map them to frontend-friendly pole/port names and keep backwards fallback.
     const totalPoles = apiStation.totalPoles ?? apiStation.totalPosts ?? 0;
     const availablePoles = apiStation.availablePoles ?? apiStation.availablePosts ?? 0;
 
-    // Generate mock poles and ports (since API doesn't provide detailed structure)
-    const poles = [];
-  for (let i = 1; i <= totalPoles; i++) {
-      const portsPerPole = 2; // Each pole has 2 ports
-      const ports = [];
+    let poles = [];
+    
+    // Use real slots data if provided, otherwise generate fallback data
+    if (slotsData && Array.isArray(slotsData) && slotsData.length > 0) {
+      // Group slots by charging post (pole)
+      const postMap = new Map();
+      
+      slotsData.forEach((slot) => {
+        const postId = slot.chargingPostId || slot.postId;
+        if (!postMap.has(postId)) {
+          postMap.set(postId, {
+            id: `${apiStation.stationId}-post${postId}`,
+            poleId: `${apiStation.stationId}-post${postId}`,
+            name: `Trụ sạc ${postId}`,
+            poleNumber: postId,
+            type: slot.powerKw >= 50 ? "DC" : "AC",
+            power: slot.powerKw,
+            voltage: slot.powerKw >= 50 ? 400 : 220,
+            status: "active",
+            ports: [],
+            totalPorts: 0,
+            availablePorts: 0,
+          });
+        }
+        
+        const post = postMap.get(postId);
+        post.ports.push({
+          id: `${apiStation.stationId}-slot${slot.slotId}`,
+          portId: `${apiStation.stationId}-slot${slot.slotId}`,
+          slotId: slot.slotId,
+          portNumber: slot.slotId,
+          connectorType: slot.connectorType || (slot.powerKw >= 50 ? "CCS2" : "Type 2"),
+          maxPower: slot.powerKw,
+          status: slot.status === "available" ? "available" : "occupied",
+          currentRate: slot.powerKw >= 50 ? 5000 : 3000,
+        });
+        post.totalPorts++;
+        if (slot.status === "available") {
+          post.availablePorts++;
+        }
+      });
+      
+      poles = Array.from(postMap.values());
+      console.log(`✅ Loaded ${poles.length} poles from real database slots for station ${apiStation.stationId}`);
+    } else {
+      // Fallback: Generate mock poles and ports if API doesn't provide slots
+      console.warn(`⚠️ No slots data for station ${apiStation.stationId}, using fallback data`);
+      for (let i = 1; i <= totalPoles; i++) {
+        const portsPerPole = 2;
+        const ports = [];
 
-  // Determine pole type based on pole number
-  const isAC = i <= Math.ceil(totalPoles * 0.3); // 30% AC poles
-  const isDCFast = !isAC && i <= Math.ceil(totalPoles * 0.7); // 40% DC Fast
-      // Remaining are DC Ultra
+        const isAC = i <= Math.ceil(totalPoles * 0.3);
+        const isDCFast = !isAC && i <= Math.ceil(totalPoles * 0.7);
 
-      const poleType = isAC ? "AC" : "DC";
-      const polePower = isAC ? 7 : isDCFast ? 50 : 150;
-      const poleVoltage = isAC ? 220 : 400;
+        const poleType = isAC ? "AC" : "DC";
+        const polePower = isAC ? 7 : isDCFast ? 50 : 150;
+        const poleVoltage = isAC ? 220 : 400;
 
-      for (let j = 1; j <= portsPerPole; j++) {
-        ports.push({
-          id: `${apiStation.stationId}-pole${i}-port${j}`,
-          portId: `${apiStation.stationId}-pole${i}-port${j}`,
-          portNumber: j,
-          connectorType:
-            poleType === "AC" ? "Type 2" : j === 1 ? "CCS2" : "CHAdeMO",
-          maxPower: polePower,
+        for (let j = 1; j <= portsPerPole; j++) {
+          ports.push({
+            id: `${apiStation.stationId}-pole${i}-port${j}`,
+            portId: `${apiStation.stationId}-pole${i}-port${j}`,
+            portNumber: j,
+            connectorType:
+              poleType === "AC" ? "Type 2" : j === 1 ? "CCS2" : "CHAdeMO",
+            maxPower: polePower,
+            status: i <= availablePoles ? "available" : "occupied",
+            currentRate: poleType === "AC" ? 3000 : isDCFast ? 5000 : 7000,
+          });
+        }
+
+        poles.push({
+          id: `${apiStation.stationId}-pole${i}`,
+          poleId: `${apiStation.stationId}-pole${i}`,
+          name: `Trụ sạc ${i}`,
+          poleNumber: i,
+          type: poleType,
+          power: polePower,
+          voltage: poleVoltage,
           status: i <= availablePoles ? "available" : "occupied",
-          currentRate: poleType === "AC" ? 3000 : isDCFast ? 5000 : 7000,
+          ports: ports,
+          totalPorts: portsPerPole,
+          availablePorts: i <= availablePoles ? portsPerPole : 0,
         });
       }
-
-      poles.push({
-        id: `${apiStation.stationId}-pole${i}`,
-        poleId: `${apiStation.stationId}-pole${i}`,
-        name: `Tr\u1ee5 s\u1ea1c ${i}`,
-        poleNumber: i,
-        type: poleType,
-        power: polePower,
-        voltage: poleVoltage,
-  status: i <= availablePoles ? "available" : "occupied",
-        ports: ports,
-        totalPorts: portsPerPole,
-        availablePorts: i <= availablePoles ? portsPerPole : 0,
-      });
     }
 
+    // Calculate real stats from poles
+    const totalPorts = poles.reduce((sum, pole) => sum + pole.totalPorts, 0);
+    const availablePorts = poles.reduce((sum, pole) => sum + pole.availablePorts, 0);
+    const maxPower = Math.max(...poles.map(p => p.power), 0);
+    
+    // Extract unique connector types from all ports
+    const connectorTypesSet = new Set();
+    poles.forEach(pole => {
+      pole.ports.forEach(port => {
+        if (port.connectorType) {
+          connectorTypesSet.add(port.connectorType);
+        }
+      });
+    });
+    const connectorTypes = Array.from(connectorTypesSet);
+    
     return {
       id: apiStation.stationId,
       stationId: apiStation.stationId,
@@ -67,17 +127,22 @@ const transformStationData = (apiStation) => {
         },
       },
       charging: {
-  totalPoles: totalPoles,
-  totalPorts: totalPoles * 2,
-  availablePorts: availablePoles,
+        totalPoles: poles.length,
+        totalPorts: totalPorts,
+        availablePorts: availablePorts,
         poles: poles,
-        maxPower: 150,
-        connectorTypes: ["CCS2", "CHAdeMO", "Type 2"],
+        maxPower: maxPower,
+        connectorTypes: connectorTypes.length > 0 ? connectorTypes : ["CCS2", "CHAdeMO", "Type 2"],
         pricing: {
           acRate: 3500,
           dcRate: 5000,
           dcFastRate: 7000,
         },
+      },
+      stats: {
+        total: totalPorts,
+        available: availablePorts,
+        occupied: totalPorts - availablePorts,
       },
       amenities: apiStation.amenities || [],
       operatingHours: apiStation.operatingHours || "00:00-24:00",
@@ -151,7 +216,22 @@ const useStationStore = create((set, get) => ({
         console.log("📊 Raw stations from API:", rawStations.length);
 
         // Transform API data to frontend format
-        const stations = rawStations.map(transformStationData);
+        // First pass: transform without slots data
+        const stations = await Promise.all(
+          rawStations.map(async (station) => {
+            try {
+              // Try to fetch slots for each station
+              console.log(`🔌 Fetching slots for station ${station.stationId}...`);
+              const slotsResponse = await stationsAPI.getStationSlots(station.stationId);
+              const slotsData = slotsResponse.data || slotsResponse.slots || [];
+              console.log(`✅ Loaded ${slotsData.length} slots for station ${station.stationId}`);
+              return transformStationData(station, slotsData);
+            } catch (slotError) {
+              console.warn(`⚠️ Could not fetch slots for station ${station.stationId}, using fallback:`, slotError.message);
+              return transformStationData(station, null);
+            }
+          })
+        );
 
         console.log("✅ Stations loaded from API:", stations.length);
         console.log("🔍 First station sample:", stations[0]);

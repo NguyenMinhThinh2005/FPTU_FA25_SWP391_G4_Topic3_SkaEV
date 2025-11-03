@@ -80,19 +80,22 @@ const useBookingStore = create(
           try {
             set({ loading: true, error: null });
 
-            // Extract slot ID from port ID (format: "stationId-poleX-portY")
-            // Available slots in DB: 3, 4, 5 (station_id=1)
-            // Map port to available slot
-            let slotId = 3; // default
-            if (bookingData.port?.id) {
-              const portStr = bookingData.port.id.toString();
-              if (portStr.includes('pole1-port1')) slotId = 3;
-              else if (portStr.includes('pole1-port2')) slotId = 4;
-              else if (portStr.includes('pole2-port1')) slotId = 5;
-              else if (portStr.includes('pole2-port2')) slotId = 4; // Reuse available slot
-              
-              // If slot 3 is reserved, try slot 4 or 5
-              console.log('🎯 Mapping port', portStr, 'to slot', slotId);
+            // Use real slot ID from database if available, otherwise fallback
+            let slotId = bookingData.port?.slotId || 3; // Use real slotId or default to 3
+            
+            if (bookingData.port?.slotId) {
+              console.log('✅ Using real slot ID from database:', slotId);
+            } else {
+              console.warn('⚠️ No real slot ID, using fallback slot:', slotId);
+              // Fallback: Extract from port ID format "stationId-slotX"
+              if (bookingData.port?.id) {
+                const portStr = bookingData.port.id.toString();
+                const slotMatch = portStr.match(/slot(\d+)/);
+                if (slotMatch) {
+                  slotId = parseInt(slotMatch[1]);
+                  console.log('🎯 Extracted slot ID from port string:', slotId);
+                }
+              }
             }
 
             const apiPayload = {
