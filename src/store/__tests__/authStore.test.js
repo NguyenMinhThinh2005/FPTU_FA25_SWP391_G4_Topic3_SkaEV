@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import useAuthStore from '../authStore';
-import { authAPI } from '../services/api';
+import { authAPI } from '../../services/api';
 
 // Mock API
-vi.mock('../services/api', () => ({
+vi.mock('../../services/api', () => ({
   authAPI: {
     login: vi.fn(),
     register: vi.fn(),
