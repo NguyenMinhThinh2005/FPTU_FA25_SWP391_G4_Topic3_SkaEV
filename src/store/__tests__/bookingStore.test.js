@@ -1064,5 +1064,654 @@ describe('bookingStore', () => {
       expect(booking?.status).toBe('charging');
     }
   });
+
+  // ======= BRANCH COVERAGE TESTS - createBooking variants =======
+  
+  it('creates booking with port.slotId fallback logic', async () => {
+    const { result } = renderHook(() => useBookingStore());
+    
+    const bookingDataWithoutSlotId = {
+      stationId: 1,
+      stationName: 'Test Station',
+      port: { id: 'station1-slot5' }, // No slotId, should extract from ID
+      schedulingType: 'immediate',
+      targetSOC: 80,
+      initialSOC: 20,
+    };
+
+    await act(async () => {
+      await result.current.createBooking(bookingDataWithoutSlotId);
+    });
+
+    expect(result.current.currentBooking).toBeDefined();
+  });
+
+  it('creates booking with real slotId from database', async () => {
+    const { result } = renderHook(() => useBookingStore());
+    
+    const bookingDataWithSlotId = {
+      stationId: 1,
+      stationName: 'Test Station',
+      port: { slotId: 7, id: 'station1-slot7' }, // Real slotId present
+      schedulingType: 'immediate',
+      targetSOC: 80,
+      initialSOC: 20,
+    };
+
+    await act(async () => {
+      await result.current.createBooking(bookingDataWithSlotId);
+    });
+
+    expect(result.current.currentBooking).toBeDefined();
+  });
+
+  it('handles API error gracefully and uses local fallback', async () => {
+    bookingsAPI.create.mockRejectedValueOnce({
+      response: { data: { message: 'Server error' } },
+      message: 'Network error'
+    });
+
+    const { result } = renderHook(() => useBookingStore());
+    
+    const bookingData = {
+      stationId: 1,
+      stationName: 'Test Station',
+      port: { slotId: 3 },
+      schedulingType: 'immediate',
+      targetSOC: 80,
+      initialSOC: 20,
+    };
+
+    await act(async () => {
+      await result.current.createBooking(bookingData);
+    });
+
+    // Should create booking locally even if API fails
+    expect(result.current.currentBooking).toBeDefined();
+    expect(result.current.error).toBeDefined();
+  });
+
+  it('creates scheduled booking with scheduledDateTime', async () => {
+    const { result } = renderHook(() => useBookingStore());
+    
+    const futureDate = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
+    const bookingData = {
+      stationId: 1,
+      stationName: 'Test Station',
+      port: { slotId: 3 },
+      schedulingType: 'scheduled',
+      scheduledDateTime: futureDate,
+      estimatedDuration: 90,
+      targetSOC: 80,
+      initialSOC: 20,
+    };
+
+    await act(async () => {
+      await result.current.createBooking(bookingData);
+    });
+
+    expect(result.current.currentBooking).toBeDefined();
+    expect(result.current.currentBooking.schedulingType).toBe('scheduled');
+  });
+
+  it('merges API response with local booking data', async () => {
+    bookingsAPI.create.mockResolvedValueOnce({
+      bookingId: 999,
+      status: 'confirmed',
+      createdAt: '2025-11-07T01:00:00Z',
+    });
+
+    const { result } = renderHook(() => useBookingStore());
+    
+    const bookingData = {
+      stationId: 1,
+      stationName: 'Test Station',
+      port: { slotId: 3 },
+      schedulingType: 'immediate',
+      targetSOC: 80,
+      initialSOC: 20,
+    };
+
+    await act(async () => {
+      await result.current.createBooking(bookingData);
+    });
+
+    expect(result.current.currentBooking).toBeDefined();
+    expect(result.current.currentBooking.apiId).toBe(999);
+  });
+
+  // ======= BRANCH COVERAGE - cancelBooking variants =======
+  
+  it('cancels booking with apiId via API', async () => {
+    bookingsAPI.cancel.mockResolvedValueOnce({ success: true });
+
+    const { result } = renderHook(() => useBookingStore());
+    
+    // Create booking first
+    await act(async () => {
+      await result.current.createBooking({
+        stationId: 1,
+        stationName: 'Test Station',
+        port: { slotId: 3 },
+        schedulingType: 'immediate',
+        targetSOC: 80,
+        initialSOC: 20,
+      });
+    });
+
+    const bookingId = result.current.currentBooking.id;
+
+    // Set apiId manually to test API cancellation path
+    act(() => {
+      const store = useBookingStore.getState();
+      store.bookings[0].apiId = 123;
+    });
+
+    await act(async () => {
+      await result.current.cancelBooking(bookingId, 'User changed plans');
+    });
+
+    expect(bookingsAPI.cancel).toHaveBeenCalledWith(123, 'User changed plans');
+  });
+
+  it('cancels booking without apiId (local only)', async () => {
+    const { result } = renderHook(() => useBookingStore());
+    
+    await act(async () => {
+      await result.current.createBooking({
+        stationId: 1,
+        stationName: 'Test Station',
+        port: { slotId: 3 },
+        schedulingType: 'immediate',
+        targetSOC: 80,
+        initialSOC: 20,
+      });
+    });
+
+    const bookingId = result.current.currentBooking.id;
+
+    await act(async () => {
+      await result.current.cancelBooking(bookingId, 'Test cancellation');
+    });
+
+    const booking = result.current.bookings.find(b => b.id === bookingId);
+    expect(booking.status).toBe('cancelled');
+    expect(booking.cancellationReason).toBe('Test cancellation');
+  });
+
+  it('cancels booking even when API fails', async () => {
+    bookingsAPI.cancel.mockRejectedValueOnce(new Error('API error'));
+
+    const { result } = renderHook(() => useBookingStore());
+    
+    await act(async () => {
+      await result.current.createBooking({
+        stationId: 1,
+        stationName: 'Test Station',
+        port: { slotId: 3 },
+        schedulingType: 'immediate',
+        targetSOC: 80,
+        initialSOC: 20,
+      });
+    });
+
+    const bookingId = result.current.currentBooking.id;
+
+    // Set apiId to trigger API call
+    act(() => {
+      const store = useBookingStore.getState();
+      store.bookings[0].apiId = 123;
+    });
+
+    await act(async () => {
+      await result.current.cancelBooking(bookingId, 'Emergency cancel');
+    });
+
+    // Should still cancel locally even if API fails
+    const booking = result.current.bookings.find(b => b.id === bookingId);
+    expect(booking.status).toBe('cancelled');
+  });
+
+  // ======= BRANCH COVERAGE - updateBookingStatus variants =======
+  
+  it('updates booking status in all collections', () => {
+    const { result } = renderHook(() => useBookingStore());
+    
+    act(() => {
+      const store = useBookingStore.getState();
+      const booking = {
+        id: 'BOOK456',
+        stationId: 1,
+        status: 'pending',
+      };
+      store.bookings = [booking];
+      store.bookingHistory = [booking];
+      store.currentBooking = booking;
+    });
+
+    act(() => {
+      result.current.updateBookingStatus('BOOK456', 'confirmed', { 
+        confirmedAt: '2025-11-07T01:00:00Z' 
+      });
+    });
+
+    expect(result.current.bookings[0].status).toBe('confirmed');
+    expect(result.current.bookingHistory[0].status).toBe('confirmed');
+    expect(result.current.currentBooking.status).toBe('confirmed');
+    expect(result.current.currentBooking.confirmedAt).toBe('2025-11-07T01:00:00Z');
+  });
+
+  it('updates booking status when not current booking', () => {
+    const { result } = renderHook(() => useBookingStore());
+    
+    act(() => {
+      const store = useBookingStore.getState();
+      const booking1 = { id: 'BOOK1', status: 'pending' };
+      const booking2 = { id: 'BOOK2', status: 'pending' };
+      store.bookings = [booking1, booking2];
+      store.currentBooking = booking2;
+    });
+
+    act(() => {
+      result.current.updateBookingStatus('BOOK1', 'cancelled');
+    });
+
+    expect(result.current.bookings[0].status).toBe('cancelled');
+    expect(result.current.currentBooking.id).toBe('BOOK2'); // Should remain unchanged
+  });
+
+  // ======= BRANCH COVERAGE - SOC tracking edge cases =======
+  
+  it('initializes SOC tracking with null values', () => {
+    const { result } = renderHook(() => useBookingStore());
+    
+    act(() => {
+      result.current.updateSOC('BOOK789', {});
+    });
+
+    const soc = result.current.socTracking?.['BOOK789'];
+    expect(soc).toBeDefined();
+  });
+
+  it('updates SOC with partial data', () => {
+    const { result } = renderHook(() => useBookingStore());
+    
+    act(() => {
+      result.current.updateSOC('BOOK789', {
+        currentSOC: 50,
+        // Missing targetSOC and estimatedTimeRemaining
+      });
+    });
+
+    const soc = result.current.socTracking?.['BOOK789'];
+    expect(soc.currentSOC).toBe(50);
+  });
+
+  // ======= BRANCH COVERAGE - Charging session edge cases =======
+  
+  it('stops charging when not currently charging', () => {
+    const { result } = renderHook(() => useBookingStore());
+    
+    if (result.current.stopCharging) {
+      act(() => {
+        const store = useBookingStore.getState();
+        store.currentBooking = { id: 'BOOK999', status: 'pending' };
+        store.socTracking = { 'BOOK999': { currentSOC: 50 } };
+      });
+
+      act(() => {
+        result.current.stopCharging('BOOK999', { finalSOC: 50 });
+      });
+
+      // Should handle gracefully
+      expect(result.current.currentBooking).toBeDefined();
+    }
+  });
+
+  it('pauses already paused charging', () => {
+    const { result } = renderHook(() => useBookingStore());
+    
+    if (result.current.pauseCharging) {
+      act(() => {
+        const store = useBookingStore.getState();
+        store.currentBooking = { id: 'BOOK888', status: 'paused' };
+      });
+
+      act(() => {
+        result.current.pauseCharging('BOOK888');
+      });
+
+      // Should remain paused
+      expect(result.current.currentBooking.status).toBe('paused');
+    }
+  });
+
+  it('resumes non-paused charging', () => {
+    const { result } = renderHook(() => useBookingStore());
+    
+    if (result.current.resumeCharging) {
+      act(() => {
+        const store = useBookingStore.getState();
+        store.currentBooking = { id: 'BOOK777', status: 'charging' };
+      });
+
+      act(() => {
+        result.current.resumeCharging('BOOK777');
+      });
+
+      // Should remain charging
+      expect(result.current.currentBooking.status).toBe('charging');
+    }
+  });
+
+  // ======= BRANCH COVERAGE - completeBooking variants =======
+  
+  it('completes booking without apiId (local only)', async () => {
+    const { result } = renderHook(() => useBookingStore());
+    
+    act(() => {
+      const store = useBookingStore.getState();
+      const booking = { 
+        id: 'BOOK555', 
+        status: 'charging',
+        apiId: null // No API ID
+      };
+      store.bookings = [booking];
+      store.currentBooking = booking;
+    });
+
+    await act(async () => {
+      await result.current.completeBooking('BOOK555', {
+        finalSOC: 90,
+        energyDelivered: 25.5,
+        chargingRate: 8500,
+      });
+    });
+
+    const booking = result.current.bookings.find(b => b.id === 'BOOK555');
+    expect(booking.status).toBe('completed');
+    expect(booking.finalSOC).toBe(90);
+  });
+
+  it('completes booking with apiId but ENABLE_COMPLETE_API=false', async () => {
+    const { result } = renderHook(() => useBookingStore());
+    
+    act(() => {
+      const store = useBookingStore.getState();
+      const booking = { 
+        id: 'BOOK666', 
+        status: 'charging',
+        apiId: 999 // Has API ID but ENABLE_COMPLETE_API is false
+      };
+      store.bookings = [booking];
+      store.currentBooking = booking;
+    });
+
+    await act(async () => {
+      await result.current.completeBooking('BOOK666', {
+        finalSOC: 95,
+        currentSOC: 95,
+        energyDelivered: 30,
+      });
+    });
+
+    const booking = result.current.bookings.find(b => b.id === 'BOOK666');
+    expect(booking.status).toBe('completed');
+  });
+
+  it('handles completeBooking when booking not found', async () => {
+    const { result } = renderHook(() => useBookingStore());
+    
+    // Clear any existing bookings first
+    act(() => {
+      const store = useBookingStore.getState();
+      store.bookings = [];
+      store.currentBooking = null;
+    });
+
+    await act(async () => {
+      await result.current.completeBooking('NONEXISTENT', {
+        finalSOC: 80,
+      });
+    });
+
+    // Should handle gracefully without error
+    expect(result.current.bookings).toHaveLength(0);
+  });
+
+  // ======= BRANCH COVERAGE - scanQRCode edge cases =======
+  
+  it('scans QR code for pending booking', () => {
+    const { result } = renderHook(() => useBookingStore());
+    
+    act(() => {
+      const store = useBookingStore.getState();
+      const booking = { id: 'BOOK111', status: 'pending' };
+      store.bookings = [booking];
+    });
+
+    act(() => {
+      result.current.scanQRCode('BOOK111', { qrCode: 'QR123' });
+    });
+
+    const booking = result.current.bookings.find(b => b.id === 'BOOK111');
+    expect(booking.status).toBe('confirmed');
+    expect(booking.qrScanned).toBe(true);
+  });
+
+  it('scans QR code for scheduled booking', () => {
+    const { result } = renderHook(() => useBookingStore());
+    
+    act(() => {
+      const store = useBookingStore.getState();
+      const booking = { id: 'BOOK222', status: 'scheduled' };
+      store.bookings = [booking];
+    });
+
+    act(() => {
+      result.current.scanQRCode('BOOK222', { qrCode: 'QR456' });
+    });
+
+    const booking = result.current.bookings.find(b => b.id === 'BOOK222');
+    expect(booking.status).toBe('confirmed');
+  });
+
+  it('throws error when scanning QR for non-existent booking', () => {
+    const { result } = renderHook(() => useBookingStore());
+    
+    expect(() => {
+      act(() => {
+        result.current.scanQRCode('NONEXISTENT', { qrCode: 'QR789' });
+      });
+    }).toThrow('Booking not found');
+  });
+
+  it('throws error when scanning QR for invalid status booking', () => {
+    const { result } = renderHook(() => useBookingStore());
+    
+    act(() => {
+      const store = useBookingStore.getState();
+      const booking = { id: 'BOOK333', status: 'completed' };
+      store.bookings = [booking];
+    });
+
+    expect(() => {
+      act(() => {
+        result.current.scanQRCode('BOOK333', { qrCode: 'QR999' });
+      });
+    }).toThrow('Booking is not in valid state for QR scanning');
+  });
+
+  // ======= BRANCH COVERAGE - startCharging edge cases =======
+  
+  it('starts charging for booking with apiId', async () => {
+    const { result } = renderHook(() => useBookingStore());
+    
+    act(() => {
+      const store = useBookingStore.getState();
+      const booking = { 
+        id: 'BOOK444', 
+        status: 'confirmed',
+        qrScanned: true,
+        apiId: 888 // Has API ID
+      };
+      store.bookings = [booking];
+    });
+
+    await act(async () => {
+      await result.current.startCharging('BOOK444');
+    });
+
+    const booking = result.current.bookings.find(b => b.id === 'BOOK444');
+    expect(booking.status).toBe('charging');
+    expect(booking.chargingStarted).toBe(true);
+  });
+
+  it('starts charging for booking without apiId', async () => {
+    const { result } = renderHook(() => useBookingStore());
+    
+    act(() => {
+      const store = useBookingStore.getState();
+      const booking = { 
+        id: 'BOOK555', 
+        status: 'confirmed',
+        qrScanned: true,
+        apiId: null // No API ID
+      };
+      store.bookings = [booking];
+    });
+
+    await act(async () => {
+      await result.current.startCharging('BOOK555');
+    });
+
+    const booking = result.current.bookings.find(b => b.id === 'BOOK555');
+    expect(booking.status).toBe('charging');
+  });
+
+  // ======= BRANCH COVERAGE - updateChargingProgress with chargingRate =======
+  
+  it('updates charging progress with chargingRate and calculates estimatedTime', () => {
+    const { result } = renderHook(() => useBookingStore());
+    
+    act(() => {
+      const store = useBookingStore.getState();
+      store.socTracking = {
+        'BOOK123': {
+          currentSOC: 50,
+          targetSOC: 90,
+        }
+      };
+    });
+
+    act(() => {
+      result.current.updateChargingProgress('BOOK123', {
+        currentSOC: 60,
+        chargingRate: 1, // 1% per minute
+        powerDelivered: 50,
+        energyDelivered: 10,
+      });
+    });
+
+    const soc = result.current.socTracking?.['BOOK123'];
+    expect(soc.currentSOC).toBe(60);
+    expect(soc.chargingRate).toBe(1);
+    expect(soc.estimatedTimeToTarget).toBeDefined();
+  });
+
+  it('updates charging progress without chargingRate', () => {
+    const { result } = renderHook(() => useBookingStore());
+    
+    act(() => {
+      const store = useBookingStore.getState();
+      store.socTracking = {
+        'BOOK456': {
+          currentSOC: 30,
+          targetSOC: 80,
+        }
+      };
+    });
+
+    act(() => {
+      result.current.updateChargingProgress('BOOK456', {
+        currentSOC: 40,
+        chargingRate: null, // No charging rate
+        powerDelivered: 30,
+      });
+    });
+
+    const soc = result.current.socTracking?.['BOOK456'];
+    expect(soc.currentSOC).toBe(40);
+    expect(soc.estimatedTimeToTarget).toBeNull();
+  });
+
+  it('updates charging progress with extra sensor data', () => {
+    const { result } = renderHook(() => useBookingStore());
+    
+    act(() => {
+      const store = useBookingStore.getState();
+      store.socTracking = {
+        'BOOK789': {
+          currentSOC: 70,
+          targetSOC: 90,
+        }
+      };
+      store.chargingSession = {
+        bookingId: 'BOOK789',
+        status: 'active',
+      };
+    });
+
+    act(() => {
+      result.current.updateChargingProgress('BOOK789', {
+        currentSOC: 75,
+        chargingRate: 0.5,
+        powerDelivered: 25,
+        energyDelivered: 15,
+        voltage: 400,
+        current: 62.5,
+        temperature: 35,
+      });
+    });
+
+    const soc = result.current.socTracking?.['BOOK789'];
+    const session = result.current.chargingSession;
+    
+    expect(soc.currentSOC).toBe(75);
+    expect(soc.chargingRate).toBe(0.5);
+    
+    // Extra sensor data is stored in chargingSession
+    expect(session.powerDelivered).toBe(25);
+    expect(session.energyDelivered).toBe(15);
+    expect(session.voltage).toBe(400);
+    expect(session.temperature).toBe(35);
+  });
+
+  // ======= BRANCH COVERAGE - initializeSOCTracking with defaults =======
+  
+  it('initializes SOC tracking with default targetSOC', () => {
+    const { result } = renderHook(() => useBookingStore());
+    
+    act(() => {
+      result.current.initializeSOCTracking('BOOK999', 25); // No targetSOC provided
+    });
+
+    const soc = result.current.socTracking?.['BOOK999'];
+    expect(soc.initialSOC).toBe(25);
+    expect(soc.currentSOC).toBe(25);
+    expect(soc.targetSOC).toBe(80); // Default value
+  });
+
+  it('initializes SOC tracking with custom targetSOC', () => {
+    const { result } = renderHook(() => useBookingStore());
+    
+    act(() => {
+      result.current.initializeSOCTracking('BOOK888', 20, 95); // Custom targetSOC
+    });
+
+    const soc = result.current.socTracking?.['BOOK888'];
+    expect(soc.initialSOC).toBe(20);
+    expect(soc.targetSOC).toBe(95);
+  });
 });
 

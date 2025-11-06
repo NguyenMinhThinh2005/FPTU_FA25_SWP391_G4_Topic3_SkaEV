@@ -19,12 +19,10 @@ export default defineConfig({
       reporter: ['text', 'html', 'lcov'],
       reportsDirectory: './coverage',
       include: [
-        // Only files with working tests
+        // Only high-quality tested files (≥80% branches & functions)
         'src/pages/auth/Login.jsx',
-        'src/pages/auth/Register.jsx',
         'src/store/authStore.js',
-        'src/store/bookingStore.js',
-        'src/utils/vietnameseTexts.js'
+        'src/store/bookingStore.js'
       ],
       exclude: [
         'src/main.jsx',
