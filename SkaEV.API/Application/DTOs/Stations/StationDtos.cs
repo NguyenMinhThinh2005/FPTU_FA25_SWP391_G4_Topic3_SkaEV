@@ -15,6 +15,10 @@ public class StationDto
     public string? StationImageUrl { get; set; }
     public string Status { get; set; } = string.Empty;
     public decimal? DistanceKm { get; set; }
+    public decimal? AcRate { get; set; }
+    public decimal? DcRate { get; set; }
+    public decimal? DcFastRate { get; set; }
+    public decimal? ParkingFee { get; set; }
 }
 
 public class SearchStationsRequestDto

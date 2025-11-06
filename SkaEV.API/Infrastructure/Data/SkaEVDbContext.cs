@@ -44,8 +44,14 @@ public class SkaEVDbContext : DbContext
         base.OnModelCreating(modelBuilder);
 
         // Configure table names to match database
-        modelBuilder.Entity<User>().ToTable("users");
-        modelBuilder.Entity<UserProfile>().ToTable("user_profiles");
+        modelBuilder.Entity<User>().ToTable("users", tb =>
+        {
+            tb.HasTrigger("trg_users_updated_at");
+        });
+        modelBuilder.Entity<UserProfile>().ToTable("user_profiles", tb =>
+        {
+            tb.HasTrigger("trg_user_profiles_updated_at");
+        });
         modelBuilder.Entity<Vehicle>().ToTable("vehicles");
         modelBuilder.Entity<ChargingStation>().ToTable("charging_stations");
         modelBuilder.Entity<ChargingPost>().ToTable("charging_posts");
@@ -56,7 +62,10 @@ public class SkaEVDbContext : DbContext
         modelBuilder.Entity<QRCode>().ToTable("qr_codes");
         modelBuilder.Entity<Notification>().ToTable("notifications");
         modelBuilder.Entity<SystemLog>().ToTable("system_logs");
-        modelBuilder.Entity<Review>().ToTable("reviews");
+        modelBuilder.Entity<Review>().ToTable("reviews", tb =>
+        {
+            tb.HasTrigger("trg_reviews_updated_at");
+        });
         modelBuilder.Entity<PricingRule>().ToTable("pricing_rules");
         modelBuilder.Entity<StationStaff>().ToTable("station_staff");
         modelBuilder.Entity<ServicePlan>().ToTable("service_plans");

@@ -1,5 +1,6 @@
 ﻿import React from "react";
 import useBookingStore from "../store/bookingStore";
+import useVehicleStore from "../store/vehicleStore";
 import useAuthStore from "../store/authStore";
 
 /**
@@ -8,7 +9,10 @@ import useAuthStore from "../store/authStore";
  */
 export const useMasterDataSync = () => {
   const { user } = useAuthStore();
-  const { bookingHistory, getBookingStats, loadUserBookings, fetchUserVehicles } = useBookingStore();
+  const bookingHistory = useBookingStore((state) => state.bookingHistory);
+  const getBookingStats = useBookingStore((state) => state.getBookingStats);
+  const loadUserBookings = useBookingStore((state) => state.loadUserBookings);
+  const fetchVehicles = useVehicleStore((state) => state.fetchVehicles);
   const [isLoading, setIsLoading] = React.useState(false);
   const [hasLoaded, setHasLoaded] = React.useState(false);
 
@@ -18,13 +22,10 @@ export const useMasterDataSync = () => {
       if (user && !hasLoaded && !isLoading) {
         setIsLoading(true);
         console.log("📥 useMasterDataSync: Loading data from database...");
-        
+
         try {
           // Load both bookings and vehicles in parallel
-          await Promise.all([
-            loadUserBookings(),
-            fetchUserVehicles()
-          ]);
+          await Promise.all([loadUserBookings(), fetchVehicles()]);
           setHasLoaded(true);
           console.log("✅ useMasterDataSync: Data loaded successfully");
         } catch (error) {
@@ -37,7 +38,7 @@ export const useMasterDataSync = () => {
     };
 
     loadData();
-  }, [user, hasLoaded, isLoading, loadUserBookings, fetchUserVehicles]);
+  }, [user, hasLoaded, isLoading, loadUserBookings, fetchVehicles]);
 
   // Return unified stats
   const stats = getBookingStats();

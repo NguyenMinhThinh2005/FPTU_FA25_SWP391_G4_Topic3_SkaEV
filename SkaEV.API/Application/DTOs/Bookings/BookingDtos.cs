@@ -36,6 +36,15 @@ public class BookingDto
     public decimal? CurrentSoc { get; set; }
     public int? EstimatedDuration { get; set; }
     public DateTime CreatedAt { get; set; }
+    public decimal? TotalEnergyKwh { get; set; }
+    public decimal? EnergyDelivered { get; set; }
+    public decimal? TotalAmount { get; set; }
+    public decimal? Subtotal { get; set; }
+    public decimal? TaxAmount { get; set; }
+    public decimal? UnitPrice { get; set; }
+    public int? ChargingDurationMinutes { get; set; }
+    public decimal? FinalSoc { get; set; }
+    public DateTime? CompletedAt { get; set; }
 }
 
 public class ScanQRCodeDto

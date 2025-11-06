@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using SkaEV.API.Application.DTOs.Reviews;
 using SkaEV.API.Domain.Entities;
@@ -19,13 +20,12 @@ public class ReviewService : IReviewService
     public async Task<IEnumerable<ReviewDto>> GetStationReviewsAsync(int stationId, int page, int pageSize)
     {
         return await _context.Reviews
-            .Include(r => r.User)
-            .Include(r => r.ChargingStation)
+            .AsNoTracking()
             .Where(r => r.StationId == stationId)
             .OrderByDescending(r => r.CreatedAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .Select(r => MapToDto(r))
+            .Select(ReviewProjection)
             .ToListAsync();
     }
 
@@ -39,22 +39,22 @@ public class ReviewService : IReviewService
     public async Task<IEnumerable<ReviewDto>> GetUserReviewsAsync(int userId)
     {
         return await _context.Reviews
-            .Include(r => r.User)
-            .Include(r => r.ChargingStation)
+            .AsNoTracking()
             .Where(r => r.UserId == userId)
             .OrderByDescending(r => r.CreatedAt)
-            .Select(r => MapToDto(r))
+            .Select(ReviewProjection)
             .ToListAsync();
     }
 
     public async Task<ReviewDto?> GetReviewByIdAsync(int reviewId)
     {
         var review = await _context.Reviews
-            .Include(r => r.User)
-            .Include(r => r.ChargingStation)
-            .FirstOrDefaultAsync(r => r.ReviewId == reviewId);
+            .AsNoTracking()
+            .Where(r => r.ReviewId == reviewId)
+            .Select(ReviewProjection)
+            .FirstOrDefaultAsync();
 
-        return review == null ? null : MapToDto(review);
+        return review;
     }
 
     public async Task<ReviewDto> CreateReviewAsync(int userId, CreateReviewDto createDto)
@@ -62,13 +62,6 @@ public class ReviewService : IReviewService
         // Validate rating
         if (createDto.Rating < 1 || createDto.Rating > 5)
             throw new ArgumentException("Rating must be between 1 and 5");
-
-        // Check if user has already reviewed this station
-        var existingReview = await _context.Reviews
-            .FirstOrDefaultAsync(r => r.UserId == userId && r.StationId == createDto.StationId);
-
-        if (existingReview != null)
-            throw new ArgumentException("You have already reviewed this station");
 
         // Find a booking for this user and station to link the review
         var booking = await _context.Bookings
@@ -79,7 +72,14 @@ public class ReviewService : IReviewService
         if (booking == null)
             throw new ArgumentException("You must complete a booking at this station before reviewing");
 
-        var review = new Review
+        // Check if user has already reviewed THIS SPECIFIC BOOKING
+        var existingReview = await _context.Reviews
+            .FirstOrDefaultAsync(r => r.BookingId == booking.BookingId);
+
+        if (existingReview != null)
+            throw new ArgumentException("You have already reviewed this booking session");
+
+        var reviewEntity = new Review
         {
             BookingId = booking.BookingId,
             UserId = userId,
@@ -90,26 +90,26 @@ public class ReviewService : IReviewService
             UpdatedAt = DateTime.UtcNow
         };
 
-        _context.Reviews.Add(review);
+        _context.Reviews.Add(reviewEntity);
         await _context.SaveChangesAsync();
 
         // Reload with navigation properties
-        review = await _context.Reviews
-            .Include(r => r.User)
-            .Include(r => r.ChargingStation)
-            .FirstAsync(r => r.ReviewId == review.ReviewId);
+        var reviewDto = await _context.Reviews
+            .AsNoTracking()
+            .Where(r => r.ReviewId == reviewEntity.ReviewId)
+            .Select(ReviewProjection)
+            .FirstAsync();
 
         _logger.LogInformation("Created review {ReviewId} for station {StationId} by user {UserId}", 
-            review.ReviewId, createDto.StationId, userId);
+            reviewDto.ReviewId, createDto.StationId, userId);
 
-        return MapToDto(review);
+        return reviewDto;
     }
 
     public async Task<ReviewDto> UpdateReviewAsync(int reviewId, UpdateReviewDto updateDto)
     {
         var review = await _context.Reviews
-            .Include(r => r.User)
-            .Include(r => r.ChargingStation)
+            .AsNoTracking()
             .FirstOrDefaultAsync(r => r.ReviewId == reviewId);
 
         if (review == null)
@@ -119,14 +119,25 @@ public class ReviewService : IReviewService
         if (updateDto.Rating < 1 || updateDto.Rating > 5)
             throw new ArgumentException("Rating must be between 1 and 5");
 
-        review.Rating = updateDto.Rating;
-        review.Comment = updateDto.Comment;
-        review.UpdatedAt = DateTime.UtcNow;
+        var updatedAt = DateTime.UtcNow;
+        var rows = await _context.Database.ExecuteSqlInterpolatedAsync($@"
+            UPDATE reviews
+            SET rating = {updateDto.Rating},
+                comment = {updateDto.Comment},
+                updated_at = {updatedAt}
+            WHERE review_id = {reviewId}");
 
-        await _context.SaveChangesAsync();
+        if (rows == 0)
+        {
+            throw new InvalidOperationException("Failed to update review");
+        }
 
         _logger.LogInformation("Updated review {ReviewId}", reviewId);
-        return MapToDto(review);
+        return await _context.Reviews
+            .AsNoTracking()
+            .Where(r => r.ReviewId == reviewId)
+            .Select(ReviewProjection)
+            .FirstAsync();
     }
 
     public async Task DeleteReviewAsync(int reviewId)
@@ -145,41 +156,38 @@ public class ReviewService : IReviewService
 
     public async Task<StationRatingSummaryDto> GetStationRatingSummaryAsync(int stationId)
     {
-        var reviews = await _context.Reviews
+        var summary = await _context.Reviews
             .Where(r => r.StationId == stationId)
-            .ToListAsync();
-
-        if (!reviews.Any())
-        {
-            return new StationRatingSummaryDto
+            .GroupBy(r => 1)
+            .Select(g => new StationRatingSummaryDto
             {
                 StationId = stationId,
-                AverageRating = 0,
-                TotalReviews = 0
-            };
-        }
+                AverageRating = g.Average(r => (decimal)r.Rating),
+                TotalReviews = g.Count(),
+                FiveStarCount = g.Count(r => r.Rating == 5),
+                FourStarCount = g.Count(r => r.Rating == 4),
+                ThreeStarCount = g.Count(r => r.Rating == 3),
+                TwoStarCount = g.Count(r => r.Rating == 2),
+                OneStarCount = g.Count(r => r.Rating == 1)
+            })
+            .FirstOrDefaultAsync();
 
-        return new StationRatingSummaryDto
+        return summary ?? new StationRatingSummaryDto
         {
             StationId = stationId,
-            AverageRating = (decimal)reviews.Average(r => r.Rating),
-            TotalReviews = reviews.Count,
-            FiveStarCount = reviews.Count(r => r.Rating == 5),
-            FourStarCount = reviews.Count(r => r.Rating == 4),
-            ThreeStarCount = reviews.Count(r => r.Rating == 3),
-            TwoStarCount = reviews.Count(r => r.Rating == 2),
-            OneStarCount = reviews.Count(r => r.Rating == 1)
+            AverageRating = 0,
+            TotalReviews = 0
         };
     }
 
-    private ReviewDto MapToDto(Review review)
+    private static ReviewDto MapToDto(Review review)
     {
         return new ReviewDto
         {
             ReviewId = review.ReviewId,
             UserId = review.UserId,
             UserName = review.User?.FullName ?? "Unknown",
-            UserAvatar = null, // Not in current schema
+            UserAvatar = null,
             StationId = review.StationId,
             StationName = review.ChargingStation?.StationName ?? "Unknown",
             Rating = review.Rating,
@@ -188,4 +196,18 @@ public class ReviewService : IReviewService
             UpdatedAt = review.UpdatedAt
         };
     }
+
+    private static readonly Expression<Func<Review, ReviewDto>> ReviewProjection = review => new ReviewDto
+    {
+        ReviewId = review.ReviewId,
+        UserId = review.UserId,
+        UserName = review.User != null ? review.User.FullName : "Unknown",
+        UserAvatar = null,
+        StationId = review.StationId,
+        StationName = review.ChargingStation != null ? review.ChargingStation.StationName : "Unknown",
+        Rating = review.Rating,
+        Comment = review.Comment,
+        CreatedAt = review.CreatedAt,
+        UpdatedAt = review.UpdatedAt
+    };
 }

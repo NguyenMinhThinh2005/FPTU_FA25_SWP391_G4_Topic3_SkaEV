@@ -1,4 +1,4 @@
-﻿import React, { useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -63,10 +63,40 @@ import {
   BatteryFull,
 } from "@mui/icons-material";
 import { formatCurrency } from "../../utils/helpers";
+import useReviewStore from "../../store/reviewStore";
 
-const RatingModal = ({ open, onClose, chargingSession, station, onSubmit }) => {
+const RatingModal = ({
+  open,
+  onClose,
+  chargingSession,
+  completedSession,
+  station,
+  onSuccess,
+}) => {
+  // Debug log để kiểm tra data nhận được
+  useEffect(() => {
+    if (open) {
+      console.log("🔍 RatingModal Debug:");
+      console.log("  - chargingSession:", chargingSession);
+      console.log("  - completedSession:", completedSession);
+      console.log("  - station:", station);
+    }
+  }, [open, chargingSession, completedSession, station]);
+
   // Provide default values to prevent errors
-  const safeChargingSession = chargingSession || {};
+  const rawSessionData = completedSession || chargingSession || {};
+  
+  // Normalize data structure from different sources
+  const sessionData = {
+    energyDelivered: rawSessionData.energyDelivered || 0,
+    duration: rawSessionData.chargingDuration || rawSessionData.duration || 0,
+    totalAmount: rawSessionData.totalAmount || rawSessionData.cost || rawSessionData.totalCost || 0,
+    initialSOC: rawSessionData.initialSOC || rawSessionData.currentSOC || 0,
+    targetSOC: rawSessionData.finalSOC || rawSessionData.targetSOC || 0,
+    chargingRate: rawSessionData.chargingRate || 0,
+    bookingId: rawSessionData.bookingId,
+  };
+
   const safeStation = station || { id: "unknown", name: "Trạm sạc" };
   // Chỉ giữ các đánh giá quan trọng
   const [ratings, setRatings] = useState({
@@ -78,12 +108,37 @@ const RatingModal = ({ open, onClose, chargingSession, station, onSubmit }) => {
 
   const [review, setReview] = useState("");
   const [quickFeedback, setQuickFeedback] = useState([]);
-  const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [wouldRecommend, setWouldRecommend] = useState(true);
   const [allowPublicReview, setAllowPublicReview] = useState(true);
   const [stationIssues, setStationIssues] = useState([]);
   const [chargingEfficiency, setChargingEfficiency] = useState("excellent");
+  const [errorMessage, setErrorMessage] = useState("");
+  const [wasUpdated, setWasUpdated] = useState(false);
+
+  const submitReview = useReviewStore((state) => state.submitReview);
+  const fetchStationReviews = useReviewStore(
+    (state) => state.fetchStationReviews
+  );
+  const fetchStationSummary = useReviewStore(
+    (state) => state.fetchStationSummary
+  );
+  const clearReviewError = useReviewStore((state) => state.clearError);
+  const storeError = useReviewStore((state) => state.error);
+  const submitting = useReviewStore((state) => state.submitting);
+
+  useEffect(() => {
+    if (!open) {
+      setSubmitted(false);
+      setErrorMessage("");
+      clearReviewError();
+      return;
+    }
+
+    if (storeError) {
+      setErrorMessage(storeError);
+    }
+  }, [open, storeError, clearReviewError]);
 
   // Add error boundary protection
   if (!open) return null;
@@ -258,71 +313,128 @@ const RatingModal = ({ open, onClose, chargingSession, station, onSubmit }) => {
     );
   };
 
-  const handleSubmit = async () => {
-    setSubmitting(true);
+  const resolveStationId = (value) => {
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value;
+    }
+    if (!value) {
+      return null;
+    }
+    const numeric = Number(value);
+    if (!Number.isNaN(numeric)) {
+      return numeric;
+    }
+    const digits = String(value).match(/\d+/);
+    return digits ? Number(digits[0]) : null;
+  };
 
-    const ratingData = {
-      stationId: safeStation.id,
-      stationName: safeStation.name,
-      chargingSessionId: safeChargingSession?.id || "temp-session",
-      ratings,
-      review,
-      quickFeedback,
-      wouldRecommend,
-      allowPublicReview,
-      stationIssues,
-      chargingEfficiency,
-      timestamp: new Date().toISOString(),
-      userVehicle: {
-        // This would come from user profile in real app
-        make: "VinFast",
-        model: "VF8",
-        batteryCapacity: 87.7,
-        connectorType: "CCS2",
-      },
-      chargingDetails: {
-        duration: safeChargingSession?.duration || 45,
-        energyDelivered: safeChargingSession?.energyDelivered || 18.5,
-        totalCost: safeChargingSession?.totalCost || 125000,
-        chargingRate: safeChargingSession?.chargingRate || 45,
-        startSOC: 25, // Starting State of Charge %
-        endSOC: 80, // Ending State of Charge %
-        peakPower: 45, // kW
-        avgPower: 42, // kW
-        efficiency: chargingEfficiency,
-        connectorUsed: "CCS2 - Trụ A01",
-        temperature: 28, // Celsius
-      },
-      locationContext: {
-        weather: "Nắng, 28°C",
-        timeOfDay:
-          new Date().getHours() >= 6 && new Date().getHours() <= 18
-            ? "Ngày"
-            : "Đêm",
-        crowdLevel: quickFeedback.includes("parking_blocked")
-          ? "Đông đúc"
-          : "Bình thường",
-      },
-    };
+  const handleSubmit = async () => {
+    setErrorMessage("");
+    clearReviewError();
+
+    const stationId = resolveStationId(
+      safeStation?.stationId ?? safeStation?.id
+    );
+
+    if (!stationId) {
+      setErrorMessage("Không xác định được trạm sạc để gửi đánh giá.");
+      return;
+    }
+
+    const feedbackLabels = quickFeedback
+      .map(
+        (feedbackId) =>
+          quickFeedbackOptions.find((option) => option.id === feedbackId)?.label
+      )
+      .filter(Boolean)
+      .join(", ");
+
+    const issuesLabels = stationIssues
+      .map(
+        (issueId) => issueOptions.find((option) => option.id === issueId)?.label
+      )
+      .filter(Boolean)
+      .join(", ");
+
+    const sessionSummaryParts = [
+      sessionData?.energyDelivered
+        ? `${sessionData.energyDelivered} kWh`
+        : null,
+      sessionData?.duration ? `${sessionData.duration} phút` : null,
+      sessionData?.totalCost ? formatCurrency(sessionData.totalCost) : null,
+    ].filter(Boolean);
+
+    const commentSections = [];
+
+    if (review && review.trim()) {
+      commentSections.push(review.trim());
+    }
+
+    if (feedbackLabels) {
+      commentSections.push(`Phản hồi nhanh: ${feedbackLabels}`);
+    }
+
+    if (issuesLabels) {
+      commentSections.push(`Vấn đề gặp phải: ${issuesLabels}`);
+    }
+
+    commentSections.push(
+      `Sẵn sàng giới thiệu: ${wouldRecommend ? "Có" : "Không"}`
+    );
+
+    if (!allowPublicReview) {
+      commentSections.push("Yêu cầu giữ đánh giá ở chế độ riêng tư.");
+    }
+
+    if (sessionSummaryParts.length > 0) {
+      commentSections.push(`Phiên sạc: ${sessionSummaryParts.join(" • ")}`);
+    }
+
+    commentSections.push(`Hiệu suất sạc: ${chargingEfficiency}`);
+
+    const commentPayload = commentSections.join("\n\n");
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      const { review: createdReview, wasUpdated: reviewWasUpdated } =
+        await submitReview({
+          stationId,
+          rating: ratings.overall,
+          comment: commentPayload,
+        });
 
-      if (onSubmit) {
-        onSubmit(ratingData);
-      }
+      // Refresh latest data for this station but do not block UI if API fails
+      Promise.allSettled([
+        fetchStationSummary(stationId),
+        fetchStationReviews(stationId, 1, 5),
+      ]).catch(() => null);
 
+      setWasUpdated(Boolean(reviewWasUpdated));
       setSubmitted(true);
 
-      // Auto close after 3 seconds
+      if (onSuccess) {
+        onSuccess(createdReview, reviewWasUpdated);
+      }
+
       setTimeout(() => {
         handleClose();
       }, 3000);
     } catch (error) {
-      console.error("Error submitting rating:", error);
-    } finally {
-      setSubmitting(false);
+      const apiMessage =
+        error?.response?.data?.message ||
+        error?.message ||
+        storeError ||
+        "Không thể gửi đánh giá, vui lòng thử lại.";
+      const messageText =
+        typeof apiMessage === "string"
+          ? apiMessage
+          : "Không thể gửi đánh giá, vui lòng thử lại.";
+      if (messageText.toLowerCase().includes("already reviewed")) {
+        setErrorMessage(
+          "Bạn đã đánh giá trạm này rồi. Hãy chỉnh sửa đánh giá hiện có của bạn."
+        );
+      } else {
+        setErrorMessage(messageText);
+      }
     }
   };
 
@@ -344,11 +456,17 @@ const RatingModal = ({ open, onClose, chargingSession, station, onSubmit }) => {
     setStationIssues([]);
     setChargingEfficiency("excellent");
     setSubmitted(false);
-    setSubmitting(false);
+    setErrorMessage("");
+    setWasUpdated(false);
+    clearReviewError();
     onClose();
   };
 
-  const isFormValid = ratings.overall > 0;
+  const stationIdIsValid = Boolean(
+    resolveStationId(safeStation?.stationId ?? safeStation?.id)
+  );
+
+  const isFormValid = ratings.overall > 0 && stationIdIsValid;
 
   if (submitted) {
     return (
@@ -357,37 +475,18 @@ const RatingModal = ({ open, onClose, chargingSession, station, onSubmit }) => {
           <Box sx={{ mb: 3 }}>
             <CheckCircle sx={{ fontSize: 80, color: "success.main", mb: 2 }} />
             <Typography variant="h5" gutterBottom color="success.dark">
-              Đánh giá đã được gửi thành công!
+              {wasUpdated
+                ? "Đánh giá của bạn đã được cập nhật!"
+                : "Đánh giá đã được gửi thành công!"}
             </Typography>
             <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
               Cảm ơn bạn đã dành thời gian chia sẻ trải nghiệm
             </Typography>
           </Box>
 
-          <Card variant="outlined" sx={{ p: 3, mb: 3, bgcolor: "primary.50" }}>
-            <Typography variant="h6" color="primary.main" gutterBottom>
-              🎁 Phần thưởng cho bạn
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Nhận ngay 50 SkaPoints vào tài khoản
-            </Typography>
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 1,
-              }}
-            >
-              <Star sx={{ color: "warning.main" }} />
-              <Typography variant="h6" color="primary.main">
-                +50 Points
-              </Typography>
-            </Box>
-          </Card>
-
           <Typography variant="body2" color="text.secondary">
-            Đánh giá sẽ được xem xét và hiển thị trong 24h tới
+            Đánh giá sẽ được xem xét và hiển thị trong 24h tới. Điểm thưởng sẽ
+            được cộng khi chương trình khuyến khích được kích hoạt trở lại.
           </Typography>
         </DialogContent>
       </Dialog>
@@ -411,6 +510,12 @@ const RatingModal = ({ open, onClose, chargingSession, station, onSubmit }) => {
       </DialogTitle>
 
       <DialogContent>
+        {errorMessage && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {errorMessage}
+          </Alert>
+        )}
+
         {/* Comprehensive Charging Session Summary */}
         <Card
           sx={{
@@ -436,7 +541,7 @@ const RatingModal = ({ open, onClose, chargingSession, station, onSubmit }) => {
                     sx={{ fontSize: 24, color: "warning.main", mb: 0.5 }}
                   />
                   <Typography variant="h6" color="primary.main">
-                    {safeChargingSession?.energyDelivered || "18.5"} kWh
+                    {sessionData.energyDelivered.toFixed(1)} kWh
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
                     Năng lượng nạp
@@ -450,7 +555,7 @@ const RatingModal = ({ open, onClose, chargingSession, station, onSubmit }) => {
                     sx={{ fontSize: 24, color: "info.main", mb: 0.5 }}
                   />
                   <Typography variant="h6" color="primary.main">
-                    {safeChargingSession?.duration || "45"} phút
+                    {sessionData.duration} phút
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
                     Thời gian sạc
@@ -464,7 +569,7 @@ const RatingModal = ({ open, onClose, chargingSession, station, onSubmit }) => {
                     sx={{ fontSize: 24, color: "success.main", mb: 0.5 }}
                   />
                   <Typography variant="h6" color="primary.main">
-                    {formatCurrency(chargingSession?.totalCost || 89000)}
+                    {formatCurrency(sessionData.totalAmount)}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
                     Tổng chi phí
@@ -478,7 +583,9 @@ const RatingModal = ({ open, onClose, chargingSession, station, onSubmit }) => {
                     sx={{ fontSize: 24, color: "primary.main", mb: 0.5 }}
                   />
                   <Typography variant="h6" color="primary.main">
-                    {chargingSession?.chargingRate || "45"} kW
+                    {sessionData.chargingRate > 0 
+                      ? sessionData.chargingRate.toFixed(1)
+                      : (sessionData.energyDelivered / (sessionData.duration / 60 || 1)).toFixed(1)} kW
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
                     Tốc độ TB
@@ -493,22 +600,22 @@ const RatingModal = ({ open, onClose, chargingSession, station, onSubmit }) => {
                 sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}
               >
                 <Typography variant="body2" color="text.secondary">
-                  Pin: 25% → 80%
+                  Pin: {sessionData.initialSOC}% → {sessionData.targetSOC}%
                 </Typography>
                 <Typography
                   variant="body2"
                   color="success.main"
                   fontWeight="medium"
                 >
-                  +55% (+{(chargingSession?.energyDelivered || 18.5).toFixed(1)}{" "}
-                  kWh)
+                  +{(sessionData.targetSOC - sessionData.initialSOC)}% 
+                  (+{sessionData.energyDelivered.toFixed(1)} kWh)
                 </Typography>
               </Box>
               <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                 <Battery20 sx={{ color: "warning.main" }} />
                 <LinearProgress
                   variant="determinate"
-                  value={80}
+                  value={sessionData.targetSOC}
                   sx={{
                     flexGrow: 1,
                     height: 8,
@@ -528,17 +635,46 @@ const RatingModal = ({ open, onClose, chargingSession, station, onSubmit }) => {
 
         {/* Đánh giá tổng thể - tối giản, nổi bật */}
         <Box sx={{ maxWidth: 400, mx: "auto", mb: 3, textAlign: "center" }}>
-          <Typography variant="h5" sx={{ fontWeight: 700, color: "primary.main", mb: 1, letterSpacing: 0.5 }}>
+          <Typography
+            variant="h5"
+            sx={{
+              fontWeight: 700,
+              color: "primary.main",
+              mb: 1,
+              letterSpacing: 0.5,
+            }}
+          >
             Đánh giá tổng thể
           </Typography>
-          <Card variant="outlined" sx={{ borderRadius: 4, boxShadow: "0 2px 12px rgba(25,118,210,0.08)", p: 0, background: "#f8fafc", minHeight: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <CardContent sx={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', p: 3 }}>
+          <Card
+            variant="outlined"
+            sx={{
+              borderRadius: 4,
+              boxShadow: "0 2px 12px rgba(25,118,210,0.08)",
+              p: 0,
+              background: "#f8fafc",
+              minHeight: 100,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <CardContent
+              sx={{
+                width: "100%",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                p: 3,
+              }}
+            >
               <Rating
                 name="overall"
                 value={ratings.overall || 0}
                 onChange={(_, value) => handleRatingChange("overall", value)}
                 size="large"
-                sx={{ fontSize: 38, mx: 'auto' }}
+                sx={{ fontSize: 38, mx: "auto" }}
               />
             </CardContent>
           </Card>
@@ -606,10 +742,7 @@ const RatingModal = ({ open, onClose, chargingSession, station, onSubmit }) => {
           </AccordionDetails>
         </Accordion>
 
-
         <Box sx={{ my: 3 }} />
-
-        
 
         {/* Issue Reporting */}
         <Accordion>
@@ -680,7 +813,6 @@ const RatingModal = ({ open, onClose, chargingSession, station, onSubmit }) => {
           helperText={`${review.length}/500 ký tự`}
           inputProps={{ maxLength: 500 }}
         />
-
       </DialogContent>
 
       <DialogActions sx={{ p: 3, bgcolor: "grey.50" }}>

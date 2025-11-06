@@ -33,10 +33,8 @@ import FindStations from "./pages/customer/FindStations";
 import BookingHistory from "./pages/customer/BookingHistory";
 import PaymentMethods from "./pages/customer/PaymentMethods";
 import PaymentHistory from "./pages/customer/PaymentHistory";
-import CustomerProfile from "./pages/customer/CustomerProfile";
+import CustomerProfile from "./pages/customer/CustomerProfileIntegrated";
 import PaymentPage from "./pages/customer/PaymentPage";
-import AnalyticsPage from "./pages/customer/AnalyticsPage";
-import CustomerAnalytics from "./pages/customer/Analytics";
 import MonthlyCostReports from "./pages/customer/MonthlyCostReports";
 import ChargingHabitsAnalysis from "./pages/customer/ChargingHabitsAnalysis";
 
@@ -171,7 +169,6 @@ function App() {
                 <Route path="profile" element={<CustomerProfile />} />
                 <Route path="charging" element={<ChargingFlow />} />
                 <Route path="payment" element={<PaymentPage />} />
-                <Route path="analytics" element={<AnalyticsPage />} />
                 <Route path="payment-history" element={<PaymentHistory />} />
                 <Route
                   path="monthly-reports"
@@ -193,7 +190,10 @@ function App() {
                 }
               >
                 <Route path="dashboard" element={<StaffDashboard />} />
-                <Route path="charging-sessions" element={<ChargingSessions />} />
+                <Route
+                  path="charging-sessions"
+                  element={<ChargingSessions />}
+                />
                 <Route path="monitoring" element={<Monitoring />} />
                 <Route path="profile" element={<StaffProfile />} />
                 <Route index element={<Navigate to="dashboard" replace />} />
