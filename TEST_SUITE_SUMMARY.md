@@ -9,41 +9,49 @@ All test files have been successfully created, configured, and committed to the 
 ## 📁 Files Created/Modified
 
 ### Configuration Files (2)
+
 - ✅ `package.json` - Added Vitest, RTL, and testing dependencies + test scripts
 - ✅ `vite.config.js` - Added Vitest configuration with jsdom environment and coverage
 
 ### Test Setup (3)
+
 - ✅ `src/setupTests.js` - Global test setup with mocks (matchMedia, IntersectionObserver, etc.)
 - ✅ `src/tests/utils/renderWithRouter.jsx` - Custom render with Router + Theme providers
 - ✅ `src/tests/utils/mockLocalStorage.js` - Auth token storage helpers
 
 ### Authentication Tests (2)
+
 - ✅ `src/pages/auth/__tests__/Register.test.jsx` - Registration flow (8 test cases)
   - Renders form, empty validation, successful registration, 400/500 errors, duplicate submit prevention, navigation
 - ✅ `src/pages/auth/__tests__/Login.test.jsx` - Login flow (11 test cases)
   - Renders form, validation, successful login with token storage, 401/500 errors, role-based navigation, password visibility toggle
 
 ### Booking Flow Tests (1)
+
 - ✅ `src/components/customer/__tests__/BookingModal.test.jsx` - Complete booking wizard (13 test cases)
   - Charger type selection, socket/port selection, time selection, confirmation, API errors (409/401/500), pricing display, navigation
 
 ### QR & Charging Tests (2)
+
 - ✅ `src/components/ui/__tests__/QRCodeScanner.test.jsx` - QR scanning (11 test cases)
   - Camera permissions, valid/invalid QR formats, station info display, API validation, error handling
 - ✅ `src/pages/customer/__tests__/ChargeControl.test.jsx` - Start/Stop charging (13 test cases)
   - Start session, stop session, SOC progress, real-time stats, payment trigger, error handling
 
 ### Payment Tests (1)
+
 - ✅ `src/pages/customer/__tests__/Payment.test.jsx` - Payment processing (11 test cases)
   - Payment form, method selection, success, 402/409/500 errors, duplicate prevention, invoice generation
 
 ### Store Tests (2)
+
 - ✅ `src/store/__tests__/authStore.test.js` - Auth state management (10 test cases)
   - Login, register, logout, error handling, persistence, role helpers
 - ✅ `src/store/__tests__/bookingStore.test.js` - Booking state management (12 test cases)
   - Fetch bookings, create booking, QR scan, start/stop charging, SOC tracking, cancel booking
 
 ### Documentation & Mocks (2)
+
 - ✅ `TESTING_README.md` - Comprehensive testing guide with setup, patterns, troubleshooting
 - ✅ `src/mocks/handlers.js` - MSW handlers for integration tests (optional)
 
@@ -52,10 +60,13 @@ All test files have been successfully created, configured, and committed to the 
 ## 📊 Test Statistics
 
 ### Total Test Files: **10**
+
 ### Total Test Cases: **91+**
+
 ### Coverage Target: **≥80%**
 
 ### Test Distribution by Flow:
+
 - **Authentication**: 19 tests (Register + Login)
 - **Booking Flow**: 13 tests (Station → Charger → Socket → Time → Confirm)
 - **QR & Charging**: 24 tests (Scan → Start → Stop)
@@ -85,21 +96,25 @@ All test files have been successfully created, configured, and committed to the 
 ## 🚀 Commands to Run
 
 ### 1. Install Dependencies
+
 ```bash
 npm ci
 ```
 
 ### 2. Run Tests (Watch Mode)
+
 ```bash
 npm run test
 ```
 
 ### 3. Run Tests Once (CI Mode)
+
 ```bash
 npm run test:run
 ```
 
 ### 4. Run with Coverage
+
 ```bash
 npm run test:cov
 ```
@@ -128,6 +143,7 @@ gh pr create --base develop --head feature/tests/ev-booking --title "feat: Add c
 ## ✨ Key Features
 
 ### ✅ Complete Flow Coverage
+
 - [x] Register/Login with token storage (sessionStorage)
 - [x] Station selection & filtering
 - [x] Charger type selection (AC/DC)
@@ -142,6 +158,7 @@ gh pr create --base develop --head feature/tests/ev-booking --title "feat: Add c
 - [x] Invoice generation
 
 ### ✅ Error Handling
+
 - [x] 401 Unauthorized (redirect to login)
 - [x] 400 Bad Request (validation errors)
 - [x] 402 Payment Required (payment declined)
@@ -149,11 +166,13 @@ gh pr create --base develop --head feature/tests/ev-booking --title "feat: Add c
 - [x] 500 Server Error (graceful fallback)
 
 ### ✅ State Management
+
 - [x] Auth store (login, logout, persistence)
 - [x] Booking store (create, update, SOC tracking)
 - [x] Token storage (sessionStorage with localStorage fallback)
 
 ### ✅ Best Practices
+
 - [x] RTL best practices (accessible queries)
 - [x] User-centric testing (user-event)
 - [x] Async assertions (waitFor)
@@ -181,6 +200,7 @@ All files                       |   85+   |   80+    |   85+   |   85+   |
 ```
 
 ### Files Below 80% (If Any):
+
 - Check `coverage/index.html` for detailed breakdown
 - Add tests for uncovered branches (error handlers, edge cases)
 
@@ -191,6 +211,7 @@ All files                       |   85+   |   80+    |   85+   |   85+   |
 Some tests include **TODO comments** for manual refinement:
 
 1. **Selector Adjustments**: If components don't have stable selectors, add `data-testid` attributes:
+
    ```jsx
    <button data-testid="AUTO_BookingModal_confirmButton">Confirm</button>
    ```
@@ -215,6 +236,7 @@ Some tests include **TODO comments** for manual refinement:
 ## 🎉 Success Criteria Met
 
 ✅ **All requirements completed**:
+
 - [x] Scanned repo and auto-detected components/services/stores
 - [x] Mapped import paths correctly
 - [x] Modified `package.json` and `vite.config.js`

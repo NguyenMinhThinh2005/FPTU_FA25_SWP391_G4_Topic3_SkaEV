@@ -16,14 +16,17 @@ Duration:    72.23s
 ### ✅ Tests Passing (10/46)
 
 **Auth Tests:**
+
 - ✅ LoginPage > renders login form with all fields
 - ✅ RegisterPage > renders registration form
 
 **State Management:**
+
 - ✅ authStore (some tests passing)
 - ✅ bookingStore (some tests passing)
 
 **Other:**
+
 - ✅ Various component render tests
 
 ---
@@ -39,16 +42,18 @@ TestingLibraryElementError: Found multiple elements with the text of: /password/
 ```
 
 **Files Affected:**
+
 - `src/pages/auth/__tests__/Login.test.jsx` (5 tests)
 - `src/pages/auth/__tests__/Register.test.jsx` (some tests)
 
 **Fix Needed:**
+
 ```javascript
 // BEFORE (fails)
 const passwordInput = screen.getByLabelText(/password/i);
 
 // AFTER (use more specific query)
-const passwordInput = screen.getByRole('textbox', { name: /password/i });
+const passwordInput = screen.getByRole("textbox", { name: /password/i });
 // OR
 const passwordInput = document.querySelector('input[name="password"]');
 ```
@@ -66,9 +71,11 @@ Received: aria-invalid="false"
 ```
 
 **Files Affected:**
+
 - `src/pages/auth/__tests__/Register.test.jsx`
 
 **Fix Needed:**
+
 - Check actual component implementation for validation strategy
 - Update tests to match actual error display (helperText, error state, toast, etc.)
 - May need to inspect `vietnameseTexts` usage or MUI TextField error props
@@ -85,15 +92,18 @@ expect(authAPI.register).toHaveBeenCalled();
 ```
 
 **Files Affected:**
+
 - `src/pages/auth/__tests__/Register.test.jsx` (multiple tests)
 
 **Possible Causes:**
+
 - Form validation preventing submission
 - Missing form state initialization
 - Component using different API service path
 - Need to check actual component's `onSubmit` handler
 
 **Fix Needed:**
+
 ```javascript
 // Check component's actual API import
 import authAPI from '../../../services/authAPI'; // verify path
@@ -119,9 +129,11 @@ Received element is not disabled
 ```
 
 **Files Affected:**
+
 - `src/pages/auth/__tests__/Register.test.jsx`
 
 **Fix Needed:**
+
 - Check if component uses different loading state mechanism
 - May need to add `data-testid` for loading indicator
 - Verify component's async handling pattern
@@ -138,24 +150,27 @@ TypeError: getBookingStats is not a function
 ```
 
 **Files Affected:**
+
 - ALL Payment.test.jsx tests (13 failed)
 
 **Fix Needed:**
+
 ```javascript
 // In setupTests.js or Payment.test.jsx, add mock:
-vi.mock('../../../hooks/useMasterDataSync', () => ({
+vi.mock("../../../hooks/useMasterDataSync", () => ({
   useMasterDataSync: () => ({
     stats: { totalBookings: 0, activeBookings: 0 },
     loading: false,
-    error: null
-  })
+    error: null,
+  }),
 }));
 
-vi.mock('../../../store/bookingStore', () => ({
-  default: (selector) => selector({
-    getBookingStats: () => ({ totalBookings: 0 }),
-    // ... other store methods
-  })
+vi.mock("../../../store/bookingStore", () => ({
+  default: (selector) =>
+    selector({
+      getBookingStats: () => ({ totalBookings: 0 }),
+      // ... other store methods
+    }),
 }));
 ```
 
@@ -170,9 +185,11 @@ Error: Test timed out in 5000ms.
 ```
 
 **Files Affected:**
+
 - `src/pages/auth/__tests__/Register.test.jsx` > "successfully registers user"
 
 **Fix Needed:**
+
 - Increase timeout: `test('...', async () => { ... }, 10000)`
 - Or fix async mocks to resolve immediately
 - Check waitFor conditions
@@ -184,12 +201,13 @@ Error: Test timed out in 5000ms.
 ### Priority 1: Fix Core Test Utilities
 
 1. **Update setupTests.js** - Add missing global mocks:
+
    ```javascript
    // Mock useMasterDataSync
-   vi.mock('./hooks/useMasterDataSync', () => ({
-     useMasterDataSync: () => ({ stats: {}, loading: false })
+   vi.mock("./hooks/useMasterDataSync", () => ({
+     useMasterDataSync: () => ({ stats: {}, loading: false }),
    }));
-   
+
    // Mock bookingStore.getBookingStats
    // ... (see issue #5 above)
    ```
@@ -197,12 +215,13 @@ Error: Test timed out in 5000ms.
 2. **Fix password selectors** in all auth tests:
    ```javascript
    // Use name attribute or more specific query
-   screen.getByRole('textbox', { name: /password/i })
+   screen.getByRole("textbox", { name: /password/i });
    ```
 
 ### Priority 2: Align Tests with Component Implementation
 
 3. **Read actual component files**:
+
    - `src/pages/auth/Register.jsx`
    - `src/pages/auth/Login.jsx`
    - `src/pages/customer/Payment.jsx`
@@ -229,6 +248,7 @@ Error: Test timed out in 5000ms.
 ## 📝 Recommended Next Steps
 
 ### Step 1: Inspect Real Components
+
 ```bash
 # Read the actual implementation
 code src/pages/auth/Register.jsx
@@ -237,20 +257,24 @@ code src/pages/customer/Payment.jsx
 ```
 
 ### Step 2: Fix Test Selectors
+
 - Update password field queries (use `name` attribute)
 - Add `data-testid` where needed
 
 ### Step 3: Fix Mocks
+
 - Add `useMasterDataSync` mock
 - Add `getBookingStats` to bookingStore mock
 - Verify API service paths
 
 ### Step 4: Re-run Tests
+
 ```bash
 npm run test:cov
 ```
 
 ### Step 5: Analyze Coverage
+
 ```bash
 # Open coverage report
 start coverage/index.html
@@ -260,16 +284,16 @@ start coverage/index.html
 
 ## 📖 Test Files Status
 
-| File | Status | Pass | Fail | Notes |
-|------|--------|------|------|-------|
-| `Register.test.jsx` | ❌ | 2 | 6 | Validation & submission issues |
-| `Login.test.jsx` | ❌ | 5 | 6 | Password selector issues |
-| `BookingModal.test.jsx` | ⚠️ | ? | ? | Not executed due to imports |
-| `QRCodeScanner.test.jsx` | ⚠️ | ? | ? | Not executed |
-| `ChargeControl.test.jsx` | ⚠️ | ? | ? | Not executed |
-| `Payment.test.jsx` | ❌ | 0 | 13 | Missing `getBookingStats` mock |
-| `authStore.test.js` | ✅ | Most | Few | Working |
-| `bookingStore.test.js` | ✅ | Most | Few | Working |
+| File                     | Status | Pass | Fail | Notes                          |
+| ------------------------ | ------ | ---- | ---- | ------------------------------ |
+| `Register.test.jsx`      | ❌     | 2    | 6    | Validation & submission issues |
+| `Login.test.jsx`         | ❌     | 5    | 6    | Password selector issues       |
+| `BookingModal.test.jsx`  | ⚠️     | ?    | ?    | Not executed due to imports    |
+| `QRCodeScanner.test.jsx` | ⚠️     | ?    | ?    | Not executed                   |
+| `ChargeControl.test.jsx` | ⚠️     | ?    | ?    | Not executed                   |
+| `Payment.test.jsx`       | ❌     | 0    | 13   | Missing `getBookingStats` mock |
+| `authStore.test.js`      | ✅     | Most | Few  | Working                        |
+| `bookingStore.test.js`   | ✅     | Most | Few  | Working                        |
 
 ---
 

@@ -10,7 +10,8 @@
 
 **Coverage achieved**: **84.03%** (vượt target 80%)
 
-**Action needed**: 
+**Action needed**:
+
 - ✅ File đã được mở trong browser
 - 📸 **Chụp màn hình coverage report** (showing 84.03%)
 - Đảm bảo screenshot hiển thị rõ:
@@ -19,6 +20,7 @@
   - Timestamp/date
 
 **Screenshot should show**:
+
 ```
 All files          | 84.03% | 50.92% | 52.85% | 84.03% |
 ├─ pages/auth      | 89.83% |        |        |        |
@@ -39,6 +41,7 @@ All files          | 84.03% | 50.92% | 52.85% | 84.03% |
 **File location**: `./TESTING_README.md`
 
 **Content includes**:
+
 - ✅ Test Coverage Summary (84.03%)
 - ✅ Test Statistics (41 passed, 31 skipped)
 - ✅ Tested Features breakdown
@@ -49,6 +52,7 @@ All files          | 84.03% | 50.92% | 52.85% | 84.03% |
 - ✅ Troubleshooting guide
 
 **Quick preview**:
+
 ```bash
 cat TESTING_README.md | Select-Object -First 30
 ```
@@ -59,7 +63,8 @@ cat TESTING_README.md | Select-Object -First 30
 
 **Status**: ✅ HOÀN THÀNH & PUSHED
 
-**Repository**: 
+**Repository**:
+
 ```
 https://github.com/NguyenMinhThinh2005/FPTU_FA25_SWP391_G4_Topic3_SkaEV
 ```
@@ -67,15 +72,18 @@ https://github.com/NguyenMinhThinh2005/FPTU_FA25_SWP391_G4_Topic3_SkaEV
 **Branch**: `feature/tests/ev-booking`
 
 **Direct branch link**:
+
 ```
 https://github.com/NguyenMinhThinh2005/FPTU_FA25_SWP391_G4_Topic3_SkaEV/tree/feature/tests/ev-booking
 ```
 
 **Latest commits**:
+
 - ✅ e61f9aa: "📚 Update TESTING_README.md with final coverage results (84.03%)"
 - ✅ 937a0c2: "✅ Achieve 84% test coverage - Complete EV booking flow unit tests"
 
 **Files pushed**:
+
 - ✅ All test files (6 test files)
 - ✅ Coverage reports (HTML, LCOV)
 - ✅ Configuration (vite.config.js, setupTests.js)
@@ -89,6 +97,7 @@ https://github.com/NguyenMinhThinh2005/FPTU_FA25_SWP391_G4_Topic3_SkaEV/tree/fea
 **Status**: ⚠️ CHƯA TẠO
 
 **Action needed**:
+
 1. Go to: https://github.com/NguyenMinhThinh2005/FPTU_FA25_SWP391_G4_Topic3_SkaEV/pulls
 2. Click "New pull request"
 3. Select: `feature/tests/ev-booking` → `main` (or your default branch)
@@ -96,31 +105,37 @@ https://github.com/NguyenMinhThinh2005/FPTU_FA25_SWP391_G4_Topic3_SkaEV/tree/fea
 5. Description: Copy from template below
 
 **PR Description Template**:
+
 ```markdown
 ## 🧪 Unit Testing Frontend - EV Booking Flow
 
 ### 📊 Coverage Results
+
 - **Overall Coverage**: 84.03% ✅ (Target: ≥80%)
 - **Tests Passed**: 41/72
 - **Pass Rate**: 100% (of non-skipped tests)
 
 ### 📁 Files Changed
+
 - 6 test files created
 - Test utilities and setup
 - Coverage configuration
 - Documentation
 
 ### ✅ Tested Features
+
 - Authentication (Login/Register)
 - Auth State Management (Zustand)
 - Booking State Management
 - EV Booking Flow Logic
 
 ### 📝 Documentation
+
 - See `TESTING_README.md` for full guide
 - Coverage report: `./coverage/index.html`
 
 ### 🔗 Related Issues
+
 Closes #[issue-number] (if applicable)
 ```
 
@@ -131,9 +146,11 @@ Closes #[issue-number] (if applicable)
 ### Files to Submit/Show:
 
 1. **Screenshot** (tự chụp):
+
    - `coverage-report-screenshot.png` (84.03% visible)
 
 2. **Documentation** (đã có):
+
    - ✅ `TESTING_README.md`
    - ✅ `TEST_FIXES_APPLIED.md`
    - ✅ This file: `SUBMISSION_CHECKLIST.md`
@@ -207,6 +224,7 @@ All files          | 84.03% | 50.92% | 52.85% | 84.03% |
 **Status**: ✅ **CÓ THỂ NỘP NGAY**
 
 Bạn chỉ cần:
+
 1. 📸 Chụp màn hình `coverage/index.html` (đang mở trong browser)
 2. ✅ Nộp screenshot + link GitHub branch
 3. (Optional) Tạo Pull Request để trông professional hơn
