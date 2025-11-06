@@ -54,3 +54,18 @@ global.navigator.mediaDevices = {
     })
   )
 };
+
+// Mock useMasterDataSync globally
+vi.mock('./hooks/useMasterDataSync', () => ({
+  useMasterDataSync: () => ({
+    bookingHistory: [],
+    stats: {
+      total: 0,
+      completed: 0,
+      totalAmount: 0,
+      totalEnergyCharged: 0
+    },
+    completedBookings: [],
+    isDataReady: false
+  })
+}));
