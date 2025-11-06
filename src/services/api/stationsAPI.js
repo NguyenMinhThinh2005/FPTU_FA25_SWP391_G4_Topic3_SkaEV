@@ -20,9 +20,10 @@ export const getStationById = async (id) => {
  * Get available slots for a station
  */
 export const getAvailableSlots = async (stationId, date) => {
-  const response = await api.get(`/stations/${stationId}/available-slots`, {
-    params: { date }
-  });
+  // Backend endpoint: GET /api/Stations/{stationId}/slots
+  // Optional date param currently unused by API; include only if provided
+  const config = date ? { params: { date } } : undefined;
+  const response = await api.get(`/stations/${stationId}/slots`, config);
   return response.data;
 };
 
