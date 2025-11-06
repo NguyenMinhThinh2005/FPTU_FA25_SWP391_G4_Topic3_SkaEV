@@ -2,6 +2,102 @@
 import { persist } from "zustand/middleware";
 import { bookingsAPI } from "../services/api";
 
+const normalizeTimestamp = (value) => {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+};
+
+const calculateDurationMinutes = (startIso, endIso) => {
+  if (!startIso || !endIso) return null;
+  const start = new Date(startIso).getTime();
+  const end = new Date(endIso).getTime();
+  if (Number.isNaN(start) || Number.isNaN(end) || end < start) return null;
+  return Math.round((end - start) / 60000);
+};
+
+const addMinutes = (isoString, minutes) => {
+  if (!isoString || minutes == null) return null;
+  const base = new Date(isoString);
+  if (Number.isNaN(base.getTime())) return null;
+  const end = new Date(base.getTime() + minutes * 60000);
+  return end.toISOString();
+};
+
+const mapApiBookingToStore = (apiBooking) => {
+  const createdAt = normalizeTimestamp(apiBooking.createdAt);
+  const scheduledStart = normalizeTimestamp(apiBooking.scheduledStartTime);
+  const estimatedArrival = normalizeTimestamp(apiBooking.estimatedArrival);
+  const actualStart = normalizeTimestamp(apiBooking.actualStartTime);
+  const actualEnd = normalizeTimestamp(apiBooking.actualEndTime);
+  const chargingDuration = calculateDurationMinutes(actualStart, actualEnd);
+  const estimatedDuration = apiBooking.estimatedDuration ?? null;
+  const durationMinutes = chargingDuration ?? estimatedDuration ?? null;
+  const effectiveStart = actualStart || scheduledStart || estimatedArrival || createdAt;
+  const projectedEnd =
+    effectiveStart && (estimatedDuration ?? durationMinutes) != null
+      ? addMinutes(effectiveStart, estimatedDuration ?? durationMinutes)
+      : null;
+  const estimatedEndTime = actualEnd || projectedEnd;
+  const baseCost = Number(
+    apiBooking.totalAmount ?? apiBooking.totalCost ?? apiBooking.finalAmount ?? 0
+  );
+  const deliveredEnergy = Number(
+    apiBooking.energyDelivered ?? apiBooking.energyKwh ?? apiBooking.totalEnergy ?? 0
+  );
+
+  return {
+    id: apiBooking.bookingId,
+    bookingId: apiBooking.bookingId,
+    apiId: apiBooking.bookingId,
+    userId: apiBooking.userId,
+    customerName: apiBooking.customerName,
+    stationId: apiBooking.stationId,
+    stationName: apiBooking.stationName,
+    stationAddress: apiBooking.stationAddress,
+    slotId: apiBooking.slotId,
+    slotNumber: apiBooking.slotNumber,
+    schedulingType: (apiBooking.schedulingType || "immediate").toLowerCase(),
+    status: (apiBooking.status || "pending").toLowerCase(),
+    statusRaw: apiBooking.status,
+    bookingCode: `BK-${apiBooking.bookingId}`,
+    bookingTime: createdAt,
+    createdAt,
+    bookingDate: createdAt,
+    scheduledDateTime: scheduledStart,
+    scheduledTime: scheduledStart,
+    scheduledDate: scheduledStart ? scheduledStart.split("T")[0] : null,
+    estimatedArrival,
+    estimatedDuration,
+    duration: durationMinutes,
+    durationMinutes,
+    sessionDurationMinutes: durationMinutes,
+    actualStartTime: actualStart,
+    actualEndTime: actualEnd,
+    startTime: effectiveStart,
+    endTime: actualEnd || estimatedEndTime,
+    estimatedEndTime,
+    chargingStarted: Boolean(actualStart),
+    chargingEndedAt: actualEnd,
+    chargingDuration,
+    vehicleId: apiBooking.vehicleId,
+    vehicleType: apiBooking.vehicleType,
+    licensePlate: apiBooking.licensePlate,
+  portNumber: apiBooking.slotNumber,
+    slotName: apiBooking.slotNumber,
+    targetSOC: apiBooking.targetSoc ?? null,
+    currentSOC: apiBooking.currentSoc ?? null,
+  cost: baseCost,
+  totalAmount: baseCost,
+    chargingRate: null,
+  energyDelivered: deliveredEnergy,
+    powerDelivered: null,
+    qrScanned: false,
+    chargingStartedAt: actualStart,
+    notes: null,
+  };
+};
+
 const useBookingStore = create(
   persist(
     (set, get) => ({
@@ -15,6 +111,35 @@ const useBookingStore = create(
       error: null,
 
       // Actions
+      fetchBookings: async (params = {}) => {
+        set({ loading: true, error: null });
+        try {
+          const response = await bookingsAPI.getAll({ limit: 200, offset: 0, ...params });
+          const apiBookings = Array.isArray(response?.data) ? response.data : [];
+          const transformed = apiBookings.map(mapApiBookingToStore);
+
+          // Sort by creation date desc
+          transformed.sort((a, b) => {
+            const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+            const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+            return bTime - aTime;
+          });
+
+          set({
+            bookings: transformed,
+            bookingHistory: transformed,
+            loading: false,
+          });
+
+          return { success: true, data: transformed };
+        } catch (error) {
+          const errorMessage = error.message || "Error fetching bookings";
+          console.error("Fetch bookings error:", errorMessage, error);
+          set({ error: errorMessage, loading: false });
+          return { success: false, error: errorMessage };
+        }
+      },
+
       createBooking: async (bookingData) => {
         // API is enabled - database has sp_create_booking stored procedure
         const ENABLE_API = true; // Database is ready with stored procedure
@@ -142,8 +267,8 @@ const useBookingStore = create(
 
         // Save to store
         set((state) => ({
-          bookings: [...state.bookings, booking],
-          bookingHistory: [...state.bookingHistory, booking],
+          bookings: [booking, ...state.bookings],
+          bookingHistory: [booking, ...state.bookingHistory],
           currentBooking: booking,
           socTracking: {
             ...state.socTracking,

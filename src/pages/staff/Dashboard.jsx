@@ -40,63 +40,7 @@ const StaffDashboard = () => {
     energyConsumed: 0,
   });
   const [alerts, setAlerts] = useState([]);
-
-  // Mock data - TODO: Thay thế bằng API thực tế
-  const mockStationInfo = {
-    id: 1,
-    name: "Trạm sạc FPT Complex",
-    address: "Lô E2a-7, D1, KCN Cao, Q9, HCM",
-    staffName: "Nguyễn Văn A",
-  };
-
-  const mockConnectors = [
-    {
-      id: "CON-01",
-      stationId: 1,
-      type: "AC",
-      maxPower: 22,
-      status: "Available",
-      statusLabel: "Rảnh",
-      statusColor: "success",
-      currentSession: null,
-    },
-    {
-      id: "CON-02",
-      stationId: 1,
-      type: "AC",
-      maxPower: 22,
-      status: "Charging",
-      statusLabel: "Đang sạc",
-      statusColor: "primary",
-      currentSession: {
-        id: "SES-001",
-        startTime: new Date(Date.now() - 45 * 60 * 1000),
-        energyConsumed: 15.5,
-        estimatedCost: 77500,
-        vehicleSOC: 65,
-      },
-    },
-    {
-      id: "CON-03",
-      stationId: 1,
-      type: "DC",
-      maxPower: 50,
-      status: "Available",
-      statusLabel: "Rảnh",
-      statusColor: "success",
-      currentSession: null,
-    },
-    {
-      id: "CON-04",
-      stationId: 1,
-      type: "DC",
-      maxPower: 50,
-      status: "Faulted",
-      statusLabel: "Lỗi",
-      statusColor: "error",
-      currentSession: null,
-    },
-  ];
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     loadDashboardData();
@@ -104,39 +48,67 @@ const StaffDashboard = () => {
 
   const loadDashboardData = async () => {
     setLoading(true);
+    setError(null);
     try {
-      // TODO: Thay thế bằng API call thực tế
-      // const response = await fetch(`/api/staff/dashboard`);
-      // const data = await response.json();
-      
-      setStationInfo(mockStationInfo);
-      setConnectors(mockConnectors);
+      const response = await staffAPI.getDashboardOverview();
 
-      // Mock daily statistics
-      setDailyStats({
-        revenue: 2850000,
-        completedSessions: 12,
-        energyConsumed: 285.5,
-      });
+      if (!response || typeof response !== "object") {
+        throw new Error("Không nhận được dữ liệu dashboard");
+      }
 
-      // Mock alerts
-      const mockAlerts = [
-        {
-          id: 1,
-          type: "warning",
-          message: "Điểm sạc CON-04 đang Offline",
-          timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
-        },
-        {
-          id: 2,
-          type: "info",
-          message: "Phiên sạc SES-096 chưa thanh toán",
-          timestamp: new Date(Date.now() - 90 * 60 * 1000),
-        },
-      ];
-      setAlerts(mockAlerts);
+      const {
+        hasAssignment,
+        station,
+        staff,
+        connectors: connectorPayload = [],
+        dailyStats: dailyStatsPayload,
+        alerts: alertPayload = [],
+      } = response;
+
+      if (hasAssignment && station) {
+        setStationInfo({
+          id: station.stationId,
+          name: station.stationName,
+          address: `${station.address}${station.city ? `, ${station.city}` : ""}`,
+          staffName: staff?.fullName || "",
+        });
+      } else {
+        setStationInfo(null);
+      }
+
+      const normalizedConnectors = Array.isArray(connectorPayload)
+        ? connectorPayload
+            .map((connector) => mapConnectorForDisplay(connector))
+            .filter(Boolean)
+        : [];
+      setConnectors(normalizedConnectors);
+
+      if (dailyStatsPayload) {
+        setDailyStats({
+          revenue: Number(dailyStatsPayload.revenue || 0),
+          completedSessions: Number(dailyStatsPayload.completedSessions || 0),
+          energyConsumed: Number(dailyStatsPayload.energyDeliveredKwh || 0),
+        });
+      } else {
+        setDailyStats({ revenue: 0, completedSessions: 0, energyConsumed: 0 });
+      }
+
+      const normalizedAlerts = Array.isArray(alertPayload)
+        ? alertPayload.map((alert) => ({
+            id: alert.alertId ?? safeRandomId(),
+            type: normalizeAlertSeverity(alert.severity),
+            message: alert.message,
+            timestamp: alert.createdAtUtc ? new Date(alert.createdAtUtc) : new Date(),
+          }))
+        : [];
+      setAlerts(normalizedAlerts);
     } catch (error) {
       console.error("Error loading dashboard:", error);
+      setError(error.message || "Không thể tải dashboard nhân viên");
+      setStationInfo(null);
+      setConnectors([]);
+      setDailyStats({ revenue: 0, completedSessions: 0, energyConsumed: 0 });
+      setAlerts([]);
     } finally {
       setLoading(false);
     }
@@ -157,6 +129,73 @@ const StaffDashboard = () => {
     }
   };
 
+  const safeRandomId = () =>
+    typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `alert-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+  const normalizeAlertSeverity = (severity) => {
+    const normalized = (severity || "info").toString().toLowerCase();
+    if (normalized === "error" || normalized === "critical") return "error";
+    if (normalized === "warning" || normalized === "warn") return "warning";
+    return "info";
+  };
+
+  const mapConnectorForDisplay = (connector) => {
+    if (!connector) return null;
+
+    const rawStatus = (connector.operationalStatus || connector.technicalStatus || "").trim();
+    const statusKey = rawStatus.toLowerCase();
+
+    const statusMap = {
+      available: { status: "Available", label: "Rảnh", color: "success" },
+      charging: { status: "Charging", label: "Đang sạc", color: "primary" },
+      in_use: { status: "Charging", label: "Đang sạc", color: "primary" },
+      maintenance: { status: "Faulted", label: "Bảo trì", color: "warning" },
+      faulted: { status: "Faulted", label: "Lỗi", color: "error" },
+      offline: { status: "Faulted", label: "Offline", color: "error" },
+      unavailable: { status: "Unavailable", label: "Không khả dụng", color: "default" },
+      reserved: { status: "Reserved", label: "Đã giữ chỗ", color: "info" },
+    };
+
+    const mapped = statusMap[statusKey] || {
+      status: "Unknown",
+      label: rawStatus || "Không xác định",
+      color: "default",
+    };
+
+    let currentSession = null;
+    if (connector.activeSession) {
+      const session = connector.activeSession;
+      currentSession = {
+        id: `SES-${session.bookingId}`,
+        startTime: session.startedAt ? new Date(session.startedAt) : null,
+        energyConsumed: Number(session.energyDelivered || 0),
+        vehicleSOC:
+          session.currentSoc !== undefined && session.currentSoc !== null
+            ? Number(session.currentSoc)
+            : null,
+        customerName: session.customerName,
+        vehicleInfo: session.vehicleInfo,
+      };
+    }
+
+    return {
+      id: connector.connectorCode || `SLOT-${connector.slotId}`,
+      slotId: connector.slotId,
+      type: connector.connectorType,
+      maxPower: Number(connector.maxPower || 0),
+      status: mapped.status,
+      statusLabel: mapped.label,
+      statusColor: mapped.color,
+      technicalStatus: connector.technicalStatus,
+      voltage: connector.voltage,
+      current: connector.current,
+      temperature: connector.temperature,
+      currentSession,
+    };
+  };
+
   // Statistics
   const totalConnectors = connectors.length;
   const availableConnectors = connectors.filter((c) => c.status === "Available").length;
@@ -173,14 +212,31 @@ const StaffDashboard = () => {
           <Typography variant="h4" fontWeight="bold" gutterBottom>
             Quản lý Trạm sạc
           </Typography>
-          <Typography variant="body1" color="text.secondary">
-            {stationInfo?.name} - {stationInfo?.address}
-          </Typography>
+          {stationInfo ? (
+            <Typography variant="body1" color="text.secondary">
+              {stationInfo.name} - {stationInfo.address}
+            </Typography>
+          ) : (
+            <Typography variant="body2" color="text.secondary">
+              Chưa có trạm được giao phụ trách
+            </Typography>
+          )}
         </Box>
-        <Button variant="outlined" startIcon={<Refresh />} onClick={loadDashboardData}>
+        <Button
+          variant="outlined"
+          startIcon={<Refresh />}
+          onClick={loadDashboardData}
+          disabled={loading}
+        >
           Làm mới
         </Button>
       </Box>
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {error}
+        </Alert>
+      )}
 
       {/* Staff Info Alert */}
       {stationInfo && (
@@ -200,7 +256,7 @@ const StaffDashboard = () => {
                 <MonetizationOn color="success" sx={{ fontSize: 40 }} />
                 <Box>
                   <Typography variant="h4" fontWeight="bold" color="success.main">
-                    {dailyStats.revenue.toLocaleString()}
+                    {Number(dailyStats.revenue || 0).toLocaleString()}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     Doanh thu hôm nay (VNĐ)
@@ -238,7 +294,7 @@ const StaffDashboard = () => {
                 <Bolt color="warning" sx={{ fontSize: 40 }} />
                 <Box>
                   <Typography variant="h4" fontWeight="bold" color="warning.main">
-                    {dailyStats.energyConsumed.toFixed(1)}
+                    {Number(dailyStats.energyConsumed || 0).toFixed(1)}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     Năng lượng tiêu thụ (kWh)

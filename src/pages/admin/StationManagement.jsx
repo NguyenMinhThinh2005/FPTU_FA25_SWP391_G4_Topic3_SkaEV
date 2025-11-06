@@ -53,23 +53,19 @@ import {
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import ConfirmDialog from "../../components/ui/ConfirmDialog";
-import useAuthStore from "../../store/authStore";
 import useStationStore from "../../store/stationStore";
 import useBookingStore from "../../store/bookingStore";
+import useUserStore from "../../store/userStore";
 import { formatCurrency } from "../../utils/helpers";
 
 const StationManagement = () => {
-  // eslint-disable-next-line no-unused-vars
   const navigate = useNavigate();
-  // eslint-disable-next-line no-unused-vars
-  const { user } = useAuthStore();
   const { stations, addStation, updateStation, deleteStation, remoteDisableStation, remoteEnableStation } =
     useStationStore();
   const { bookings } = useBookingStore();
+  const { users, fetchUsers } = useUserStore();
   const [selectedStation, setSelectedStation] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
-  // eslint-disable-next-line no-unused-vars
-  const [viewMode, setViewMode] = useState("list"); // 'list' | 'map'
   const [filterStatus, setFilterStatus] = useState("all");
   const [deleteDialog, setDeleteDialog] = useState({
     open: false,
@@ -87,10 +83,22 @@ const StationManagement = () => {
     pricePerKwh: 3500,
     status: "active",
     availableSlots: 4,
+    managerUserId: null,
   });
 
   // Validation errors
   const [errors, setErrors] = useState({});
+
+  // Fetch users on component mount
+  React.useEffect(() => {
+    fetchUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Get staff users for dropdown
+  const staffUsers = React.useMemo(() => {
+    return users.filter(u => u.role === "staff");
+  }, [users]);
 
   // Station analytics data
   const stationAnalytics = stations.map((station) => {
@@ -107,10 +115,12 @@ const StationManagement = () => {
     });
 
     const revenue = thisMonthBookings.reduce((sum, b) => sum + b.cost, 0);
+    const totalPorts = station.charging.totalPorts || 0;
+    const availablePorts = station.charging.availablePorts || 0;
     const utilization =
-      ((station.charging.totalPorts - station.charging.availablePorts) /
-        station.charging.totalPorts) *
-      100;
+      totalPorts > 0
+        ? ((totalPorts - availablePorts) / totalPorts) * 100
+        : 0;
     const avgSessionTime =
       stationBookings.length > 0
         ? stationBookings.reduce((sum, b) => sum + (b.duration || 60), 0) /
@@ -137,6 +147,7 @@ const StationManagement = () => {
       pricePerKwh: station.charging.pricePerKwh,
       status: station.status,
       availableSlots: station.charging.availablePorts || station.charging.totalPorts,
+      managerUserId: station.managerUserId || null,
     });
     setDialogOpen(true);
   };
@@ -152,6 +163,7 @@ const StationManagement = () => {
       pricePerKwh: 3500,
       status: "active",
       availableSlots: 4,
+      managerUserId: null,
     });
     setDialogOpen(true);
     setErrors({});
@@ -212,6 +224,7 @@ const StationManagement = () => {
         pricePerKwh: parseFloat(stationForm.pricePerKwh)
       },
       status: stationForm.status,
+      managerUserId: stationForm.managerUserId || null,
       lastUpdated: new Date().toISOString(),
     };
 
@@ -370,12 +383,12 @@ const StationManagement = () => {
                 <Box>
                   <Typography variant="h4" fontWeight="bold">
                     {filteredStations.reduce(
-                      (sum, s) => sum + s.charging.totalPorts,
+                      (sum, s) => sum + (s.charging.availablePorts || 0),
                       0
                     )}
                   </Typography>
                   <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                    Tổng số cổng khả dụng
+                    Tổng số cổng khả dụng hiện tại
                   </Typography>
                 </Box>
               </Box>
@@ -424,19 +437,26 @@ const StationManagement = () => {
             <Table>
               <TableHead>
                 <TableRow>
-                  <TableCell width="25%">Trạm sạc</TableCell>
-                  <TableCell align="center" width="10%">Trạng thái</TableCell>
-                  <TableCell align="center" width="12%">Cổng</TableCell>
+                  <TableCell width="22%">Trạm sạc</TableCell>
+                  <TableCell align="center" width="8%">Trạng thái</TableCell>
+                  <TableCell align="center" width="10%">Cổng</TableCell>
                   <TableCell align="center" width="12%">Sử dụng</TableCell>
-                  <TableCell align="center" width="15%">Doanh thu tháng</TableCell>
+                  <TableCell width="18%">Nhân viên quản lý</TableCell>
+                  <TableCell align="center" width="12%">Doanh thu tháng</TableCell>
                   <TableCell align="center" width="8%">Phiên</TableCell>
                   <TableCell align="center" width="8%">Phiên TB</TableCell>
-                  <TableCell align="center" width="10%">Thao tác</TableCell>
+                  <TableCell align="center" width="8%">Thao tác</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {filteredStations.map((station) => (
-                  <TableRow key={station.id} hover>
+                  {filteredStations.map((station) => {
+                    const managerName = station.manager?.name ?? station.managerName ?? null;
+                    const managerEmail = station.manager?.email ?? station.managerEmail ?? null;
+                    const managerPhone = station.manager?.phone ?? station.managerPhoneNumber ?? null;
+                    const managerId = station.manager?.userId ?? station.managerUserId ?? null;
+
+                    return (
+                    <TableRow key={station.id} hover>
                     <TableCell>
                       <Box
                         sx={{ display: "flex", alignItems: "center", gap: 2 }}
@@ -489,6 +509,35 @@ const StationManagement = () => {
                         </Typography>
                       </Box>
                     </TableCell>
+                      <TableCell>
+                        {managerName || managerEmail || managerPhone ? (
+                          <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+                            <Typography variant="subtitle2" fontWeight="medium">
+                              {managerName || "Nhân viên chưa rõ"}
+                            </Typography>
+                            {managerEmail && (
+                              <Typography variant="caption" color="text.secondary">
+                                {managerEmail}
+                              </Typography>
+                            )}
+                            {managerPhone && (
+                              <Typography variant="caption" color="text.secondary">
+                                {managerPhone}
+                              </Typography>
+                            )}
+                            {managerId && (
+                              <Chip
+                                label={`ID: ${managerId}`}
+                                size="small"
+                                variant="outlined"
+                                sx={{ alignSelf: "flex-start" }}
+                              />
+                            )}
+                          </Box>
+                        ) : (
+                          <Chip label="Chưa phân công" size="small" variant="outlined" color="default" />
+                        )}
+                      </TableCell>
                     <TableCell align="center">
                       <Typography variant="body2" fontWeight="medium">
                         {formatCurrency(station.monthlyRevenue)}
@@ -506,16 +555,25 @@ const StationManagement = () => {
                       <Box sx={{ display: "flex", gap: 0.5, justifyContent: "center" }}>
                         <IconButton
                           size="small"
+                          color="primary"
+                          onClick={() => navigate(`/admin/stations/${station.id}/analytics`)}
+                          title="Xem phân tích chi tiết"
+                        >
+                          <TrendingUp />
+                        </IconButton>
+                        <IconButton
+                          size="small"
                           onClick={() => handleStationClick(station)}
+                          title="Chỉnh sửa"
                         >
                           <Edit />
                         </IconButton>
                         {station.status !== 'offline' ? (
-                          <IconButton size="small" color="warning" onClick={() => remoteDisableStation(station.id)}>
+                          <IconButton size="small" color="warning" onClick={() => remoteDisableStation(station.id)} title="Tắt trạm">
                             <PowerSettingsNew />
                           </IconButton>
                         ) : (
-                          <IconButton size="small" color="success" onClick={() => remoteEnableStation(station.id)}>
+                          <IconButton size="small" color="success" onClick={() => remoteEnableStation(station.id)} title="Bật trạm">
                             <PowerSettingsNew />
                           </IconButton>
                         )}
@@ -523,13 +581,15 @@ const StationManagement = () => {
                           size="small" 
                           color="error"
                           onClick={() => handleDeleteClick(station)}
+                          title="Xóa"
                         >
                           <Delete />
                         </IconButton>
                       </Box>
                     </TableCell>
-                  </TableRow>
-                ))}
+                    </TableRow>
+                  );
+                  })}
               </TableBody>
             </Table>
           </TableContainer>
@@ -649,6 +709,26 @@ const StationManagement = () => {
                     <MenuItem value="active">Đang hoạt động</MenuItem>
                     <MenuItem value="maintenance">Bảo trì</MenuItem>
                     <MenuItem value="offline">Ngoại tuyến</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+
+              <Grid item xs={12}>
+                <FormControl fullWidth>
+                  <InputLabel>Nhân viên quản lý</InputLabel>
+                  <Select
+                    value={stationForm.managerUserId || ""}
+                    label="Nhân viên quản lý"
+                    onChange={(e) => setStationForm({ ...stationForm, managerUserId: e.target.value || null })}
+                  >
+                    <MenuItem value="">
+                      <em>Không có</em>
+                    </MenuItem>
+                    {staffUsers.map((staff) => (
+                      <MenuItem key={staff.userId} value={staff.userId}>
+                        {staff.fullName || staff.email} - {staff.email}
+                      </MenuItem>
+                    ))}
                   </Select>
                 </FormControl>
               </Grid>

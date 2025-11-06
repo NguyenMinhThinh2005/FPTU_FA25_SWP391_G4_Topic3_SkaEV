@@ -47,9 +47,13 @@ import StaffProfile from "./pages/staff/Profile";
 // Admin Pages
 import AdminDashboard from "./pages/admin/Dashboard";
 import UserManagement from "./pages/admin/UserManagement";
+import UserDetail from "./pages/admin/UserDetail";
+import SupportRequestsManagement from "./pages/admin/SupportRequestsManagement";
 import AdvancedAnalytics from "./pages/admin/AdvancedAnalytics";
+import ReportsAnalytics from "./pages/admin/ReportsAnalytics";
 import AdminStationManagement from "./pages/admin/StationManagement";
 import IncidentManagement from "./pages/admin/IncidentManagement";
+import StationDetailAnalytics from "./pages/admin/StationDetailAnalytics";
 
 // Create React Query client
 const queryClient = new QueryClient({
@@ -196,8 +200,12 @@ function App() {
               >
                 <Route path="dashboard" element={<AdminDashboard />} />
                 <Route path="analytics" element={<AdvancedAnalytics />} />
+                <Route path="reports" element={<ReportsAnalytics />} />
                 <Route path="stations" element={<AdminStationManagement />} />
+                <Route path="stations/:stationId/analytics" element={<StationDetailAnalytics />} />
                 <Route path="users" element={<UserManagement />} />
+                <Route path="users/:userId" element={<UserDetail />} />
+                <Route path="support-requests" element={<SupportRequestsManagement />} />
                 <Route path="incidents" element={<IncidentManagement />} />
                 <Route index element={<Navigate to="dashboard" replace />} />
               </Route>

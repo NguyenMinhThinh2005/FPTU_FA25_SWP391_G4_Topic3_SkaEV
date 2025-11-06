@@ -5,7 +5,7 @@ using SkaEV.API.Infrastructure.Data;
 
 namespace SkaEV.API.Application.Services;
 
-public class AdminUserService : IAdminUserService
+public partial class AdminUserService : IAdminUserService
 {
     private readonly SkaEVDbContext _context;
     private readonly ILogger<AdminUserService> _logger;
@@ -31,8 +31,8 @@ public class AdminUserService : IAdminUserService
 
         if (!string.IsNullOrEmpty(search))
         {
-            query = query.Where(u => 
-                u.FullName.Contains(search) || 
+            query = query.Where(u =>
+                u.FullName.Contains(search) ||
                 u.Email.Contains(search) ||
                 (u.PhoneNumber != null && u.PhoneNumber.Contains(search)));
         }
@@ -51,7 +51,23 @@ public class AdminUserService : IAdminUserService
                 Status = u.IsActive ? "active" : "inactive",
                 CreatedAt = u.CreatedAt,
                 UpdatedAt = u.UpdatedAt,
-                LastLoginAt = null
+                LastLoginAt = null,
+                ManagedStationId = _context.StationStaff
+                    .Where(ss => ss.StaffUserId == u.UserId && ss.IsActive)
+                    .Select(ss => (int?)ss.StationId)
+                    .FirstOrDefault(),
+                ManagedStationName = _context.StationStaff
+                    .Where(ss => ss.StaffUserId == u.UserId && ss.IsActive)
+                    .Select(ss => ss.ChargingStation.StationName)
+                    .FirstOrDefault(),
+                ManagedStationAddress = _context.StationStaff
+                    .Where(ss => ss.StaffUserId == u.UserId && ss.IsActive)
+                    .Select(ss => ss.ChargingStation.Address)
+                    .FirstOrDefault(),
+                ManagedStationCity = _context.StationStaff
+                    .Where(ss => ss.StaffUserId == u.UserId && ss.IsActive)
+                    .Select(ss => ss.ChargingStation.City)
+                    .FirstOrDefault()
             })
             .ToListAsync();
     }
@@ -71,8 +87,8 @@ public class AdminUserService : IAdminUserService
 
         if (!string.IsNullOrEmpty(search))
         {
-            query = query.Where(u => 
-                u.FullName.Contains(search) || 
+            query = query.Where(u =>
+                u.FullName.Contains(search) ||
                 u.Email.Contains(search) ||
                 (u.PhoneNumber != null && u.PhoneNumber.Contains(search)));
         }
@@ -92,6 +108,12 @@ public class AdminUserService : IAdminUserService
         if (user == null)
             return null;
 
+        var activeAssignment = await _context.StationStaff
+            .Include(ss => ss.ChargingStation)
+            .Where(ss => ss.StaffUserId == userId && ss.IsActive)
+            .OrderByDescending(ss => ss.AssignedAt)
+            .FirstOrDefaultAsync();
+
         return new AdminUserDetailDto
         {
             UserId = user.UserId,
@@ -103,6 +125,10 @@ public class AdminUserService : IAdminUserService
             CreatedAt = user.CreatedAt,
             UpdatedAt = user.UpdatedAt,
             LastLoginAt = null, // Not tracked in current schema
+            ManagedStationId = activeAssignment?.StationId,
+            ManagedStationName = activeAssignment?.ChargingStation.StationName,
+            ManagedStationAddress = activeAssignment?.ChargingStation.Address,
+            ManagedStationCity = activeAssignment?.ChargingStation.City,
             AvatarUrl = user.UserProfile?.AvatarUrl,
             TotalBookings = user.Bookings.Count,
             TotalSpent = user.Invoices.Sum(i => i.TotalAmount),
@@ -125,6 +151,16 @@ public class AdminUserService : IAdminUserService
         if (!validRoles.Contains(createDto.Role))
             throw new ArgumentException("Invalid role");
 
+        if (createDto.Role == "staff")
+        {
+            if (!createDto.ManagedStationId.HasValue)
+                throw new ArgumentException("Staff users must be assigned to a station");
+        }
+        else if (createDto.ManagedStationId.HasValue)
+        {
+            throw new ArgumentException("Only staff users can be assigned to manage a station");
+        }
+
         var user = new User
         {
             Email = createDto.Email,
@@ -140,8 +176,14 @@ public class AdminUserService : IAdminUserService
         _context.Users.Add(user);
         await _context.SaveChangesAsync();
 
+        if (user.Role == "staff" && createDto.ManagedStationId.HasValue)
+        {
+            await HandleStaffAssignmentAsync(user, createDto.ManagedStationId.Value);
+            await _context.SaveChangesAsync();
+        }
+
         _logger.LogInformation("Created user {UserId} with role {Role}", user.UserId, createDto.Role);
-        return MapToDto(user);
+        return await BuildUserDtoAsync(user.UserId);
     }
 
     public async Task<AdminUserDto> UpdateUserAsync(int userId, UpdateUserDto updateDto)
@@ -154,20 +196,53 @@ public class AdminUserService : IAdminUserService
 
         if (updateDto.FullName != null)
             user.FullName = updateDto.FullName;
-        
+
         if (updateDto.PhoneNumber != null)
             user.PhoneNumber = updateDto.PhoneNumber;
-        
+
         if (updateDto.Email != null)
         {
             // Check if new email is already in use
             var emailExists = await _context.Users
                 .AnyAsync(u => u.Email == updateDto.Email && u.UserId != userId);
-            
+
             if (emailExists)
                 throw new ArgumentException("Email already in use");
-            
+
             user.Email = updateDto.Email;
+        }
+
+        var validRoles = new[] { "customer", "staff", "admin" };
+        if (!string.IsNullOrEmpty(updateDto.Role) && updateDto.Role != user.Role)
+        {
+            if (!validRoles.Contains(updateDto.Role))
+                throw new ArgumentException("Invalid role");
+
+            // Transitioning away from staff should remove assignments later
+            user.Role = updateDto.Role;
+        }
+
+        var activeAssignment = await GetActiveAssignmentAsync(userId);
+        var managedStationSpecified = updateDto.ManagedStationId.HasValue;
+
+        if (user.Role == "staff")
+        {
+            if (managedStationSpecified)
+            {
+                await HandleStaffAssignmentAsync(user, updateDto.ManagedStationId!.Value, activeAssignment);
+            }
+            else if (activeAssignment == null)
+            {
+                throw new ArgumentException("Staff users must be assigned to a station");
+            }
+        }
+        else
+        {
+            if (managedStationSpecified)
+                throw new ArgumentException("Only staff users can be assigned to manage a station");
+
+            if (activeAssignment != null)
+                activeAssignment.IsActive = false;
         }
 
         user.UpdatedAt = DateTime.UtcNow;
@@ -175,7 +250,7 @@ public class AdminUserService : IAdminUserService
         await _context.SaveChangesAsync();
 
         _logger.LogInformation("Updated user {UserId}", userId);
-        return MapToDto(user);
+        return await BuildUserDtoAsync(user.UserId);
     }
 
     public async Task<AdminUserDto> UpdateUserRoleAsync(int userId, string role)
@@ -190,13 +265,21 @@ public class AdminUserService : IAdminUserService
         if (!validRoles.Contains(role))
             throw new ArgumentException("Invalid role");
 
+        var activeAssignment = await GetActiveAssignmentAsync(userId);
+
+        if (role == "staff")
+            throw new ArgumentException("Use the user update endpoint to assign staff role with station selection");
+
         user.Role = role;
         user.UpdatedAt = DateTime.UtcNow;
+
+        if (activeAssignment != null)
+            activeAssignment.IsActive = false;
 
         await _context.SaveChangesAsync();
 
         _logger.LogInformation("Updated user {UserId} role to {Role}", userId, role);
-        return MapToDto(user);
+        return await BuildUserDtoAsync(userId);
     }
 
     public async Task<AdminUserDto> ActivateUserAsync(int userId)
@@ -213,7 +296,7 @@ public class AdminUserService : IAdminUserService
         await _context.SaveChangesAsync();
 
         _logger.LogInformation("Activated user {UserId}", userId);
-        return MapToDto(user);
+        return await BuildUserDtoAsync(userId);
     }
 
     public async Task<AdminUserDto> DeactivateUserAsync(int userId, string reason)
@@ -230,7 +313,7 @@ public class AdminUserService : IAdminUserService
         await _context.SaveChangesAsync();
 
         _logger.LogInformation("Deactivated user {UserId}. Reason: {Reason}", userId, reason);
-        return MapToDto(user);
+        return await BuildUserDtoAsync(userId);
     }
 
     public async Task DeleteUserAsync(int userId)
@@ -267,7 +350,7 @@ public class AdminUserService : IAdminUserService
 
         // Generate temporary password
         var tempPassword = GenerateTemporaryPassword();
-    user.PasswordHash = tempPassword;
+        user.PasswordHash = tempPassword;
         user.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
@@ -326,27 +409,87 @@ public class AdminUserService : IAdminUserService
         };
     }
 
+    private async Task<StationStaff?> GetActiveAssignmentAsync(int userId)
+    {
+        return await _context.StationStaff
+            .Where(ss => ss.StaffUserId == userId && ss.IsActive)
+            .OrderByDescending(ss => ss.AssignedAt)
+            .FirstOrDefaultAsync();
+    }
+
+    private async Task HandleStaffAssignmentAsync(User user, int stationId, StationStaff? existingAssignment = null)
+    {
+        existingAssignment ??= await GetActiveAssignmentAsync(user.UserId);
+
+        if (existingAssignment != null && existingAssignment.StationId == stationId && existingAssignment.IsActive)
+            return;
+
+        if (existingAssignment != null)
+            existingAssignment.IsActive = false;
+
+        var stationExists = await _context.ChargingStations
+            .AnyAsync(s => s.StationId == stationId && s.DeletedAt == null);
+
+        if (!stationExists)
+            throw new ArgumentException("Managed station not found");
+
+        var stationAssigned = await _context.StationStaff
+            .AnyAsync(ss => ss.StationId == stationId && ss.IsActive && ss.StaffUserId != user.UserId);
+
+        if (stationAssigned)
+            throw new ArgumentException("Station is already assigned to another staff");
+
+        var assignment = new StationStaff
+        {
+            StaffUserId = user.UserId,
+            StationId = stationId,
+            AssignedAt = DateTime.UtcNow,
+            IsActive = true
+        };
+
+        _context.StationStaff.Add(assignment);
+    }
+
+    private async Task<AdminUserDto> BuildUserDtoAsync(int userId)
+    {
+        return await _context.Users
+            .Where(u => u.UserId == userId)
+            .Select(u => new AdminUserDto
+            {
+                UserId = u.UserId,
+                Email = u.Email,
+                FullName = u.FullName,
+                PhoneNumber = u.PhoneNumber,
+                Role = u.Role,
+                Status = u.IsActive ? "active" : "inactive",
+                CreatedAt = u.CreatedAt,
+                UpdatedAt = u.UpdatedAt,
+                LastLoginAt = null,
+                ManagedStationId = _context.StationStaff
+                    .Where(ss => ss.StaffUserId == u.UserId && ss.IsActive)
+                    .Select(ss => (int?)ss.StationId)
+                    .FirstOrDefault(),
+                ManagedStationName = _context.StationStaff
+                    .Where(ss => ss.StaffUserId == u.UserId && ss.IsActive)
+                    .Select(ss => ss.ChargingStation.StationName)
+                    .FirstOrDefault(),
+                ManagedStationAddress = _context.StationStaff
+                    .Where(ss => ss.StaffUserId == u.UserId && ss.IsActive)
+                    .Select(ss => ss.ChargingStation.Address)
+                    .FirstOrDefault(),
+                ManagedStationCity = _context.StationStaff
+                    .Where(ss => ss.StaffUserId == u.UserId && ss.IsActive)
+                    .Select(ss => ss.ChargingStation.City)
+                    .FirstOrDefault()
+            })
+            .FirstAsync();
+    }
+
     private string GenerateTemporaryPassword()
     {
         const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%";
         var random = new Random();
         return new string(Enumerable.Repeat(chars, 12)
             .Select(s => s[random.Next(s.Length)]).ToArray());
-    }
-
-    private AdminUserDto MapToDto(User user)
-    {
-        return new AdminUserDto
-        {
-            UserId = user.UserId,
-            Email = user.Email,
-            FullName = user.FullName,
-            PhoneNumber = user.PhoneNumber,
-            Role = user.Role,
-            Status = user.IsActive ? "active" : "inactive",
-            CreatedAt = user.CreatedAt,
-            UpdatedAt = user.UpdatedAt,
-            LastLoginAt = null // Not tracked in current schema
-        };
     }
 }

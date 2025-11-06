@@ -44,6 +44,7 @@ const useUserStore = create(
             fullName: `${data.firstName || ""} ${data.lastName || ""}`.trim(),
             phoneNumber: data.phone || "",
             role: data.role || "customer",
+            managedStationId: data.managedStationId ? Number(data.managedStationId) : undefined,
           };
           const response = await usersAPI.create(userData);
           // Backend returns created user directly
@@ -72,6 +73,9 @@ const useUserStore = create(
               : undefined,
             phoneNumber: updates.phone,
             role: updates.role,
+            managedStationId: updates.managedStationId !== undefined
+              ? (updates.managedStationId === null ? null : Number(updates.managedStationId))
+              : undefined,
           };
           // Remove undefined fields
           Object.keys(updateData).forEach(key => 

@@ -5,6 +5,16 @@ import axiosInstance from '../axiosConfig';
  * Requires Staff/Admin role authorization
  */
 const staffAPI = {
+  // ==================== DASHBOARD OVERVIEW ====================
+
+  /**
+   * Load station overview for the authenticated staff member
+   */
+  getDashboardOverview: async () => {
+    const response = await axiosInstance.get('/api/staff/dashboard');
+    return response.data;
+  },
+
   // ==================== ISSUES MANAGEMENT ====================
   
   /**
@@ -19,7 +29,7 @@ const staffAPI = {
     if (params.assignedTo) queryParams.append('assignedTo', params.assignedTo);
     
     const response = await axiosInstance.get(`/api/StaffIssues?${queryParams}`);
-    return response.data;
+    return response.data?.data ?? [];
   },
 
   /**
@@ -27,7 +37,7 @@ const staffAPI = {
    */
   getMyIssues: async () => {
     const response = await axiosInstance.get('/api/StaffIssues/my-issues');
-    return response.data;
+    return response.data?.data ?? [];
   },
 
   /**
@@ -59,7 +69,7 @@ const staffAPI = {
    * Assign issue to staff member (admin only)
    */
   assignIssue: async (issueId, staffId) => {
-    const response = await axiosInstance.put(`/api/StaffIssues/${issueId}/assign`, { staffId });
+    const response = await axiosInstance.patch(`/api/StaffIssues/${issueId}/assign`, { assignedToUserId: staffId });
     return response.data;
   },
 
@@ -68,10 +78,7 @@ const staffAPI = {
    * @param {string} status - 'reported' | 'in_progress' | 'resolved' | 'closed'
    */
   updateIssueStatus: async (issueId, status, resolution = null) => {
-    const response = await axiosInstance.put(`/api/StaffIssues/${issueId}/status`, {
-      status,
-      resolution
-    });
+    const response = await axiosInstance.patch(`/api/StaffIssues/${issueId}/status`, { status, resolution });
     return response.data;
   },
 
@@ -138,7 +145,7 @@ const staffAPI = {
    */
   getStationsStatus: async () => {
     const response = await axiosInstance.get('/api/stations');
-    return response.data;
+    return response.data?.data ?? [];
   },
 
   /**
@@ -154,7 +161,7 @@ const staffAPI = {
    */
   getStationSlots: async (stationId) => {
     const response = await axiosInstance.get(`/api/stations/${stationId}/slots`);
-    return response.data;
+    return response.data?.data ?? [];
   },
 
   /**

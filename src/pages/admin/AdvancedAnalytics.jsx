@@ -111,86 +111,34 @@ const AdvancedAnalytics = () => {
       console.log("🏆 Performance response:", performanceResponse);
       console.log("📊 Peak hours response:", peakHoursResponse);
 
+      // Parse backend response structure correctly
+      // Backend returns: { data: [...], summary: {...} }
       setRevenueData(revenueResponse.data || []);
       setUsageData(usageResponse.data || []);
       setStationPerformanceData(performanceResponse.data || []);
-      setPeakHoursData(peakHoursResponse.data?.hourlyUsage || []);
+      // Peak hours returns: { data: { hourlyDistribution: [...], peakHour: 9 } }
+      setPeakHoursData(peakHoursResponse.data?.hourlyDistribution || []);
       
       console.log("✅ Data loaded successfully");
       console.log("📈 Revenue items:", revenueResponse.data?.length || 0);
       console.log("📊 Usage items:", usageResponse.data?.length || 0);
+      console.log("🏆 Performance items:", performanceResponse.data?.length || 0);
+      console.log("⏰ Peak hours items:", peakHoursResponse.data?.length || 0);
       
     } catch (err) {
       console.error("Error fetching analytics data:", err);
-      console.log("📊 Using fallback mock data for demo");
-      
-      // Fallback to mock data for demo purposes
-      setError("Đang sử dụng dữ liệu mẫu để demo. API backend chưa có dữ liệu thực.");
-      
-      // Generate mock data based on time range
-      const mockRevenue = generateMockRevenueData(timeRange);
-      const mockUsage = generateMockUsageData(timeRange);
-      const mockPerformance = generateMockStationPerformance();
-      const mockPeakHours = generateMockPeakHours();
-      
-      setRevenueData(mockRevenue);
-      setUsageData(mockUsage);
-      setStationPerformanceData(mockPerformance);
-      setPeakHoursData(mockPeakHours);
+      setError(
+        err?.message ||
+          "Không thể tải dữ liệu phân tích. Vui lòng kiểm tra backend, seed dữ liệu báo cáo hoặc thử lại."
+      );
+      setRevenueData([]);
+      setUsageData([]);
+      setStationPerformanceData([]);
+      setPeakHoursData([]);
     } finally {
       setLoading(false);
     }
   }, [timeRange]);
-
-  // Mock data generators
-  const generateMockRevenueData = (range) => {
-    const dataPoints = range === "7d" ? 7 : range === "30d" ? 4 : range === "90d" ? 3 : 12;
-    return Array.from({ length: dataPoints }, (_, i) => ({
-      stationId: i + 1,
-      stationName: `Trạm sạc ${i + 1}`,
-      month: new Date().getMonth() + 1,
-      year: new Date().getFullYear(),
-      totalRevenue: Math.floor(Math.random() * 5000000) + 2000000,
-      totalEnergySoldKwh: Math.floor(Math.random() * 1000) + 500,
-      totalTransactions: Math.floor(Math.random() * 150) + 50,
-    }));
-  };
-
-  const generateMockUsageData = (range) => {
-    const dataPoints = range === "7d" ? 7 : range === "30d" ? 4 : range === "90d" ? 3 : 12;
-    return Array.from({ length: dataPoints }, (_, i) => ({
-      stationId: i + 1,
-      stationName: `Trạm sạc ${i + 1}`,
-      month: new Date().getMonth() + 1,
-      year: new Date().getFullYear(),
-      completedSessions: Math.floor(Math.random() * 120) + 40,
-      totalBookings: Math.floor(Math.random() * 150) + 60,
-      utilizationRatePercent: Math.random() * 40 + 60, // 60-100%
-    }));
-  };
-
-  const generateMockStationPerformance = () => {
-    const types = ["DC Fast", "AC Level 2", "Ultra Fast"];
-    return Array.from({ length: 10 }, (_, i) => ({
-      stationId: i + 1,
-      stationName: `Trạm sạc ${i + 1}`,
-      chargingType: types[i % types.length],
-      totalRevenue: Math.floor(Math.random() * 8000000) + 3000000,
-      totalEnergyDelivered: Math.floor(Math.random() * 2000) + 800,
-      completedSessions: Math.floor(Math.random() * 200) + 100,
-      utilizationRate: Math.random() * 30 + 70, // 70-100%
-      status: i < 8 ? "active" : "inactive",
-    }));
-  };
-
-  const generateMockPeakHours = () => {
-    return Array.from({ length: 24 }, (_, hour) => ({
-      hour,
-      sessionCount: hour >= 7 && hour <= 19 
-        ? Math.floor(Math.random() * 80) + 40 
-        : Math.floor(Math.random() * 30) + 10,
-    }));
-  };
 
   useEffect(() => {
     fetchAnalyticsData();
@@ -257,21 +205,50 @@ const AdvancedAnalytics = () => {
 
   // Revenue by charging type
   const getRevenueByType = () => {
-    // Group revenue by charging type from station performance
-    const typeRevenue = {};
-    stationPerformanceData.forEach(station => {
-      const type = station.chargingType || "Standard AC";
-      if (!typeRevenue[type]) {
-        typeRevenue[type] = 0;
+    // If we have revenue data, aggregate by station and estimate charging types
+    if (revenueData.length === 0) return [];
+
+    // Calculate total revenue by station
+    const stationRevenue = {};
+    revenueData.forEach(item => {
+      const stationId = item.stationId;
+      if (!stationRevenue[stationId]) {
+        stationRevenue[stationId] = {
+          stationName: item.stationName,
+          totalRevenue: 0
+        };
       }
-      typeRevenue[type] += station.totalRevenue || 0;
+      stationRevenue[stationId].totalRevenue += item.totalRevenue || 0;
     });
 
-    return Object.entries(typeRevenue).map(([name, revenue]) => ({
-      name,
-      revenue,
-      value: revenue, // For pie chart percentage
-    }));
+    // Estimate charging types based on station names (temporary solution)
+    // In production, this should come from station metadata
+    const typeRevenue = {
+      "Standard AC": 0,
+      "Fast DC": 0,
+      "Ultra Fast": 0
+    };
+
+    Object.values(stationRevenue).forEach(station => {
+      const name = station.stationName.toLowerCase();
+      if (name.includes("fast") || name.includes("nhanh")) {
+        if (name.includes("ultra") || name.includes("siêu")) {
+          typeRevenue["Ultra Fast"] += station.totalRevenue;
+        } else {
+          typeRevenue["Fast DC"] += station.totalRevenue;
+        }
+      } else {
+        typeRevenue["Standard AC"] += station.totalRevenue;
+      }
+    });
+
+    return Object.entries(typeRevenue)
+      .filter(([, revenue]) => revenue > 0)
+      .map(([name, revenue]) => ({
+        name,
+        revenue,
+        value: revenue, // For pie chart percentage
+      }));
   };
 
   // Chart colors
