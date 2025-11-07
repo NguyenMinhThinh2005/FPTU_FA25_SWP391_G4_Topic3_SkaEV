@@ -1,4 +1,3 @@
-/* eslint-disable no-unused-vars, no-undef */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -114,7 +113,7 @@ describe.skip('BookingModal (skipped: MUI x-date-pickers import error)', () => {
   });
 
   it('selects DC fast charger type', async () => {
-    const user = userEvent.setup();
+  const _user = userEvent.setup();
     renderWithRouter(
       <BookingModal
         open={true}
@@ -128,7 +127,7 @@ describe.skip('BookingModal (skipped: MUI x-date-pickers import error)', () => {
     const dcCard = screen.getByText(/sạc.*nhanh dc/i).closest('div[role="button"]') ||
                    screen.getByText(/sạc.*nhanh dc/i).closest('button');
     
-    await user.click(dcCard);
+  await _user.click(dcCard);
 
     // Should show "Tiếp tục" or move to next step
     const nextButton = screen.getByRole('button', { name: /tiếp tục/i });
@@ -136,7 +135,7 @@ describe.skip('BookingModal (skipped: MUI x-date-pickers import error)', () => {
   });
 
   it('navigates through all steps: charger type -> socket type -> time -> confirm', async () => {
-    const user = userEvent.setup();
+  const _user = userEvent.setup();
     renderWithRouter(
       <BookingModal
         open={true}
@@ -150,11 +149,11 @@ describe.skip('BookingModal (skipped: MUI x-date-pickers import error)', () => {
     const dcCard = screen.getByText(/sạc.*nhanh dc/i).closest('button') ||
                    screen.getByText(/150/i).closest('button');
     if (dcCard) {
-      await user.click(dcCard);
+      await _user.click(dcCard);
     }
 
     let nextButton = screen.getByRole('button', { name: /tiếp tục/i });
-    await user.click(nextButton);
+  await _user.click(nextButton);
 
     // Step 2: Select socket/port
     await waitFor(() => {
@@ -167,12 +166,12 @@ describe.skip('BookingModal (skipped: MUI x-date-pickers import error)', () => {
       const availablePort = screen.getByText(/available/i).closest('button') ||
                             portCards[0].closest('button');
       if (availablePort) {
-        await user.click(availablePort);
+        await _user.click(availablePort);
       }
     }
 
     nextButton = screen.getByRole('button', { name: /tiếp tục/i });
-    await user.click(nextButton);
+  await _user.click(nextButton);
 
     // Step 3: Select time
     await waitFor(() => {
@@ -182,8 +181,8 @@ describe.skip('BookingModal (skipped: MUI x-date-pickers import error)', () => {
     // Component may use date/time picker - select immediate or schedule
     // For immediate booking, may auto-select or have a radio button
     
-    nextButton = screen.getByRole('button', { name: /tiếp tục/i });
-    await user.click(nextButton);
+  nextButton = screen.getByRole('button', { name: /tiếp tục/i });
+  await _user.click(nextButton);
 
     // Step 4: Confirm booking
     await waitFor(() => {
@@ -195,7 +194,7 @@ describe.skip('BookingModal (skipped: MUI x-date-pickers import error)', () => {
   });
 
   it('validates time selection - cannot book in the past', async () => {
-    const user = userEvent.setup();
+  const _user = userEvent.setup();
     renderWithRouter(
       <BookingModal
         open={true}

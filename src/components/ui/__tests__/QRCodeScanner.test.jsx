@@ -1,4 +1,3 @@
-/* eslint-disable no-unused-vars, no-undef */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -81,7 +80,7 @@ describe.skip('QRCodeScanner', () => {
     );
 
     await waitFor(() => {
-      expect(global.navigator.mediaDevices.getUserMedia).toHaveBeenCalledWith({ video: true });
+      expect(globalThis.navigator.mediaDevices.getUserMedia).toHaveBeenCalledWith({ video: true });
     });
   });
 

@@ -60,7 +60,7 @@ This test suite provides comprehensive unit and integration tests for the comple
 8. **Start Charging** → Begin charging session ✅
 9. **Stop Charging** → End session ✅
 10. **Payment** → Process payment ✅
-11. **Invoice** → View receipt ✅
+
 
 ## Installation
 
@@ -414,4 +414,4 @@ For issues or questions, check:
 
 ---
 
-**Happy Testing! 🚀**
+
