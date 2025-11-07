@@ -30,4 +30,5 @@ export function renderWithRouter(ui, {
   return render(ui, { wrapper: Wrapper, ...renderOptions });
 }
 
-export * from '@testing-library/react';
+// Intentionally only export helpers to avoid re-exporting non-component symbols
+// (re-exports can trigger react-refresh/only-export-components ESLint rule).

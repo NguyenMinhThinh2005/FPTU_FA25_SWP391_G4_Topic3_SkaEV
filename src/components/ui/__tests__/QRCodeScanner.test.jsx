@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars, no-undef */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -57,7 +58,7 @@ describe.skip('QRCodeScanner', () => {
     vi.clearAllMocks();
     
     // Mock camera permissions
-    global.navigator.mediaDevices = {
+    globalThis.navigator.mediaDevices = {
       getUserMedia: vi.fn(() =>
         Promise.resolve({
           getTracks: () => [{ stop: vi.fn() }],
@@ -216,7 +217,7 @@ describe.skip('QRCodeScanner', () => {
 
   it('handles camera permission denied', async () => {
     // Mock permission denied
-    global.navigator.mediaDevices.getUserMedia = vi.fn(() =>
+    globalThis.navigator.mediaDevices.getUserMedia = vi.fn(() =>
       Promise.reject(new Error('Permission denied'))
     );
 
