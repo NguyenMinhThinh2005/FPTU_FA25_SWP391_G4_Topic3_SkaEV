@@ -49,6 +49,14 @@ SkaEV.API/appsettings.*.json
 # PowerShell scripts - may contain machine-specific paths
 *.ps1
 !*.example.ps1
+!start-all.ps1
+!run-backend.ps1
+!run-frontend.ps1
+
+# Sensitive PowerShell scripts with passwords/credentials
+reset-user-password.ps1
+test-user-creation.ps1
+quick-setup-after-pull.ps1
 
 # Batch files - may contain machine-specific paths
 *.bat
@@ -58,6 +66,12 @@ SkaEV.API/appsettings.*.json
 database/delete_users_*.sql
 database/local_*.sql
 database/temp_*.sql
+
+# Sensitive database scripts with user data/passwords
+database/delete-soft-deleted-users.sql
+database/reset-user-password.sql
+database/reset-all-new-users.sql
+database/add-main-accounts.sql
 
 # Local configuration files
 *.local.json
@@ -70,6 +84,12 @@ database/temp_*.sql
 
 # Test/temp files
 .azure/*.md
+
+# Sensitive documentation with passwords and test data
+ACCOUNT_PASSWORDS.md
+TEST_USER_CREATION.md
+FIX_USER_MANAGEMENT.md
+FIX_ADMIN_LOGIN.md
 !.azure/README.md
 
 # Temporary documentation files (work in progress)
