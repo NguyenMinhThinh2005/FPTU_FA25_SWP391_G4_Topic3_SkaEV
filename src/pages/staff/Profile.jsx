@@ -83,27 +83,6 @@ const StaffProfile = () => {
     },
   ]);
 
-  const [certifications] = useState([
-    {
-      name: "EV Charging Systems Level 2",
-      issuer: "Viện xe điện",
-      expiry: "2025-06-15",
-      status: "active",
-    },
-    {
-      name: "Chứng chỉ an toàn điện",
-      issuer: "Hội đồng an toàn",
-      expiry: "2025-12-30",
-      status: "expiring",
-    },
-    {
-      name: "Technical Support Level 1",
-      issuer: "Đào tạo SkaEV",
-      expiry: "2025-03-20",
-      status: "active",
-    },
-  ]);
-
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);
   };
@@ -117,19 +96,6 @@ const StaffProfile = () => {
     console.log("Saving profile:", profileData);
     setEditMode(false);
     // Show success message
-  };
-
-  const getCertificationColor = (status) => {
-    switch (status) {
-      case "active":
-        return "success";
-      case "expiring":
-        return "warning";
-      case "expired":
-        return "error";
-      default:
-        return "default";
-    }
   };
 
   const getActivityColor = (status) => {
@@ -271,26 +237,26 @@ const StaffProfile = () => {
             </Typography>
             <Grid container spacing={3}>
               <Grid item xs={12} sm={6}>
-                  <TextField
-                    fullWidth
-                    label="Họ"
-                    value={profileData.firstName}
-                    onChange={(e) =>
-                      handleProfileChange("firstName", e.target.value)
-                    }
-                    disabled
-                  />
+                <TextField
+                  fullWidth
+                  label="Họ"
+                  value={profileData.firstName}
+                  onChange={(e) =>
+                    handleProfileChange("firstName", e.target.value)
+                  }
+                  disabled
+                />
               </Grid>
               <Grid item xs={12} sm={6}>
-                  <TextField
-                    fullWidth
-                    label="Tên"
-                    value={profileData.lastName}
-                    onChange={(e) =>
-                      handleProfileChange("lastName", e.target.value)
-                    }
-                    disabled
-                  />
+                <TextField
+                  fullWidth
+                  label="Tên"
+                  value={profileData.lastName}
+                  onChange={(e) =>
+                    handleProfileChange("lastName", e.target.value)
+                  }
+                  disabled
+                />
               </Grid>
               <Grid item xs={12} sm={6}>
                 <TextField
@@ -354,11 +320,16 @@ const StaffProfile = () => {
               {/* Phần Chi tiết công việc - GỘP VÀO ĐÂY */}
               <Grid item xs={12} sx={{ mt: 2 }}>
                 <Divider />
-                <Typography variant="h6" fontWeight="bold" gutterBottom sx={{ mt: 2 }}>
+                <Typography
+                  variant="h6"
+                  fontWeight="bold"
+                  gutterBottom
+                  sx={{ mt: 2 }}
+                >
                   Chi tiết công việc
                 </Typography>
               </Grid>
-              
+
               <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
@@ -372,7 +343,7 @@ const StaffProfile = () => {
                   }}
                 />
               </Grid>
-              
+
               <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
@@ -386,7 +357,7 @@ const StaffProfile = () => {
                   }}
                 />
               </Grid>
-              
+
               <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth

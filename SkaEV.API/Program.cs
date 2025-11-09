@@ -5,6 +5,7 @@ using Microsoft.OpenApi.Models;
 using System.Text;
 using SkaEV.API.Infrastructure.Data;
 using SkaEV.API.Application.Services;
+using SkaEV.API.Application.Services.Payments;
 // using SkaEV.API.Hubs; // Temporarily commented out
 using Serilog;
 using Serilog.Events;
@@ -118,6 +119,7 @@ builder.Services.AddScoped<IStationService, StationService>();
 builder.Services.AddScoped<IBookingService, BookingService>();
 builder.Services.AddScoped<IPaymentMethodService, PaymentMethodService>();
 builder.Services.AddScoped<IReportService, ReportService>();
+builder.Services.AddSingleton<IPaymentProcessor, SimulatedPaymentProcessor>();
 
 // New Services
 builder.Services.AddScoped<IInvoiceService, InvoiceService>();

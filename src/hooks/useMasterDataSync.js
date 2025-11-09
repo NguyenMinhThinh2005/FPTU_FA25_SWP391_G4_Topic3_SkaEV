@@ -2,6 +2,7 @@
 import useBookingStore from "../store/bookingStore";
 import useVehicleStore from "../store/vehicleStore";
 import useAuthStore from "../store/authStore";
+import usePaymentMethodStore from "../store/paymentMethodStore";
 
 /**
  * Master Data Sync - Đảm bảo tất cả components sử dụng cùng data
@@ -13,6 +14,10 @@ export const useMasterDataSync = () => {
   const getBookingStats = useBookingStore((state) => state.getBookingStats);
   const loadUserBookings = useBookingStore((state) => state.loadUserBookings);
   const fetchVehicles = useVehicleStore((state) => state.fetchVehicles);
+  const paymentMethods = usePaymentMethodStore((state) => state.methods);
+  const fetchPaymentMethods = usePaymentMethodStore(
+    (state) => state.fetchPaymentMethods
+  );
   const [isLoading, setIsLoading] = React.useState(false);
   const [hasLoaded, setHasLoaded] = React.useState(false);
 
@@ -25,7 +30,11 @@ export const useMasterDataSync = () => {
 
         try {
           // Load both bookings and vehicles in parallel
-          await Promise.all([loadUserBookings(), fetchVehicles()]);
+          await Promise.all([
+            loadUserBookings(),
+            fetchVehicles(),
+            fetchPaymentMethods(),
+          ]);
           setHasLoaded(true);
           console.log("✅ useMasterDataSync: Data loaded successfully");
         } catch (error) {
@@ -38,7 +47,14 @@ export const useMasterDataSync = () => {
     };
 
     loadData();
-  }, [user, hasLoaded, isLoading, loadUserBookings, fetchVehicles]);
+  }, [
+    user,
+    hasLoaded,
+    isLoading,
+    loadUserBookings,
+    fetchVehicles,
+    fetchPaymentMethods,
+  ]);
 
   // Return unified stats
   const stats = getBookingStats();
@@ -62,5 +78,6 @@ export const useMasterDataSync = () => {
     completedBookings: bookingHistory.filter((b) => b.status === "completed"),
     isDataReady: bookingHistory.length > 0,
     isLoadingFromDB: isLoading,
+    paymentMethods,
   };
 };

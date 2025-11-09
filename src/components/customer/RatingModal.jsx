@@ -85,12 +85,16 @@ const RatingModal = ({
 
   // Provide default values to prevent errors
   const rawSessionData = completedSession || chargingSession || {};
-  
+
   // Normalize data structure from different sources
   const sessionData = {
     energyDelivered: rawSessionData.energyDelivered || 0,
     duration: rawSessionData.chargingDuration || rawSessionData.duration || 0,
-    totalAmount: rawSessionData.totalAmount || rawSessionData.cost || rawSessionData.totalCost || 0,
+    totalAmount:
+      rawSessionData.totalAmount ||
+      rawSessionData.cost ||
+      rawSessionData.totalCost ||
+      0,
     initialSOC: rawSessionData.initialSOC || rawSessionData.currentSOC || 0,
     targetSOC: rawSessionData.finalSOC || rawSessionData.targetSOC || 0,
     chargingRate: rawSessionData.chargingRate || 0,
@@ -583,9 +587,13 @@ const RatingModal = ({
                     sx={{ fontSize: 24, color: "primary.main", mb: 0.5 }}
                   />
                   <Typography variant="h6" color="primary.main">
-                    {sessionData.chargingRate > 0 
+                    {sessionData.chargingRate > 0
                       ? sessionData.chargingRate.toFixed(1)
-                      : (sessionData.energyDelivered / (sessionData.duration / 60 || 1)).toFixed(1)} kW
+                      : (
+                          sessionData.energyDelivered /
+                          (sessionData.duration / 60 || 1)
+                        ).toFixed(1)}{" "}
+                    kW
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
                     Tốc độ TB
@@ -607,8 +615,8 @@ const RatingModal = ({
                   color="success.main"
                   fontWeight="medium"
                 >
-                  +{(sessionData.targetSOC - sessionData.initialSOC)}% 
-                  (+{sessionData.energyDelivered.toFixed(1)} kWh)
+                  +{sessionData.targetSOC - sessionData.initialSOC}% (+
+                  {sessionData.energyDelivered.toFixed(1)} kWh)
                 </Typography>
               </Box>
               <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
