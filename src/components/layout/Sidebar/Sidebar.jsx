@@ -37,11 +37,8 @@ const Sidebar = ({ open, onClose }) => {
     switch (user?.role) {
       case "admin":
         return [
-          {
-            text: getText("nav.dashboard"),
-            icon: <Dashboard />,
-            path: "/admin/dashboard",
-          },
+          // Admin dashboard intentionally hidden from the main nav to
+          // reduce clutter for admin workflows. Keep other admin routes.
           {
             text: getText("nav.advancedAnalytics"),
             icon: <Analytics />,
