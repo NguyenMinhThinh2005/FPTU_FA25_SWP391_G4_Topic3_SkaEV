@@ -13,7 +13,6 @@ import {
   Chip,
   Divider,
   Stack,
-  CircularProgress,
 } from "@mui/material";
 import {
   ElectricCar,
@@ -29,15 +28,10 @@ import {
   AccessTime,
   MonetizationOn,
 } from "@mui/icons-material";
-import staffService from "../../services/staffService";
-import { formatCurrency } from "../../utils/helpers";
 
 const StaffDashboard = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [stations, setStations] = useState([]);
-  const [selectedStation, setSelectedStation] = useState(null);
   const [stationInfo, setStationInfo] = useState(null);
   const [connectors, setConnectors] = useState([]);
   const [dailyStats, setDailyStats] = useState({
@@ -46,7 +40,7 @@ const StaffDashboard = () => {
     energyConsumed: 0,
   });
   const [alerts, setAlerts] = useState([]);
-  const [activeSessions, setActiveSessions] = useState([]);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     loadDashboardData();
@@ -56,93 +50,68 @@ const StaffDashboard = () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await staffService.getDashboardData();
-      
-      console.log('📊 Staff Dashboard Data:', data);
+      const response = await staffAPI.getDashboardOverview();
 
-      // Set stations
-      const stationsList = data.stations || [];
-      setStations(stationsList);
-      
-      // Auto-select first station if available
-      if (stationsList.length > 0 && !selectedStation) {
-        const firstStation = stationsList[0];
-        setSelectedStation(firstStation);
-        await loadStationDetails(firstStation.stationId);
+      if (!response || typeof response !== "object") {
+        throw new Error("Không nhận được dữ liệu dashboard");
       }
 
-      // Set daily stats
-      setDailyStats(data.dailyStats || {
-        revenue: 0,
-        completedSessions: 0,
-        energyConsumed: 0,
-      });
+      const {
+        hasAssignment,
+        station,
+        staff,
+        connectors: connectorPayload = [],
+        dailyStats: dailyStatsPayload,
+        alerts: alertPayload = [],
+      } = response;
 
-      // Set alerts from issues
-      setAlerts(data.alerts || []);
+      if (hasAssignment && station) {
+        setStationInfo({
+          id: station.stationId,
+          name: station.stationName,
+          address: `${station.address}${station.city ? `, ${station.city}` : ""}`,
+          staffName: staff?.fullName || "",
+        });
+      } else {
+        setStationInfo(null);
+      }
 
-      // Set active sessions
-      setActiveSessions(data.activeSessions || []);
+      const normalizedConnectors = Array.isArray(connectorPayload)
+        ? connectorPayload
+            .map((connector) => mapConnectorForDisplay(connector))
+            .filter(Boolean)
+        : [];
+      setConnectors(normalizedConnectors);
 
+      if (dailyStatsPayload) {
+        setDailyStats({
+          revenue: Number(dailyStatsPayload.revenue || 0),
+          completedSessions: Number(dailyStatsPayload.completedSessions || 0),
+          energyConsumed: Number(dailyStatsPayload.energyDeliveredKwh || 0),
+        });
+      } else {
+        setDailyStats({ revenue: 0, completedSessions: 0, energyConsumed: 0 });
+      }
+
+      const normalizedAlerts = Array.isArray(alertPayload)
+        ? alertPayload.map((alert) => ({
+            id: alert.alertId ?? safeRandomId(),
+            type: normalizeAlertSeverity(alert.severity),
+            message: alert.message,
+            timestamp: alert.createdAtUtc ? new Date(alert.createdAtUtc) : new Date(),
+          }))
+        : [];
+      setAlerts(normalizedAlerts);
     } catch (error) {
       console.error("Error loading dashboard:", error);
-      setError(error.message || "Không thể tải dữ liệu dashboard");
+      setError(error.message || "Không thể tải dashboard nhân viên");
+      setStationInfo(null);
+      setConnectors([]);
+      setDailyStats({ revenue: 0, completedSessions: 0, energyConsumed: 0 });
+      setAlerts([]);
     } finally {
       setLoading(false);
     }
-  };
-
-  const loadStationDetails = async (stationId) => {
-    try {
-      const stationData = await staffService.getStationWithLiveData(stationId);
-      console.log('🔌 Station Details:', stationData);
-
-      // Set station info
-      setStationInfo({
-        name: stationData.name || 'Unknown Station',
-        address: stationData.address || '',
-        staffName: stationData.staffName || 'Staff Member'
-      });
-
-      // Map slots to connectors format
-      const mappedConnectors = (stationData.slots || []).map((slot, index) => ({
-        id: slot.slotId || `SLOT-${index + 1}`,
-        stationId: slot.stationId,
-        name: `Cổng ${index + 1}`,
-        type: slot.connectorType || "AC",
-        maxPower: slot.maxPower || 22,
-        status: slot.status || "available",
-        statusLabel: getStatusLabel(slot.status),
-        statusColor: getStatusColor(slot.status),
-        currentSession: slot.currentBooking || null,
-      }));
-
-      setConnectors(mappedConnectors);
-    } catch (error) {
-      console.error("Error loading station details:", error);
-    }
-  };
-
-  const getStatusLabel = (status) => {
-    const labels = {
-      available: "Rảnh",
-      occupied: "Đang sạc",
-      faulted: "Lỗi",
-      maintenance: "Bảo trì",
-      offline: "Ngoại tuyến",
-    };
-    return labels[status] || status;
-  };
-
-  const getStatusColor = (status) => {
-    const colors = {
-      available: "success",
-      occupied: "primary",
-      faulted: "error",
-      maintenance: "warning",
-      offline: "default",
-    };
-    return colors[status] || "default";
   };
 
   const getStatusIcon = (status) => {
@@ -158,6 +127,73 @@ const StaffDashboard = () => {
       default:
         return <Build color="warning" />;
     }
+  };
+
+  const safeRandomId = () =>
+    typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `alert-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+  const normalizeAlertSeverity = (severity) => {
+    const normalized = (severity || "info").toString().toLowerCase();
+    if (normalized === "error" || normalized === "critical") return "error";
+    if (normalized === "warning" || normalized === "warn") return "warning";
+    return "info";
+  };
+
+  const mapConnectorForDisplay = (connector) => {
+    if (!connector) return null;
+
+    const rawStatus = (connector.operationalStatus || connector.technicalStatus || "").trim();
+    const statusKey = rawStatus.toLowerCase();
+
+    const statusMap = {
+      available: { status: "Available", label: "Rảnh", color: "success" },
+      charging: { status: "Charging", label: "Đang sạc", color: "primary" },
+      in_use: { status: "Charging", label: "Đang sạc", color: "primary" },
+      maintenance: { status: "Faulted", label: "Bảo trì", color: "warning" },
+      faulted: { status: "Faulted", label: "Lỗi", color: "error" },
+      offline: { status: "Faulted", label: "Offline", color: "error" },
+      unavailable: { status: "Unavailable", label: "Không khả dụng", color: "default" },
+      reserved: { status: "Reserved", label: "Đã giữ chỗ", color: "info" },
+    };
+
+    const mapped = statusMap[statusKey] || {
+      status: "Unknown",
+      label: rawStatus || "Không xác định",
+      color: "default",
+    };
+
+    let currentSession = null;
+    if (connector.activeSession) {
+      const session = connector.activeSession;
+      currentSession = {
+        id: `SES-${session.bookingId}`,
+        startTime: session.startedAt ? new Date(session.startedAt) : null,
+        energyConsumed: Number(session.energyDelivered || 0),
+        vehicleSOC:
+          session.currentSoc !== undefined && session.currentSoc !== null
+            ? Number(session.currentSoc)
+            : null,
+        customerName: session.customerName,
+        vehicleInfo: session.vehicleInfo,
+      };
+    }
+
+    return {
+      id: connector.connectorCode || `SLOT-${connector.slotId}`,
+      slotId: connector.slotId,
+      type: connector.connectorType,
+      maxPower: Number(connector.maxPower || 0),
+      status: mapped.status,
+      statusLabel: mapped.label,
+      statusColor: mapped.color,
+      technicalStatus: connector.technicalStatus,
+      voltage: connector.voltage,
+      current: connector.current,
+      temperature: connector.temperature,
+      currentSession,
+    };
   };
 
   // Statistics
@@ -176,14 +212,31 @@ const StaffDashboard = () => {
           <Typography variant="h4" fontWeight="bold" gutterBottom>
             Quản lý Trạm sạc
           </Typography>
-          <Typography variant="body1" color="text.secondary">
-            {stationInfo?.name} - {stationInfo?.address}
-          </Typography>
+          {stationInfo ? (
+            <Typography variant="body1" color="text.secondary">
+              {stationInfo.name} - {stationInfo.address}
+            </Typography>
+          ) : (
+            <Typography variant="body2" color="text.secondary">
+              Chưa có trạm được giao phụ trách
+            </Typography>
+          )}
         </Box>
-        <Button variant="outlined" startIcon={<Refresh />} onClick={loadDashboardData}>
+        <Button
+          variant="outlined"
+          startIcon={<Refresh />}
+          onClick={loadDashboardData}
+          disabled={loading}
+        >
           Làm mới
         </Button>
       </Box>
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {error}
+        </Alert>
+      )}
 
       {/* Staff Info Alert */}
       {stationInfo && (
@@ -203,7 +256,7 @@ const StaffDashboard = () => {
                 <MonetizationOn color="success" sx={{ fontSize: 40 }} />
                 <Box>
                   <Typography variant="h4" fontWeight="bold" color="success.main">
-                    {dailyStats.revenue.toLocaleString()}
+                    {Number(dailyStats.revenue || 0).toLocaleString()}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     Doanh thu hôm nay (VNĐ)
@@ -241,7 +294,7 @@ const StaffDashboard = () => {
                 <Bolt color="warning" sx={{ fontSize: 40 }} />
                 <Box>
                   <Typography variant="h4" fontWeight="bold" color="warning.main">
-                    {dailyStats.energyConsumed.toFixed(1)}
+                    {Number(dailyStats.energyConsumed || 0).toFixed(1)}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     Năng lượng tiêu thụ (kWh)

@@ -117,6 +117,7 @@ builder.Services.AddScoped<IStationService, StationService>();
 builder.Services.AddScoped<IBookingService, BookingService>();
 builder.Services.AddScoped<IPaymentMethodService, PaymentMethodService>();
 builder.Services.AddScoped<IReportService, ReportService>();
+builder.Services.AddScoped<IStaffDashboardService, StaffDashboardService>();
 
 // New Services
 builder.Services.AddScoped<IInvoiceService, InvoiceService>();
@@ -129,10 +130,19 @@ builder.Services.AddScoped<ISlotService, SlotService>();
 builder.Services.AddScoped<IUserProfileService, UserProfileService>();
 builder.Services.AddScoped<IAdminUserService, AdminUserService>();
 builder.Services.AddScoped<IIssueService, IssueService>(); // Optional - requires 08_ADD_ISSUES_TABLE.sql
+builder.Services.AddScoped<IncidentService>(); // Incident management service
+builder.Services.AddScoped<StationAnalyticsService>(); // Station analytics service
+
+// Admin Management Services
+builder.Services.AddScoped<IAdminStationManagementService, AdminStationManagementService>();
 // Temporarily commented out - services not implemented yet
 // builder.Services.AddScoped<IMonitoringService, MonitoringService>(); // Real-time monitoring
 // builder.Services.AddScoped<IDemandForecastingService, DemandForecastingService>(); // AI demand forecasting
 // builder.Services.AddScoped<IAdvancedAnalyticsService, AdvancedAnalyticsService>(); // Advanced ML analytics
+
+// Background Simulation Services (for student project demo)
+builder.Services.AddHostedService<SkaEV.API.Services.ChargingSimulationService>();
+builder.Services.AddHostedService<SkaEV.API.Services.SystemEventsSimulationService>();
 
 // Configure Swagger
 builder.Services.AddEndpointsApiExplorer();

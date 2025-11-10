@@ -181,9 +181,13 @@ const AdminDashboard = () => {
     setActionDialog({ open: false, type: "", station: null });
   };
 
-  const getDistanceToStation = () => {
-    // Tính toán khoảng cách giả lập cho chế độ xem admin
-    return (Math.random() * 10 + 1).toFixed(1);
+  const getDistanceToStation = (station) => {
+    // Use cached distance from station object if available
+    if (station?.distance !== undefined) {
+      return station.distance.toFixed(1);
+    }
+    // Fallback: return default value for admin view (center of network)
+    return "N/A";
   };
 
   // Hoạt động gần đây

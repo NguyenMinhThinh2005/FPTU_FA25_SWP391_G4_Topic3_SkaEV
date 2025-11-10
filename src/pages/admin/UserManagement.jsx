@@ -1,4 +1,5 @@
-﻿import React, { useMemo, useState, useEffect } from "react";
+﻿import React, { useMemo, useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Box,
   Typography,
@@ -23,6 +24,7 @@ import {
   DialogContent,
   DialogActions,
   FormControl,
+  FormHelperText,
   InputLabel,
   Select,
   MenuItem,
@@ -45,7 +47,8 @@ const roleOptions = [
 ];
 
 const UserManagement = () => {
-  const { users, addUser, updateUser, deleteUser, changeUserRole, fetchUsers, loading } = useUserStore();
+  const navigate = useNavigate();
+  const { users, addUser, updateUser, deleteUser, fetchUsers, loading } = useUserStore();
   const { stations, fetchStations } = useStationStore();
   const [query, setQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
@@ -57,7 +60,7 @@ const UserManagement = () => {
   const [editUser, setEditUser] = useState(null);
   const [userToDelete, setUserToDelete] = useState(null);
   const [userToChangeRole, setUserToChangeRole] = useState(null);
-  const [selectedStations, setSelectedStations] = useState([]);
+  const [selectedStationId, setSelectedStationId] = useState(null);
   const [newRole, setNewRole] = useState("");
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
   const [form, setForm] = useState({
@@ -66,15 +69,62 @@ const UserManagement = () => {
     lastName: "",
     phone: "",
     role: "customer",
-    password: "", // Thêm trường password
+    managedStationId: null,
   });
+
+  const selectedStation = useMemo(() => {
+    if (!selectedStationId) return null;
+    return stations.find((s) => (s.stationId ?? s.id) === selectedStationId) || null;
+  }, [stations, selectedStationId]);
+
+  const currentSelectionId = useMemo(() => {
+    if (selectedStationId != null) return selectedStationId;
+    if (form.managedStationId != null) return form.managedStationId;
+    return null;
+  }, [selectedStationId, form.managedStationId]);
+
+  const getStationManager = useCallback((station) => {
+    if (!station) return null;
+    const userId = station.manager?.userId ?? station.managerUserId ?? null;
+    const name = station.manager?.name ?? station.managerName ?? null;
+    const email = station.manager?.email ?? station.managerEmail ?? null;
+    const phone = station.manager?.phone ?? station.managerPhoneNumber ?? null;
+    return userId || name || email || phone
+      ? { userId: userId ?? null, name: name ?? null, email: email ?? null, phone: phone ?? null }
+      : null;
+  }, []);
+
+  const isStationDisabled = useCallback(
+    (station) => {
+      const manager = getStationManager(station);
+      if (!manager) return false;
+
+      const stationKey = station.stationId ?? station.id;
+
+      if (currentSelectionId != null && stationKey === currentSelectionId) {
+        return false;
+      }
+
+      if (manager.userId && editUser && manager.userId === editUser.userId) {
+        return false;
+      }
+
+      return true;
+    },
+    [currentSelectionId, editUser, getStationManager]
+  );
+
+  const availableStationsCount = useMemo(
+    () => stations.filter((station) => !isStationDisabled(station)).length,
+    [stations, isStationDisabled]
+  );
 
   // Fetch users and stations on component mount
   useEffect(() => {
     console.log("UserManagement mounted, fetching users...");
     fetchUsers();
     fetchStations();
-  }, []);
+  }, [fetchUsers, fetchStations]);
 
   const filteredUsers = useMemo(() => {
     let filtered = users;
@@ -100,7 +150,8 @@ const UserManagement = () => {
 
   const openCreate = () => {
     setEditUser(null);
-    setForm({ email: "", firstName: "", lastName: "", phone: "", role: "customer", password: "" });
+    setForm({ email: "", firstName: "", lastName: "", phone: "", role: "customer", managedStationId: null });
+    setSelectedStationId(null);
     setDialogOpen(true);
   };
 
@@ -113,7 +164,9 @@ const UserManagement = () => {
       lastName: lastNameParts.join(" ") || "",
       phone: user.phoneNumber || "",
       role: user.role,
+      managedStationId: user.managedStationId != null ? Number(user.managedStationId) : null,
     });
+    setSelectedStationId(user.managedStationId != null ? Number(user.managedStationId) : null);
     setDialogOpen(true);
   };
 
@@ -128,18 +181,35 @@ const UserManagement = () => {
     setRoleDialogOpen(true);
   };
 
+  const handleRoleChange = (nextRole) => {
+    setForm((prev) => ({
+      ...prev,
+      role: nextRole,
+      managedStationId: nextRole === "staff" ? prev.managedStationId : null,
+    }));
+
+    if (nextRole !== "staff") {
+      setSelectedStationId(null);
+    } else if (selectedStationId == null && form.managedStationId != null) {
+      setSelectedStationId(form.managedStationId);
+    }
+  };
+
+  const handleManagedStationChange = (value) => {
+    const parsedValue = value === "" || value === null ? null : Number(value);
+    setForm((prev) => ({ ...prev, managedStationId: parsedValue }));
+    setSelectedStationId(parsedValue);
+  };
+
   const handleSave = async () => {
     if (!form.email || !form.firstName || !form.role) {
       setSnackbar({ open: true, message: "Vui lòng điền đầy đủ thông tin bắt buộc", severity: "error" });
       return;
     }
 
-    // Validate password for new users
-    if (!editUser) {
-      if (!form.password || form.password.length < 6) {
-        setSnackbar({ open: true, message: "Mật khẩu phải có ít nhất 6 ký tự", severity: "error" });
-        return;
-      }
+    if (form.role === "staff" && !form.managedStationId) {
+      setSnackbar({ open: true, message: "Vui lòng chọn trạm mà nhân viên sẽ quản lý", severity: "error" });
+      return;
     }
 
     try {
@@ -150,6 +220,7 @@ const UserManagement = () => {
           lastName: form.lastName,
           phone: form.phone,
           role: form.role,
+          managedStationId: form.role === "staff" ? form.managedStationId : undefined,
         });
         
         if (result.success) {
@@ -165,11 +236,12 @@ const UserManagement = () => {
           lastName: form.lastName,
           phone: form.phone,
           role: form.role,
-          password: form.password, // Sử dụng password từ form
+          password: "Temp123!", // Default password
+          managedStationId: form.role === "staff" ? form.managedStationId : undefined,
         });
         
         if (result.success) {
-          setSnackbar({ open: true, message: `Tạo người dùng thành công! Mật khẩu: ${form.password}`, severity: "success" });
+          setSnackbar({ open: true, message: "Tạo người dùng thành công! Mật khẩu mặc định: Temp123!", severity: "success" });
           setDialogOpen(false);
         } else {
           setSnackbar({ open: true, message: result.error || "Lỗi tạo người dùng", severity: "error" });
@@ -202,15 +274,12 @@ const UserManagement = () => {
     if (!userToChangeRole || !newRole) return;
     
     try {
-      const result = await changeUserRole(userToChangeRole.userId, newRole);
+      const result = await updateUser(userToChangeRole.userId, { role: newRole });
       
       if (result.success) {
         setSnackbar({ open: true, message: `Đã thay đổi vai trò thành ${newRole}`, severity: "success" });
         setRoleDialogOpen(false);
         setUserToChangeRole(null);
-        setNewRole("");
-        // Refresh users list to ensure UI is updated
-        await fetchUsers();
       } else {
         setSnackbar({ open: true, message: result.error || "Lỗi thay đổi vai trò", severity: "error" });
       }
@@ -219,33 +288,39 @@ const UserManagement = () => {
     }
   };
 
-  const openStationAssignDialog = (user) => {
-    // Deprecated - Tích hợp vào dialog Staff edit rồi
-    setEditUser(user);
-    setForm({
-      email: user.email,
-      firstName: user.fullName?.split(" ")[0] || "",
-      lastName: user.fullName?.split(" ").slice(1).join(" ") || "",
-      phone: user.phoneNumber || "",
-      role: user.role,
-      employeeId: user.employeeId || "",
-      department: user.department || "",
-      position: user.position || "",
-      joinDate: user.joinDate || "",
-      location: user.location || "Hà Nội",
-    });
-    setSelectedStations(user.assignedStationIds || []);
-    setStaffEditTab(1); // Mở tab Phân quyền trạm sạc
-    setStaffEditDialogOpen(true);
-  };
+  // Deprecated functions - kept for backwards compatibility but not used
+  // const openStationAssignDialog = (user) => {
+  //   // Tích hợp vào dialog Staff edit rồi
+  //   setEditUser(user);
+  //   setForm({
+  //     email: user.email,
+  //     firstName: user.fullName?.split(" ")[0] || "",
+  //     lastName: user.fullName?.split(" ").slice(1).join(" ") || "",
+  //     phone: user.phoneNumber || "",
+  //     role: user.role,
+  //     employeeId: user.employeeId || "",
+  //     department: user.department || "",
+  //     position: user.position || "",
+  //     joinDate: user.joinDate || "",
+  //     location: user.location || "Hà Nội",
+  //   });
+  //   setSelectedStations(user.assignedStationIds || []);
+  //   setStaffEditTab(1); // Mở tab Phân quyền trạm sạc
+  //   setStaffEditDialogOpen(true);
+  // };
 
-  const handleAssignStations = async () => {
-    // Deprecated - Dùng handleSaveStaff thay thế
-    return handleSaveStaff();
-  };
+  // const handleAssignStations = async () => {
+  //   // Dùng handleSaveStaff thay thế
+  //   return handleSaveStaff();
+  // };
 
   const handleSaveStaff = async () => {
     if (!editUser) return;
+
+    if (!selectedStationId) {
+      setSnackbar({ open: true, message: "Vui lòng chọn trạm quản lý cho nhân viên", severity: "error" });
+      return;
+    }
     
     try {
       // Save staff info and station assignments
@@ -260,18 +335,20 @@ const UserManagement = () => {
         position: form.position,
         joinDate: form.joinDate,
         location: form.location,
-        assignedStationIds: selectedStations,
+        managedStationId: selectedStationId,
       });
       
       if (result.success) {
         setSnackbar({ 
           open: true, 
-          message: `Đã cập nhật thông tin và phân quyền ${selectedStations.length} trạm sạc cho ${form.firstName} ${form.lastName}`, 
+          message: selectedStation
+            ? `Đã phân quyền trạm ${selectedStation.name || selectedStation.stationName} cho ${form.firstName} ${form.lastName}`
+            : `Đã cập nhật thông tin nhân viên`, 
           severity: "success" 
         });
         setStaffEditDialogOpen(false);
         setEditUser(null);
-        setSelectedStations([]);
+        setSelectedStationId(null);
         fetchUsers();
       } else {
         setSnackbar({ open: true, message: result.error || "Lỗi cập nhật thông tin nhân viên", severity: "error" });
@@ -282,11 +359,18 @@ const UserManagement = () => {
   };
 
   const toggleStationSelection = (stationId) => {
-    setSelectedStations(prev => 
-      prev.includes(stationId) 
-        ? prev.filter(id => id !== stationId)
-        : [...prev, stationId]
-    );
+    const normalizedId = Number(stationId);
+    const station = stations.find((s) => (s.stationId ?? s.id) === normalizedId);
+
+    if (station && isStationDisabled(station)) {
+      return;
+    }
+
+    setSelectedStationId((prev) => {
+      const nextValue = prev === normalizedId ? null : normalizedId;
+      setForm((current) => ({ ...current, managedStationId: nextValue }));
+      return nextValue;
+    });
   };
 
   const getRoleChip = (role) => {
@@ -429,6 +513,15 @@ const UserManagement = () => {
                           {getRoleChip(u.role)}
                         </TableCell>
                         <TableCell align="center">
+                          <Tooltip title="Xem chi tiết">
+                            <IconButton 
+                              size="small" 
+                              color="info" 
+                              onClick={() => navigate(`/admin/users/${u.userId}`)}
+                            >
+                              <Visibility />
+                            </IconButton>
+                          </Tooltip>
                           <Tooltip title="Chỉnh sửa">
                             <IconButton 
                               size="small" 
@@ -451,7 +544,7 @@ const UserManagement = () => {
                                     location: u.location || "Hà Nội",
                                   });
                                   // Load assigned stations
-                                  setSelectedStations(u.assignedStationIds || []);
+                                  setSelectedStationId(u.managedStationId || null);
                                   setStaffEditTab(0);
                                   setStaffEditDialogOpen(true);
                                 } else {
@@ -524,32 +617,86 @@ const UserManagement = () => {
                 onChange={(e) => setForm({ ...form, phone: e.target.value })}
               />
             </Grid>
-            {!editUser && (
-              <>
-                <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    label="Mật khẩu *"
-                    type="password"
-                    value={form.password}
-                    onChange={(e) => setForm({ ...form, password: e.target.value })}
-                    required
-                    helperText="Tối thiểu 6 ký tự. Ví dụ: Temp123!"
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <Visibility />
-                        </InputAdornment>
-                      ),
+            <Grid item xs={12}>
+              <FormControl fullWidth required>
+                <InputLabel>Vai trò</InputLabel>
+                <Select
+                  value={form.role}
+                  label="Vai trò"
+                  onChange={(e) => handleRoleChange(e.target.value)}
+                >
+                  <MenuItem value="customer">Khách hàng</MenuItem>
+                  <MenuItem value="staff">Nhân viên</MenuItem>
+                  <MenuItem value="admin">Admin</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            {form.role === "staff" && (
+              <Grid item xs={12}>
+                <FormControl
+                  fullWidth
+                  required
+                  error={stations.length > 0 && !form.managedStationId}
+                  disabled={stations.length === 0 || availableStationsCount === 0}
+                >
+                  <InputLabel>Trạm quản lý</InputLabel>
+                  <Select
+                    value={form.managedStationId ?? ""}
+                    label="Trạm quản lý"
+                    onChange={(e) => handleManagedStationChange(e.target.value)}
+                    displayEmpty
+                    renderValue={(value) => {
+                      if (!value) return "Chọn trạm";
+                      const station = stations.find((s) => (s.stationId ?? s.id) === Number(value));
+                      return station?.name || `Trạm #${value}`;
                     }}
-                  />
-                </Grid>
-                <Grid item xs={12}>
-                  <Alert severity="info" icon={<CheckCircle />}>
-                    Bạn có thể đặt mật khẩu tùy chỉnh hoặc sử dụng mật khẩu mẫu: <strong>Temp123!</strong>
+                  >
+                    <MenuItem value="">
+                      <em>Chưa chọn</em>
+                    </MenuItem>
+                    {stations.map((station) => {
+                      const manager = getStationManager(station);
+                      const disabled = isStationDisabled(station);
+                      const labelId = station.stationId ?? station.id;
+                      return (
+                        <MenuItem key={labelId} value={labelId} disabled={disabled}>
+                          <Box sx={{ display: "flex", flexDirection: "column" }}>
+                            <Typography variant="subtitle2" fontWeight="medium">
+                              {station.name}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {manager?.name
+                                ? `Quản lý hiện tại: ${manager.name}`
+                                : "Chưa có nhân viên quản lý"}
+                            </Typography>
+                          </Box>
+                        </MenuItem>
+                      );
+                    })}
+                  </Select>
+                  <FormHelperText>
+                    {stations.length === 0
+                      ? "Đang tải danh sách trạm..."
+                      : availableStationsCount === 0
+                      ? "Tất cả trạm đã được phân công. Vui lòng thu hồi từ nhân viên khác trước."
+                      : form.managedStationId
+                      ? "Nhân viên sẽ quản lý trạm đã chọn"
+                      : "Bắt buộc: chọn 1 trạm để phân công quản lý"}
+                  </FormHelperText>
+                </FormControl>
+                {stations.length > 0 && availableStationsCount === 0 && (
+                  <Alert severity="warning" sx={{ mt: 1 }}>
+                    Không còn trạm trống để phân công. Hãy cập nhật phân quyền của nhân viên hiện tại trước khi tạo mới.
                   </Alert>
-                </Grid>
-              </>
+                )}
+              </Grid>
+            )}
+            {!editUser && (
+              <Grid item xs={12}>
+                <Alert severity="info" icon={<CheckCircle />}>
+                  Mật khẩu mặc định: <strong>Temp123!</strong>
+                </Alert>
+              </Grid>
             )}
           </Grid>
         </DialogContent>
@@ -818,11 +965,11 @@ const UserManagement = () => {
                   Phân quyền trạm sạc cho nhân viên
                 </Typography>
                 <Typography variant="body2" color="text.secondary" gutterBottom>
-                  Chọn các trạm sạc mà nhân viên <strong>{form.firstName} {form.lastName}</strong> có quyền quản lý
+                  Chọn trạm sạc mà nhân viên <strong>{form.firstName} {form.lastName}</strong> sẽ quản lý
                 </Typography>
                 <Chip 
-                  label={`Đã chọn: ${selectedStations.length} trạm`} 
-                  color="primary" 
+                  label={selectedStation ? `Trạm: ${selectedStation.name || selectedStation.stationName}` : "Chưa chọn trạm"} 
+                  color={selectedStation ? "success" : "default"} 
                   size="small" 
                   sx={{ mt: 1 }}
                   icon={<CheckCircle />}
@@ -833,50 +980,93 @@ const UserManagement = () => {
                 <Alert severity="info">Chưa có trạm sạc nào trong hệ thống</Alert>
               ) : (
                 <Grid container spacing={2}>
-                  {stations.map((station) => (
-                    <Grid item xs={12} sm={6} key={station.stationId}>
-                      <Card 
-                        variant="outlined"
-                        sx={{ 
-                          cursor: 'pointer',
-                          border: selectedStations.includes(station.stationId) ? 2 : 1,
-                          borderColor: selectedStations.includes(station.stationId) ? 'success.main' : 'divider',
-                          bgcolor: selectedStations.includes(station.stationId) ? 'success.50' : 'transparent',
-                          transition: 'all 0.2s',
-                          '&:hover': {
-                            borderColor: 'success.main',
-                            transform: 'translateY(-2px)',
-                            boxShadow: 2
+                  {stations.map((station) => {
+                    const stationKey = station.stationId ?? station.id;
+                    const manager = getStationManager(station);
+                    const disabled = isStationDisabled(station);
+                    const isSelected = selectedStationId === stationKey;
+                    const totalPorts = station.charging?.totalPorts ?? station.totalChargers ?? 0;
+                    const availablePorts = station.charging?.availablePorts ?? station.availablePosts ?? 0;
+
+                    return (
+                      <Grid item xs={12} sm={6} key={stationKey}>
+                        <Tooltip
+                          title={
+                            disabled && manager
+                              ? `Đã phân công cho ${manager.name || manager.email || "nhân viên khác"}`
+                              : ""
                           }
-                        }}
-                        onClick={() => toggleStationSelection(station.stationId)}
-                      >
-                        <CardContent>
-                          <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-                            <Box sx={{ flex: 1 }}>
-                              <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
-                                {station.name}
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                <LocationOn fontSize="inherit" />
-                                {station.address}
-                              </Typography>
-                              <Box sx={{ mt: 1 }}>
-                                <Chip 
-                                  label={`${station.totalChargers || 0} bộ sạc`} 
-                                  size="small" 
-                                  variant="outlined"
-                                />
-                              </Box>
-                            </Box>
-                            {selectedStations.includes(station.stationId) && (
-                              <CheckCircle color="success" />
-                            )}
+                          disableHoverListener={!disabled || isSelected}
+                        >
+                          <Box>
+                            <Card 
+                              variant="outlined"
+                              sx={{ 
+                                cursor: disabled ? 'not-allowed' : 'pointer',
+                                border: isSelected ? 2 : 1,
+                                borderColor: isSelected ? 'success.main' : 'divider',
+                                bgcolor: isSelected ? 'success.50' : 'transparent',
+                                opacity: disabled && !isSelected ? 0.6 : 1,
+                                transition: 'all 0.2s',
+                                '&:hover': disabled ? {} : {
+                                  borderColor: 'success.main',
+                                  transform: 'translateY(-2px)',
+                                  boxShadow: 2
+                                }
+                              }}
+                              onClick={() => {
+                                if (!disabled) {
+                                  toggleStationSelection(stationKey);
+                                }
+                              }}
+                            >
+                              <CardContent>
+                                <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                                  <Box sx={{ flex: 1, pr: 1 }}>
+                                    <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
+                                      {station.name}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                      <LocationOn fontSize="inherit" />
+                                      {station.location?.address || station.address}
+                                    </Typography>
+                                    <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                                      <Chip 
+                                        label={`${totalPorts} cổng`} 
+                                        size="small" 
+                                        variant="outlined"
+                                      />
+                                      <Chip 
+                                        label={`Trống: ${availablePorts}`} 
+                                        size="small" 
+                                        variant="outlined"
+                                        color="info"
+                                      />
+                                    </Box>
+                                    <Chip
+                                      icon={<Person fontSize="small" />}
+                                      label={
+                                        manager
+                                          ? `Quản lý: ${manager.name || manager.email || "Nhân viên khác"}`
+                                          : "Chưa phân công nhân viên"
+                                      }
+                                      size="small"
+                                      color={manager ? (disabled && !isSelected ? "default" : "success") : "primary"}
+                                      variant={manager ? "filled" : "outlined"}
+                                      sx={{ mt: 1, maxWidth: '100%' }}
+                                    />
+                                  </Box>
+                                  {isSelected && (
+                                    <CheckCircle color="success" />
+                                  )}
+                                </Box>
+                              </CardContent>
+                            </Card>
                           </Box>
-                        </CardContent>
-                      </Card>
-                    </Grid>
-                  ))}
+                        </Tooltip>
+                      </Grid>
+                    );
+                  })}
                 </Grid>
               )}
             </Box>

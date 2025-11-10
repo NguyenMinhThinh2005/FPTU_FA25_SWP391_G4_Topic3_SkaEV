@@ -104,6 +104,19 @@ const FindStations = () => {
     }
   }, [getFilteredStations, searchQuery, filters]);
 
+  // Cache station distances to prevent recalculation
+  const stationsWithDistance = React.useMemo(() => {
+    return filteredStations.map(station => ({
+      ...station,
+      cachedDistance: calculateDistance(
+        userLocation.lat,
+        userLocation.lng,
+        station.location.coordinates.lat,
+        station.location.coordinates.lng
+      )
+    }));
+  }, [filteredStations, userLocation]);
+
   useEffect(() => {
     // Initialize data first
     initializeData();
@@ -172,12 +185,16 @@ const FindStations = () => {
 
 
   const getDistanceToStation = (station) => {
+    // Use cached distance if available, otherwise calculate
+    if (station.cachedDistance !== undefined) {
+      return station.cachedDistance.toFixed(1);
+    }
     return calculateDistance(
       userLocation.lat,
       userLocation.lng,
       station.location.coordinates.lat,
       station.location.coordinates.lng
-    );
+    ).toFixed(1);
   };
 
   const getStatusChip = (station) => {
@@ -290,7 +307,7 @@ const FindStations = () => {
           <Card>
             <CardContent>
               <Typography variant="h6" gutterBottom>
-                {loading ? "Đang tải..." : `${filteredStations.length} ${getText("stations.stationsFound")}`}
+                {loading ? "Đang tải..." : `${stationsWithDistance.length} ${getText("stations.stationsFound")}`}
               </Typography>
 
               {loading ? (
@@ -299,7 +316,7 @@ const FindStations = () => {
                 </Box>
               ) : (
                 <List>
-                  {filteredStations.map((station, index) => (
+                  {stationsWithDistance.map((station, index) => (
                     <React.Fragment key={station.id}>
                       <ListItem
                         onClick={() => setSelectedStation(station)}
@@ -433,7 +450,7 @@ const FindStations = () => {
                         </Button>
                       </ListItem>
 
-                      {index < filteredStations.length - 1 && <Divider />}
+                      {index < stationsWithDistance.length - 1 && <Divider />}
                     </React.Fragment>
                   ))}
                 </List>

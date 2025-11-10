@@ -39,11 +39,11 @@ public class AdminUsersController : ControllerBase
         {
             var users = await _adminUserService.GetAllUsersAsync(role, status, search, page, pageSize);
             var totalCount = await _adminUserService.GetUserCountAsync(role, status, search);
-            
-            return Ok(new 
-            { 
-                data = users, 
-                pagination = new 
+
+            return Ok(new
+            {
+                data = users,
+                pagination = new
                 {
                     page,
                     pageSize,
@@ -94,7 +94,7 @@ public class AdminUsersController : ControllerBase
         try
         {
             var user = await _adminUserService.CreateUserAsync(createDto);
-            
+
             return CreatedAtAction(
                 nameof(GetUser),
                 new { userId = user.UserId },
@@ -325,9 +325,279 @@ public class AdminUsersController : ControllerBase
         }
     }
 
+    // ==================== PHASE 2: EXTENDED USER MANAGEMENT ====================
+
+    /// <summary>
+    /// Get user charging history
+    /// </summary>
+    [HttpGet("{userId}/charging-history")]
+    [ProducesResponseType(typeof(IEnumerable<UserChargingHistoryDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetUserChargingHistory(int userId, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+    {
+        try
+        {
+            var history = await _adminUserService.GetUserChargingHistoryAsync(userId, page, pageSize);
+            return Ok(new { success = true, data = history });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting user charging history {UserId}", userId);
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
+    }
+
+    /// <summary>
+    /// Get user payment history
+    /// </summary>
+    [HttpGet("{userId}/payment-history")]
+    [ProducesResponseType(typeof(IEnumerable<UserPaymentHistoryDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetUserPaymentHistory(int userId, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+    {
+        try
+        {
+            var history = await _adminUserService.GetUserPaymentHistoryAsync(userId, page, pageSize);
+            return Ok(new { success = true, data = history });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting user payment history {UserId}", userId);
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
+    }
+
+    /// <summary>
+    /// Get user statistics
+    /// </summary>
+    [HttpGet("{userId}/statistics")]
+    [ProducesResponseType(typeof(UserStatisticsDto), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetUserStatistics(int userId)
+    {
+        try
+        {
+            var stats = await _adminUserService.GetUserStatisticsAsync(userId);
+            return Ok(new { success = true, data = stats });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting user statistics {UserId}", userId);
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
+    }
+
+    // ==================== NOTIFICATIONS ====================
+
+    /// <summary>
+    /// Get all notifications
+    /// </summary>
+    [HttpGet("notifications")]
+    [ProducesResponseType(typeof(IEnumerable<NotificationDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetNotifications(
+        [FromQuery] int? userId = null,
+        [FromQuery] string? type = null,
+        [FromQuery] bool? isRead = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50)
+    {
+        try
+        {
+            var notifications = await _adminUserService.GetAllNotificationsAsync(userId, type, isRead, page, pageSize);
+            return Ok(new { success = true, data = notifications });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting notifications");
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
+    }
+
+    /// <summary>
+    /// Send notification to user(s)
+    /// </summary>
+    [HttpPost("notifications")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> SendNotification([FromBody] CreateNotificationDto dto)
+    {
+        try
+        {
+            var count = await _adminUserService.SendNotificationAsync(dto);
+            return Ok(new { success = true, message = $"Notification sent to {count} user(s)", data = count });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error sending notification");
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
+    }
+
+    /// <summary>
+    /// Send promotion to targeted users
+    /// </summary>
+    [HttpPost("notifications/promotions")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> SendPromotion([FromBody] SendPromotionDto dto)
+    {
+        try
+        {
+            var count = await _adminUserService.SendPromotionAsync(dto);
+            return Ok(new { success = true, message = $"Promotion sent to {count} user(s)", data = count });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error sending promotion");
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
+    }
+
+    /// <summary>
+    /// Mark notification as read
+    /// </summary>
+    [HttpPatch("notifications/{notificationId}/read")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> MarkNotificationAsRead(int notificationId)
+    {
+        try
+        {
+            var success = await _adminUserService.MarkNotificationAsReadAsync(notificationId);
+            return Ok(new { success, message = success ? "Notification marked as read" : "Notification not found" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error marking notification as read");
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
+    }
+
+    // ==================== SUPPORT REQUESTS ====================
+
+    /// <summary>
+    /// Get support requests with filtering
+    /// </summary>
+    [HttpGet("support-requests")]
+    [ProducesResponseType(typeof(IEnumerable<SupportRequestDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetSupportRequests([FromQuery] SupportRequestFilterDto filter)
+    {
+        try
+        {
+            var (requests, totalCount) = await _adminUserService.GetSupportRequestsAsync(filter);
+
+            return Ok(new
+            {
+                success = true,
+                data = requests,
+                pagination = new
+                {
+                    page = filter.PageNumber,
+                    pageSize = filter.PageSize,
+                    totalCount,
+                    totalPages = (int)Math.Ceiling(totalCount / (double)filter.PageSize)
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting support requests");
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
+    }
+
+    /// <summary>
+    /// Get support request detail
+    /// </summary>
+    [HttpGet("support-requests/{requestId}")]
+    [ProducesResponseType(typeof(SupportRequestDetailDto), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetSupportRequestDetail(int requestId)
+    {
+        try
+        {
+            var request = await _adminUserService.GetSupportRequestDetailAsync(requestId);
+
+            if (request == null)
+                return NotFound(new { success = false, message = "Support request not found" });
+
+            return Ok(new { success = true, data = request });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting support request detail");
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
+    }
+
+    /// <summary>
+    /// Update support request
+    /// </summary>
+    [HttpPatch("support-requests/{requestId}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> UpdateSupportRequest(int requestId, [FromBody] UpdateSupportRequestDto dto)
+    {
+        try
+        {
+            var success = await _adminUserService.UpdateSupportRequestAsync(requestId, dto);
+
+            if (!success)
+                return NotFound(new { success = false, message = "Support request not found" });
+
+            return Ok(new { success = true, message = "Support request updated successfully" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating support request");
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
+    }
+
+    /// <summary>
+    /// Reply to support request
+    /// </summary>
+    [HttpPost("support-requests/{requestId}/reply")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> ReplySupportRequest(int requestId, [FromBody] ReplySupportRequestDto dto)
+    {
+        try
+        {
+            dto.RequestId = requestId;
+            dto.StaffId = GetUserId();
+
+            var success = await _adminUserService.ReplySupportRequestAsync(dto);
+
+            if (!success)
+                return NotFound(new { success = false, message = "Support request not found" });
+
+            return Ok(new { success = true, message = "Reply sent successfully" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error replying to support request");
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
+    }
+
+    /// <summary>
+    /// Close support request
+    /// </summary>
+    [HttpPost("support-requests/{requestId}/close")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> CloseSupportRequest(int requestId, [FromBody] string resolutionNotes)
+    {
+        try
+        {
+            var success = await _adminUserService.CloseSupportRequestAsync(requestId, resolutionNotes);
+
+            if (!success)
+                return NotFound(new { success = false, message = "Support request not found" });
+
+            return Ok(new { success = true, message = "Support request closed successfully" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error closing support request");
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
+    }
+
     private int GetUserId()
     {
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        return int.Parse(userIdClaim ?? "0");
+        return int.Parse(userIdClaim!);
     }
 }

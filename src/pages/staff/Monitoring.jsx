@@ -1,5 +1,5 @@
 /* eslint-disable */
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import staffAPI from "../../services/api/staffAPI";
 import {
@@ -30,7 +30,6 @@ import {
   IconButton,
   Snackbar,
   Stack,
-  LinearProgress,
 } from "@mui/material";
 import {
   Warning,
@@ -72,86 +71,120 @@ const Monitoring = () => {
     { value: "low", label: "Thấp", color: "success" },
     { value: "medium", label: "Trung bình", color: "warning" },
     { value: "high", label: "Cao", color: "error" },
+    { value: "urgent", label: "Khẩn cấp", color: "error" },
   ];
 
   useEffect(() => {
     loadMonitoringData();
     // Handle navigation state
     if (location.state?.action === "report" && location.state?.connectorId) {
-      setReportForm({ ...reportForm, connectorId: location.state.connectorId });
+      setReportForm((prev) => ({ ...prev, connectorId: location.state.connectorId }));
       setReportDialog(true);
     }
   }, [location.state]);
 
+  const mapSlotStatus = (status = "") => {
+    const normalized = status.toLowerCase();
+    switch (normalized) {
+      case "available":
+        return { technical: "online", operational: "Sẵn sàng" };
+      case "occupied":
+      case "charging":
+        return { technical: "online", operational: "Đang hoạt động" };
+      case "maintenance":
+        return { technical: "offline", operational: "Bảo trì" };
+      case "faulted":
+      case "error":
+        return { technical: "offline", operational: "Lỗi" };
+      default:
+        return { technical: "unknown", operational: "Không rõ" };
+    }
+  };
+
+  const mapIssueStatus = (status = "") => {
+    const normalized = status.toLowerCase();
+    switch (normalized) {
+      case "resolved":
+        return { key: "completed", label: "Đã xử lý" };
+      case "in_progress":
+      case "in-progress":
+        return { key: "in_progress", label: "Đang xử lý" };
+      case "closed":
+        return { key: "completed", label: "Đã đóng" };
+      default:
+        return { key: "pending", label: "Chờ xử lý" };
+    }
+  };
+
   const loadMonitoringData = async () => {
     try {
-      console.log("🔄 Loading monitoring data from API...");
-      
-      // Fetch stations with slots (connectors)
-      const stationsData = await staffAPI.getStationsStatus();
-      console.log("✅ Stations data:", stationsData);
-      
-      // Transform stations to connectors format
-      const connectorsData = [];
-      if (stationsData && Array.isArray(stationsData)) {
-        stationsData.forEach(station => {
-          // Get slots from charging structure
-          if (station.charging?.poles) {
-            station.charging.poles.forEach((pole, poleIndex) => {
-              if (pole.ports) {
-                pole.ports.forEach((port, portIndex) => {
-                  connectorsData.push({
-                    id: `${station.id}-P${poleIndex + 1}-${portIndex + 1}`,
-                    stationId: station.id,
-                    stationName: station.name,
-                    type: pole.connectorType || "AC",
-                    maxPower: pole.maxPower || 22,
-                    status: port.status === "available" ? "online" : "offline",
-                    operationalStatus: port.status === "available" ? "Available" : 
-                                     port.status === "charging" ? "Charging" : "Faulted",
-                    voltage: port.status === "available" ? 230 : 0,
-                    current: port.status === "charging" ? 32 : 0,
-                    temperature: port.status === "available" ? 28 : 0,
-                  });
-                });
-              }
-            });
-          }
-        });
-      }
-      
-      // Fetch issues/incidents
-      const issuesData = await staffAPI.getAllIssues();
-      console.log("✅ Issues data:", issuesData);
-      
-      // Transform issues to incidents format
-      const incidentsData = (issuesData || []).map(issue => ({
-        id: issue.issueId || issue.id,
-        connectorId: issue.stationId ? `${issue.stationId}-connector` : "Unknown",
-        type: issue.category || "other",
-        typeLabel: issue.title || issue.category,
-        priority: issue.priority || "medium",
-        description: issue.description,
-        status: issue.status === "resolved" ? "completed" : 
-                issue.status === "in_progress" ? "in_progress" : "pending",
-        statusLabel: issue.status === "resolved" ? "Hoàn thành" :
-                    issue.status === "in_progress" ? "Đang xử lý" : "Chờ xử lý",
-        reportedAt: new Date(issue.reportedAt || issue.createdAt),
-        adminResponse: issue.resolution,
-      }));
-      
+      const stations = await staffAPI.getStationsStatus();
+      const stationList = Array.isArray(stations) ? stations : [];
+
+      const connectorsByStation = await Promise.all(
+        stationList.map(async (station) => {
+          const slots = await staffAPI.getStationSlots(station.stationId);
+          return slots.map((slot) => {
+            const status = mapSlotStatus(slot.status);
+            return {
+              id: `ST${station.stationId}-P${slot.postNumber}-S${slot.slotNumber}`,
+              stationId: station.stationId,
+              stationName: station.stationName,
+              slotId: slot.slotId,
+              postId: slot.postId,
+              postNumber: slot.postNumber,
+              slotNumber: slot.slotNumber,
+              type: slot.connectorType || "Không rõ",
+              maxPower: slot.maxPower || 0,
+              status: status.technical,
+              operationalStatus: status.operational,
+              currentPower: slot.currentPowerUsage ?? null,
+              currentSoc: slot.currentSoc ?? null,
+              currentUser: slot.currentUserName ?? null,
+              bookingStart: slot.bookingStartTime ? new Date(slot.bookingStartTime) : null,
+            };
+          });
+        })
+      );
+
+      const connectorsData = connectorsByStation.flat();
+
+  const issues = await staffAPI.getAllIssues();
+
+  const issueList = Array.isArray(issues) ? issues : [];
+
+      const incidentsData = issueList.map((issue) => {
+        const status = mapIssueStatus(issue.status);
+        const resolvedAt = issue.resolvedAt ? new Date(issue.resolvedAt) : null;
+        const resolution = issue.resolution ?? (resolvedAt ? `Hoàn tất lúc ${resolvedAt.toLocaleString("vi-VN")}` : null);
+        const priority = (issue.priority || "medium").toLowerCase();
+
+        return {
+          id: issue.issueId,
+          connectorId: issue.postName ? `${issue.stationName} · Post ${issue.postName}` : `ST${issue.stationId}`,
+          type: issue.title || "Sự cố",
+          priority,
+          description: issue.description,
+          status: status.key,
+          statusLabel: status.label,
+          stationName: issue.stationName,
+          assignedTo: issue.assignedToUserName,
+          reportedBy: issue.reportedByUserName,
+          reportedAt: new Date(issue.createdAt),
+          adminResponse: resolution,
+        };
+      });
+
       setConnectors(connectorsData);
       setIncidents(incidentsData);
-      
+
     } catch (error) {
       console.error("❌ Error loading monitoring data:", error);
-      setSnackbar({ 
-        open: true, 
-        message: "Không thể tải dữ liệu. Sử dụng dữ liệu mẫu.", 
-        severity: "warning" 
+      setSnackbar({
+        open: true,
+        message: "Không thể tải dữ liệu theo thời gian thực. Vui lòng thử lại.",
+        severity: "error",
       });
-      
-      // Fallback to empty data
       setConnectors([]);
       setIncidents([]);
     }
@@ -164,22 +197,22 @@ const Monitoring = () => {
     }
 
     try {
-      console.log("📤 Submitting issue report:", reportForm);
-      
-      // Extract station ID from connector ID (format: "stationId-P1-1")
-      const stationId = parseInt(reportForm.connectorId.split('-')[0]) || 1;
-      
-      // Create issue via API
+      const targetConnector = connectors.find((c) => c.id === reportForm.connectorId);
+
+      if (!targetConnector) {
+        setSnackbar({ open: true, message: "Không tìm thấy điểm sạc đã chọn", severity: "error" });
+        return;
+      }
+
       const issueData = {
-        stationId: stationId,
-        title: incidentTypes.find(t => t.value === reportForm.incidentType)?.label || "Sự cố",
+        stationId: targetConnector.stationId,
+        postId: targetConnector.postId,
+        title: incidentTypes.find((t) => t.value === reportForm.incidentType)?.label || "Sự cố kỹ thuật",
         description: reportForm.description,
         priority: reportForm.priority,
-        category: reportForm.incidentType,
       };
-      
+
       const result = await staffAPI.createIssue(issueData);
-      console.log("✅ Issue created:", result);
       
       // Upload attachments if any
       if (reportForm.attachments.length > 0 && result.issueId) {
@@ -239,24 +272,27 @@ const Monitoring = () => {
 
   const getStatusIcon = (status) => {
     switch (status) {
-      case "Available":
+      case "Sẵn sàng":
         return <CheckCircle color="success" />;
-      case "Charging":
+      case "Đang hoạt động":
         return <Build color="primary" />;
-      case "Faulted":
+      case "Bảo trì":
+        return <PowerOff color="warning" />;
+      case "Lỗi":
         return <Error color="error" />;
-      case "Unavailable":
-        return <PowerOff color="disabled" />;
       default:
         return <Warning color="warning" />;
     }
   };
 
-  const onlineConnectors = connectors.filter((c) => c.status === "online").length;
-  const offlineConnectors = connectors.filter((c) => c.status === "offline").length;
-  const availableConnectors = connectors.filter((c) => c.operationalStatus === "Available").length;
-  const chargingConnectors = connectors.filter((c) => c.operationalStatus === "Charging").length;
-  const faultedConnectors = connectors.filter((c) => c.operationalStatus === "Faulted").length;
+  const stats = useMemo(() => {
+    const online = connectors.filter((c) => c.status === "online").length;
+    const offline = connectors.filter((c) => c.status === "offline").length;
+    const ready = connectors.filter((c) => c.operationalStatus === "Sẵn sàng").length;
+    const active = connectors.filter((c) => c.operationalStatus === "Đang hoạt động").length;
+    const faulted = connectors.filter((c) => c.operationalStatus === "Lỗi" || c.operationalStatus === "Bảo trì").length;
+    return { online, offline, ready, active, faulted };
+  }, [connectors]);
 
   return (
     <Box>
@@ -286,7 +322,7 @@ const Monitoring = () => {
           <Card>
             <CardContent>
               <Typography variant="h5" fontWeight="bold" color="success.main">
-                {onlineConnectors}
+                {stats.online}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Điểm sạc Online
@@ -298,7 +334,7 @@ const Monitoring = () => {
           <Card>
             <CardContent>
               <Typography variant="h5" fontWeight="bold" color="error.main">
-                {offlineConnectors}
+                {stats.offline}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Điểm sạc Offline
@@ -310,7 +346,7 @@ const Monitoring = () => {
           <Card>
             <CardContent>
               <Typography variant="h5" fontWeight="bold" color="success.main">
-                {availableConnectors}
+                {stats.ready}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Đang Rảnh
@@ -322,7 +358,7 @@ const Monitoring = () => {
           <Card>
             <CardContent>
               <Typography variant="h5" fontWeight="bold" color="primary.main">
-                {chargingConnectors}
+                {stats.active}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Đang Sạc
@@ -334,7 +370,7 @@ const Monitoring = () => {
           <Card>
             <CardContent>
               <Typography variant="h5" fontWeight="bold" color="error.main">
-                {faultedConnectors}
+                {stats.faulted}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Lỗi/Bảo trì
@@ -355,13 +391,15 @@ const Monitoring = () => {
               <TableHead>
                 <TableRow>
                   <TableCell>Mã điểm sạc</TableCell>
+                  <TableCell>Trạm</TableCell>
                   <TableCell>Loại</TableCell>
-                  <TableCell>Công suất</TableCell>
+                  <TableCell>Công suất tối đa</TableCell>
                   <TableCell align="center">Trạng thái Kỹ thuật</TableCell>
                   <TableCell align="center">Trạng thái Hoạt động</TableCell>
-                  <TableCell align="right">Điện áp (V)</TableCell>
-                  <TableCell align="right">Dòng điện (A)</TableCell>
-                  <TableCell align="right">Nhiệt độ (°C)</TableCell>
+                  <TableCell align="right">Công suất tức thời (kW)</TableCell>
+                  <TableCell align="right">SOC hiện tại (%)</TableCell>
+                  <TableCell align="right">Bắt đầu lúc</TableCell>
+                  <TableCell align="right">Người dùng</TableCell>
                   <TableCell align="center">Thao tác</TableCell>
                 </TableRow>
               </TableHead>
@@ -369,11 +407,12 @@ const Monitoring = () => {
                 {connectors.map((connector) => (
                   <TableRow key={connector.id} hover>
                     <TableCell fontWeight={600}>{connector.id}</TableCell>
+                    <TableCell>{connector.stationName}</TableCell>
                     <TableCell>{connector.type}</TableCell>
                     <TableCell>{connector.maxPower} kW</TableCell>
                     <TableCell align="center">
                       <Chip
-                        label={connector.status === "online" ? "Online" : "Offline"}
+                        label={connector.status === "online" ? "Online" : connector.status === "offline" ? "Offline" : "Không rõ"}
                         color={getStatusColor(connector.status)}
                         size="small"
                       />
@@ -386,18 +425,22 @@ const Monitoring = () => {
                         variant="outlined"
                       />
                     </TableCell>
-                    <TableCell align="right">{connector.voltage}</TableCell>
-                    <TableCell align="right">{connector.current}</TableCell>
                     <TableCell align="right">
-                      <Box display="flex" alignItems="center" justifyContent="flex-end" gap={1}>
-                        {connector.temperature}
-                        {connector.temperature > 40 && (
-                          <Warning fontSize="small" color="warning" />
-                        )}
-                      </Box>
+                      {typeof connector.currentPower === "number"
+                        ? connector.currentPower.toFixed(2)
+                        : "-"}
                     </TableCell>
+                    <TableCell align="right">
+                      {typeof connector.currentSoc === "number"
+                        ? connector.currentSoc.toFixed(0)
+                        : "-"}
+                    </TableCell>
+                    <TableCell align="right">
+                      {connector.bookingStart ? connector.bookingStart.toLocaleTimeString("vi-VN") : "-"}
+                    </TableCell>
+                    <TableCell align="right">{connector.currentUser ?? "-"}</TableCell>
                     <TableCell align="center">
-                      {connector.status === "offline" && (
+                      {connector.status !== "online" && (
                         <Button
                           size="small"
                           variant="outlined"
@@ -431,11 +474,12 @@ const Monitoring = () => {
               <TableHead>
                 <TableRow>
                   <TableCell>Mã sự cố</TableCell>
-                  <TableCell>Điểm sạc</TableCell>
+                  <TableCell>Trạm</TableCell>
                   <TableCell>Loại sự cố</TableCell>
                   <TableCell>Mô tả</TableCell>
                   <TableCell align="center">Ưu tiên</TableCell>
                   <TableCell align="center">Trạng thái</TableCell>
+                  <TableCell>Gán cho</TableCell>
                   <TableCell>Phản hồi</TableCell>
                   <TableCell>Thời gian</TableCell>
                 </TableRow>
@@ -444,8 +488,8 @@ const Monitoring = () => {
                 {incidents.map((incident) => (
                   <TableRow key={incident.id} hover>
                     <TableCell fontWeight={600}>{incident.id}</TableCell>
-                    <TableCell>{incident.connectorId}</TableCell>
-                    <TableCell>{incident.typeLabel}</TableCell>
+                    <TableCell>{incident.stationName || incident.connectorId}</TableCell>
+                    <TableCell>{incident.type}</TableCell>
                     <TableCell>{incident.description}</TableCell>
                     <TableCell align="center">
                       <Chip
@@ -461,6 +505,7 @@ const Monitoring = () => {
                         size="small" 
                       />
                     </TableCell>
+                    <TableCell>{incident.assignedTo || "Chưa phân công"}</TableCell>
                     <TableCell>
                       {incident.adminResponse ? (
                         <Button
@@ -502,7 +547,7 @@ const Monitoring = () => {
                   >
                     {connectors.map((c) => (
                       <MenuItem key={c.id} value={c.id}>
-                        {c.id} - {c.type} {c.maxPower}kW
+                        {c.stationName} · Post {c.postNumber} · Slot {c.slotNumber} ({c.type} {c.maxPower}kW)
                       </MenuItem>
                     ))}
                   </Select>
@@ -601,12 +646,16 @@ const Monitoring = () => {
                       <Typography variant="body1" fontWeight={600}>{selectedIncident.id}</Typography>
                     </Grid>
                     <Grid item xs={6}>
+                      <Typography variant="caption" color="text.secondary">Trạm:</Typography>
+                      <Typography variant="body1" fontWeight={600}>{selectedIncident.stationName || "Không xác định"}</Typography>
+                    </Grid>
+                    <Grid item xs={6}>
                       <Typography variant="caption" color="text.secondary">Điểm sạc:</Typography>
-                      <Typography variant="body1" fontWeight={600}>{selectedIncident.connectorId}</Typography>
+                      <Typography variant="body1">{selectedIncident.connectorId}</Typography>
                     </Grid>
                     <Grid item xs={6}>
                       <Typography variant="caption" color="text.secondary">Loại sự cố:</Typography>
-                      <Typography variant="body1">{selectedIncident.typeLabel}</Typography>
+                      <Typography variant="body1">{selectedIncident.type}</Typography>
                     </Grid>
                     <Grid item xs={6}>
                       <Typography variant="caption" color="text.secondary">Mức độ ưu tiên:</Typography>
@@ -627,6 +676,14 @@ const Monitoring = () => {
                         color={selectedIncident.status === "completed" ? "success" : "warning"}
                         size="small" 
                       />
+                    </Grid>
+                    <Grid item xs={6}>
+                      <Typography variant="caption" color="text.secondary">Người báo cáo:</Typography>
+                      <Typography variant="body1">{selectedIncident.reportedBy || "Không rõ"}</Typography>
+                    </Grid>
+                    <Grid item xs={6}>
+                      <Typography variant="caption" color="text.secondary">Người phụ trách:</Typography>
+                      <Typography variant="body1">{selectedIncident.assignedTo || "Chưa phân công"}</Typography>
                     </Grid>
                     <Grid item xs={6}>
                       <Typography variant="caption" color="text.secondary">Thời gian báo cáo:</Typography>
