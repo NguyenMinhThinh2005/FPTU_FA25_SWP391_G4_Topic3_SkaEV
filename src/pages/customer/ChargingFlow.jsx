@@ -1,4 +1,31 @@
 ﻿/* eslint-disable */
+/**
+ * ChargingFlow Component - Refactored Flow
+ * 
+ * CHANGES (Nov 2025):
+ * 1. Step 0 - Select Station: 
+ *    - REMOVED: Map view for station selection
+ *    - ADDED: List/Grid view with station cards showing all details
+ *    - Each card shows: name, address, distance, availability, slots, price, operating hours
+ * 
+ * 2. Step 1 - Navigation (NEW):
+ *    - ADDED: Map with directions to booked station
+ *    - Shows route from user location to selected station
+ *    - Used for navigation only, not for station selection
+ * 
+ * 3. Date/Time Restrictions:
+ *    - Only TODAY bookings allowed (Vietnam timezone UTC+7)
+ *    - Future date selection removed in ChargingDateTimePicker component
+ *    - Backend validation in BookingService.cs rejects non-today bookings
+ * 
+ * Flow Steps:
+ * 0. Select Station (List/Grid) 
+ * 1. Navigation Map (after booking)
+ * 2. QR Scan
+ * 3. Connect Vehicle
+ * 4. Charging
+ * 5. Complete
+ */
 import React, { useState, useEffect } from "react";
 import {
   Box,
@@ -96,7 +123,7 @@ const ChargingFlow = () => {
   // Các bước của flow booking sạc xe
   const flowSteps = [
     "Chọn trạm",
-    "Đặt lịch",
+    "Chỉ đường",
     "Quét QR",
     "Kết nối",
     "Đang sạc",
@@ -122,7 +149,7 @@ const ChargingFlow = () => {
   };
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStation, setSelectedStation] = useState(null);
-  const [viewMode, setViewMode] = useState("list"); // 'list' or 'map'
+  // viewMode removed - always use list/grid view in step 0, map only for navigation in step 1
   const [userLocation, setUserLocation] = useState({
     lat: 10.8231, // Default to Ho Chi Minh City (HCMC)
     lng: 106.6297,
@@ -533,7 +560,7 @@ const ChargingFlow = () => {
     console.log("🎯 Booking completed:", booking);
     setCurrentBookingData(booking);
     setBookingModalOpen(false);
-    setFlowStep(2); // Move to QR scan step
+    setFlowStep(1); // Move to navigation/direction map step
 
     // Initialize session data based on booking
     const energyNeeded = (sessionData.targetSOC - sessionData.startSOC) * 0.6; // 60kWh battery
@@ -745,7 +772,7 @@ const ChargingFlow = () => {
           </Stepper>
         </CardContent>
       </Card>
-      {/* Step 0: Find Stations */}
+      {/* Step 0: Select Station - LIST/GRID VIEW (Map removed) */}
       {flowStep === 0 && (
         <Grid container spacing={3}>
           {/* Search and Filters */}
@@ -798,7 +825,7 @@ const ChargingFlow = () => {
             </Card>
           </Grid>
 
-          {/* Stations List or Map */}
+          {/* Stations List/Grid View - MAP REMOVED */}
           <Grid item xs={12}>
             <Card>
               <CardContent>
@@ -809,203 +836,270 @@ const ChargingFlow = () => {
                     fontWeight: "bold",
                     color: "black",
                     mb: 3,
-                    textAlign: "center",
                   }}
                 >
-                  🗺️ Bản đồ trạm sạc ({filteredStations.length} trạm)
+                  📍 Danh sách trạm sạc ({filteredStations.length} trạm)
                 </Typography>
-                <StationMapLeaflet
-                  stations={filteredStations}
-                  onStationSelect={handleStationSelect}
-                />
-              </CardContent>
-            </Card>
-          </Grid>
 
-          {/* Stations List with Distance and Ranking */}
-          <Grid item xs={12}>
-            <Card>
-              <CardContent>
-                <Typography
-                  variant="h6"
-                  gutterBottom
-                  sx={{
-                    fontWeight: "bold",
-                    color: "black",
-                    mb: 2,
-                  }}
-                >
-                  📍 Danh sách trạm ({filteredStations.length})
-                </Typography>
-                <List>
-                  {filteredStations.map((station, index) => {
-                    const isAvailable = station.stats?.available > 0;
-                    return (
-                      <ListItem
-                        key={station.id}
-                        onClick={() => handleStationSelect(station)}
-                        sx={{
-                          borderRadius: 2,
-                          mb: 1,
-                          border: 1,
-                          borderColor: "divider",
-                          cursor: "pointer",
-                          "&:hover": {
-                            backgroundColor: "grey.50",
-                            borderColor: "primary.main",
-                          },
-                        }}
-                      >
-                        {/* Station Number Badge */}
-                        <Box
-                          sx={{
-                            minWidth: 40,
-                            height: 40,
-                            borderRadius: "50%",
-                            backgroundColor: "primary.main",
-                            color: "white",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            fontWeight: "bold",
-                            fontSize: "1.1rem",
-                            mr: 2,
-                            flexShrink: 0,
-                          }}
-                        >
-                          {index + 1}
-                        </Box>
+                {loading ? (
+                  <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+                    <Typography>Đang tải danh sách trạm...</Typography>
+                  </Box>
+                ) : filteredStations.length === 0 ? (
+                  <Box sx={{ textAlign: "center", py: 4 }}>
+                    <Typography variant="body1" color="text.secondary">
+                      Không tìm thấy trạm sạc phù hợp
+                    </Typography>
+                  </Box>
+                ) : (
+                  <Grid container spacing={2}>
+                    {filteredStations.map((station, index) => {
+                      const isAvailable = station.stats?.available > 0;
+                      const distance = station.distanceFromUser?.toFixed(1) || "N/A";
+                      const pricing = station.charging?.pricing?.acRate || 
+                                     station.charging?.pricing?.dcRate || 0;
 
-                        <ListItemIcon sx={{ minWidth: "auto", mr: 2 }}>
-                          <Avatar
-                            src={getStationImage(station)}
-                            sx={{ width: 50, height: 50 }}
-                            onError={(e) => {
-                              e.target.onerror = null;
-                              e.target.src =
-                                'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="50" height="50"%3E%3Crect fill="%231379FF" width="50" height="50"/%3E%3Ctext fill="white" x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="10"%3EStation%3C/text%3E%3C/svg%3E';
-                            }}
-                          >
-                            <ElectricCar />
-                          </Avatar>
-                        </ListItemIcon>
-
-                        <Box sx={{ flex: 1, minWidth: 0 }}>
-                          {/* Tên trạm và badges */}
-                          <Box
+                      return (
+                        <Grid item xs={12} md={6} key={station.id}>
+                          <Card
                             sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 1,
-                              mb: 0.5,
-                              flexWrap: "wrap",
+                              height: "100%",
+                              cursor: "pointer",
+                              transition: "all 0.3s",
+                              border: "2px solid",
+                              borderColor: "divider",
+                              "&:hover": {
+                                borderColor: "primary.main",
+                                boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                                transform: "translateY(-4px)",
+                              },
                             }}
+                            onClick={() => handleStationSelect(station)}
                           >
-                            <Typography
-                              variant="body1"
-                              fontWeight="bold"
-                              sx={{ mr: 1 }}
-                            >
-                              {station.name}
-                            </Typography>
-                            {station.distanceFromUser !== undefined && (
-                              <Chip
-                                label={`Cách ${station.distanceFromUser.toFixed(
-                                  1
-                                )} km`}
-                                size="small"
-                                color="primary"
-                                variant="outlined"
-                                sx={{ fontWeight: "bold" }}
-                              />
-                            )}
-                            <Chip
-                              label={isAvailable ? "Còn chỗ" : "Đầy"}
-                              size="small"
-                              color={isAvailable ? "success" : "error"}
-                            />
-                          </Box>
-
-                          {/* Thông tin chi tiết */}
-                          <Box>
-                            <Box
-                              sx={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 0.5,
-                                mb: 0.5,
-                              }}
-                            >
-                              <LocationOn
-                                sx={{ fontSize: 14, color: "text.secondary" }}
-                              />
-                              <Typography
-                                variant="body2"
-                                color="text.secondary"
-                              >
-                                {station.location?.address}
-                              </Typography>
-                            </Box>
-                            <Box
-                              sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}
-                            >
-                              <Box
-                                sx={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: 0.5,
-                                }}
-                              >
-                                <Speed
-                                  sx={{ fontSize: 14, color: "text.secondary" }}
-                                />
-                                <Typography
-                                  variant="body2"
-                                  color="text.secondary"
+                            <CardContent>
+                              {/* Station Header */}
+                              <Box sx={{ display: "flex", alignItems: "start", mb: 2 }}>
+                                {/* Station Number Badge */}
+                                <Box
+                                  sx={{
+                                    minWidth: 40,
+                                    height: 40,
+                                    borderRadius: "50%",
+                                    backgroundColor: "primary.main",
+                                    color: "white",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    fontWeight: "bold",
+                                    fontSize: "1.1rem",
+                                    mr: 2,
+                                    flexShrink: 0,
+                                  }}
                                 >
-                                  Tối đa {station.charging?.maxPower || 0}kW
-                                </Typography>
+                                  {index + 1}
+                                </Box>
+
+                                {/* Station Avatar */}
+                                <Avatar
+                                  src={getStationImage(station)}
+                                  sx={{ width: 60, height: 60, mr: 2 }}
+                                  onError={(e) => {
+                                    e.target.onerror = null;
+                                    e.target.src =
+                                      'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="60" height="60"%3E%3Crect fill="%231379FF" width="60" height="60"/%3E%3Ctext fill="white" x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="12"%3EStation%3C/text%3E%3C/svg%3E';
+                                  }}
+                                >
+                                  <ElectricCar />
+                                </Avatar>
+
+                                {/* Station Info */}
+                                <Box sx={{ flex: 1 }}>
+                                  <Typography variant="h6" fontWeight="bold" sx={{ mb: 0.5 }}>
+                                    {station.name}
+                                  </Typography>
+                                  <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mb: 1 }}>
+                                    <Chip
+                                      label={`${distance} km`}
+                                      size="small"
+                                      color="primary"
+                                      variant="outlined"
+                                    />
+                                    <Chip
+                                      label={isAvailable ? "Còn chỗ" : "Đầy"}
+                                      size="small"
+                                      color={isAvailable ? "success" : "error"}
+                                    />
+                                  </Box>
+                                </Box>
                               </Box>
-                              <Typography
-                                variant="body2"
-                                color="text.secondary"
-                              >
-                                ⚡ {station.stats?.available || 0}/
-                                {station.stats?.total || 0} cổng trống
-                              </Typography>
-                              {station.operatingHours && (
-                                <Typography
-                                  variant="body2"
-                                  color="text.secondary"
-                                >
-                                  🕐{" "}
-                                  {formatOperatingHours(station.operatingHours)}
-                                </Typography>
-                              )}
-                            </Box>
-                          </Box>
-                        </Box>
 
-                        <Button
-                          variant="contained"
-                          size="small"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleStationSelect(station);
-                          }}
-                          sx={{ ml: 2, flexShrink: 0 }}
-                        >
-                          Đặt ngay
-                        </Button>
-                      </ListItem>
-                    );
-                  })}
-                </List>
+                              {/* Station Details */}
+                              <Box sx={{ mb: 2 }}>
+                                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mb: 1 }}>
+                                  <LocationOn sx={{ fontSize: 18, color: "text.secondary" }} />
+                                  <Typography variant="body2" color="text.secondary">
+                                    {station.location?.address}
+                                  </Typography>
+                                </Box>
+
+                                <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+                                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                                    <Speed sx={{ fontSize: 18, color: "primary.main" }} />
+                                    <Typography variant="body2">
+                                      Tối đa {station.charging?.maxPower || 0}kW
+                                    </Typography>
+                                  </Box>
+
+                                  <Typography variant="body2" color="text.secondary">
+                                    ⚡ {station.stats?.available || 0}/{station.stats?.total || 0} cổng trống
+                                  </Typography>
+                                </Box>
+
+                                {station.operatingHours && (
+                                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                                    🕐 {formatOperatingHours(station.operatingHours)}
+                                  </Typography>
+                                )}
+
+                                {pricing > 0 && (
+                                  <Typography variant="body2" color="success.main" sx={{ mt: 0.5, fontWeight: "bold" }}>
+                                    💰 Từ {formatCurrency(pricing)}/kWh
+                                  </Typography>
+                                )}
+                              </Box>
+
+                              {/* Action Button */}
+                              <Button
+                                fullWidth
+                                variant="contained"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleStationSelect(station);
+                                }}
+                                disabled={!isAvailable}
+                              >
+                                {isAvailable ? "Chọn trạm này" : "Hết chỗ"}
+                              </Button>
+                            </CardContent>
+                          </Card>
+                        </Grid>
+                      );
+                    })}
+                  </Grid>
+                )}
               </CardContent>
             </Card>
           </Grid>
         </Grid>
       )}
+
+      {/* Step 1: Navigation/Direction Map - Show route to booked station */}
+      {flowStep === 1 && selectedStation && (
+        <Grid container spacing={3}>
+          <Grid item xs={12}>
+            <Card>
+              <CardContent>
+                <Typography variant="h5" gutterBottom sx={{ fontWeight: "bold", mb: 2 }}>
+                  ✅ Đặt lịch thành công!
+                </Typography>
+                <Alert severity="success" sx={{ mb: 3 }}>
+                  Bạn đã đặt trạm <strong>{selectedStation.name}</strong> thành công. 
+                  Hãy di chuyển đến trạm và quét QR để bắt đầu sạc.
+                </Alert>
+
+                {/* Station Info Summary */}
+                <Card variant="outlined" sx={{ mb: 3, p: 2 }}>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} md={6}>
+                      <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+                        <Avatar
+                          src={getStationImage(selectedStation)}
+                          sx={{ width: 60, height: 60, mr: 2 }}
+                        >
+                          <ElectricCar />
+                        </Avatar>
+                        <Box>
+                          <Typography variant="h6" fontWeight="bold">
+                            {selectedStation.name}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {selectedStation.location?.address}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </Grid>
+                    <Grid item xs={12} md={6}>
+                      <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                        <Chip
+                          icon={<LocationOn />}
+                          label={`${selectedStation.distanceFromUser?.toFixed(1) || "N/A"} km`}
+                          color="primary"
+                          variant="outlined"
+                        />
+                        <Chip
+                          icon={<Speed />}
+                          label={`${selectedStation.charging?.maxPower || 0}kW`}
+                          color="primary"
+                          variant="outlined"
+                        />
+                        {selectedStation.operatingHours && (
+                          <Chip
+                            label={formatOperatingHours(selectedStation.operatingHours)}
+                            color="default"
+                            variant="outlined"
+                          />
+                        )}
+                      </Box>
+                    </Grid>
+                  </Grid>
+                </Card>
+
+                {/* Map with directions */}
+                <Typography variant="h6" gutterBottom sx={{ fontWeight: "bold", mb: 2 }}>
+                  🗺️ Chỉ đường đến trạm
+                </Typography>
+                <Box sx={{ 
+                  height: 500, 
+                  border: "1px solid", 
+                  borderColor: "divider", 
+                  borderRadius: 2,
+                  overflow: "hidden"
+                }}>
+                  <StationMapLeaflet
+                    stations={[selectedStation]}
+                    onStationSelect={() => {}}
+                    userLocation={userLocation}
+                    showRoute={true}
+                    centerOnStation={true}
+                  />
+                </Box>
+
+                {/* Action Buttons */}
+                <Box sx={{ display: "flex", gap: 2, mt: 3, justifyContent: "center" }}>
+                  <Button
+                    variant="outlined"
+                    onClick={() => {
+                      setFlowStep(0);
+                      setSelectedStation(null);
+                    }}
+                  >
+                    Chọn trạm khác
+                  </Button>
+                  <Button
+                    variant="contained"
+                    size="large"
+                    onClick={() => setFlowStep(2)}
+                    startIcon={<QrCodeScanner />}
+                  >
+                    Tôi đã đến trạm - Quét QR
+                  </Button>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+      )}
+
       {/* Step 2: QR Scan */}
       {flowStep === 2 && (
         <Grid item xs={12}>

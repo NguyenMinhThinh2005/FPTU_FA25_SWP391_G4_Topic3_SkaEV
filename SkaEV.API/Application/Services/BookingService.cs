@@ -28,6 +28,31 @@ public class BookingService : IBookingService
 
     public async Task<int> CreateBookingAsync(CreateBookingDto dto)
     {
+        // Validate: Only allow bookings for today (UTC+7 Vietnam timezone)
+        if (dto.ScheduledStartTime.HasValue)
+        {
+            var vietnamTimeZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
+            var nowInVietnam = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, vietnamTimeZone);
+            var todayInVietnam = nowInVietnam.Date;
+            
+            var scheduledTimeUtc = dto.ScheduledStartTime.Value;
+            var scheduledTimeInVietnam = TimeZoneInfo.ConvertTimeFromUtc(scheduledTimeUtc, vietnamTimeZone);
+            var scheduledDate = scheduledTimeInVietnam.Date;
+            
+            // Check if scheduled date is not today
+            if (scheduledDate != todayInVietnam)
+            {
+                throw new InvalidOperationException("Chỉ cho phép đặt trạm sạc trong ngày hôm nay. Không thể đặt trước cho ngày khác.");
+            }
+            
+            // Check if scheduled time is at least 30 minutes in the future
+            var minimumTime = nowInVietnam.AddMinutes(30);
+            if (scheduledTimeInVietnam < minimumTime)
+            {
+                throw new InvalidOperationException($"Thời gian đặt phải ít nhất 30 phút từ bây giờ. Vui lòng chọn sau {minimumTime:HH:mm}.");
+            }
+        }
+        
         // Use stored procedure sp_create_booking
         var userIdParam = new SqlParameter("@user_id", dto.UserId);
         var vehicleIdParam = new SqlParameter("@vehicle_id", dto.VehicleId);
