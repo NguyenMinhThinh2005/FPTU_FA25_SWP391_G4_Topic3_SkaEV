@@ -105,12 +105,6 @@ const Sidebar = ({ open, onClose }) => {
             icon: <Payment />,
             path: "/customer/payment",
           },
-          // 4. Thống kê & báo cáo (tách riêng)
-          {
-            text: "Thống kê & báo cáo",
-            icon: <Analytics />,
-            path: "/customer/analytics",
-          },
         ];
 
       default:
