@@ -101,18 +101,12 @@ public class StationService : IStationService
         var totalPosts = postList.Count;
         var totalSlots = slotList.Count;
 
-        var availableSlotCount = slotList.Count(slot => IsSlotAvailable(slot.Status));
+        // REQUIREMENT: Available slots = Total slots - Active sessions
+        var availableSlotCount = Math.Max(0, totalSlots - activeSessions);
+
         var maintenanceSlotCount = slotList.Count(slot => IsSlotMaintenance(slot.Status));
         var occupiedSlotCount = slotList.Count(slot => IsSlotOccupied(slot.Status));
         var reservedSlotCount = slotList.Count(slot => IsSlotReserved(slot.Status));
-
-        var accountedSlots = availableSlotCount + maintenanceSlotCount + occupiedSlotCount + reservedSlotCount;
-        if (accountedSlots < totalSlots)
-        {
-            occupiedSlotCount += totalSlots - accountedSlots;
-        }
-
-        availableSlotCount = Math.Clamp(availableSlotCount, 0, totalSlots);
 
         var statusIsActive = StatusComparer.Equals(stationStatus, "active");
         if (!statusIsActive)
@@ -136,7 +130,7 @@ public class StationService : IStationService
         var totalPowerCapacityKw = postList.Sum(post => post.PowerOutput);
 
         var utilizationRate = totalSlots > 0
-            ? Math.Round(((decimal)(totalSlots - availableSlotCount) / totalSlots) * 100, 2)
+            ? Math.Round(((decimal)activeSessions / totalSlots) * 100, 2)
             : 0;
 
         return new StationAggregates(
@@ -244,7 +238,6 @@ public class StationService : IStationService
             .Where(s => s.StationId == stationId)
             .Include(s => s.ChargingPosts)
                 .ThenInclude(post => post.ChargingSlots)
-            .Include(s => s.Bookings.Where(b => b.DeletedAt == null && b.Status == "in_progress"))
             .AsSplitQuery()
             .AsNoTracking()
             .FirstOrDefaultAsync();
@@ -259,7 +252,12 @@ public class StationService : IStationService
             .AsNoTracking()
             .FirstOrDefaultAsync();
 
-        var activeSessions = stationEntity.Bookings?.Count ?? 0;
+        // Query active bookings separately to avoid Include filter issues
+        var activeSessions = await _context.Bookings
+            .IgnoreQueryFilters() // Ignore global query filter for deleted_at
+            .Where(b => b.StationId == stationId && b.Status == "in_progress" && b.DeletedAt == null)
+            .CountAsync();
+
         var aggregates = CalculateAggregates(stationEntity.ChargingPosts, activeSessions, stationEntity.Status);
         return ComposeStationDto(stationEntity, aggregates, assignment);
     }
@@ -281,7 +279,6 @@ public class StationService : IStationService
         var stationsRaw = await query
             .Include(s => s.ChargingPosts)
                 .ThenInclude(post => post.ChargingSlots)
-            .Include(s => s.Bookings.Where(b => b.DeletedAt == null && b.Status == "in_progress"))
             .AsSplitQuery()
             .AsNoTracking()
             .ToListAsync();
@@ -292,12 +289,35 @@ public class StationService : IStationService
         }
 
         var stationIds = stationsRaw.Select(s => s.StationId).ToList();
+
+        // DEBUG: Try raw SQL query first
+        Console.WriteLine($"[DEBUG] Testing raw SQL query...");
+        var rawSqlTest = await _context.Database.SqlQueryRaw<int>(
+            "SELECT COUNT(*) as Value FROM bookings WHERE status = 'in_progress' AND deleted_at IS NULL"
+        ).FirstOrDefaultAsync();
+        Console.WriteLine($"[DEBUG] Raw SQL found {rawSqlTest} total active bookings");
+
+        // Query active bookings separately to avoid Include filter issues
+        var activeBookingCounts = await _context.Bookings
+            .IgnoreQueryFilters() // Ignore global query filter for deleted_at
+            .Where(b => stationIds.Contains(b.StationId) && b.Status == "in_progress" && b.DeletedAt == null)
+            .GroupBy(b => b.StationId)
+            .Select(g => new { StationId = g.Key, Count = g.Count() })
+            .ToListAsync();
+
+        Console.WriteLine($"[DEBUG] Found {activeBookingCounts.Count} stations with active bookings");
+        foreach (var item in activeBookingCounts.Take(5))
+        {
+            Console.WriteLine($"[DEBUG] Station {item.StationId}: {item.Count} active bookings");
+        }
+
+        var activeBookingsDict = activeBookingCounts.ToDictionary(x => x.StationId, x => x.Count);
         var managerAssignments = await GetActiveManagerAssignmentsAsync(stationIds);
 
         var stations = stationsRaw.Select(station =>
         {
             managerAssignments.TryGetValue(station.StationId, out var assignment);
-            var activeSessions = station.Bookings?.Count ?? 0;
+            activeBookingsDict.TryGetValue(station.StationId, out var activeSessions);
             var aggregates = CalculateAggregates(station.ChargingPosts, activeSessions, station.Status);
             return ComposeStationDto(station, aggregates, assignment);
         }).ToList();

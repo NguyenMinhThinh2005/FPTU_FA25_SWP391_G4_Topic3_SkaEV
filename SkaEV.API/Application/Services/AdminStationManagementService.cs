@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using SkaEV.API.Application.DTOs.Admin;
 using SkaEV.API.Domain.Entities;
 using SkaEV.API.Infrastructure.Data;
@@ -50,10 +51,21 @@ internal record StationCapacityMetrics(
     decimal CurrentPowerUsageKw,
     decimal UtilizationRate);
 
+internal record StationCompletedSessionSummary(
+    int StationId,
+    DateTime CreatedAt,
+    DateTime? ActualStartTime,
+    DateTime? ActualEndTime,
+    decimal Revenue);
+
 public class AdminStationManagementService : IAdminStationManagementService
 {
     private readonly SkaEVDbContext _context;
     private readonly ILogger<AdminStationManagementService> _logger;
+    private readonly IConfiguration _configuration;
+    private readonly bool _enableAutoDisableOnCritical;
+    private readonly int _recentErrorWindowMinutes;
+    private readonly int _recentErrorThreshold;
 
     private static readonly StringComparer StatusComparer = StringComparer.OrdinalIgnoreCase;
 
@@ -70,10 +82,17 @@ public class AdminStationManagementService : IAdminStationManagementService
 
     public AdminStationManagementService(
         SkaEVDbContext context,
-        ILogger<AdminStationManagementService> logger)
+        ILogger<AdminStationManagementService> logger,
+        IConfiguration configuration)
     {
         _context = context;
         _logger = logger;
+        _configuration = configuration;
+
+        // Read configuration with sensible defaults. These can be set in appsettings or environment variables.
+        _enableAutoDisableOnCritical = bool.TryParse(_configuration["AdminStation:EnableAutoDisableOnCritical"], out var b) && b;
+        _recentErrorWindowMinutes = int.TryParse(_configuration["AdminStation:RecentErrorWindowMinutes"], out var w) ? Math.Max(1, w) : 60;
+        _recentErrorThreshold = int.TryParse(_configuration["AdminStation:RecentErrorThreshold"], out var t) ? Math.Max(1, t) : 3;
     }
 
     private static StationCapacityMetrics CalculateCapacityMetrics(ChargingStation station)
@@ -160,6 +179,28 @@ public class AdminStationManagementService : IAdminStationManagementService
 
         var stationIds = stationEntities.Select(s => s.StationId).ToList();
 
+        var thirtyDaysAgo = DateTime.UtcNow.AddDays(-30);
+        var todayUtcDate = DateTime.UtcNow.Date;
+
+        var completedSessionsRaw = await _context.Bookings
+            .Where(b => stationIds.Contains(b.StationId)
+                        && b.Status == "completed"
+                        && b.DeletedAt == null
+                        && b.CreatedAt >= thirtyDaysAgo)
+            .Include(b => b.Invoice)
+            .Select(b => new StationCompletedSessionSummary(
+                b.StationId,
+                b.CreatedAt,
+                b.ActualStartTime,
+                b.ActualEndTime,
+                b.Invoice != null ? b.Invoice.TotalAmount : 0m))
+            .AsNoTracking()
+            .ToListAsync();
+
+        var completedSessionsLookup = completedSessionsRaw
+            .GroupBy(session => session.StationId)
+            .ToDictionary(group => group.Key, group => group.ToList());
+
         var managerAssignments = await _context.StationStaff
             .Where(ss => stationIds.Contains(ss.StationId) && ss.IsActive)
             .Include(ss => ss.StaffUser)
@@ -174,6 +215,29 @@ public class AdminStationManagementService : IAdminStationManagementService
         {
             var metrics = CalculateCapacityMetrics(station);
             managerLookup.TryGetValue(station.StationId, out var manager);
+            completedSessionsLookup.TryGetValue(station.StationId, out var completedSessions);
+
+            var completedList = completedSessions ?? new List<StationCompletedSessionSummary>();
+
+            var monthlyRevenue = completedList.Sum(item => item.Revenue);
+            var monthlyCompleted = completedList.Count;
+
+            var durationSamples = completedList
+                .Where(item => item.ActualStartTime.HasValue && item.ActualEndTime.HasValue)
+                .Select(item => (item.ActualEndTime!.Value - item.ActualStartTime!.Value).TotalMinutes)
+                .Where(minutes => minutes > 0)
+                .ToList();
+
+            var averageSessionDuration = durationSamples.Count > 0
+                ? Math.Round(durationSamples.Average(), 1)
+                : 0;
+
+            var todayCompletedSessions = completedList
+                .Where(item => item.CreatedAt.Date == todayUtcDate)
+                .ToList();
+
+            var todayRevenue = todayCompletedSessions.Sum(item => item.Revenue);
+            var todaySessionCount = todayCompletedSessions.Count;
 
             return new StationListDto
             {
@@ -204,7 +268,12 @@ public class AdminStationManagementService : IAdminStationManagementService
                 ManagerUserId = manager?.StaffUserId,
                 ManagerName = manager?.StaffUser.FullName,
                 ManagerEmail = manager?.StaffUser.Email,
-                ManagerPhoneNumber = manager?.StaffUser.PhoneNumber
+                ManagerPhoneNumber = manager?.StaffUser.PhoneNumber,
+                MonthlyRevenue = monthlyRevenue,
+                MonthlyCompletedSessions = monthlyCompleted,
+                AverageSessionDurationMinutes = averageSessionDuration,
+                TodayRevenue = todayRevenue,
+                TodayCompletedSessions = todaySessionCount
             };
         }).ToList();
 
@@ -774,6 +843,7 @@ public class AdminStationManagementService : IAdminStationManagementService
                 ErrorCode = parts.Length > 6 ? parts[6] : "",
                 Message = parts.Length > 7 ? parts[7] : log.Message,
                 Details = log.StackTrace,
+                ClassificationSource = (log.StackTrace != null && log.StackTrace.Contains("ClassificationSource:auto")) ? "auto" : "manual",
                 OccurredAt = log.CreatedAt,
                 IsResolved = log.Severity == "resolved"
             };
@@ -806,17 +876,142 @@ public class AdminStationManagementService : IAdminStationManagementService
     {
         try
         {
-            var station = await _context.ChargingStations.FindAsync(stationId);
+            // Load station with posts so changes to posts are tracked and persisted
+            var station = await _context.ChargingStations
+                .Include(s => s.ChargingPosts)
+                .ThenInclude(p => p.ChargingSlots)
+                .FirstOrDefaultAsync(s => s.StationId == stationId);
             var post = postId.HasValue ? await _context.ChargingPosts.FindAsync(postId.Value) : null;
 
+            // Determine whether to run automatic classification. If caller passed "auto" or empty severity, classify here.
+            var finalSeverity = severity;
+            var ranAutoClassification = false;
+            if (string.IsNullOrWhiteSpace(finalSeverity) || string.Equals(finalSeverity, "auto", StringComparison.OrdinalIgnoreCase))
+            {
+                ranAutoClassification = true;
+                // Compute context metrics used for classification
+                var activeSessions = await _context.Bookings
+                    .Where(b => b.StationId == stationId && b.Status == "in_progress" && b.DeletedAt == null)
+                    .CountAsync();
+
+                var windowStart = DateTime.UtcNow.AddMinutes(-_recentErrorWindowMinutes);
+                var recentErrors = await _context.SystemLogs
+                    .Where(log => log.LogType == "station_error" && log.CreatedAt >= windowStart && log.Message != null && log.Message.StartsWith($"{stationId}|"))
+                    .ToListAsync();
+
+                var recentSameType = recentErrors.Count(log =>
+                {
+                    try
+                    {
+                        var parts = log.Message.Split('|');
+                        return parts.Length > 5 && string.Equals(parts[5], errorType, StringComparison.OrdinalIgnoreCase);
+                    }
+                    catch
+                    {
+                        return false;
+                    }
+                });
+
+                // Basic rule-map for error types -> base severity
+                var criticalTypes = new[] { "power_failure", "overheat", "safety_trip", "fire_risk" };
+                var majorTypes = new[] { "communication_lost", "connector_fault", "hardware_error", "sensor_failure" };
+
+                if (criticalTypes.Contains(errorType, StringComparer.OrdinalIgnoreCase))
+                {
+                    finalSeverity = "critical";
+                }
+                else if (majorTypes.Contains(errorType, StringComparer.OrdinalIgnoreCase))
+                {
+                    finalSeverity = "major";
+                }
+                else if (recentSameType >= _recentErrorThreshold)
+                {
+                    finalSeverity = "major";
+                }
+                else if (activeSessions > 0 && (string.Equals(errorType, "charging_interruption", StringComparison.OrdinalIgnoreCase) || string.Equals(errorType, "unexpected_disconnect", StringComparison.OrdinalIgnoreCase)))
+                {
+                    finalSeverity = "major";
+                }
+                else
+                {
+                    finalSeverity = "minor";
+                }
+
+                _logger.LogInformation("Auto-classified station {StationId} error '{ErrorType}' => {Severity} (activeSessions={ActiveSessions}, recentSameType={RecentSameType})",
+                    stationId, errorType, finalSeverity, activeSessions, recentSameType);
+
+                // Automated actions for critical severity (configurable)
+                if (string.Equals(finalSeverity, "critical", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Automated actions for critical severity (configurable)
+                    if (string.Equals(finalSeverity, "critical", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // Optionally auto-disable station if no active sessions and feature enabled
+                        if (_enableAutoDisableOnCritical)
+                        {
+                            if (activeSessions == 0 && station != null)
+                            {
+                                // Update station and posts immediately so the DB reflects the change before we create action logs
+                                station.Status = "inactive";
+                                if (station.ChargingPosts != null)
+                                {
+                                    foreach (var p in station.ChargingPosts)
+                                    {
+                                        p.Status = "offline";
+                                        p.UpdatedAt = DateTime.UtcNow;
+                                    }
+                                }
+
+                                station.UpdatedAt = DateTime.UtcNow;
+                                await _context.SaveChangesAsync();
+
+                                _logger.LogInformation("Auto-disabled station {StationId} due to critical auto-classified error", stationId);
+
+                                var actionMsg = $"{stationId}|{station?.StationName}|auto_action|auto_disable|Station auto-disabled due to critical error {errorType}";
+                                var actionLog = new SystemLog
+                                {
+                                    LogType = "station_action",
+                                    Severity = "info",
+                                    Message = actionMsg,
+                                    CreatedAt = DateTime.UtcNow
+                                };
+                                _context.SystemLogs.Add(actionLog);
+                            }
+                            else
+                            {
+                                _logger.LogInformation("Auto-disable skipped for station {StationId} because active sessions exist or station not found (activeSessions={ActiveSessions})", stationId, activeSessions);
+                            }
+                        }
+
+                        // Create a lightweight support/action log entry so operators can triage (always add this regardless of auto-disable)
+                        var supportMsg = $"{stationId}|{station?.StationName}|auto_action|create_support_ticket||Critical error auto-detected: {errorType} - {message}";
+                        var supportLog = new SystemLog
+                        {
+                            LogType = "station_action",
+                            Severity = "info",
+                            Message = supportMsg,
+                            StackTrace = details,
+                            CreatedAt = DateTime.UtcNow
+                        };
+                        _context.SystemLogs.Add(supportLog);
+                    }
+                }
+            }
+
             var logMessage = $"{stationId}|{station?.StationName}|{postId}|{post?.PostNumber}|{slotId}|{errorType}||{message}";
+
+            var stackTraceWithClassification = details ?? string.Empty;
+            if (ranAutoClassification)
+            {
+                stackTraceWithClassification = stackTraceWithClassification + "\nClassificationSource:auto";
+            }
 
             var log = new SystemLog
             {
                 LogType = "station_error",
-                Severity = severity,
+                Severity = finalSeverity,
                 Message = logMessage,
-                StackTrace = details,
+                StackTrace = stackTraceWithClassification,
                 CreatedAt = DateTime.UtcNow
             };
 

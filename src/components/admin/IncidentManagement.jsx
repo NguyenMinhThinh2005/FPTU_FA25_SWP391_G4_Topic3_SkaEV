@@ -26,14 +26,11 @@ import {
   CardContent,
   Alert,
   CircularProgress,
-  Tooltip,
-  Stack
+  Tooltip
 } from '@mui/material';
 import {
-  Add as AddIcon,
   Visibility as ViewIcon,
   Edit as EditIcon,
-  Refresh as RefreshIcon,
   FilterList as FilterIcon,
   Close as CloseIcon
 } from '@mui/icons-material';
@@ -147,21 +144,39 @@ const IncidentManagement = () => {
   const getSeverityColor = (severity) => {
     const colors = {
       critical: 'error',
-      high: 'warning',
-      medium: 'info',
+      high: 'error',
+      medium: 'warning',
       low: 'success'
     };
     return colors[severity] || 'default';
+  };
+
+  const displaySeverityLabel = (severity) => {
+    const labels = {
+      critical: 'Nghiêm trọng',
+      high: 'Nghiêm trọng',
+      medium: 'Trung bình',
+      low: 'Nhẹ'
+    };
+    return labels[severity] || severity || 'N/A';
   };
 
   const getStatusColor = (status) => {
     const colors = {
       open: 'error',
       in_progress: 'warning',
-      resolved: 'success',
-      closed: 'default'
+      resolved: 'success'
     };
     return colors[status] || 'default';
+  };
+
+  const displayStatusLabel = (status) => {
+    const labels = {
+      open: 'Chưa xử lý',
+      in_progress: 'Đang xử lý',
+      resolved: 'Đã xử lý'
+    };
+    return labels[status] || status || 'N/A';
   };
 
   const formatDate = (dateString) => {
@@ -174,25 +189,9 @@ const IncidentManagement = () => {
         <Typography variant="h4" fontWeight="bold">
           Quản lý Sự cố
         </Typography>
-        <Stack direction="row" spacing={2}>
-          <Button
-            variant="outlined"
-            startIcon={<RefreshIcon />}
-            onClick={() => {
-              fetchIncidents();
-              fetchStats();
-            }}
-          >
-            Làm mới
-          </Button>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => handleOpenDialog('create')}
-          >
-            Báo cáo Sự cố
-          </Button>
-        </Stack>
+        <Typography variant="body2" color="text.secondary">
+          Dữ liệu được đồng bộ tự động từ hệ thống
+        </Typography>
       </Box>
 
       {error && (
@@ -282,7 +281,7 @@ const IncidentManagement = () => {
               </Select>
             </FormControl>
           </Grid>
-          <Grid item xs={12} sm={3}>
+          <Grid item xs={12} sm={4}>
             <FormControl fullWidth size="small">
               <InputLabel>Mức độ nghiêm trọng</InputLabel>
               <Select
@@ -292,26 +291,8 @@ const IncidentManagement = () => {
               >
                 <MenuItem value="">Tất cả</MenuItem>
                 <MenuItem value="critical">Nghiêm trọng</MenuItem>
-                <MenuItem value="high">Cao</MenuItem>
                 <MenuItem value="medium">Trung bình</MenuItem>
-                <MenuItem value="low">Thấp</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid item xs={12} sm={4}>
-            <FormControl fullWidth size="small">
-              <InputLabel>Trạm sạc</InputLabel>
-              <Select
-                value={filters.stationId || ''}
-                label="Trạm sạc"
-                onChange={(e) => setFilters({ stationId: e.target.value || null })}
-              >
-                <MenuItem value="">Tất cả</MenuItem>
-                {stations.map((station) => (
-                  <MenuItem key={station.stationId} value={station.stationId}>
-                    {station.stationName}
-                  </MenuItem>
-                ))}
+                <MenuItem value="low">Nhẹ</MenuItem>
               </Select>
             </FormControl>
           </Grid>
@@ -371,14 +352,14 @@ const IncidentManagement = () => {
                   </TableCell>
                   <TableCell>
                     <Chip
-                      label={incident.severity}
+                      label={displaySeverityLabel(incident.severity)}
                       size="small"
                       color={getSeverityColor(incident.severity)}
                     />
                   </TableCell>
                   <TableCell>
                     <Chip
-                      label={incident.status.replace('_', ' ')}
+                      label={displayStatusLabel(incident.status)}
                       size="small"
                       color={getStatusColor(incident.status)}
                     />
@@ -473,10 +454,9 @@ const IncidentManagement = () => {
                     label="Mức độ nghiêm trọng"
                     onChange={(e) => setFormData({ ...formData, severity: e.target.value })}
                   >
-                    <MenuItem value="critical">Nghiêm trọng</MenuItem>
-                    <MenuItem value="high">Cao</MenuItem>
-                    <MenuItem value="medium">Trung bình</MenuItem>
-                    <MenuItem value="low">Thấp</MenuItem>
+                        <MenuItem value="critical">Nghiêm trọng</MenuItem>
+                        <MenuItem value="medium">Trung bình</MenuItem>
+                        <MenuItem value="low">Nhẹ</MenuItem>
                   </Select>
                 </FormControl>
               </Grid>
@@ -522,7 +502,7 @@ const IncidentManagement = () => {
                   Mức độ nghiêm trọng
                 </Typography>
                 <Chip
-                  label={selectedIncident.severity}
+                  label={displaySeverityLabel(selectedIncident.severity)}
                   color={getSeverityColor(selectedIncident.severity)}
                 />
               </Grid>
@@ -531,7 +511,7 @@ const IncidentManagement = () => {
                   Trạng thái
                 </Typography>
                 <Chip
-                  label={selectedIncident.status.replace('_', ' ')}
+                  label={displayStatusLabel(selectedIncident.status)}
                   color={getStatusColor(selectedIncident.status)}
                 />
               </Grid>
@@ -607,10 +587,9 @@ const IncidentManagement = () => {
                     label="Trạng thái"
                     onChange={(e) => setUpdateData({ ...updateData, status: e.target.value })}
                   >
-                    <MenuItem value="open">Đang mở</MenuItem>
+                    <MenuItem value="open">Chưa xử lý</MenuItem>
                     <MenuItem value="in_progress">Đang xử lý</MenuItem>
-                    <MenuItem value="resolved">Đã giải quyết</MenuItem>
-                    <MenuItem value="closed">Đã đóng</MenuItem>
+                    <MenuItem value="resolved">Đã xử lý</MenuItem>
                   </Select>
                 </FormControl>
               </Grid>

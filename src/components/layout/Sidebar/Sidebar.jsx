@@ -113,6 +113,10 @@ const Sidebar = ({ open, onClose }) => {
   };
 
   const navigationItems = getNavigationItems();
+  // Hide admin dashboard menu entry by default per admin UX request
+  const filteredNavigationItems = navigationItems.filter(
+    (item) => !(user?.role === "admin" && item.path === "/admin/dashboard")
+  );
 
   const handleNavigation = (path) => {
     navigate(path);
@@ -315,7 +319,7 @@ const Sidebar = ({ open, onClose }) => {
         ) : (
           // For other roles (admin, staff)
           <>
-            {navigationItems.map((item) => (
+            {filteredNavigationItems.map((item) => (
               <ListItem key={item.text} disablePadding sx={{ mb: 0.5 }}>
                 <ListItemButton
                   onClick={() => handleNavigation(item.path)}

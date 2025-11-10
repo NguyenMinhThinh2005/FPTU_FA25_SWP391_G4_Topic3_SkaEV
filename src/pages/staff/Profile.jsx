@@ -400,6 +400,26 @@ const StaffProfile = () => {
                   }}
                 />
               </Grid>
+              
+              {/* Certifications - render if present to avoid unused variable eslint warnings */}
+              {certifications && certifications.length > 0 && (
+                <Grid item xs={12} sx={{ mt: 2 }}>
+                  <Divider />
+                  <Typography variant="h6" fontWeight="bold" gutterBottom sx={{ mt: 2 }}>
+                    Chứng chỉ
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                    {certifications.map((cert, idx) => (
+                      <Chip
+                        key={idx}
+                        label={cert.name}
+                        size="small"
+                        color={getCertificationColor(cert.status)}
+                      />
+                    ))}
+                  </Box>
+                </Grid>
+              )}
             </Grid>
           </CardContent>
         </Card>

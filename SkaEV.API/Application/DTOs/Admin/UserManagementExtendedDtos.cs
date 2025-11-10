@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace SkaEV.API.Application.DTOs.Admin;
 
 // ==================== USER HISTORY & STATISTICS ====================
@@ -54,6 +56,147 @@ public class UserStatisticsDto
     public string MostUsedStation { get; set; } = string.Empty;
     public string PreferredPaymentMethod { get; set; } = string.Empty;
     public int TotalVehicles { get; set; }
+}
+
+// ==================== USER VEHICLES ====================
+
+/// <summary>
+/// Vehicle information for admin user detail view
+/// </summary>
+public class AdminUserVehicleDto
+{
+    public int VehicleId { get; set; }
+    public string VehicleType { get; set; } = string.Empty;
+    public string? Brand { get; set; }
+    public string? Model { get; set; }
+    public string LicensePlate { get; set; } = string.Empty;
+    public decimal? BatteryCapacity { get; set; }
+    public string? ConnectorType { get; set; }
+    public bool IsDefault { get; set; }
+    public string Status { get; set; } = "active";
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}
+
+// ==================== STAFF DETAIL SUPPORT ====================
+
+/// <summary>
+/// Station assignment overview for staff accounts
+/// </summary>
+public class AdminStaffStationDto
+{
+    public int StationId { get; set; }
+    public string StationName { get; set; } = string.Empty;
+    public string Address { get; set; } = string.Empty;
+    public string City { get; set; } = string.Empty;
+    public int TotalPosts { get; set; }
+    public int TotalSlots { get; set; }
+    public int AvailableSlots { get; set; }
+    public int ActiveSessions { get; set; }
+    public int CompletedSessionsToday { get; set; }
+    public decimal RevenueToday { get; set; }
+    public int OpenIncidents { get; set; }
+    public int AssignedIncidents { get; set; }
+    public DateTime AssignedAt { get; set; }
+    public bool IsPrimaryAssignment { get; set; }
+}
+
+/// <summary>
+/// Upcoming schedule entry for staff detail view
+/// </summary>
+public class AdminStaffScheduleDto
+{
+    public int BookingId { get; set; }
+    public string DayOfWeek { get; set; } = string.Empty;
+    public string Shift { get; set; } = string.Empty;
+    public string TimeRange { get; set; } = string.Empty;
+    public string StationName { get; set; } = string.Empty;
+    public string Status { get; set; } = string.Empty;
+    public string Vehicle { get; set; } = string.Empty;
+    public string SlotLabel { get; set; } = string.Empty;
+    public DateTime StartTime { get; set; }
+    public DateTime? EndTime { get; set; }
+}
+
+/// <summary>
+/// Recent activity (incident, maintenance, alert) handled by staff
+/// </summary>
+public class AdminStaffActivityDto
+{
+    public int IncidentId { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string IncidentType { get; set; } = string.Empty;
+    public string StationName { get; set; } = string.Empty;
+    public string Status { get; set; } = string.Empty;
+    public string Severity { get; set; } = string.Empty;
+    public DateTime ReportedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}
+
+// ==================== ADMIN DETAIL SUPPORT ====================
+
+/// <summary>
+/// High-level metrics for an admin account
+/// </summary>
+public class AdminOverviewDto
+{
+    public int UserId { get; set; }
+    public int TotalUsers { get; set; }
+    public int ActiveUsers { get; set; }
+    public int TotalStations { get; set; }
+    public int ActiveStations { get; set; }
+    public int TotalBookings30Days { get; set; }
+    public decimal Revenue30Days { get; set; }
+    public int NewUsers30Days { get; set; }
+    public int OpenIncidents { get; set; }
+    public DateTime? LastLoginAt { get; set; }
+    public List<AdminOverviewStationDto> TopStations { get; set; } = new();
+}
+
+public class AdminOverviewStationDto
+{
+    public int StationId { get; set; }
+    public string StationName { get; set; } = string.Empty;
+    public int CompletedSessions { get; set; }
+    public decimal Revenue { get; set; }
+}
+
+/// <summary>
+/// Activity log entry for admin detail view
+/// </summary>
+public class AdminActivityLogDto
+{
+    public int LogId { get; set; }
+    public string Category { get; set; } = string.Empty;
+    public string Severity { get; set; } = string.Empty;
+    public string Message { get; set; } = string.Empty;
+    public string? Endpoint { get; set; }
+    public string? IpAddress { get; set; }
+    public DateTime CreatedAt { get; set; }
+}
+
+/// <summary>
+/// Permission matrix entry for admin account
+/// </summary>
+public class AdminPermissionDto
+{
+    public string ModuleKey { get; set; } = string.Empty;
+    public string ModuleName { get; set; } = string.Empty;
+    public List<string> Permissions { get; set; } = new();
+}
+
+/// <summary>
+/// Audit trail entry for admin activity
+/// </summary>
+public class AdminAuditLogDto
+{
+    public int LogId { get; set; }
+    public string Category { get; set; } = string.Empty;
+    public string Severity { get; set; } = string.Empty;
+    public string Message { get; set; } = string.Empty;
+    public string? Endpoint { get; set; }
+    public string? IpAddress { get; set; }
+    public DateTime CreatedAt { get; set; }
 }
 
 // ==================== NOTIFICATIONS ====================

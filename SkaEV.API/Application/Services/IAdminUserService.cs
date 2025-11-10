@@ -22,6 +22,18 @@ public interface IAdminUserService
     Task<List<UserChargingHistoryDto>> GetUserChargingHistoryAsync(int userId, int page = 1, int pageSize = 20);
     Task<List<UserPaymentHistoryDto>> GetUserPaymentHistoryAsync(int userId, int page = 1, int pageSize = 20);
     Task<UserStatisticsDto> GetUserStatisticsAsync(int userId);
+    Task<List<AdminUserVehicleDto>> GetUserVehiclesAsync(int userId);
+
+    // Staff detail support
+    Task<List<AdminStaffStationDto>> GetStaffStationAssignmentsAsync(int staffUserId);
+    Task<List<AdminStaffScheduleDto>> GetStaffScheduleAsync(int staffUserId);
+    Task<List<AdminStaffActivityDto>> GetStaffActivitiesAsync(int staffUserId, int limit = 25);
+
+    // Admin detail support
+    Task<AdminOverviewDto> GetAdminOverviewAsync(int adminUserId);
+    Task<List<AdminActivityLogDto>> GetAdminActivityLogAsync(int adminUserId, int limit = 25);
+    Task<List<AdminPermissionDto>> GetAdminPermissionsAsync(int adminUserId);
+    Task<List<AdminAuditLogDto>> GetAdminAuditLogAsync(int adminUserId, int limit = 50);
 
     // Notifications
     Task<List<NotificationDto>> GetAllNotificationsAsync(int? userId = null, string? type = null, bool? isRead = null, int page = 1, int pageSize = 50);

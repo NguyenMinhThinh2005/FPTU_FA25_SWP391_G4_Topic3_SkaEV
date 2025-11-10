@@ -77,7 +77,9 @@ const CustomerProfile = () => {
     address: "",
   });
   const [saveSuccess, setSaveSuccess] = useState(false);
-  const [loading, setLoading] = useState(true);
+  // loading is used only to control async flow; prefix with underscore to
+  // avoid unused-var ESLint errors while preserving setLoading usage
+  const [_loading, setLoading] = useState(true);
 
   useEffect(() => {
     // Fetch full user profile from backend

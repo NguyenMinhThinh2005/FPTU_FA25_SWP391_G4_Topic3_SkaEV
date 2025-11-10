@@ -3,69 +3,64 @@ import axiosInstance from "../axiosConfig";
 const adminAPI = {
   // User Analytics
   getUserAnalytics: async (timeRange = "30d") => {
-    const response = await axiosInstance.get(`/admin/users/analytics`, {
+    // axiosInstance already returns response.data via interceptor
+    return axiosInstance.get(`/admin/users/analytics`, {
       params: { timeRange },
     });
-    return response.data;
   },
 
   // Station Analytics
   getStationAnalytics: async (timeRange = "30d") => {
-    const response = await axiosInstance.get(`/admin/stations/analytics`, {
+    return axiosInstance.get(`/admin/stations/analytics`, {
       params: { timeRange },
     });
-    return response.data;
   },
 
   // User Management
   getAllUsers: async (params = {}) => {
-    const response = await axiosInstance.get("/admin/users", { params });
-    return response.data;
+    // Use the same admin users path as other service helpers
+    return axiosInstance.get("/admin/adminusers", { params });
+  },
+
+  // Backwards compatible alias used by some hooks/components
+  getUsers: async (params = {}) => {
+    return axiosInstance.get("/admin/adminusers", { params });
   },
 
   getUserDetail: async (userId) => {
-    const response = await axiosInstance.get(`/admin/users/${userId}`);
-    return response.data;
+    return axiosInstance.get(`/admin/adminusers/${userId}`);
   },
 
   createUser: async (userData) => {
-    const response = await axiosInstance.post("/admin/users", userData);
-    return response.data;
+    return axiosInstance.post("/admin/adminusers", userData);
   },
 
   updateUser: async (userId, userData) => {
-    const response = await axiosInstance.put(`/admin/users/${userId}`, userData);
-    return response.data;
+    return axiosInstance.put(`/admin/adminusers/${userId}`, userData);
   },
 
   updateUserRole: async (userId, role) => {
-    const response = await axiosInstance.patch(`/admin/users/${userId}/role`, { role });
-    return response.data;
+    return axiosInstance.patch(`/admin/adminusers/${userId}/role`, { role });
   },
 
   deleteUser: async (userId) => {
-    const response = await axiosInstance.delete(`/admin/users/${userId}`);
-    return response.data;
+    return axiosInstance.delete(`/admin/adminusers/${userId}`);
   },
 
   activateUser: async (userId) => {
-    const response = await axiosInstance.patch(`/admin/users/${userId}/activate`);
-    return response.data;
+    return axiosInstance.patch(`/admin/adminusers/${userId}/activate`);
   },
 
   deactivateUser: async (userId, reason) => {
-    const response = await axiosInstance.patch(`/admin/users/${userId}/deactivate`, { reason });
-    return response.data;
+    return axiosInstance.patch(`/admin/adminusers/${userId}/deactivate`, { reason });
   },
 
   getUserActivity: async (userId) => {
-    const response = await axiosInstance.get(`/admin/users/${userId}/activity`);
-    return response.data;
+    return axiosInstance.get(`/admin/adminusers/${userId}/activity`);
   },
 
   getUserStatistics: async () => {
-    const response = await axiosInstance.get("/admin/users/statistics");
-    return response.data;
+    return axiosInstance.get("/admin/adminusers/statistics");
   },
 };
 

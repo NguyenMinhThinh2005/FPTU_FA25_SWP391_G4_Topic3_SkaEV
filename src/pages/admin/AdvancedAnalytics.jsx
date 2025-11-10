@@ -51,6 +51,26 @@ import {
 import { formatCurrency } from "../../utils/helpers";
 import reportsAPI from "../../services/api/reportsAPI";
 
+const formatPeriodLabel = (year, month) => {
+  if (!year) {
+    return "Không xác định";
+  }
+  if (!month) {
+    return `${year}`;
+  }
+  return `${year}-${String(month).padStart(2, "0")}`;
+};
+
+const getPeriodSortKey = (year, month) => {
+  if (!year) {
+    return "0000-00";
+  }
+  if (!month) {
+    return `${year}-00`;
+  }
+  return `${year}-${String(month).padStart(2, "0")}`;
+};
+
 const AdvancedAnalytics = () => {
   // States
   const [timeRange, setTimeRange] = useState("30d");
@@ -147,18 +167,25 @@ const AdvancedAnalytics = () => {
   // Calculate KPIs from real data
   const calculateKPIs = () => {
     const totalRevenue = revenueData.reduce((sum, r) => sum + (r.totalRevenue || 0), 0);
-    const totalSessions = usageData.reduce((sum, u) => sum + (u.completedSessions || 0), 0);
-    const totalBookings = usageData.reduce((sum, u) => sum + (u.totalBookings || 0), 0);
     const totalEnergy = revenueData.reduce((sum, r) => sum + (r.totalEnergySoldKwh || 0), 0);
-    const avgUtilization = usageData.length > 0 
-      ? usageData.reduce((sum, u) => sum + (u.utilizationRatePercent || 0), 0) / usageData.length
-      : 0;
 
-    // Calculate growth (compare first half vs second half of data)
+    const sessionsFromUsage = usageData.reduce((sum, u) => sum + (u.completedSessions || 0), 0);
+    const bookingsFromUsage = usageData.reduce((sum, u) => sum + (u.totalBookings || 0), 0);
+    const sessionsFromRevenue = revenueData.reduce((sum, r) => sum + (r.totalTransactions || 0), 0);
+
+    const resolvedSessions = sessionsFromUsage > 0 ? sessionsFromUsage : sessionsFromRevenue;
+    const resolvedBookings = bookingsFromUsage > 0 ? bookingsFromUsage : Math.max(sessionsFromRevenue, bookingsFromUsage);
+
+    let avgUtilization = 0;
+    if (usageData.length > 0) {
+      avgUtilization = usageData.reduce((sum, u) => sum + (u.utilizationRatePercent || 0), 0) / usageData.length;
+    } else if (stationPerformanceData.length > 0) {
+      avgUtilization = stationPerformanceData.reduce((sum, s) => sum + (s.utilizationRate || s.currentOccupancyPercent || 0), 0) / stationPerformanceData.length;
+    }
+
     const halfLength = Math.ceil(revenueData.length / 2);
     const firstHalf = revenueData.slice(0, halfLength);
     const secondHalf = revenueData.slice(halfLength);
-    
     const firstHalfRevenue = firstHalf.reduce((sum, r) => sum + (r.totalRevenue || 0), 0);
     const secondHalfRevenue = secondHalf.reduce((sum, r) => sum + (r.totalRevenue || 0), 0);
     const revenueGrowth = firstHalfRevenue > 0 
@@ -167,10 +194,10 @@ const AdvancedAnalytics = () => {
 
     return {
       totalRevenue,
-      totalSessions,
-      totalBookings,
+      totalSessions: resolvedSessions,
+      totalBookings: resolvedBookings,
       totalEnergy,
-      avgUtilization,
+      avgUtilization: Math.min(Math.max(avgUtilization, 0), 100),
       revenueGrowth,
     };
   };
@@ -180,27 +207,73 @@ const AdvancedAnalytics = () => {
   // Transform revenue data for charts (group by day/week/month based on timeRange)
   const getRevenueChartData = () => {
     if (revenueData.length === 0) return [];
-    
-    return revenueData.map(item => ({
+
+    const sortedRevenue = [...revenueData].sort((a, b) =>
+      getPeriodSortKey(a.year, a.month).localeCompare(getPeriodSortKey(b.year, b.month))
+    );
+
+    return sortedRevenue.map((item) => ({
       label: item.stationName || `Trạm ${item.stationId}`,
-      dateLabel: `${item.month}/${item.year}`,
+      dateLabel: formatPeriodLabel(item.year, item.month),
       revenue: item.totalRevenue || 0,
       energy: item.totalEnergySoldKwh || 0,
       sessions: item.totalTransactions || 0,
     }));
   };
 
-  // Transform usage data for sessions chart
-  const getSessionsChartData = () => {
-    if (usageData.length === 0) return [];
-    
-    return usageData.map(item => ({
-      label: item.stationName || `Trạm ${item.stationId}`,
-      dateLabel: `${item.month}/${item.year}`,
-      sessions: item.completedSessions || 0,
-      bookings: item.totalBookings || 0,
-      utilization: item.utilizationRatePercent || 0,
-    }));
+  const getEnergyUtilizationData = () => {
+    if (revenueData.length === 0 && usageData.length === 0 && stationPerformanceData.length === 0) {
+      return [];
+    }
+
+    const stationMap = new Map();
+
+    const ensureStationEntry = (stationId, stationName = null) => {
+      if (!stationMap.has(stationId)) {
+        stationMap.set(stationId, {
+          stationId,
+          label: stationName || `Trạm ${stationId}`,
+          energy: 0,
+          utilizationSamples: [],
+        });
+      }
+      return stationMap.get(stationId);
+    };
+
+    revenueData.forEach((item) => {
+      const entry = ensureStationEntry(item.stationId, item.stationName);
+      entry.energy += item.totalEnergySoldKwh || 0;
+    });
+
+    usageData.forEach((item) => {
+      const entry = ensureStationEntry(item.stationId, item.stationName);
+      if (typeof item.utilizationRatePercent === "number" && !Number.isNaN(item.utilizationRatePercent)) {
+        entry.utilizationSamples.push(item.utilizationRatePercent);
+      }
+    });
+
+    stationPerformanceData.forEach((item) => {
+      const entry = ensureStationEntry(item.stationId, item.stationName);
+      if (entry.utilizationSamples.length === 0 && typeof item.utilizationRate === "number") {
+        entry.utilizationSamples.push(item.utilizationRate);
+      }
+    });
+
+    return Array.from(stationMap.values())
+      .map((entry) => {
+        const utilization = entry.utilizationSamples.length > 0
+          ? entry.utilizationSamples.reduce((sum, val) => sum + val, 0) / entry.utilizationSamples.length
+          : 0;
+
+        return {
+          label: entry.label,
+          energy: Number(entry.energy.toFixed(2)),
+          utilization: Math.min(Math.max(utilization, 0), 100),
+        };
+      })
+      .filter((entry) => entry.energy > 0 || entry.utilization > 0)
+      .sort((a, b) => b.energy - a.energy)
+      .slice(0, 12);
   };
 
   // Revenue by charging type
@@ -284,7 +357,7 @@ const AdvancedAnalytics = () => {
   // Format tooltip
   const formatTooltipValue = (value, name) => {
     if (name === "revenue" || name.includes("Doanh thu")) return formatCurrency(value);
-    if (name === "energy" || name.includes("Năng lượng")) return `${value.toFixed(1)} kWh`;
+  if (name === "energy" || name.includes("Năng lượng")) return `${value.toFixed(1)} kWh`;
     if (name === "utilization" || name.includes("Sử dụng")) return `${value.toFixed(1)}%`;
     return value;
   };
@@ -502,7 +575,7 @@ const AdvancedAnalytics = () => {
                     >
                       <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                       <XAxis 
-                        dataKey="dateLabel" 
+                        dataKey="label" 
                         angle={-15}
                         textAnchor="end"
                         height={60}
@@ -688,10 +761,10 @@ const AdvancedAnalytics = () => {
                 Năng lượng & Tỷ lệ sử dụng ({getTimeRangeLabel()})
               </Typography>
               <Box sx={{ height: 320 }}>
-                {getSessionsChartData().length > 0 ? (
+                {getEnergyUtilizationData().length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <ComposedChart 
-                      data={getSessionsChartData()}
+                      data={getEnergyUtilizationData()}
                       margin={{ top: 10, right: 30, left: 0, bottom: 5 }}
                     >
                       <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -706,7 +779,7 @@ const AdvancedAnalytics = () => {
                         yAxisId="left"
                         tick={{ fontSize: 12 }}
                         label={{ 
-                          value: 'Phiên hoàn thành', 
+                          value: 'Năng lượng (kWh)', 
                           angle: -90, 
                           position: 'insideLeft',
                           style: { textAnchor: 'middle', fontSize: 12, fill: '#666' }
@@ -736,9 +809,9 @@ const AdvancedAnalytics = () => {
                       <Legend wrapperStyle={{ paddingTop: '10px' }} />
                       <Bar
                         yAxisId="left"
-                        dataKey="sessions"
+                        dataKey="energy"
                         fill={colors.success}
-                        name="Phiên hoàn thành"
+                        name="Năng lượng (kWh)"
                         radius={[4, 4, 0, 0]}
                       />
                       <Line

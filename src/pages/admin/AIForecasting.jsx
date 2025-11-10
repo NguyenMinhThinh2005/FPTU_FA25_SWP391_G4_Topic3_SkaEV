@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
   Box,
   Card,
@@ -39,19 +39,9 @@ const AIForecasting = () => {
   const [peakHours, setPeakHours] = useState([]);
   const [demandScores, setDemandScores] = useState([]);
 
-  useEffect(() => {
-    fetchStations();
-    fetchDemandScores();
-  }, []);
-
-  useEffect(() => {
-    if (selectedStation) {
-      fetchForecast();
-      fetchPeakHours();
-    }
-  }, [selectedStation]);
-
-  const fetchStations = async () => {
+  // stabilize functions with useCallback so they can be safely included in
+  // dependency arrays without triggering exhaustive-deps warnings
+  const fetchStations = useCallback(async () => {
     try {
       const data = await stationsAPI.getAllStations();
       setStations(data);
@@ -62,11 +52,19 @@ const AIForecasting = () => {
       console.error('Error fetching stations:', err);
       setError('Failed to load stations');
     }
-  };
+  }, []);
 
-  const fetchForecast = async () => {
+  const fetchDemandScores = useCallback(async () => {
+    try {
+      const data = await demandForecastingAPI.getDemandScores();
+      setDemandScores(data);
+    } catch (err) {
+      console.error('Error fetching demand scores:', err);
+    }
+  }, []);
+
+  const fetchForecast = useCallback(async () => {
     if (!selectedStation) return;
-    
     try {
       setLoading(true);
       const data = await demandForecastingAPI.getStationForecast(selectedStation);
@@ -77,27 +75,29 @@ const AIForecasting = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedStation]);
 
-  const fetchPeakHours = async () => {
+  const fetchPeakHours = useCallback(async () => {
     if (!selectedStation) return;
-    
     try {
       const data = await demandForecastingAPI.getPeakHours(selectedStation);
       setPeakHours(data);
     } catch (err) {
       console.error('Error fetching peak hours:', err);
     }
-  };
+  }, [selectedStation]);
 
-  const fetchDemandScores = async () => {
-    try {
-      const data = await demandForecastingAPI.getDemandScores();
-      setDemandScores(data);
-    } catch (err) {
-      console.error('Error fetching demand scores:', err);
+  useEffect(() => {
+    fetchStations();
+    fetchDemandScores();
+  }, [fetchStations, fetchDemandScores]);
+
+  useEffect(() => {
+    if (selectedStation) {
+      fetchForecast();
+      fetchPeakHours();
     }
-  };
+  }, [fetchForecast, fetchPeakHours, selectedStation]);
 
   const getTrendIcon = (trend) => {
     switch (trend?.toLowerCase()) {

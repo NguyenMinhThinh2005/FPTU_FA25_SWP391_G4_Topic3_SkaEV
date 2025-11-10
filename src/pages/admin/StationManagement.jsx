@@ -54,15 +54,20 @@ import {
 import { useNavigate } from "react-router-dom";
 import ConfirmDialog from "../../components/ui/ConfirmDialog";
 import useStationStore from "../../store/stationStore";
-import useBookingStore from "../../store/bookingStore";
 import useUserStore from "../../store/userStore";
 import { formatCurrency } from "../../utils/helpers";
 
 const StationManagement = () => {
   const navigate = useNavigate();
-  const { stations, addStation, updateStation, deleteStation, remoteDisableStation, remoteEnableStation } =
-    useStationStore();
-  const { bookings } = useBookingStore();
+  const {
+    stations,
+    addStation,
+    updateStation,
+    deleteStation,
+    remoteDisableStation,
+    remoteEnableStation,
+    fetchAdminStations
+  } = useStationStore();
   const { users, fetchUsers } = useUserStore();
   const [selectedStation, setSelectedStation] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -92,8 +97,15 @@ const StationManagement = () => {
   // Fetch users on component mount
   React.useEffect(() => {
     fetchUsers();
+    fetchAdminStations({ pageSize: 100 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  React.useEffect(() => {
+    if (!stations || stations.length === 0) {
+      fetchAdminStations({ pageSize: 100 });
+    }
+  }, [fetchAdminStations, stations]);
 
   // Get staff users for dropdown
   const staffUsers = React.useMemo(() => {
@@ -102,37 +114,35 @@ const StationManagement = () => {
 
   // Station analytics data
   const stationAnalytics = stations.map((station) => {
-    const stationBookings = bookings.filter(
-      (b) => b.stationId === station.id
+    const monthlyRevenue = Number(
+      station.monthlyRevenue ?? station.revenue ?? station.todayRevenue ?? 0
     );
-    const thisMonthBookings = stationBookings.filter((b) => {
-      const bookingDate = new Date(b.startTime);
-      const now = new Date();
-      return (
-        bookingDate.getMonth() === now.getMonth() &&
-        bookingDate.getFullYear() === now.getFullYear()
-      );
-    });
 
-    const revenue = thisMonthBookings.reduce((sum, b) => sum + b.cost, 0);
-    const totalPorts = station.charging.totalPorts || 0;
-    const availablePorts = station.charging.availablePorts || 0;
-    const utilization =
-      totalPorts > 0
-        ? ((totalPorts - availablePorts) / totalPorts) * 100
-        : 0;
-    const avgSessionTime =
-      stationBookings.length > 0
-        ? stationBookings.reduce((sum, b) => sum + (b.duration || 60), 0) /
-          stationBookings.length
-        : 0;
+    const monthlyBookings =
+      station.monthlyBookings ??
+      station.monthlyCompletedSessions ??
+      station.todayCompletedSessions ??
+      0;
+
+    const utilization = Number.isFinite(station.utilizationRate)
+      ? station.utilizationRate
+      : station.utilization ?? 0;
+
+    const avgSessionTime = Number(
+      station.avgSessionTime ??
+        station.averageSessionDurationMinutes ??
+        0
+    );
 
     return {
       ...station,
-      monthlyRevenue: revenue,
-      monthlyBookings: thisMonthBookings.length,
+      monthlyRevenue,
+      monthlyBookings,
       utilization: utilization || 0,
-      avgSessionTime
+      avgSessionTime,
+      todayRevenue: Number(station.todayRevenue ?? 0),
+      todayCompletedSessions:
+        station.todayCompletedSessions ?? station.todaySessionCount ?? 0,
     };
   });
 
@@ -412,7 +422,7 @@ const StationManagement = () => {
                   <Typography variant="h4" fontWeight="bold">
                     {formatCurrency(
                       filteredStations.reduce(
-                        (sum, s) => sum + s.monthlyRevenue,
+                        (sum, s) => sum + (s.todayRevenue ?? 0),
                         0
                       )
                     )}
@@ -444,7 +454,7 @@ const StationManagement = () => {
                   <TableCell width="18%">Nhân viên quản lý</TableCell>
                   <TableCell align="center" width="12%">Doanh thu tháng</TableCell>
                   <TableCell align="center" width="8%">Phiên</TableCell>
-                  <TableCell align="center" width="8%">Phiên TB</TableCell>
+                  <TableCell align="center" width="8%">Thời gian/Phiên</TableCell>
                   <TableCell align="center" width="8%">Thao tác</TableCell>
                 </TableRow>
               </TableHead>
@@ -459,7 +469,11 @@ const StationManagement = () => {
                     <TableRow key={station.id} hover>
                     <TableCell>
                       <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 2 }}
+                        sx={{ display: "flex", alignItems: "center", gap: 2, cursor: 'pointer' }}
+                        onClick={() => navigate(`/admin/stations/${station.id}/analytics`)}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/admin/stations/${station.id}/analytics`); }}
                       >
                         <Avatar
                           sx={{

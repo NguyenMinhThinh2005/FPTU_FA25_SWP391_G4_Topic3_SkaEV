@@ -40,7 +40,6 @@ import {
   BatteryChargingFull,
   EvStation,
   Payment,
-  Notifications,
   TrendingUp,
   AttachMoney,
   AccessTime,
@@ -77,89 +76,136 @@ const UserDetail = () => {
 
   const fetchVehicles = useCallback(async () => {
     try {
-      // Mock vehicles data - replace with actual API when available
-      setVehicles([
-        {
-          vehicleId: 1,
-          brand: "VinFast",
-          model: "VF 8",
-          licensePlate: "30A-12345",
-          batteryCapacity: 87.7,
-          connectorType: "CCS2",
-          status: "active",
-        },
-      ]);
+      const response = await axiosInstance.get(`/admin/AdminUsers/${userId}/vehicles`);
+      const payload = response?.data?.data ?? response?.data;
+
+      const normalized = Array.isArray(payload)
+        ? payload.map((vehicle) => ({
+            vehicleId: vehicle.vehicleId,
+            brand: vehicle.brand || vehicle.vehicleMake || vehicle.vehicleType || "N/A",
+            model: vehicle.model || vehicle.vehicleModel || "",
+            vehicleType: vehicle.vehicleType || vehicle.vehicleName || "",
+            licensePlate: vehicle.licensePlate || "",
+            batteryCapacity: vehicle.batteryCapacity ?? null,
+            connectorType: vehicle.connectorType || vehicle.chargingPortType || "",
+            status: vehicle.status || (vehicle.isDefault ? "active" : "inactive"),
+            isDefault: vehicle.isDefault ?? vehicle.isPrimary ?? false,
+            createdAt: vehicle.createdAt,
+          }))
+        : [];
+
+      setVehicles(normalized);
     } catch (error) {
       console.error("Error fetching vehicles:", error);
+      setVehicles([]);
     }
-  }, []);
+  }, [userId]);
+
+  const fetchStatistics = useCallback(async () => {
+    try {
+      const response = await axiosInstance.get(`/admin/AdminUsers/${userId}/statistics`);
+      const payload = response?.data?.data ?? response?.data;
+
+      if (!payload) {
+        setStatistics(null);
+        return;
+      }
+
+      const totalSessions = payload.totalChargingSessions ?? payload.totalSessions ?? 0;
+      const completedSessions = payload.completedSessions ?? 0;
+      const totalEnergy = Number(payload.totalEnergyConsumedKwh ?? payload.totalEnergyKwh ?? 0);
+      const totalSpent = Number(payload.totalSpent ?? payload.totalSpentVnd ?? 0);
+
+      setStatistics({
+        totalSessions,
+        completedSessions,
+        cancelledSessions: payload.cancelledSessions ?? 0,
+        totalEnergyKwh: totalEnergy,
+        totalSpentVnd: totalSpent,
+        averageDurationMinutes: Number(payload.averageSessionDurationMinutes ?? payload.averageDurationMinutes ?? 0),
+        averageEnergyPerSessionKwh:
+          completedSessions > 0 ? totalEnergy / completedSessions : Number(payload.averageEnergyPerSessionKwh ?? 0),
+        averageSpendingPerSessionVnd:
+          completedSessions > 0 ? totalSpent / completedSessions : Number(payload.averageSpendingPerSessionVnd ?? 0),
+        preferredPaymentMethod: payload.preferredPaymentMethod || "N/A",
+        mostUsedStationName: payload.mostUsedStation ?? payload.mostUsedStationName ?? "",
+        mostUsedStationAddress: payload.mostUsedStationAddress ?? "",
+        totalVehicles: payload.totalVehicles ?? payload.vehicleCount ?? 0,
+      });
+    } catch (error) {
+      console.error("Error fetching statistics:", error);
+      setStatistics(null);
+    }
+  }, [userId]);
 
   const fetchUserData = useCallback(async () => {
     try {
       setLoading(true);
-      console.log("=== FETCHING USER DETAIL ===");
-      console.log("User ID:", userId);
-      
-      // Use direct endpoint to get user by ID with auth token automatically added
       const response = await axiosInstance.get(`/admin/AdminUsers/${userId}`);
-      
-      console.log("Response status:", response.status);
-      console.log("Response data:", response.data);
-      console.log("Response data type:", typeof response.data);
-      console.log("Has userId?", response.data?.userId);
-      console.log("Has success?", response.data?.success);
-      
-      if (response.data) {
-        // Handle both response formats: direct data or wrapped in success object
-        const userData = response.data.success ? response.data.data : response.data;
-        
-        console.log("Processed userData:", userData);
-        console.log("userData has userId?", userData?.userId);
-        
-        if (userData && userData.userId) {
-          console.log("✓ Setting user data:", userData);
-          setUser(userData);
-          // Fetch vehicles
-          fetchVehicles();
+      const userData = response?.data?.success ? response.data.data : response?.data;
+
+      if (userData && userData.userId) {
+        setUser(userData);
+
+        if (userData.role === "customer") {
+          await Promise.all([fetchVehicles(), fetchStatistics()]);
+          setChargingHistory([]);
+          setPaymentHistory([]);
         } else {
-          console.error("✗ No valid user data found in response");
-          console.error("userData:", userData);
-          setUser(null);
+          setVehicles([]);
+          setChargingHistory([]);
+          setPaymentHistory([]);
+          setStatistics(null);
         }
       } else {
-        console.error("✗ No response data");
         setUser(null);
+        setVehicles([]);
+        setChargingHistory([]);
+        setPaymentHistory([]);
+        setStatistics(null);
       }
     } catch (error) {
-      console.error("=== ERROR FETCHING USER ===");
-      console.error("Error:", error);
-      console.error("Error message:", error.message);
-      console.error("Error response:", error.response);
-      console.error("Error response status:", error.response?.status);
-      console.error("Error response data:", error.response?.data);
-      
-      // If 404, user not found
-      if (error.response?.status === 404) {
-        console.error("User not found (404)");
-        setUser(null);
-      } else {
-        console.error("Other error occurred");
-        setUser(null);
-      }
+      console.error("Error fetching user detail:", error);
+      setUser(null);
     } finally {
       setLoading(false);
     }
-  }, [userId, fetchVehicles]);
+  }, [userId, fetchVehicles, fetchStatistics]);
 
   const fetchChargingHistory = useCallback(async () => {
     try {
       const response = await axiosInstance.get(`/admin/AdminUsers/${userId}/charging-history?pageNumber=1&pageSize=20`);
-      
-      if (response.data.success) {
-        setChargingHistory(response.data.data?.sessions ?? []);
-      } else {
-        setChargingHistory([]);
-      }
+
+      const payload = response?.data?.data ?? response?.data;
+      const sessions = Array.isArray(payload?.sessions)
+        ? payload.sessions
+        : Array.isArray(payload)
+        ? payload
+        : [];
+
+      const normalized = sessions.map((session) => {
+        const bookingId = session.bookingId ?? session.bookingID; // support legacy casing
+        const totalAmount = Number(session.totalAmount ?? session.totalAmountVnd ?? 0);
+        const energy = Number(session.energyConsumedKwh ?? session.energyConsumed ?? 0);
+
+        return {
+          bookingId,
+          bookingCode: session.bookingCode || (bookingId ? `BK${String(bookingId).padStart(6, "0")}` : "-"),
+          stationName: session.stationName || "-",
+          stationAddress: session.stationAddress || "",
+          postNumber: session.postNumber || "",
+          slotNumber: session.slotNumber || "",
+          status: session.status || "unknown",
+          energyConsumedKwh: energy,
+          totalAmountVnd: totalAmount,
+          startTime: session.startTime,
+          endTime: session.endTime,
+          durationMinutes: session.durationMinutes,
+          paymentStatus: session.paymentStatus || "pending",
+        };
+      });
+
+      setChargingHistory(normalized);
     } catch (error) {
       console.error("Error fetching charging history:", error);
       setChargingHistory([]);
@@ -169,39 +215,57 @@ const UserDetail = () => {
   const fetchPaymentHistory = useCallback(async () => {
     try {
       const response = await axiosInstance.get(`/admin/AdminUsers/${userId}/payment-history?pageNumber=1&pageSize=20`);
-      
-      if (response.data.success) {
-        setPaymentHistory(response.data.data?.payments ?? []);
-      } else {
-        setPaymentHistory([]);
-      }
+
+      const payload = response?.data?.data ?? response?.data;
+      const payments = Array.isArray(payload?.payments)
+        ? payload.payments
+        : Array.isArray(payload)
+        ? payload
+        : [];
+
+      const normalized = payments.map((payment) => ({
+        paymentId: payment.paymentId ?? payment.invoiceId,
+        invoiceId: payment.invoiceId,
+        transactionId: payment.transactionId || "",
+        paymentMethod: payment.paymentMethod || "unknown",
+        amount: Number(payment.amount ?? 0),
+        status: payment.status || payment.paymentStatus || "pending",
+        paidDate: payment.paymentDate || payment.paidDate,
+        stationName: payment.stationName,
+      }));
+
+      setPaymentHistory(normalized);
     } catch (error) {
       console.error("Error fetching payment history:", error);
       setPaymentHistory([]);
     }
   }, [userId]);
 
-  const fetchStatistics = useCallback(async () => {
-    try {
-      const response = await axiosInstance.get(`/admin/AdminUsers/${userId}/statistics`);
-      
-      if (response.data.success) {
-        setStatistics(response.data.data);
-      }
-    } catch (error) {
-      console.error("Error fetching statistics:", error);
-    }
-  }, [userId]);
 
   useEffect(() => {
     fetchUserData();
   }, [fetchUserData]);
 
   useEffect(() => {
-    if (currentTab === 0) fetchChargingHistory();
-    if (currentTab === 1) fetchPaymentHistory();
-    if (currentTab === 2) fetchStatistics();
-  }, [currentTab, fetchChargingHistory, fetchPaymentHistory, fetchStatistics]);
+    setCurrentTab(0);
+  }, [userId, user?.role]);
+
+  useEffect(() => {
+    if (user?.role !== "customer") return;
+
+    if (currentTab === 0 && chargingHistory.length === 0) fetchChargingHistory();
+    if (currentTab === 1 && paymentHistory.length === 0) fetchPaymentHistory();
+    if (currentTab === 2 && !statistics) fetchStatistics();
+  }, [
+    currentTab,
+    user?.role,
+    chargingHistory.length,
+    paymentHistory.length,
+    statistics,
+    fetchChargingHistory,
+    fetchPaymentHistory,
+    fetchStatistics,
+  ]);
 
   const handleSendNotification = async () => {
     try {
@@ -248,10 +312,12 @@ const UserDetail = () => {
   };
 
   const formatCurrency = (amount) => {
+    const value = Number.isFinite(amount) ? amount : 0;
+
     return new Intl.NumberFormat("vi-VN", {
       style: "currency",
       currency: "VND",
-    }).format(amount);
+    }).format(value);
   };
 
   const formatDate = (dateString) => {
@@ -329,97 +395,167 @@ const UserDetail = () => {
                 </Box>
               </Grid>
 
-              {/* Vehicles */}
-              <Grid item xs={12} md={4}>
-                <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
-                  Phương tiện ({vehicles.length})
-                </Typography>
-                {vehicles.length === 0 ? (
-                  <Alert severity="info" icon={<DirectionsCar />}>
-                    Chưa có phương tiện
-                  </Alert>
-                ) : (
-                  vehicles.map((vehicle) => (
-                    <Card key={vehicle.vehicleId} variant="outlined" sx={{ mb: 1 }}>
-                      <CardContent sx={{ py: 1.5 }}>
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                          <DirectionsCar color="primary" />
-                          <Box sx={{ flex: 1 }}>
-                            <Typography variant="body2" fontWeight="medium">
-                              {vehicle.brand} {vehicle.model}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              {vehicle.licensePlate} • {vehicle.connectorType} • {vehicle.batteryCapacity} kWh
-                            </Typography>
+              {/* Vehicles - Only for Customer */}
+              {user.role === "customer" && (
+                <Grid item xs={12} md={4}>
+                  <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
+                    Phương tiện ({vehicles.length})
+                  </Typography>
+                  {vehicles.length === 0 ? (
+                    <Alert severity="info" icon={<DirectionsCar />}>
+                      Chưa có phương tiện
+                    </Alert>
+                  ) : (
+                    vehicles.map((vehicle) => (
+                      <Card key={vehicle.vehicleId} variant="outlined" sx={{ mb: 1 }}>
+                        <CardContent sx={{ py: 1.5 }}>
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                            <DirectionsCar color="primary" />
+                            <Box sx={{ flex: 1 }}>
+                              <Typography variant="body2" fontWeight="medium">
+                                {vehicle.brand} {vehicle.model}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {vehicle.licensePlate} • {vehicle.connectorType} • {vehicle.batteryCapacity} kWh
+                              </Typography>
+                            </Box>
+                            <Chip
+                              label={vehicle.status === "active" ? "Hoạt động" : "Không hoạt động"}
+                              color={vehicle.status === "active" ? "success" : "default"}
+                              size="small"
+                            />
                           </Box>
-                          <Chip
-                            label={vehicle.status === "active" ? "Hoạt động" : "Không hoạt động"}
-                            color={vehicle.status === "active" ? "success" : "default"}
-                            size="small"
-                          />
-                        </Box>
-                      </CardContent>
-                    </Card>
-                  ))
-                )}
-              </Grid>
+                        </CardContent>
+                      </Card>
+                    ))
+                  )}
+                </Grid>
+              )}
 
-              {/* Quick Stats */}
-              <Grid item xs={12} md={4}>
-                <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
-                  Thống kê nhanh
-                </Typography>
-                <Grid container spacing={1}>
-                  <Grid item xs={6}>
-                    <Card variant="outlined">
-                      <CardContent sx={{ textAlign: "center", py: 1.5 }}>
-                        <Typography variant="h6" color="primary" fontWeight="bold">
-                          {statistics?.totalSessions || 0}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          Lượt sạc
-                        </Typography>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                  <Grid item xs={6}>
-                    <Card variant="outlined">
-                      <CardContent sx={{ textAlign: "center", py: 1.5 }}>
-                        <Typography variant="h6" color="success.main" fontWeight="bold">
-                          {(statistics?.totalEnergyKwh || 0).toFixed(2)}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          kWh
-                        </Typography>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                  <Grid item xs={6}>
-                    <Card variant="outlined">
-                      <CardContent sx={{ textAlign: "center", py: 1.5 }}>
-                        <Typography variant="h6" color="info.main" fontWeight="bold">
-                          {formatCurrency(statistics?.totalSpentVnd || 0)}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          Tổng chi
-                        </Typography>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                  <Grid item xs={6}>
-                    <Card variant="outlined">
-                      <CardContent sx={{ textAlign: "center", py: 1.5 }}>
-                        <Typography variant="h6" color="warning.main" fontWeight="bold">
-                          {(statistics?.averageDurationMinutes || 0).toFixed(0)}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          Phút/lần
-                        </Typography>
-                      </CardContent>
-                    </Card>
+              {/* Quick Stats - Only for Customer */}
+              {user.role === "customer" && (
+                <Grid item xs={12} md={4}>
+                  <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
+                    Thống kê nhanh
+                  </Typography>
+                  <Grid container spacing={1}>
+                    <Grid item xs={6}>
+                      <Card variant="outlined">
+                        <CardContent sx={{ textAlign: "center", py: 1.5 }}>
+                          <Typography variant="h6" color="primary" fontWeight="bold">
+                            {statistics?.totalSessions || 0}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            Lượt sạc
+                          </Typography>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                    <Grid item xs={6}>
+                      <Card variant="outlined">
+                        <CardContent sx={{ textAlign: "center", py: 1.5 }}>
+                          <Typography variant="h6" color="success.main" fontWeight="bold">
+                            {(statistics?.totalEnergyKwh || 0).toFixed(2)}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            kWh
+                          </Typography>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                    <Grid item xs={6}>
+                      <Card variant="outlined">
+                        <CardContent sx={{ textAlign: "center", py: 1.5 }}>
+                          <Typography variant="h6" color="info.main" fontWeight="bold">
+                            {formatCurrency(statistics?.totalSpentVnd || 0)}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            Tổng chi
+                          </Typography>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                    <Grid item xs={6}>
+                      <Card variant="outlined">
+                        <CardContent sx={{ textAlign: "center", py: 1.5 }}>
+                          <Typography variant="h6" color="warning.main" fontWeight="bold">
+                            {(statistics?.averageDurationMinutes || 0).toFixed(0)}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            Phút/lần
+                          </Typography>
+                        </CardContent>
+                      </Card>
+                    </Grid>
                   </Grid>
                 </Grid>
-              </Grid>
+              )}
+
+              {/* Admin/Staff Info Section */}
+              {(user.role === "admin" || user.role === "staff") && (
+                <Grid item xs={12} md={8}>
+                  <Card variant="outlined">
+                    <CardContent>
+                      <Typography variant="h6" fontWeight="bold" gutterBottom>
+                        Thông tin chi tiết
+                      </Typography>
+                      
+                      {user.role === "admin" && (
+                        <Alert severity="success" icon={<CheckCircle />} sx={{ mb: 2 }}>
+                          Tài khoản quản trị hệ thống với quyền hạn đầy đủ
+                        </Alert>
+                      )}
+                      
+                      {user.role === "staff" && (
+                        <Alert severity="info" icon={<EvStation />} sx={{ mb: 2 }}>
+                          Nhân viên quản lý trạm sạc
+                        </Alert>
+                      )}
+
+                      <Grid container spacing={2}>
+                        <Grid item xs={12} sm={6}>
+                          <Typography variant="body2" color="text.secondary" gutterBottom>
+                            Trạng thái hoạt động
+                          </Typography>
+                          <Chip
+                            label={user.isActive ? "Đang hoạt động" : "Tạm ngưng"}
+                            color={user.isActive ? "success" : "default"}
+                            icon={<CheckCircle />}
+                          />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                          <Typography variant="body2" color="text.secondary" gutterBottom>
+                            Vai trò
+                          </Typography>
+                          <Typography variant="body1" fontWeight="medium">
+                            {user.role === "admin" ? "Quản trị viên" : "Nhân viên"}
+                          </Typography>
+                        </Grid>
+                        {user.role === "staff" && (
+                          <>
+                            <Grid item xs={12} sm={6}>
+                              <Typography variant="body2" color="text.secondary" gutterBottom>
+                                Trạm đang quản lý
+                              </Typography>
+                              <Typography variant="body1" fontWeight="medium">
+                                {user.assignedStationsCount || 0} trạm
+                              </Typography>
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                              <Typography variant="body2" color="text.secondary" gutterBottom>
+                                Lịch làm việc
+                              </Typography>
+                              <Typography variant="body1" fontWeight="medium">
+                                Xem chi tiết trong tab bên dưới
+                              </Typography>
+                            </Grid>
+                          </>
+                        )}
+                      </Grid>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              )}
             </Grid>
           </CardContent>
         </Card>
@@ -430,34 +566,26 @@ const UserDetail = () => {
         <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
           <Tabs value={currentTab} onChange={(e, v) => setCurrentTab(v)}>
             {/* Customer Tabs */}
-            {user.role === "customer" && (
-              <>
-                <Tab label="Lịch sử sạc" icon={<BatteryChargingFull />} iconPosition="start" />
-                <Tab label="Lịch sử thanh toán" icon={<Payment />} iconPosition="start" />
-                <Tab label="Thống kê chi tiết" icon={<TrendingUp />} iconPosition="start" />
-                <Tab label="Phương tiện" icon={<DirectionsCar />} iconPosition="start" />
-              </>
-            )}
+            {user.role === "customer" && [
+              <Tab key="customer-history" label="Lịch sử sạc" icon={<BatteryChargingFull />} iconPosition="start" />,
+              <Tab key="customer-payments" label="Lịch sử thanh toán" icon={<Payment />} iconPosition="start" />,
+              <Tab key="customer-stats" label="Thống kê chi tiết" icon={<TrendingUp />} iconPosition="start" />,
+              <Tab key="customer-vehicles" label="Phương tiện" icon={<DirectionsCar />} iconPosition="start" />,
+            ]}
             
             {/* Staff Tabs */}
-            {user.role === "staff" && (
-              <>
-                <Tab label="Trạm được giao" icon={<EvStation />} iconPosition="start" />
-                <Tab label="Lịch làm việc" icon={<Schedule />} iconPosition="start" />
-                <Tab label="Hoạt động" icon={<TrendingUp />} iconPosition="start" />
-                <Tab label="Thông báo" icon={<Notifications />} iconPosition="start" />
-              </>
-            )}
+            {user.role === "staff" && [
+              <Tab key="staff-stations" label="Trạm được giao" icon={<EvStation />} iconPosition="start" />,
+              <Tab key="staff-schedule" label="Lịch làm việc" icon={<Schedule />} iconPosition="start" />,
+            ]}
             
             {/* Admin Tabs */}
-            {user.role === "admin" && (
-              <>
-                <Tab label="Tổng quan" icon={<TrendingUp />} iconPosition="start" />
-                <Tab label="Hoạt động" icon={<AccessTime />} iconPosition="start" />
-                <Tab label="Quyền hạn" icon={<CheckCircle />} iconPosition="start" />
-                <Tab label="Nhật ký" icon={<Receipt />} iconPosition="start" />
-              </>
-            )}
+            {user.role === "admin" && [
+              <Tab key="admin-overview" label="Tổng quan" icon={<TrendingUp />} iconPosition="start" />,
+              <Tab key="admin-activities" label="Hoạt động" icon={<AccessTime />} iconPosition="start" />,
+              <Tab key="admin-perms" label="Quyền hạn" icon={<CheckCircle />} iconPosition="start" />,
+              <Tab key="admin-audit" label="Nhật ký" icon={<Receipt />} iconPosition="start" />,
+            ]}
           </Tabs>
         </Box>
 

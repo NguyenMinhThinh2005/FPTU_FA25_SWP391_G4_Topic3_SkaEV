@@ -30,6 +30,11 @@ public class StationListDto
     public decimal CurrentPowerUsageKw { get; set; }
     public decimal TotalPowerCapacityKw { get; set; }
     public decimal UtilizationRate { get; set; } // Percentage
+    public decimal MonthlyRevenue { get; set; }
+    public int MonthlyCompletedSessions { get; set; }
+    public double AverageSessionDurationMinutes { get; set; }
+    public decimal TodayRevenue { get; set; }
+    public int TodayCompletedSessions { get; set; }
 
     // Error indicators
     public int ErrorCount { get; set; }
@@ -281,6 +286,7 @@ public class StationErrorLogDto
     public string ErrorCode { get; set; } = string.Empty;
     public string Message { get; set; } = string.Empty;
     public string? Details { get; set; }
+    public string ClassificationSource { get; set; } = "manual"; // manual or auto
 
     public DateTime OccurredAt { get; set; }
     public bool IsResolved { get; set; }

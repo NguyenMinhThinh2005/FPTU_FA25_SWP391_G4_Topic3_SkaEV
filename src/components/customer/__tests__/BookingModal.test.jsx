@@ -214,7 +214,7 @@ describe.skip('BookingModal (skipped: MUI x-date-pickers import error)', () => {
   });
 
   it('creates booking successfully with all required data', async () => {
-    const user = userEvent.setup();
+  const _user = userEvent.setup();
     
     const mockBookingResponse = {
       bookingId: 123,
@@ -260,7 +260,7 @@ describe.skip('BookingModal (skipped: MUI x-date-pickers import error)', () => {
   });
 
   it('handles 409 Conflict (slot already booked)', async () => {
-    const user = userEvent.setup();
+  const _user = userEvent.setup();
     
     const error = new Error('Slot already booked');
     error.response = {
@@ -324,7 +324,7 @@ describe.skip('BookingModal (skipped: MUI x-date-pickers import error)', () => {
   });
 
   it('prevents duplicate booking submission', async () => {
-    const user = userEvent.setup();
+  const _user = userEvent.setup();
     
     // Slow API response
     bookingsAPI.create.mockImplementation(() => new Promise(resolve => setTimeout(resolve, 2000)));
@@ -340,8 +340,8 @@ describe.skip('BookingModal (skipped: MUI x-date-pickers import error)', () => {
 
     // Click confirm twice
     const confirmButton = screen.getByRole('button', { name: /xác nhận/i });
-    await user.click(confirmButton);
-    await user.click(confirmButton);
+  await _user.click(confirmButton);
+  await _user.click(confirmButton);
 
     // Only one API call
     await waitFor(() => {
@@ -381,7 +381,7 @@ describe.skip('BookingModal (skipped: MUI x-date-pickers import error)', () => {
   });
 
   it('allows going back to previous step', async () => {
-    const user = userEvent.setup();
+  const _user = userEvent.setup();
     renderWithRouter(
       <BookingModal
         open={true}
@@ -395,13 +395,13 @@ describe.skip('BookingModal (skipped: MUI x-date-pickers import error)', () => {
     // Click back button
     const backButton = screen.queryByRole('button', { name: /quay lại|back/i });
     if (backButton) {
-      await user.click(backButton);
+  await _user.click(backButton);
       // Should return to previous step
     }
   });
 
   it('closes modal when clicking close button', async () => {
-    const user = userEvent.setup();
+  const _user = userEvent.setup();
     renderWithRouter(
       <BookingModal
         open={true}
@@ -415,7 +415,7 @@ describe.skip('BookingModal (skipped: MUI x-date-pickers import error)', () => {
                         document.querySelector('[aria-label="close"]');
     
     if (closeButton) {
-      await user.click(closeButton);
+  await _user.click(closeButton);
       expect(mockOnClose).toHaveBeenCalled();
     }
   });
