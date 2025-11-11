@@ -1,4 +1,31 @@
 ﻿/* eslint-disable */
+/**
+ * ChargingFlow Component - Refactored Flow
+ * 
+ * CHANGES (Nov 2025):
+ * 1. Step 0 - Select Station: 
+ *    - REMOVED: Map view for station selection
+ *    - ADDED: List/Grid view with station cards showing all details
+ *    - Each card shows: name, address, distance, availability, slots, price, operating hours
+ * 
+ * 2. Step 1 - Navigation (NEW):
+ *    - ADDED: Map with directions to booked station
+ *    - Shows route from user location to selected station
+ *    - Used for navigation only, not for station selection
+ * 
+ * 3. Date/Time Restrictions:
+ *    - Only TODAY bookings allowed (Vietnam timezone UTC+7)
+ *    - Future date selection removed in ChargingDateTimePicker component
+ *    - Backend validation in BookingService.cs rejects non-today bookings
+ * 
+ * Flow Steps:
+ * 0. Select Station (List/Grid) 
+ * 1. Navigation Map (after booking)
+ * 2. QR Scan
+ * 3. Connect Vehicle
+ * 4. Charging
+ * 5. Complete
+ */
 import React, { useState, useEffect } from "react";
 import {
   Box,
@@ -44,7 +71,7 @@ import useStationStore from "../../store/stationStore";
 import { formatCurrency, calculateDistance } from "../../utils/helpers";
 import StationMapLeaflet from "../../components/customer/StationMapLeaflet";
 import notificationService from "../../services/notificationService";
-import { qrCodesAPI, chargingAPI } from "../../services/api";
+import { qrCodesAPI, chargingAPI, stationsAPI } from "../../services/api";
 
 // Helper function to normalize Vietnamese text for search
 const normalize = (text) => {
@@ -96,7 +123,7 @@ const ChargingFlow = () => {
   // Các bước của flow booking sạc xe
   const flowSteps = [
     "Chọn trạm",
-    "Đặt lịch",
+    "Chỉ đường",
     "Quét QR",
     "Kết nối",
     "Đang sạc",
@@ -122,11 +149,69 @@ const ChargingFlow = () => {
   };
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStation, setSelectedStation] = useState(null);
-  const [viewMode, setViewMode] = useState("list"); // 'list' or 'map'
+  // viewMode removed - always use list/grid view in step 0, map only for navigation in step 1
   const [userLocation, setUserLocation] = useState({
     lat: 10.8231, // Default to Ho Chi Minh City (HCMC)
     lng: 106.6297,
   });
+
+  // State to store stations with real-time stats from API
+  const [stationsWithStats, setStationsWithStats] = useState([]);
+
+  // Fetch real-time stats from API for each station
+  useEffect(() => {
+    const fetchStationsStats = async () => {
+      if (!stations || stations.length === 0) return;
+
+      try {
+        const stationsWithRealStats = await Promise.all(
+          stations.map(async (station) => {
+            try {
+              // Call API to get available posts and slots for this station
+              const response = await stationsAPI.getAvailablePosts(station.id);
+              const posts = response.data?.data || response.data || [];
+
+              // Calculate stats from real API data
+              let totalSlots = 0;
+              let availableSlots = 0;
+
+              posts.forEach((post) => {
+                totalSlots += post.totalSlots || 0;
+                availableSlots += post.availableSlots || 0;
+              });
+
+              const occupiedSlots = totalSlots - availableSlots;
+
+              return {
+                ...station,
+                stats: {
+                  total: totalSlots,
+                  available: availableSlots,
+                  occupied: occupiedSlots,
+                },
+              };
+            } catch (error) {
+              console.error(
+                `Error fetching stats for station ${station.id}:`,
+                error
+              );
+              // Return station with empty stats on error
+              return {
+                ...station,
+                stats: { total: 0, available: 0, occupied: 0 },
+              };
+            }
+          })
+        );
+
+        setStationsWithStats(stationsWithRealStats);
+      } catch (error) {
+        console.error("Error fetching stations stats:", error);
+      }
+    };
+
+    fetchStationsStats();
+  }, [stations]);
 
   // Khôi phục currentBooking, chargingSession, flowStep từ sessionStorage khi mount (KHÔNG reset flowStep về 0 tự động)
   useEffect(() => {
@@ -282,10 +367,13 @@ const ChargingFlow = () => {
       );
     }
   }, []);
-  // Filter and search stations (useMemo)
+  // Filter and search stations (useMemo) - Use stationsWithStats instead of stations
   const filteredStations = React.useMemo(() => {
     try {
-      let stationList = stations ? [...stations] : [];
+      // Use stationsWithStats if available, otherwise fallback to stations
+      let stationList =
+        stationsWithStats.length > 0 ? [...stationsWithStats] : [];
+
       const query = normalize(searchQuery.trim());
       if (query) {
         stationList = stationList.filter((station) => {
@@ -346,24 +434,8 @@ const ChargingFlow = () => {
             );
             return true;
           }
-          // Check poles/ports if connectorTypes not available
-          if (station.charging.poles && Array.isArray(station.charging.poles)) {
-            const hasInPoles = station.charging.poles.some(
-              (pole) =>
-                pole &&
-                pole.ports &&
-                Array.isArray(pole.ports) &&
-                pole.ports.some(
-                  (port) =>
-                    port && connectorFilters.includes(port.connectorType)
-                )
-            );
-            if (hasInPoles) {
-              console.log("✅ Connector match in poles:", station.name);
-              return true;
-            }
-          }
-          console.log("❌ No connector match:", station.name);
+          // Fallback: check if station has connector info in charging object
+          // Fallback: check if station has connector info in charging object
           return false;
         });
         console.log(
@@ -376,28 +448,11 @@ const ChargingFlow = () => {
       if (stationList.length > 0) {
         console.log("   Stations:", stationList.map((s) => s.name).join(", "));
       }
-      // Add stats and distance to each station
+
+      // Calculate distance from user location (stats already included from API)
       stationList = stationList.map((station) => {
         let updatedStation = { ...station };
-        
-        // Add stats if not present
-        if (!station.stats && station.charging?.poles) {
-          let totalPorts = 0;
-          let availablePorts = 0;
-          station.charging.poles.forEach((pole) => {
-            const ports = pole.ports || [];
-            totalPorts += ports.length;
-            availablePorts += ports.filter(
-              (port) => port.status === "available"
-            ).length;
-          });
-          updatedStation.stats = {
-            total: totalPorts,
-            available: availablePorts,
-            occupied: totalPorts - availablePorts,
-          };
-        }
-        
+
         // Calculate distance from user location
         if (userLocation && station.location?.coordinates) {
           const distance = calculateDistance(
@@ -408,26 +463,34 @@ const ChargingFlow = () => {
           );
           updatedStation.distanceFromUser = distance;
         }
-        
+
         return updatedStation;
       });
-      
+
       // Sort by distance (ascending order) - nearest stations first
       stationList.sort((a, b) => {
-        if (a.distanceFromUser !== undefined && b.distanceFromUser !== undefined) {
+        if (
+          a.distanceFromUser !== undefined &&
+          b.distanceFromUser !== undefined
+        ) {
           return a.distanceFromUser - b.distanceFromUser;
         }
         return 0;
       });
-      
-      console.log("📍 Stations sorted by distance:", stationList.map(s => `${s.name} (${s.distanceFromUser?.toFixed(1)}km)`));
-      
+
+      console.log(
+        "📍 Stations sorted by distance:",
+        stationList.map(
+          (s) => `${s.name} (${s.distanceFromUser?.toFixed(1)}km)`
+        )
+      );
+
       return stationList;
     } catch (error) {
       console.error("❌ Error filtering stations:", error);
       return [];
     }
-  }, [searchQuery, filters.connectorTypes, stations, userLocation]);
+  }, [searchQuery, filters.connectorTypes, stationsWithStats, userLocation]);
 
   useEffect(() => {
     console.log("🚀 ChargingFlow mounted - initializing data");
@@ -447,7 +510,10 @@ const ChargingFlow = () => {
           setUserLocation(newLocation);
         },
         (error) => {
-          console.warn("⚠️ Location access denied, using default location:", error);
+          console.warn(
+            "⚠️ Location access denied, using default location:",
+            error
+          );
           // Keep default location (HCMC)
         }
       );
@@ -494,7 +560,7 @@ const ChargingFlow = () => {
     console.log("🎯 Booking completed:", booking);
     setCurrentBookingData(booking);
     setBookingModalOpen(false);
-    setFlowStep(2); // Move to QR scan step
+    setFlowStep(1); // Move to navigation/direction map step
 
     // Initialize session data based on booking
     const energyNeeded = (sessionData.targetSOC - sessionData.startSOC) * 0.6; // 60kWh battery
@@ -706,7 +772,7 @@ const ChargingFlow = () => {
           </Stepper>
         </CardContent>
       </Card>
-      {/* Step 0: Find Stations */}
+      {/* Step 0: Select Station - LIST/GRID VIEW (Map removed) */}
       {flowStep === 0 && (
         <Grid container spacing={3}>
           {/* Search and Filters */}
@@ -731,7 +797,9 @@ const ChargingFlow = () => {
                   }}
                   InputProps={{
                     startAdornment: (
-                      <Search sx={{ mr: 1, color: "text.secondary", fontSize: 24 }} />
+                      <Search
+                        sx={{ mr: 1, color: "text.secondary", fontSize: 24 }}
+                      />
                     ),
                   }}
                   sx={{
@@ -757,7 +825,7 @@ const ChargingFlow = () => {
             </Card>
           </Grid>
 
-          {/* Stations List or Map */}
+          {/* Stations List/Grid View - MAP REMOVED */}
           <Grid item xs={12}>
             <Card>
               <CardContent>
@@ -768,23 +836,270 @@ const ChargingFlow = () => {
                     fontWeight: "bold",
                     color: "black",
                     mb: 3,
-                    textAlign: "center",
                   }}
                 >
-                   Bản đồ trạm sạc 
+                  📍 Danh sách trạm sạc ({filteredStations.length} trạm)
                 </Typography>
-                <StationMapLeaflet
-                  stations={filteredStations}
-                  onStationSelect={handleStationSelect}
-                />
+
+                {loading ? (
+                  <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+                    <Typography>Đang tải danh sách trạm...</Typography>
+                  </Box>
+                ) : filteredStations.length === 0 ? (
+                  <Box sx={{ textAlign: "center", py: 4 }}>
+                    <Typography variant="body1" color="text.secondary">
+                      Không tìm thấy trạm sạc phù hợp
+                    </Typography>
+                  </Box>
+                ) : (
+                  <Grid container spacing={2}>
+                    {filteredStations.map((station, index) => {
+                      const isAvailable = station.stats?.available > 0;
+                      const distance = station.distanceFromUser?.toFixed(1) || "N/A";
+                      const pricing = station.charging?.pricing?.acRate || 
+                                     station.charging?.pricing?.dcRate || 0;
+
+                      return (
+                        <Grid item xs={12} md={6} key={station.id}>
+                          <Card
+                            sx={{
+                              height: "100%",
+                              cursor: "pointer",
+                              transition: "all 0.3s",
+                              border: "2px solid",
+                              borderColor: "divider",
+                              "&:hover": {
+                                borderColor: "primary.main",
+                                boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                                transform: "translateY(-4px)",
+                              },
+                            }}
+                            onClick={() => handleStationSelect(station)}
+                          >
+                            <CardContent>
+                              {/* Station Header */}
+                              <Box sx={{ display: "flex", alignItems: "start", mb: 2 }}>
+                                {/* Station Number Badge */}
+                                <Box
+                                  sx={{
+                                    minWidth: 40,
+                                    height: 40,
+                                    borderRadius: "50%",
+                                    backgroundColor: "primary.main",
+                                    color: "white",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    fontWeight: "bold",
+                                    fontSize: "1.1rem",
+                                    mr: 2,
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  {index + 1}
+                                </Box>
+
+                                {/* Station Avatar */}
+                                <Avatar
+                                  src={getStationImage(station)}
+                                  sx={{ width: 60, height: 60, mr: 2 }}
+                                  onError={(e) => {
+                                    e.target.onerror = null;
+                                    e.target.src =
+                                      'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="60" height="60"%3E%3Crect fill="%231379FF" width="60" height="60"/%3E%3Ctext fill="white" x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="12"%3EStation%3C/text%3E%3C/svg%3E';
+                                  }}
+                                >
+                                  <ElectricCar />
+                                </Avatar>
+
+                                {/* Station Info */}
+                                <Box sx={{ flex: 1 }}>
+                                  <Typography variant="h6" fontWeight="bold" sx={{ mb: 0.5 }}>
+                                    {station.name}
+                                  </Typography>
+                                  <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mb: 1 }}>
+                                    <Chip
+                                      label={`${distance} km`}
+                                      size="small"
+                                      color="primary"
+                                      variant="outlined"
+                                    />
+                                    <Chip
+                                      label={isAvailable ? "Còn chỗ" : "Đầy"}
+                                      size="small"
+                                      color={isAvailable ? "success" : "error"}
+                                    />
+                                  </Box>
+                                </Box>
+                              </Box>
+
+                              {/* Station Details */}
+                              <Box sx={{ mb: 2 }}>
+                                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mb: 1 }}>
+                                  <LocationOn sx={{ fontSize: 18, color: "text.secondary" }} />
+                                  <Typography variant="body2" color="text.secondary">
+                                    {station.location?.address}
+                                  </Typography>
+                                </Box>
+
+                                <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+                                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                                    <Speed sx={{ fontSize: 18, color: "primary.main" }} />
+                                    <Typography variant="body2">
+                                      Tối đa {station.charging?.maxPower || 0}kW
+                                    </Typography>
+                                  </Box>
+
+                                  <Typography variant="body2" color="text.secondary">
+                                    ⚡ {station.stats?.available || 0}/{station.stats?.total || 0} cổng trống
+                                  </Typography>
+                                </Box>
+
+                                {station.operatingHours && (
+                                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                                    🕐 {formatOperatingHours(station.operatingHours)}
+                                  </Typography>
+                                )}
+
+                                {pricing > 0 && (
+                                  <Typography variant="body2" color="success.main" sx={{ mt: 0.5, fontWeight: "bold" }}>
+                                    💰 Từ {formatCurrency(pricing)}/kWh
+                                  </Typography>
+                                )}
+                              </Box>
+
+                              {/* Action Button */}
+                              <Button
+                                fullWidth
+                                variant="contained"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleStationSelect(station);
+                                }}
+                                disabled={!isAvailable}
+                              >
+                                {isAvailable ? "Chọn trạm này" : "Hết chỗ"}
+                              </Button>
+                            </CardContent>
+                          </Card>
+                        </Grid>
+                      );
+                    })}
+                  </Grid>
+                )}
               </CardContent>
             </Card>
           </Grid>
-
-          {/* Stations List with Distance and Ranking */}
-
         </Grid>
       )}
+
+      {/* Step 1: Navigation/Direction Map - Show route to booked station */}
+      {flowStep === 1 && selectedStation && (
+        <Grid container spacing={3}>
+          <Grid item xs={12}>
+            <Card>
+              <CardContent>
+                <Typography variant="h5" gutterBottom sx={{ fontWeight: "bold", mb: 2 }}>
+                  ✅ Đặt lịch thành công!
+                </Typography>
+                <Alert severity="success" sx={{ mb: 3 }}>
+                  Bạn đã đặt trạm <strong>{selectedStation.name}</strong> thành công. 
+                  Hãy di chuyển đến trạm và quét QR để bắt đầu sạc.
+                </Alert>
+
+                {/* Station Info Summary */}
+                <Card variant="outlined" sx={{ mb: 3, p: 2 }}>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} md={6}>
+                      <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+                        <Avatar
+                          src={getStationImage(selectedStation)}
+                          sx={{ width: 60, height: 60, mr: 2 }}
+                        >
+                          <ElectricCar />
+                        </Avatar>
+                        <Box>
+                          <Typography variant="h6" fontWeight="bold">
+                            {selectedStation.name}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {selectedStation.location?.address}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </Grid>
+                    <Grid item xs={12} md={6}>
+                      <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                        <Chip
+                          icon={<LocationOn />}
+                          label={`${selectedStation.distanceFromUser?.toFixed(1) || "N/A"} km`}
+                          color="primary"
+                          variant="outlined"
+                        />
+                        <Chip
+                          icon={<Speed />}
+                          label={`${selectedStation.charging?.maxPower || 0}kW`}
+                          color="primary"
+                          variant="outlined"
+                        />
+                        {selectedStation.operatingHours && (
+                          <Chip
+                            label={formatOperatingHours(selectedStation.operatingHours)}
+                            color="default"
+                            variant="outlined"
+                          />
+                        )}
+                      </Box>
+                    </Grid>
+                  </Grid>
+                </Card>
+
+                {/* Map with directions */}
+                <Typography variant="h6" gutterBottom sx={{ fontWeight: "bold", mb: 2 }}>
+                  🗺️ Chỉ đường đến trạm
+                </Typography>
+                <Box sx={{ 
+                  height: 500, 
+                  border: "1px solid", 
+                  borderColor: "divider", 
+                  borderRadius: 2,
+                  overflow: "hidden"
+                }}>
+                  <StationMapLeaflet
+                    stations={[selectedStation]}
+                    onStationSelect={() => {}}
+                    userLocation={userLocation}
+                    showRoute={true}
+                    centerOnStation={true}
+                  />
+                </Box>
+
+                {/* Action Buttons */}
+                <Box sx={{ display: "flex", gap: 2, mt: 3, justifyContent: "center" }}>
+                  <Button
+                    variant="outlined"
+                    onClick={() => {
+                      setFlowStep(0);
+                      setSelectedStation(null);
+                    }}
+                  >
+                    Chọn trạm khác
+                  </Button>
+                  <Button
+                    variant="contained"
+                    size="large"
+                    onClick={() => setFlowStep(2)}
+                    startIcon={<QrCodeScanner />}
+                  >
+                    Tôi đã đến trạm - Quét QR
+                  </Button>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+      )}
+
       {/* Step 2: QR Scan */}
       {flowStep === 2 && (
         <Grid item xs={12}>
@@ -1692,25 +2007,6 @@ const ChargingFlow = () => {
                         }}
                       >
                         🏦 Chuyển khoản ngân hàng
-                      </Button>
-                      <Button
-                        variant={
-                          selectedPaymentMethod === "cash"
-                            ? "contained"
-                            : "outlined"
-                        }
-                        fullWidth
-                        onClick={() =>
-                          setSelectedPaymentMethod("cash")
-                        }
-                        sx={{
-                          justifyContent: "flex-start",
-                          p: 2,
-                          borderWidth: 2,
-                          "&:hover": { borderWidth: 2 },
-                        }}
-                      >
-                        💸 Thanh toán tại chỗ
                       </Button>
                     </Box>
 

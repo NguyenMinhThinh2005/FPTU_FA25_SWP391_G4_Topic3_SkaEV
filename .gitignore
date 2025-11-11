@@ -32,17 +32,19 @@ SkaEV.API/logs/
 *.user
 *.suo
 
-# Environment - all .env files except examples
+# Environment
 .env
-.env.*
-!.env.example
-!.env.*.example
+.env.local
+.env.development
+.env.production
 
 # Backend settings - each developer has their own connection string
 SkaEV.API/appsettings.Development.json
-SkaEV.API/appsettings.json
+SkaEV.API/appsettings.Local.json
 SkaEV.API/appsettings.*.json
+!SkaEV.API/appsettings.Development.json.example
 !SkaEV.API/appsettings.template.json
+!SkaEV.API/appsettings.SQLite.json
 !SkaEV.API/appsettings.*.example
 !SkaEV.API/*.example.json
 
@@ -73,9 +75,20 @@ database/reset-user-password.sql
 database/reset-all-new-users.sql
 database/add-main-accounts.sql
 
+# Database files (SQLite)
+*.db
+*.db-shm
+*.db-wal
+SkaEV.db*
+
 # Local configuration files
 *.local.json
 !appsettings.template.json
+
+# Sensitive configuration files
+**/appsettings.local.json
+**/appsettings.secrets.json
+**/connectionstrings.json
 
 # SQL Server local files
 *.mdf
@@ -91,16 +104,3 @@ TEST_USER_CREATION.md
 FIX_USER_MANAGEMENT.md
 FIX_ADMIN_LOGIN.md
 !.azure/README.md
-
-# Temporary documentation files (work in progress)
-*_TEST_*.md
-*_DEBUG_*.md
-*_GUIDE_*.md
-COMPLETE_ACCOUNT_LIST.md
-SYSTEM_STATUS_REPORT.md
-
-# Keep important docs
-!README.md
-!SETUP*.md
-!API_*.md
-!INTEGRATION*.md

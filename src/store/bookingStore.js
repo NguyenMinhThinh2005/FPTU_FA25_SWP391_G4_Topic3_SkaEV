@@ -2,6 +2,102 @@
 import { persist } from "zustand/middleware";
 import { bookingsAPI } from "../services/api";
 
+const ACTIVE_STATUSES = new Set([
+  "pending",
+  "scheduled",
+  "confirmed",
+  "in_progress",
+  "charging",
+]);
+
+const parseNumber = (value, fallback = null) => {
+  if (value === null || value === undefined || value === "") {
+    return fallback;
+  }
+  const numeric = Number(value);
+  return Number.isNaN(numeric) ? fallback : numeric;
+};
+
+const normalizeBookingFromApi = (raw) => {
+  if (!raw) {
+    return null;
+  }
+
+  const status = (raw.status || "").toLowerCase();
+  const createdAt = raw.createdAt || new Date().toISOString();
+  const scheduledStartTime =
+    raw.scheduledStartTime || raw.scheduledDateTime || null;
+  const actualStartTime = raw.actualStartTime || null;
+  const actualEndTime = raw.actualEndTime || null;
+  const completedAt = raw.completedAt || actualEndTime || null;
+
+  const chargingDurationFromApi = parseNumber(raw.chargingDurationMinutes);
+  let chargingDuration = chargingDurationFromApi;
+  if (chargingDuration === null && actualStartTime && actualEndTime) {
+    const start = new Date(actualStartTime).getTime();
+    const end = new Date(actualEndTime).getTime();
+    const diffMinutes = Math.round((end - start) / 60000);
+    chargingDuration = diffMinutes > 0 ? diffMinutes : 0;
+  }
+  if (chargingDuration === null && raw.estimatedDuration !== undefined) {
+    chargingDuration = parseNumber(raw.estimatedDuration, null);
+  }
+
+  const energyDelivered = parseNumber(
+    raw.totalEnergyKwh !== undefined ? raw.totalEnergyKwh : raw.energyDelivered,
+    0
+  );
+  const totalAmount = parseNumber(raw.totalAmount, 0);
+
+  return {
+    id: raw.bookingId,
+    bookingId: raw.bookingId,
+    apiId: raw.bookingId,
+    bookingCode: `BK-${String(raw.bookingId).padStart(6, "0")}`,
+    userId: raw.userId,
+    vehicleId: raw.vehicleId,
+    vehicleType: raw.vehicleType,
+    licensePlate: raw.licensePlate,
+    stationId: raw.stationId,
+    stationName: raw.stationName,
+    stationAddress: raw.stationAddress,
+    slotId: raw.slotId,
+    slotNumber: raw.slotNumber,
+    status,
+    statusLabel: raw.status,
+    schedulingType: raw.schedulingType,
+    bookingDate: createdAt ? createdAt.split("T")[0] : null,
+    createdAt,
+    estimatedArrival: raw.estimatedArrival || null,
+    scheduledDateTime: scheduledStartTime,
+    actualStartTime,
+    actualEndTime,
+    completedAt,
+    targetSOC: parseNumber(raw.targetSoc),
+    currentSOC: parseNumber(raw.currentSoc),
+    finalSOC: parseNumber(raw.finalSoc ?? raw.currentSoc),
+    estimatedDuration: parseNumber(raw.estimatedDuration),
+    chargingDuration,
+    energyDelivered,
+    totalEnergyKwh: energyDelivered,
+    totalAmount,
+    subtotal: parseNumber(raw.subtotal),
+    taxAmount: parseNumber(raw.taxAmount),
+    unitPrice: parseNumber(raw.unitPrice),
+    connector: raw.slotNumber
+      ? {
+          id: raw.slotId,
+          name: `Slot ${raw.slotNumber}`,
+          location: raw.stationName,
+          compatible: true,
+        }
+      : null,
+    chargerType: null,
+    qrScanned: status !== "scheduled" && status !== "pending",
+    chargingStarted: status === "in_progress" || status === "charging",
+  };
+};
+
 const useBookingStore = create(
   persist(
     (set, get) => ({
@@ -59,6 +155,12 @@ const useBookingStore = create(
           scheduledDateTime: bookingData.scheduledDateTime,
           scheduledDate: bookingData.scheduledDate,
           scheduledTime: bookingData.scheduledTime,
+          estimatedDuration: bookingData.estimatedDuration
+            ? parseInt(bookingData.estimatedDuration)
+            : null,
+          targetSOC: bookingData.targetSOC
+            ? parseInt(bookingData.targetSOC)
+            : null,
         };
 
         let booking = {
@@ -73,6 +175,10 @@ const useBookingStore = create(
               : new Date(Date.now() + 15 * 60 * 1000).toISOString(),
           qrScanned: false,
           chargingStarted: false,
+          energyDelivered: 0,
+          totalEnergyKwh: 0,
+          totalAmount: 0,
+          chargingDuration: cleanData.estimatedDuration || 0,
         };
 
         // Try API if enabled
@@ -82,18 +188,18 @@ const useBookingStore = create(
 
             // Use real slot ID from database if available, otherwise fallback
             let slotId = bookingData.port?.slotId || 3; // Use real slotId or default to 3
-            
+
             if (bookingData.port?.slotId) {
-              console.log('✅ Using real slot ID from database:', slotId);
+              console.log("✅ Using real slot ID from database:", slotId);
             } else {
-              console.warn('⚠️ No real slot ID, using fallback slot:', slotId);
+              console.warn("⚠️ No real slot ID, using fallback slot:", slotId);
               // Fallback: Extract from port ID format "stationId-slotX"
               if (bookingData.port?.id) {
                 const portStr = bookingData.port.id.toString();
                 const slotMatch = portStr.match(/slot(\d+)/);
                 if (slotMatch) {
                   slotId = parseInt(slotMatch[1]);
-                  console.log('🎯 Extracted slot ID from port string:', slotId);
+                  console.log("🎯 Extracted slot ID from port string:", slotId);
                 }
               }
             }
@@ -160,6 +266,57 @@ const useBookingStore = create(
 
         console.log("✅ Booking created:", booking.id);
         return booking;
+      },
+
+      fetchBookings: async () => {
+        set({ loading: true, error: null });
+
+        try {
+          const response = await bookingsAPI.getUserBookings();
+          const rawBookings = Array.isArray(response)
+            ? response
+            : Array.isArray(response?.data)
+            ? response.data
+            : [];
+
+          const normalizedBookings = rawBookings
+            .map(normalizeBookingFromApi)
+            .filter((booking) => booking !== null);
+
+          const sortedHistory = [...normalizedBookings].sort((a, b) => {
+            const createdA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+            const createdB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+            return createdB - createdA;
+          });
+
+          const activeBookings = normalizedBookings.filter((booking) =>
+            ACTIVE_STATUSES.has(booking.status)
+          );
+
+          const currentActiveBooking = sortedHistory.find((booking) =>
+            ["charging", "in_progress"].includes(booking.status)
+          );
+
+          set({
+            bookings: activeBookings,
+            bookingHistory: sortedHistory,
+            currentBooking: currentActiveBooking || null,
+            loading: false,
+          });
+
+          return sortedHistory;
+        } catch (error) {
+          console.error("❌ Error fetching bookings:", error);
+          set({
+            loading: false,
+            error: error?.message || "Failed to fetch bookings",
+          });
+          throw error;
+        }
+      },
+
+      loadUserBookings: async () => {
+        return get().fetchBookings();
       },
 
       updateBookingStatus: (bookingId, status, data = {}) => {
@@ -520,57 +677,89 @@ const useBookingStore = create(
       // Statistics - MASTER DATA SOURCE
       getBookingStats: () => {
         const { bookingHistory } = get();
-        const total = bookingHistory.length;
+
+        if (!bookingHistory || bookingHistory.length === 0) {
+          return {
+            total: 0,
+            completed: 0,
+            cancelled: 0,
+            completionRate: 0,
+            totalEnergyCharged: 0,
+            totalAmount: 0,
+            totalDuration: 0,
+            averageEnergy: 0,
+            averageAmount: 0,
+            averageDuration: 0,
+            averageSession: 0,
+          };
+        }
+
+        const statusOf = (booking) =>
+          (booking?.status || booking?.statusLabel || "").toLowerCase();
+
         const completedBookings = bookingHistory.filter(
-          (b) => b.status === "completed"
+          (booking) => statusOf(booking) === "completed"
         );
-        const completed = completedBookings.length;
         const cancelled = bookingHistory.filter(
-          (b) => b.status === "cancelled"
+          (booking) => statusOf(booking) === "cancelled"
         ).length;
 
-        // Calculate totals from actual booking data
-        const totalEnergyCharged = completedBookings.reduce(
-          (sum, b) => sum + (b.energyDelivered || 0),
-          0
-        );
-        const totalAmount = completedBookings.reduce(
-          (sum, b) => sum + (b.totalAmount || 0),
-          0
-        );
-        const totalDuration = completedBookings.reduce(
-          (sum, b) => sum + (b.chargingDuration || 0),
-          0
-        );
+        const completed = completedBookings.length;
+        const total = bookingHistory.length;
 
-        // Debug log
-        console.log("📊 bookingStore.getBookingStats() - Calculation:", {
-          completedBookings: completed,
-          totalEnergyCharged,
-          totalAmount,
-          totalDuration,
-        });
+        const totalEnergyCharged = completedBookings.reduce((sum, booking) => {
+          const energy = parseNumber(
+            booking?.energyDelivered !== undefined
+              ? booking.energyDelivered
+              : booking?.totalEnergyKwh,
+            0
+          );
+          return sum + (energy || 0);
+        }, 0);
+
+        const totalAmount = completedBookings.reduce((sum, booking) => {
+          const amount = parseNumber(
+            booking?.totalAmount !== undefined
+              ? booking.totalAmount
+              : booking?.amount,
+            0
+          );
+          return sum + (amount || 0);
+        }, 0);
+
+        const totalDuration = completedBookings.reduce((sum, booking) => {
+          const duration = parseNumber(
+            booking?.chargingDuration !== undefined
+              ? booking.chargingDuration
+              : booking?.chargingDurationMinutes !== undefined
+              ? booking.chargingDurationMinutes
+              : booking?.estimatedDuration,
+            0
+          );
+          return sum + (duration || 0);
+        }, 0);
 
         return {
           total,
           completed,
           cancelled,
           completionRate:
-            total > 0 ? ((completed / total) * 100).toFixed(1) : 0,
-          // Return exact values, no minimum manipulation
-          totalEnergyCharged: totalEnergyCharged.toFixed(2), // "245.00"
-          totalAmount: totalAmount.toFixed(0), // "1679966"
-          totalDuration: totalDuration, // 642
-          // Averages
+            total > 0 ? Number(((completed / total) * 100).toFixed(1)) : 0,
+          totalEnergyCharged: Number(totalEnergyCharged.toFixed(2)),
+          totalAmount: Math.round(totalAmount),
+          totalDuration,
           averageEnergy:
-            completed > 0 ? (totalEnergyCharged / completed).toFixed(2) : "0", // "20.42"
+            completed > 0
+              ? Number((totalEnergyCharged / completed).toFixed(2))
+              : 0,
           averageAmount:
-            completed > 0 ? Math.round(totalAmount / completed) : 0, // 139997
+            completed > 0 ? Math.round(totalAmount / completed) : 0,
           averageDuration:
-            completed > 0 ? Math.round(totalDuration / completed) : 0, // 54
-          // Keep for backward compatibility
+            completed > 0 ? Math.round(totalDuration / completed) : 0,
           averageSession:
-            completed > 0 ? (totalEnergyCharged / completed).toFixed(2) : "0",
+            completed > 0
+              ? Number((totalEnergyCharged / completed).toFixed(2))
+              : 0,
         };
       },
     }),

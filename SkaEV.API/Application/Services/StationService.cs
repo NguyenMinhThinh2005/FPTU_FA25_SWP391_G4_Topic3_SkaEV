@@ -4,6 +4,7 @@ using SkaEV.API.Infrastructure.Data;
 using SkaEV.API.Application.DTOs.Stations;
 using SkaEV.API.Application.DTOs.Slots;
 using Newtonsoft.Json;
+using SkaEV.API.Domain.Entities;
 
 namespace SkaEV.API.Application.Services;
 
@@ -16,6 +17,8 @@ public interface IStationService
     Task<bool> UpdateStationAsync(int stationId, UpdateStationDto dto);
     Task<bool> DeleteStationAsync(int stationId);
     Task<List<SlotDetailDto>> GetStationSlotsDetailsAsync(int stationId);
+    Task<List<SlotDetailDto>> GetAvailableSlotsAsync(int stationId);
+    Task<List<ChargingPostWithSlotsDto>> GetAvailablePostsAsync(int stationId);
 }
 
 public class StationService : IStationService
@@ -40,22 +43,35 @@ public class StationService : IStationService
             .FromSqlRaw(sql, latParam, lonParam, radiusParam)
             .ToListAsync();
 
-        var stations = stationsRaw.Select(s => new StationDto
+        var pricingLookup = await BuildPricingLookupAsync(stationsRaw.Select(s => s.StationId));
+
+        var stations = stationsRaw.Select(s =>
         {
-            StationId = s.StationId,
-            StationName = s.StationName,
-            Address = s.Address,
-            City = s.City,
-            Latitude = s.Latitude,
-            Longitude = s.Longitude,
-            TotalPosts = s.TotalPosts,
-            AvailablePosts = s.AvailablePosts,
-            OperatingHours = s.OperatingHours,
-            Amenities = !string.IsNullOrEmpty(s.Amenities)
-                ? s.Amenities.Split(',').Select(a => a.Trim()).ToList()
-                : new List<string>(),
-            StationImageUrl = s.StationImageUrl,
-            Status = s.Status
+            var pricing = pricingLookup.TryGetValue(s.StationId, out var value)
+                ? value
+                : StationPricingInfo.CreateDefault();
+
+            return new StationDto
+            {
+                StationId = s.StationId,
+                StationName = s.StationName,
+                Address = s.Address,
+                City = s.City,
+                Latitude = s.Latitude,
+                Longitude = s.Longitude,
+                TotalPosts = s.TotalPosts,
+                AvailablePosts = s.AvailablePosts,
+                OperatingHours = s.OperatingHours,
+                Amenities = !string.IsNullOrEmpty(s.Amenities)
+                    ? s.Amenities.Split(',').Select(a => a.Trim()).ToList()
+                    : new List<string>(),
+                StationImageUrl = s.StationImageUrl,
+                Status = s.Status,
+                AcRate = pricing.AcRate,
+                DcRate = pricing.DcRate,
+                DcFastRate = pricing.DcFastRate,
+                ParkingFee = pricing.ParkingFee
+            };
         }).ToList();
 
         return stations;
@@ -69,6 +85,11 @@ public class StationService : IStationService
 
         if (stationEntity == null)
             return null;
+
+        var pricingLookup = await BuildPricingLookupAsync(new[] { stationEntity.StationId });
+        var pricing = pricingLookup.TryGetValue(stationEntity.StationId, out var value)
+            ? value
+            : StationPricingInfo.CreateDefault();
 
         return new StationDto
         {
@@ -85,7 +106,11 @@ public class StationService : IStationService
                 ? stationEntity.Amenities.Split(',').Select(a => a.Trim()).ToList()
                 : new List<string>(),
             StationImageUrl = stationEntity.StationImageUrl,
-            Status = stationEntity.Status
+            Status = stationEntity.Status,
+            AcRate = pricing.AcRate,
+            DcRate = pricing.DcRate,
+            DcFastRate = pricing.DcFastRate,
+            ParkingFee = pricing.ParkingFee
         };
     }
 
@@ -105,22 +130,35 @@ public class StationService : IStationService
 
         var stationsRaw = await query.ToListAsync();
 
-        var stations = stationsRaw.Select(s => new StationDto
+        var pricingLookup = await BuildPricingLookupAsync(stationsRaw.Select(s => s.StationId));
+
+        var stations = stationsRaw.Select(s =>
         {
-            StationId = s.StationId,
-            StationName = s.StationName,
-            Address = s.Address,
-            City = s.City,
-            Latitude = s.Latitude,
-            Longitude = s.Longitude,
-            TotalPosts = s.TotalPosts,
-            AvailablePosts = s.AvailablePosts,
-            OperatingHours = s.OperatingHours,
-            Amenities = !string.IsNullOrEmpty(s.Amenities)
-                ? s.Amenities.Split(',').Select(a => a.Trim()).ToList()
-                : new List<string>(),
-            StationImageUrl = s.StationImageUrl,
-            Status = s.Status
+            var pricing = pricingLookup.TryGetValue(s.StationId, out var value)
+                ? value
+                : StationPricingInfo.CreateDefault();
+
+            return new StationDto
+            {
+                StationId = s.StationId,
+                StationName = s.StationName,
+                Address = s.Address,
+                City = s.City,
+                Latitude = s.Latitude,
+                Longitude = s.Longitude,
+                TotalPosts = s.TotalPosts,
+                AvailablePosts = s.AvailablePosts,
+                OperatingHours = s.OperatingHours,
+                Amenities = !string.IsNullOrEmpty(s.Amenities)
+                    ? s.Amenities.Split(',').Select(a => a.Trim()).ToList()
+                    : new List<string>(),
+                StationImageUrl = s.StationImageUrl,
+                Status = s.Status,
+                AcRate = pricing.AcRate,
+                DcRate = pricing.DcRate,
+                DcFastRate = pricing.DcFastRate,
+                ParkingFee = pricing.ParkingFee
+            };
         }).ToList();
 
         return stations;
@@ -148,6 +186,11 @@ public class StationService : IStationService
         _context.ChargingStations.Add(station);
         await _context.SaveChangesAsync();
 
+        var pricingLookup = await BuildPricingLookupAsync(new[] { station.StationId });
+        var pricing = pricingLookup.TryGetValue(station.StationId, out var value)
+            ? value
+            : StationPricingInfo.CreateDefault();
+
         return new StationDto
         {
             StationId = station.StationId,
@@ -161,7 +204,11 @@ public class StationService : IStationService
             OperatingHours = station.OperatingHours,
             Amenities = dto.Amenities,
             StationImageUrl = station.StationImageUrl,
-            Status = station.Status
+            Status = station.Status,
+            AcRate = pricing.AcRate,
+            DcRate = pricing.DcRate,
+            DcFastRate = pricing.DcFastRate,
+            ParkingFee = pricing.ParkingFee
         };
     }
 
@@ -234,5 +281,164 @@ public class StationService : IStationService
                          };
 
         return await slotsQuery.ToListAsync();
+    }
+
+    public async Task<List<SlotDetailDto>> GetAvailableSlotsAsync(int stationId)
+    {
+        // Return all slots (same as GetStationSlotsDetailsAsync)
+        return await GetStationSlotsDetailsAsync(stationId);
+    }
+
+    public async Task<List<ChargingPostWithSlotsDto>> GetAvailablePostsAsync(int stationId)
+    {
+        var posts = await _context.ChargingPosts
+            .Include(post => post.ChargingSlots)
+            .Include(post => post.ChargingStation)
+            .Where(post => post.StationId == stationId)
+            .ToListAsync();
+
+        // Build per-post summaries with slot breakdown so the frontend can render availability without extra joins
+        var result = posts.Select(post =>
+        {
+            var slotDtos = (post.ChargingSlots ?? new List<Domain.Entities.ChargingSlot>())
+                .OrderBy(slot => slot.SlotNumber)
+                .Select(slot => new ChargingSlotDto
+                {
+                    SlotId = slot.SlotId,
+                    PostId = slot.PostId,
+                    PostName = post.PostNumber,
+                    PostType = post.PostType,
+                    StationId = post.StationId,
+                    StationName = post.ChargingStation?.StationName ?? string.Empty,
+                    Status = slot.Status,
+                    ConnectorType = slot.ConnectorType,
+                    PowerKw = slot.MaxPower,
+                    CurrentBookingId = slot.CurrentBookingId
+                })
+                .ToList();
+
+            var computedTotalSlots = slotDtos.Count;
+            var computedAvailableSlots = slotDtos.Count(slot => string.Equals(slot.Status, "available", StringComparison.OrdinalIgnoreCase));
+
+            return new ChargingPostWithSlotsDto
+            {
+                PostId = post.PostId,
+                PostNumber = post.PostNumber,
+                PostType = post.PostType,
+                PowerOutput = post.PowerOutput,
+                TotalSlots = computedTotalSlots > 0 ? computedTotalSlots : post.TotalSlots,
+                AvailableSlots = computedTotalSlots > 0 ? computedAvailableSlots : post.AvailableSlots,
+                Status = post.Status,
+                Slots = slotDtos
+            };
+        })
+        .OrderByDescending(post => post.AvailableSlots)
+        .ThenBy(post => post.PostNumber)
+        .ToList();
+
+        return result;
+    }
+
+    private async Task<Dictionary<int, StationPricingInfo>> BuildPricingLookupAsync(IEnumerable<int> stationIds)
+    {
+        var ids = stationIds?.Distinct().ToList() ?? new List<int>();
+        if (ids.Count == 0)
+        {
+            return new Dictionary<int, StationPricingInfo>();
+        }
+
+        var pricingRules = await _context.PricingRules
+            .Where(r => r.IsActive && (!r.StationId.HasValue || ids.Contains(r.StationId.Value)))
+            .ToListAsync();
+
+        var lookup = ids.ToDictionary(id => id, _ => StationPricingInfo.CreateDefault());
+
+        var globalPricing = StationPricingInfo.FromRules(pricingRules.Where(r => !r.StationId.HasValue));
+        foreach (var id in ids)
+        {
+            lookup[id] = globalPricing.Clone();
+        }
+
+        foreach (var group in pricingRules.Where(r => r.StationId.HasValue).GroupBy(r => r.StationId!.Value))
+        {
+            if (!lookup.TryGetValue(group.Key, out var pricing))
+            {
+                pricing = globalPricing.Clone();
+                lookup[group.Key] = pricing;
+            }
+
+            pricing.ApplyRules(group);
+        }
+
+        return lookup;
+    }
+
+    private sealed class StationPricingInfo
+    {
+        public decimal? AcRate { get; private set; }
+        public decimal? DcRate { get; private set; }
+        public decimal? DcFastRate { get; private set; }
+        public decimal? ParkingFee { get; private set; }
+
+        private StationPricingInfo()
+        {
+            ParkingFee = 0;
+        }
+
+        public static StationPricingInfo CreateDefault() => new StationPricingInfo();
+
+        public static StationPricingInfo FromRules(IEnumerable<PricingRule> rules)
+        {
+            var info = CreateDefault();
+            info.ApplyRules(rules);
+            return info;
+        }
+
+        public StationPricingInfo Clone()
+        {
+            return new StationPricingInfo
+            {
+                AcRate = AcRate,
+                DcRate = DcRate,
+                DcFastRate = DcFastRate,
+                ParkingFee = ParkingFee
+            };
+        }
+
+        public void ApplyRules(IEnumerable<PricingRule> rules)
+        {
+            foreach (var rule in rules)
+            {
+                if (rule == null)
+                    continue;
+
+                var key = rule.VehicleType?.Trim().ToUpperInvariant();
+                if (string.IsNullOrEmpty(key))
+                    continue;
+
+                var value = rule.BasePrice;
+
+                switch (key)
+                {
+                    case "AC":
+                        AcRate = value;
+                        break;
+                    case "DC":
+                        DcRate = value;
+                        break;
+                    case "DC_FAST":
+                    case "DCFAST":
+                    case "DC-FAST":
+                    case "DC_FAST_CHARGING":
+                    case "DC_FAST_RATE":
+                        DcFastRate = value;
+                        break;
+                    case "PARKING":
+                    case "PARKING_FEE":
+                        ParkingFee = value;
+                        break;
+                }
+            }
+        }
     }
 }

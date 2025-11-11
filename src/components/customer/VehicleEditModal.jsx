@@ -1,162 +1,338 @@
-﻿/* eslint-disable */
-import React, { useState, useEffect } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import ConfirmDialog from "../ui/ConfirmDialog";
 import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
-  TextField,
-  Grid,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Chip,
+  Alert,
   Box,
-  Typography,
-  IconButton,
+  Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Divider,
+  FormControl,
   FormControlLabel,
+  FormHelperText,
+  Grid,
+  IconButton,
+  InputLabel,
+  MenuItem,
+  Select,
   Switch,
-  Divider
+  TextField,
+  Tooltip,
+  Typography,
 } from "@mui/material";
+import { Close, ElectricCar, InfoOutlined } from "@mui/icons-material";
 import {
-  Close,
-  Add,
-  Delete,
-  ElectricCar,
-  BatteryFull,
-  Speed,
-  EmojiNature
-} from "@mui/icons-material";
-import { CONNECTOR_TYPES } from "../../utils/constants";
+  getSupportedBrands,
+  getModelsByBrand,
+  getModelSpecs,
+  getVehicleCategory,
+} from "../../data/vehicleCatalog";
 
-const VehicleEditModal = ({ open, onClose, vehicle, onSave, onSetDefault }) => {
-  const [formData, setFormData] = useState({
-    nickname: "",
-    make: "",
-    model: "",
-    year: "",
-    batteryCapacity: "",
-    maxChargingSpeed: "",
-    connectorTypes: [],
-    licensePlate: "",
-    color: ""
-  });
+const DEFAULT_FORM = {
+  make: "",
+  model: "",
+  nickname: "",
+  year: "",
+  licensePlate: "",
+  color: "",
+  batteryCapacity: "",
+  maxChargingSpeed: "",
+  connectorTypes: [],
+  vehicleType: "car",
+};
+
+const ensureArray = (value) => {
+  if (!value) {
+    return [];
+  }
+  if (Array.isArray(value)) {
+    return value.filter(Boolean);
+  }
+  return [value].filter(Boolean);
+};
+
+const normalizeVehicleForForm = (vehicle) => {
+  if (!vehicle) {
+    return { ...DEFAULT_FORM };
+  }
+
+  const make = vehicle.make || vehicle.vehicleMake || "";
+  const model = vehicle.model || vehicle.vehicleModel || "";
+  const vehicleTypeFromCatalog = getVehicleCategory(make, model);
+
+  return {
+    make,
+    model,
+    nickname: vehicle.nickname || vehicle.vehicleName || "",
+    year: vehicle.year
+      ? String(vehicle.year)
+      : vehicle.vehicleYear
+      ? String(vehicle.vehicleYear)
+      : "",
+    licensePlate: vehicle.licensePlate || "",
+    color: vehicle.color || "",
+    batteryCapacity:
+      vehicle.batteryCapacity !== undefined && vehicle.batteryCapacity !== null
+        ? String(vehicle.batteryCapacity)
+        : "",
+    maxChargingSpeed:
+      vehicle.maxChargingSpeed !== undefined &&
+      vehicle.maxChargingSpeed !== null
+        ? String(vehicle.maxChargingSpeed)
+        : "",
+    connectorTypes: ensureArray(
+      vehicle.connectorTypes ||
+        vehicle.connectorType ||
+        vehicle.chargingPortType
+    ),
+    vehicleType:
+      vehicle.vehicleType ||
+      vehicle.vehicle_type ||
+      vehicleTypeFromCatalog ||
+      "car",
+  };
+};
+
+const withSpecDefaults = (form, specs) => {
+  if (!specs) {
+    return {
+      ...form,
+      connectorTypes: ensureArray(form.connectorTypes),
+    };
+  }
+
+  const next = {
+    ...form,
+    connectorTypes: specs.connectorTypes
+      ? ensureArray(specs.connectorTypes)
+      : ensureArray(form.connectorTypes),
+  };
+
+  if (!form.year && specs.year) {
+    next.year = String(specs.year);
+  }
+  if (!form.nickname && specs.defaultNickname) {
+    next.nickname = specs.defaultNickname;
+  }
+  if (!form.batteryCapacity && specs.batteryCapacity !== undefined) {
+    next.batteryCapacity = String(specs.batteryCapacity);
+  }
+  if (!form.maxChargingSpeed && specs.maxChargingSpeed !== undefined) {
+    next.maxChargingSpeed = String(specs.maxChargingSpeed);
+  }
+
+  if (specs.category) {
+    next.vehicleType = specs.category;
+  }
+
+  return next;
+};
+
+const formatConnectorList = (connectors) => {
+  const normalized = ensureArray(connectors);
+  if (!normalized.length) {
+    return "";
+  }
+  return normalized.join(", ");
+};
+
+const buildSpecSummary = (specs) => {
+  if (!specs) {
+    return "";
+  }
+
+  const parts = [];
+  if (specs.batteryCapacity) {
+    parts.push(`Pin ${specs.batteryCapacity} kWh`);
+  }
+  if (specs.maxChargingSpeed) {
+    parts.push(`Sạc tối đa ${specs.maxChargingSpeed} kW`);
+  }
+
+  const connectors = formatConnectorList(specs.connectorTypes);
+  if (connectors) {
+    parts.push(`Cổng ${connectors}`);
+  }
+
+  if (specs.notes) {
+    parts.push(specs.notes);
+  }
+
+  return parts.join(" • ");
+};
+
+const VehicleEditModal = ({
+  open,
+  onClose,
+  vehicle,
+  onSave,
+  submitting = false,
+}) => {
+  const [formData, setFormData] = useState(DEFAULT_FORM);
   const [isDefault, setIsDefault] = useState(false);
+  const [validationError, setValidationError] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  const [newConnectorType, setNewConnectorType] = useState("");
-
-  const connectorTypeOptions = [
-    { value: CONNECTOR_TYPES.TYPE2, label: "Type 2 (AC)" },
-    { value: CONNECTOR_TYPES.CCS2, label: "CCS2 (DC)" },
-    { value: CONNECTOR_TYPES.CHADEMO, label: "CHAdeMO" },
-    { value: CONNECTOR_TYPES.GB_T, label: "GB/T" },
-    { value: CONNECTOR_TYPES.TESLA, label: "Tesla Supercharger" }
-  ];
+  const brandOptions = useMemo(() => getSupportedBrands(), []);
+  const modelOptions = useMemo(
+    () => getModelsByBrand(formData.make),
+    [formData.make]
+  );
+  const selectedSpec = useMemo(
+    () => getModelSpecs(formData.make, formData.model),
+    [formData.make, formData.model]
+  );
+  const connectorChoices = useMemo(
+    () => ensureArray(selectedSpec?.connectorTypes),
+    [selectedSpec]
+  );
+  const specSummary = useMemo(
+    () => buildSpecSummary(selectedSpec),
+    [selectedSpec]
+  );
 
   useEffect(() => {
+    if (!open) {
+      return;
+    }
+
     if (vehicle) {
-      setFormData({
-        nickname: vehicle.nickname || "",
-        make: vehicle.make || "",
-        model: vehicle.model || "",
-        year: vehicle.year || "",
-        batteryCapacity: vehicle.batteryCapacity || "",
-        maxChargingSpeed: vehicle.maxChargingSpeed || "",
-        connectorTypes: vehicle.connectorTypes || [],
-        licensePlate: vehicle.licensePlate || "",
-        color: vehicle.color || ""
-      });
-      setIsDefault(vehicle.isDefault || false);
+      const normalized = normalizeVehicleForForm(vehicle);
+      const specs = getModelSpecs(normalized.make, normalized.model);
+      setFormData(withSpecDefaults(normalized, specs));
+      setIsDefault(Boolean(vehicle.isDefault));
     } else {
+      setFormData({ ...DEFAULT_FORM });
       setIsDefault(false);
     }
-  }, [vehicle]);
+
+    setValidationError("");
+  }, [open, vehicle]);
+
+  useEffect(() => {
+    if (!open) {
+      setConfirmOpen(false);
+    }
+  }, [open]);
+
+  const handleBrandChange = (brand) => {
+    setFormData((prev) => ({
+      ...DEFAULT_FORM,
+      make: brand,
+      nickname: prev.nickname,
+    }));
+  };
+
+  const handleModelChange = (modelName) => {
+    setFormData((prev) => {
+      const previousSpec = getModelSpecs(prev.make, prev.model);
+      const previousDefault = previousSpec?.defaultNickname || "";
+      const specs = getModelSpecs(prev.make, modelName);
+      const next = withSpecDefaults({ ...prev, model: modelName }, specs);
+
+      if (
+        prev.nickname &&
+        previousDefault &&
+        prev.nickname !== "" &&
+        prev.nickname !== previousDefault
+      ) {
+        next.nickname = prev.nickname;
+      } else if (specs?.defaultNickname) {
+        next.nickname = specs.defaultNickname;
+      }
+
+      return next;
+    });
+  };
 
   const handleInputChange = (field, value) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [field]: value
+      [field]: value,
     }));
-  };
-
-  const handleAddConnectorType = () => {
-    if (newConnectorType && !formData.connectorTypes.includes(newConnectorType)) {
-      setFormData(prev => ({
-        ...prev,
-        connectorTypes: [...prev.connectorTypes, newConnectorType]
-      }));
-      setNewConnectorType("");
-    }
-  };
-
-  const handleRemoveConnectorType = (typeToRemove) => {
-    setFormData(prev => ({
-      ...prev,
-      connectorTypes: prev.connectorTypes.filter(type => type !== typeToRemove)
-    }));
-  };
-
-
-  const handleSave = () => {
-    // Validate required fields
-    if (!formData.make || !formData.model || !formData.year) {
-      alert("Vui lòng điền đầy đủ thông tin bắt buộc (Hãng xe, Model, Năm sản xuất)");
-      return;
-    }
-    if (formData.connectorTypes.length === 0) {
-      alert("Vui lòng chọn ít nhất một loại sạc hỗ trợ");
-      return;
-    }
-    onSave(formData, isDefault);
-    onClose();
-  };
-
-  // Delete vehicle logic
-  const handleDelete = () => {
-    setConfirmOpen(true);
   };
 
   const handleConfirmDelete = () => {
     setConfirmOpen(false);
-    if (typeof onSave === 'function') {
-      onSave({ ...formData, _delete: true, _id: vehicle?.id });
-    }
-    onClose();
+    onSave?.({
+      ...formData,
+      _delete: true,
+      _id: vehicle?.id ?? vehicle?.vehicleId ?? null,
+    });
   };
 
-  const calculateRange = () => {
-    const capacity = parseFloat(formData.batteryCapacity);
-    const efficiency = 5.2; // km/kWh
-    return capacity ? Math.floor(capacity * efficiency) : 0;
+  const handleSave = async () => {
+    setValidationError("");
+
+    if (!formData.nickname?.trim()) {
+      setValidationError("Vui lòng nhập tên gợi nhớ cho xe");
+      return;
+    }
+
+    if (!formData.make) {
+      setValidationError("Vui lòng chọn hãng xe");
+      return;
+    }
+
+    if (!formData.model) {
+      setValidationError("Vui lòng chọn mẫu xe");
+      return;
+    }
+
+    const connectorSelection = ensureArray(
+      formData.connectorTypes.length
+        ? formData.connectorTypes
+        : connectorChoices
+    );
+
+    const payload = {
+      ...formData,
+      nickname: formData.nickname?.trim() || "",
+      year: formData.year?.trim() || "",
+      licensePlate: formData.licensePlate?.trim() || "",
+      color: formData.color?.trim() || "",
+      connectorTypes: connectorSelection,
+      vehicleType: getVehicleCategory(formData.make, formData.model),
+    };
+
+    try {
+      await onSave?.(payload, isDefault);
+    } catch (error) {
+      console.error("[VehicleEditModal] Failed to save vehicle", error);
+      setValidationError(error?.message || "Không thể lưu thông tin xe");
+    }
   };
 
   return (
-    <Dialog 
-      open={open} 
-      onClose={onClose} 
-      maxWidth="md" 
+    <Dialog
+      open={open}
+      onClose={submitting ? undefined : onClose}
+      maxWidth="md"
       fullWidth
-      PaperProps={{
-        sx: { borderRadius: 2 }
-      }}
+      PaperProps={{ sx: { borderRadius: 2 } }}
     >
-      <DialogTitle sx={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'space-between',
-        pb: 1
-      }}>
-        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-          <ElectricCar sx={{ mr: 1, color: 'primary.main' }} />
+      <DialogTitle
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          pb: 1,
+        }}
+      >
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <ElectricCar sx={{ color: "primary.main" }} />
           <Typography variant="h6" fontWeight="bold">
-            Chỉnh sửa thông tin xe
+            {vehicle ? "Chỉnh sửa thông tin xe" : "Thêm xe mới"}
           </Typography>
         </Box>
-        <IconButton onClick={onClose} size="small">
+        <IconButton
+          onClick={onClose}
+          size="small"
+          disabled={submitting}
+          aria-label="Đóng"
+        >
           <Close />
         </IconButton>
       </DialogTitle>
@@ -165,64 +341,108 @@ const VehicleEditModal = ({ open, onClose, vehicle, onSave, onSetDefault }) => {
 
       <DialogContent sx={{ pt: 3 }}>
         <Grid container spacing={3}>
-          {/* Basic Information */}
           <Grid item xs={12}>
-            <Typography variant="h6" gutterBottom color="primary">
-              Thông tin cơ bản
+            <Typography variant="body1" fontWeight={600} gutterBottom>
+              Thông tin xe điện của bạn
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Chúng tôi sử dụng thông tin này để gợi ý trạm sạc và giữ hồ sơ xe
+              chính xác.
             </Typography>
           </Grid>
 
           <Grid item xs={12} sm={6}>
+            <FormControl fullWidth required disabled={submitting}>
+              <InputLabel>Hãng xe</InputLabel>
+              <Select
+                value={formData.make}
+                label="Hãng xe"
+                onChange={(event) => handleBrandChange(event.target.value)}
+              >
+                {brandOptions.map((brand) => (
+                  <MenuItem key={brand} value={brand}>
+                    {brand}
+                  </MenuItem>
+                ))}
+              </Select>
+              <FormHelperText>
+                Chọn hãng để xem các mẫu xe hỗ trợ bởi SkaEV
+              </FormHelperText>
+            </FormControl>
+          </Grid>
+
+          <Grid item xs={12} sm={6}>
+            <FormControl
+              fullWidth
+              required
+              disabled={!formData.make || submitting}
+            >
+              <InputLabel>Mẫu xe</InputLabel>
+              <Select
+                value={formData.model}
+                label="Mẫu xe"
+                onChange={(event) => handleModelChange(event.target.value)}
+              >
+                {modelOptions.map(({ name, notes }) => (
+                  <MenuItem key={name} value={name}>
+                    <Box sx={{ display: "flex", flexDirection: "column" }}>
+                      <Typography variant="body1">{name}</Typography>
+                      {notes && (
+                        <Typography variant="caption" color="text.secondary">
+                          {notes}
+                        </Typography>
+                      )}
+                    </Box>
+                  </MenuItem>
+                ))}
+              </Select>
+              <FormHelperText>
+                {formData.make
+                  ? "Chọn mẫu xe bạn đang sử dụng"
+                  : "Vui lòng chọn hãng xe trước"}
+              </FormHelperText>
+            </FormControl>
+          </Grid>
+
+          <Grid item xs={12} sm={6}>
             <TextField
               fullWidth
-              label="Tên xe (nickname)"
+              required
+              label="Tên gợi nhớ"
+              placeholder="Ví dụ: Xe gia đình"
               value={formData.nickname}
-              onChange={(e) => handleInputChange('nickname', e.target.value)}
-              placeholder="Ví dụ: Xe chính, Xe gia đình"
+              onChange={(event) =>
+                handleInputChange("nickname", event.target.value)
+              }
+              disabled={submitting}
             />
           </Grid>
 
           <Grid item xs={12} sm={6}>
             <TextField
               fullWidth
-              label="Hãng xe *"
-              value={formData.make}
-              onChange={(e) => handleInputChange('make', e.target.value)}
-              placeholder="Ví dụ: Tesla, VinFast, BMW"
-              required
-            />
-          </Grid>
-
-          <Grid item xs={12} sm={6}>
-            <TextField
-              fullWidth
-              label="Model *"
-              value={formData.model}
-              onChange={(e) => handleInputChange('model', e.target.value)}
-              placeholder="Ví dụ: Model 3, VF8, iX"
-              required
-            />
-          </Grid>
-
-          <Grid item xs={12} sm={6}>
-            <TextField
-              fullWidth
-              label="Năm sản xuất *"
+              label="Năm sản xuất"
               value={formData.year}
-              onChange={(e) => handleInputChange('year', e.target.value)}
+              onChange={(event) =>
+                handleInputChange("year", event.target.value)
+              }
               placeholder="Ví dụ: 2024"
               type="number"
-              required
+              inputProps={{ min: 1990, max: new Date().getFullYear() + 1 }}
+              disabled={submitting}
             />
           </Grid>
 
           <Grid item xs={12} sm={6}>
             <TextField
               fullWidth
-              label="Biển số xe"
+              label="Biển số"
               value={formData.licensePlate}
-              onChange={(e) => handleInputChange('licensePlate', e.target.value)}
-              placeholder="Ví dụ: 30A-123.45"
+              onChange={(event) =>
+                handleInputChange("licensePlate", event.target.value)
+              }
+              placeholder="Thêm nếu bạn muốn đồng bộ nhanh hơn"
+              disabled={submitting}
             />
           </Grid>
 
@@ -231,155 +451,97 @@ const VehicleEditModal = ({ open, onClose, vehicle, onSave, onSetDefault }) => {
               fullWidth
               label="Màu sắc"
               value={formData.color}
-              onChange={(e) => handleInputChange('color', e.target.value)}
-              placeholder="Ví dụ: Xanh, Trắng, Đen"
-            />
-          </Grid>
-
-          {/* Technical Specifications */}
-          <Grid item xs={12} sx={{ mt: 2 }}>
-            <Typography variant="h6" gutterBottom color="primary">
-              Thông số kỹ thuật
-            </Typography>
-          </Grid>
-
-          <Grid item xs={12} sm={6}>
-            <TextField
-              fullWidth
-              label="Dung lượng pin (kWh)"
-              value={formData.batteryCapacity}
-              onChange={(e) => handleInputChange('batteryCapacity', e.target.value)}
-              placeholder="Ví dụ: 87.7"
-              type="number"
-              InputProps={{
-                endAdornment: <BatteryFull sx={{ color: 'text.secondary' }} />
-              }}
+              onChange={(event) =>
+                handleInputChange("color", event.target.value)
+              }
+              placeholder="Ví dụ: Trắng, Đen"
+              disabled={submitting}
             />
           </Grid>
 
           <Grid item xs={12} sm={6}>
-            <TextField
-              fullWidth
-              label="Tốc độ sạc tối đa (kW)"
-              value={formData.maxChargingSpeed}
-              onChange={(e) => handleInputChange('maxChargingSpeed', e.target.value)}
-              placeholder="Ví dụ: 150"
-              type="number"
-              InputProps={{
-                endAdornment: <Speed sx={{ color: 'text.secondary' }} />
-              }}
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={isDefault}
+                  onChange={(event) => setIsDefault(event.target.checked)}
+                  color="primary"
+                  disabled={submitting}
+                />
+              }
+              label="Đặt làm xe mặc định"
             />
           </Grid>
 
-          {/* Range Preview */}
-          {formData.batteryCapacity && (
+          {specSummary && (
             <Grid item xs={12}>
-              <Box sx={{ 
-                p: 2, 
-                bgcolor: 'grey.50', 
-                borderRadius: 1,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1
-              }}>
-                <EmojiNature color="primary" />
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <Tooltip
+                  title="Thông tin kỹ thuật được SkaEV gợi ý tự động"
+                  arrow
+                >
+                  <InfoOutlined
+                    sx={{ fontSize: 18, color: "text.secondary" }}
+                  />
+                </Tooltip>
                 <Typography variant="body2" color="text.secondary">
-                  Quãng đường ước tính: <strong>{calculateRange()} km</strong> 
-                  (hiệu suất 5.2 km/kWh)
+                  {specSummary}
                 </Typography>
               </Box>
             </Grid>
           )}
 
-          {/* Charging Types */}
-          <Grid item xs={12} sx={{ mt: 2 }}>
-            <Typography variant="h6" gutterBottom color="primary">
-              Loại sạc hỗ trợ *
-            </Typography>
-          </Grid>
-
-          <Grid item xs={12} sm={8}>
-            <FormControl fullWidth>
-              <InputLabel>Thêm loại sạc</InputLabel>
-              <Select
-                value={newConnectorType}
-                onChange={(e) => setNewConnectorType(e.target.value)}
-                label="Thêm loại sạc"
-              >
-                {connectorTypeOptions.map((option) => (
-                  <MenuItem key={option.value} value={option.value}>
-                    {option.label}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-
-          <Grid item xs={12} sm={4}>
-            <Button
-              fullWidth
-              variant="outlined"
-              startIcon={<Add />}
-              onClick={handleAddConnectorType}
-              disabled={!newConnectorType}
-              sx={{ height: '56px' }}
-            >
-              Thêm
-            </Button>
-          </Grid>
-
-          {/* Selected Connector Types */}
-          <Grid item xs={12}>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
-              {formData.connectorTypes.map((type, index) => (
-                <Chip
-                  key={index}
-                  label={connectorTypeOptions.find(opt => opt.value === type)?.label || type}
-                  onDelete={() => handleRemoveConnectorType(type)}
-                  deleteIcon={<Delete />}
-                  color="primary"
-                  variant="outlined"
-                />
-              ))}
-            </Box>
-          </Grid>
-
-          {/* Default Vehicle Setting */}
-
+          {validationError && (
+            <Grid item xs={12}>
+              <Alert severity="error" sx={{ borderRadius: 2 }}>
+                {validationError}
+              </Alert>
+            </Grid>
+          )}
         </Grid>
       </DialogContent>
 
       <Divider />
 
-      <DialogActions sx={{ p: 3, display: 'flex', justifyContent: 'space-between' }}>
+      <DialogActions sx={{ p: 3, justifyContent: "space-between" }}>
         <Box>
-          <Button onClick={onClose} variant="outlined" sx={{ mr: 1 }}>
+          <Button
+            onClick={onClose}
+            variant="outlined"
+            sx={{ mr: 1 }}
+            disabled={submitting}
+          >
             Hủy
           </Button>
-          <Button 
-            onClick={handleSave} 
-            variant="contained" 
+          <Button
+            onClick={handleSave}
+            variant="contained"
             color="primary"
-            sx={{ minWidth: 120 }}
+            disabled={submitting}
+            sx={{ minWidth: 140 }}
           >
-            Lưu thay đổi
+            {submitting ? "Đang lưu..." : "Lưu thông tin"}
           </Button>
         </Box>
-        <Button 
-          onClick={handleDelete} 
-          variant="outlined" 
-          color="error"
-        >
-          Xóa xe
-        </Button>
-        <ConfirmDialog
-          open={confirmOpen}
-          title="Xác nhận xóa xe"
-          message="Bạn có chắc chắn muốn xóa xe này? Hành động này không thể hoàn tác."
-          onConfirm={handleConfirmDelete}
-          onCancel={() => setConfirmOpen(false)}
-        />
+        {!!vehicle && (
+          <Button
+            onClick={() => setConfirmOpen(true)}
+            variant="outlined"
+            color="error"
+            disabled={submitting}
+          >
+            Xóa xe
+          </Button>
+        )}
       </DialogActions>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Xác nhận xóa xe"
+        message="Bạn có chắc chắn muốn xóa xe này? Hành động này không thể hoàn tác."
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setConfirmOpen(false)}
+      />
     </Dialog>
   );
 };

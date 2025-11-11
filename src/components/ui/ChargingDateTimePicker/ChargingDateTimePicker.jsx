@@ -47,13 +47,13 @@ const ChargingDateTimePicker = ({
   initialDateTime = null,
   disabled = false,
 }) => {
-  const [selectedDate, setSelectedDate] = useState(
-    initialDateTime?.date || null
-  );
+  // CHANGE: Auto-set date to today only, cannot be changed
+  const today = new Date();
+  const [selectedDate, setSelectedDate] = useState(today);
   const [selectedTime, setSelectedTime] = useState(
     initialDateTime?.time || null
   );
-  const [schedulingType, setSchedulingType] = useState("scheduled"); // Always scheduled, removed immediate option
+  const [schedulingType, setSchedulingType] = useState("immediate"); // Changed to immediate for same-day booking
   const [errors, setErrors] = useState({});
   const [availableSlots, setAvailableSlots] = useState([]);
 
@@ -116,33 +116,31 @@ const ChargingDateTimePicker = ({
         isValid: Object.keys(errors).length === 0,
       });
     }
-     
   }, [selectedDate, selectedTime, schedulingType, errors]);
 
   const validateDateTime = () => {
     const newErrors = {};
     const now = new Date();
+    const today = startOfDay(now);
 
-    // Always require date and time since "Sạc ngay" option is removed
-    // Validate date
+    // CHANGE: Validate that selected date is today only
     if (!selectedDate) {
-      newErrors.date = "Vui lòng chọn ngày sạc";
+      newErrors.date = "Ngày đặt chỗ: Hôm nay";
     } else {
-      const today = startOfDay(now);
       const selectedDay = startOfDay(selectedDate);
-      const maxDate = addDays(today, 7); // Allow booking up to 7 days ahead
 
-      if (isBefore(selectedDay, today)) {
-        newErrors.date = "Không thể chọn ngày trong quá khứ";
-      } else if (isAfter(selectedDay, maxDate)) {
-        newErrors.date = "Chỉ có thể đặt lịch tối đa 7 ngày trước";
+      // Only allow today's date
+      if (selectedDay.getTime() !== today.getTime()) {
+        newErrors.date = "Chỉ có thể đặt chỗ cho hôm nay";
+        // Auto-correct to today
+        setSelectedDate(today);
       }
     }
 
     // Validate time
     if (!selectedTime) {
       newErrors.time = "Vui lòng chọn giờ sạc";
-    } else if (selectedDate) {
+    } else {
       const selectedDateTime = new Date(
         selectedDate.getFullYear(),
         selectedDate.getMonth(),
@@ -151,12 +149,10 @@ const ChargingDateTimePicker = ({
         selectedTime.getMinutes()
       );
 
-      // Check if selected time is in the past (for today only)
-      if (format(selectedDate, "yyyy-MM-dd") === format(now, "yyyy-MM-dd")) {
-        const oneHourLater = new Date(now.getTime() + 60 * 60 * 1000); // 1 hour from now
-        if (isBefore(selectedDateTime, oneHourLater)) {
-          newErrors.time = "Vui lòng chọn thời gian ít nhất 1 giờ sau hiện tại";
-        }
+      // Check if selected time is in the past (for today)
+      const thirtyMinLater = new Date(now.getTime() + 30 * 60 * 1000); // 30 minutes from now minimum
+      if (isBefore(selectedDateTime, thirtyMinLater)) {
+        newErrors.time = "Vui lòng chọn thời gian ít nhất 30 phút sau hiện tại";
       }
 
       // Check station operating hours
@@ -237,75 +233,27 @@ const ChargingDateTimePicker = ({
             Lên lịch sạc
           </Typography>
 
-          {/* Scheduled DateTime Selection */}
+          {/* Today-Only Booking - Date locked to today */}
           <Box>
-            {/* Quick Date Selection */}
-            <Typography variant="subtitle2" gutterBottom>
-              Chọn nhanh:
-            </Typography>
-            <Box sx={{ display: "flex", gap: 1, mb: 2, flexWrap: "wrap" }}>
-              <Chip
-                label="Hôm nay"
-                onClick={() => handleQuickDateSelect(0)}
-                variant={
-                  selectedDate &&
-                  format(selectedDate, "yyyy-MM-dd") ===
-                    format(new Date(), "yyyy-MM-dd")
-                    ? "filled"
-                    : "outlined"
-                }
-                color="primary"
-                disabled={disabled}
-              />
-              <Chip
-                label="Ngày mai"
-                onClick={() => handleQuickDateSelect(1)}
-                variant={
-                  selectedDate &&
-                  format(selectedDate, "yyyy-MM-dd") ===
-                    format(addDays(new Date(), 1), "yyyy-MM-dd")
-                    ? "filled"
-                    : "outlined"
-                }
-                color="primary"
-                disabled={disabled}
-              />
-              
-            </Box>
+            {/* Date locked notification */}
+            <Alert severity="info" sx={{ mb: 2 }}>
+              <Typography variant="body2">
+                <strong>Đặt chỗ hôm nay:</strong>{" "}
+                {format(today, "dd/MM/yyyy (EEEE)", { locale: vi })}
+              </Typography>
+              <Typography variant="caption">
+                Hệ thống chỉ cho phép đặt chỗ trong ngày hiện tại
+              </Typography>
+            </Alert>
 
-            {/* Date Picker */}
+            {/* Time Picker Only */}
             <Grid container spacing={2} sx={{ mb: 2 }}>
-              <Grid item xs={12} sm={6}>
-                <DatePicker
-                  label="Chọn ngày"
-                  value={selectedDate}
-                  onChange={(newDate) => setSelectedDate(newDate)}
-                  disabled={disabled}
-                  minDate={new Date()}
-                  maxDate={addDays(new Date(), 7)}
-                  slotProps={{
-                    textField: {
-                      fullWidth: true,
-                      error: !!errors.date,
-                      helperText: getDateHelperText(),
-                      InputProps: {
-                        startAdornment: (
-                          <CalendarToday
-                            sx={{ mr: 1, color: "action.active" }}
-                          />
-                        ),
-                      },
-                    },
-                  }}
-                />
-              </Grid>
-
-              <Grid item xs={12} sm={6}>
+              <Grid item xs={12}>
                 <TimePicker
-                  label="Chọn giờ"
+                  label="Chọn giờ sạc hôm nay"
                   value={selectedTime}
                   onChange={(newTime) => setSelectedTime(newTime)}
-                  disabled={disabled || !selectedDate}
+                  disabled={disabled}
                   ampm={false}
                   slotProps={{
                     textField: {
