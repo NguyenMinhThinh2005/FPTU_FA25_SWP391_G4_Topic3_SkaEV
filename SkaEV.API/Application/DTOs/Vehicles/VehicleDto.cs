@@ -24,12 +24,11 @@ public class VehicleDto
 public class CreateVehicleDto
 {
     public string VehicleName { get; set; } = string.Empty;
-    public string VehicleType { get; set; } = "car";
+    public string VehicleType { get; set; } = "car"; // car or motorcycle
     public string? Vin { get; set; }
     public string? LicensePlate { get; set; }
     public string? VehicleModel { get; set; }
     public string? VehicleMake { get; set; }
-    public string VehicleType { get; set; } = string.Empty; // car or motorcycle
     public int? VehicleYear { get; set; }
     public decimal? BatteryCapacity { get; set; }
     public decimal? MaxChargingSpeed { get; set; }

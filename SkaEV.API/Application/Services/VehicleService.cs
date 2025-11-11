@@ -46,7 +46,7 @@ public class VehicleService : IVehicleService
 
         if (createDto.IsDefault)
         {
-            await UnsetDefaultVehiclesAsync(userId);
+            await UnsetDefaultVehiclesAsync(userId, saveChanges: false);
         }
 
         var connectorList = NormalizeConnectorTypes(createDto.ConnectorTypes, createDto.ConnectorType) ?? Array.Empty<string>();
