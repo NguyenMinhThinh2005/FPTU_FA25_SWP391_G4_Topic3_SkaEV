@@ -1,4 +1,4 @@
-﻿import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   Box,
   Typography,
@@ -34,11 +34,7 @@ import {
   Tabs,
   Divider,
 } from "@mui/material";
-<<<<<<< HEAD
 import { Search, Add, Edit, Delete, People, Shield, SwapHoriz, CheckCircle, Warning, LocationOn, AdminPanelSettings, Work, Badge, Phone, Email, Person, CalendarToday, Visibility } from "@mui/icons-material";
-=======
-import { Search, Add, Edit, Delete, People, Shield, SwapHoriz, CheckCircle, Warning, LocationOn, AdminPanelSettings, Work, Badge, Phone, Email, Person, CalendarToday, Visibility } from "@mui/icons-material";
->>>>>>> c52fa54faa60dc2c2c2f5afa3e86c68c2ee50610
 import useUserStore from "../../store/userStore";
 import useStationStore from "../../store/stationStore";
 
@@ -49,11 +45,7 @@ const roleOptions = [
 ];
 
 const UserManagement = () => {
-<<<<<<< HEAD
   const { users, addUser, updateUser, deleteUser, changeUserRole, fetchUsers, loading } = useUserStore();
-=======
-  const { users, addUser, updateUser, deleteUser, changeUserRole, fetchUsers, loading } = useUserStore();
->>>>>>> c52fa54faa60dc2c2c2f5afa3e86c68c2ee50610
   const { stations, fetchStations } = useStationStore();
   const [query, setQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
@@ -67,11 +59,7 @@ const UserManagement = () => {
   const [userToChangeRole, setUserToChangeRole] = useState(null);
   const [selectedStations, setSelectedStations] = useState([]);
   const [newRole, setNewRole] = useState("");
-  const [snackbar, setSnackbar] = useState({
-    open: false,
-    message: "",
-    severity: "success",
-  });
+  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
   const [form, setForm] = useState({
     email: "",
     firstName: "",
@@ -86,37 +74,33 @@ const UserManagement = () => {
     console.log("UserManagement mounted, fetching users...");
     fetchUsers();
     fetchStations();
-  }, [fetchStations, fetchUsers]);
+  }, []);
 
   const filteredUsers = useMemo(() => {
     let filtered = users;
-
+    
     // Filter by role
     if (roleFilter !== "all") {
       filtered = filtered.filter((u) => u.role === roleFilter);
     }
-
+    
     // Filter by search query
     if (query) {
       const q = query.toLowerCase();
       filtered = filtered.filter((u) => {
         const fullName = (u.fullName || "").toLowerCase();
         const email = (u.email || "").toLowerCase();
-        const phone = u.phoneNumber || "";
+        const phone = (u.phoneNumber || "");
         return fullName.includes(q) || email.includes(q) || phone.includes(q);
       });
     }
-
+    
     return filtered;
   }, [users, query, roleFilter]);
 
   const openCreate = () => {
     setEditUser(null);
-<<<<<<< HEAD
     setForm({ email: "", firstName: "", lastName: "", phone: "", role: "customer", password: "" });
-=======
-    setForm({ email: "", firstName: "", lastName: "", phone: "", role: "customer", password: "" });
->>>>>>> c52fa54faa60dc2c2c2f5afa3e86c68c2ee50610
     setDialogOpen(true);
   };
 
@@ -146,11 +130,7 @@ const UserManagement = () => {
 
   const handleSave = async () => {
     if (!form.email || !form.firstName || !form.role) {
-      setSnackbar({
-        open: true,
-        message: "Vui lòng điền đầy đủ thông tin bắt buộc",
-        severity: "error",
-      });
+      setSnackbar({ open: true, message: "Vui lòng điền đầy đủ thông tin bắt buộc", severity: "error" });
       return;
     }
 
@@ -171,128 +151,102 @@ const UserManagement = () => {
           phone: form.phone,
           role: form.role,
         });
-
+        
         if (result.success) {
-          setSnackbar({
-            open: true,
-            message: "Cập nhật người dùng thành công!",
-            severity: "success",
-          });
+          setSnackbar({ open: true, message: "Cập nhật người dùng thành công!", severity: "success" });
           setDialogOpen(false);
-        try {
-          if (editUser) {
-            const result = await updateUser(editUser.userId, {
-              email: form.email,
-              firstName: form.firstName,
-              lastName: form.lastName,
-              phone: form.phone,
-              role: form.role,
-            });
-
-            if (result.success) {
-              setSnackbar({
-                open: true,
-                message: "Cập nhật người dùng thành công!",
-                severity: "success",
-              });
-              setDialogOpen(false);
-            } else {
-              setSnackbar({
-                open: true,
-                message: result.error || "Lỗi cập nhật người dùng",
-                severity: "error",
-              });
-            }
-          } else {
-            const result = await addUser({
-              email: form.email,
-              firstName: form.firstName,
-              lastName: form.lastName,
-              phone: form.phone,
-              role: form.role,
-              password: form.password, // Sử dụng password từ form
-            });
-
-            if (result.success) {
-              setSnackbar({ open: true, message: `Tạo người dùng thành công! Mật khẩu: ${form.password}`, severity: "success" });
-              setDialogOpen(false);
-            } else {
-              setSnackbar({
-                open: true,
-                message: result.error || "Lỗi tạo người dùng",
-                severity: "error",
-              });
-            }
-          }
-        } catch (error) {
-          setSnackbar({
-            open: true,
-            message: error.message || "Có lỗi xảy ra",
-            severity: "error",
-          });
+        } else {
+          setSnackbar({ open: true, message: result.error || "Lỗi cập nhật người dùng", severity: "error" });
         }
+      } else {
+        const result = await addUser({
+          email: form.email,
+          firstName: form.firstName,
+          lastName: form.lastName,
+          phone: form.phone,
+          role: form.role,
+          password: form.password, // Sử dụng password từ form
         });
+        
+        if (result.success) {
+          setSnackbar({ open: true, message: `Tạo người dùng thành công! Mật khẩu: ${form.password}`, severity: "success" });
+          setDialogOpen(false);
+        } else {
+          setSnackbar({ open: true, message: result.error || "Lỗi tạo người dùng", severity: "error" });
+        }
+      }
+    } catch (error) {
+      setSnackbar({ open: true, message: error.message || "Có lỗi xảy ra", severity: "error" });
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!userToDelete) return;
+    
+    try {
+      const result = await deleteUser(userToDelete.userId);
+      
+      if (result.success) {
+        setSnackbar({ open: true, message: "Xóa người dùng thành công!", severity: "success" });
         setDeleteDialogOpen(false);
         setUserToDelete(null);
       } else {
-        setSnackbar({
-          open: true,
-          message: result.error || "Lỗi xóa người dùng",
-          severity: "error",
-        });
+        setSnackbar({ open: true, message: result.error || "Lỗi xóa người dùng", severity: "error" });
       }
     } catch (error) {
-      setSnackbar({
-        open: true,
-        message: error.message || "Có lỗi xảy ra",
-        severity: "error",
-      });
+      setSnackbar({ open: true, message: error.message || "Có lỗi xảy ra", severity: "error" });
     }
   };
 
   const handleChangeRole = async () => {
     if (!userToChangeRole || !newRole) return;
-
+    
     try {
-<<<<<<< HEAD
-      const result = await updateUser(userToChangeRole.userId, {
-        role: newRole,
-      });
-
-=======
       const result = await changeUserRole(userToChangeRole.userId, newRole);
       
->>>>>>> c52fa54faa60dc2c2c2f5afa3e86c68c2ee50610
       if (result.success) {
-        setSnackbar({
-          open: true,
-          message: `Đã thay đổi vai trò thành ${newRole}`,
-          severity: "success",
-        });
+        setSnackbar({ open: true, message: `Đã thay đổi vai trò thành ${newRole}`, severity: "success" });
         setRoleDialogOpen(false);
         setUserToChangeRole(null);
         setNewRole("");
         // Refresh users list to ensure UI is updated
         await fetchUsers();
       } else {
-        setSnackbar({
-          open: true,
-          message: result.error || "Lỗi thay đổi vai trò",
-          severity: "error",
-        });
+        setSnackbar({ open: true, message: result.error || "Lỗi thay đổi vai trò", severity: "error" });
       }
     } catch (error) {
-      setSnackbar({
-        open: true,
-        message: error.message || "Có lỗi xảy ra",
-        severity: "error",
-      });
+      setSnackbar({ open: true, message: error.message || "Có lỗi xảy ra", severity: "error" });
     }
+  };
+
+  const openStationAssignDialog = (user) => {
+    // Deprecated - Tích hợp vào dialog Staff edit rồi
+    setEditUser(user);
+    setForm({
+      email: user.email,
+      firstName: user.fullName?.split(" ")[0] || "",
+      lastName: user.fullName?.split(" ").slice(1).join(" ") || "",
+      phone: user.phoneNumber || "",
+      role: user.role,
+      employeeId: user.employeeId || "",
+      department: user.department || "",
+      position: user.position || "",
+      joinDate: user.joinDate || "",
+      location: user.location || "Hà Nội",
+    });
+    setSelectedStations(user.assignedStationIds || []);
+    setStaffEditTab(1); // Mở tab Phân quyền trạm sạc
+    setStaffEditDialogOpen(true);
+  };
+
+  const handleAssignStations = async () => {
+    // Deprecated - Dùng handleSaveStaff thay thế
+    return handleSaveStaff();
   };
 
   const handleSaveStaff = async () => {
     if (!editUser) return;
-
+    
     try {
       // Save staff info and station assignments
       const result = await updateUser(editUser.userId, {
@@ -308,37 +262,29 @@ const UserManagement = () => {
         location: form.location,
         assignedStationIds: selectedStations,
       });
-
+      
       if (result.success) {
-        setSnackbar({
-          open: true,
-          message: `Đã cập nhật thông tin và phân quyền ${selectedStations.length} trạm sạc cho ${form.firstName} ${form.lastName}`,
-          severity: "success",
+        setSnackbar({ 
+          open: true, 
+          message: `Đã cập nhật thông tin và phân quyền ${selectedStations.length} trạm sạc cho ${form.firstName} ${form.lastName}`, 
+          severity: "success" 
         });
         setStaffEditDialogOpen(false);
         setEditUser(null);
         setSelectedStations([]);
         fetchUsers();
       } else {
-        setSnackbar({
-          open: true,
-          message: result.error || "Lỗi cập nhật thông tin nhân viên",
-          severity: "error",
-        });
+        setSnackbar({ open: true, message: result.error || "Lỗi cập nhật thông tin nhân viên", severity: "error" });
       }
     } catch (error) {
-      setSnackbar({
-        open: true,
-        message: error.message || "Có lỗi xảy ra",
-        severity: "error",
-      });
+      setSnackbar({ open: true, message: error.message || "Có lỗi xảy ra", severity: "error" });
     }
   };
 
   const toggleStationSelection = (stationId) => {
-    setSelectedStations((prev) =>
-      prev.includes(stationId)
-        ? prev.filter((id) => id !== stationId)
+    setSelectedStations(prev => 
+      prev.includes(stationId) 
+        ? prev.filter(id => id !== stationId)
         : [...prev, stationId]
     );
   };
@@ -346,7 +292,7 @@ const UserManagement = () => {
   const getRoleChip = (role) => {
     const roleOption = roleOptions.find((r) => r.value === role);
     if (!roleOption) return <Chip label={role} size="small" />;
-
+    
     return (
       <Chip
         label={roleOption.label}
@@ -359,33 +305,14 @@ const UserManagement = () => {
 
   const stats = [
     { label: "Tổng số người dùng", value: users.length, color: "primary" },
-    {
-      label: "Quản trị viên",
-      value: users.filter((u) => u.role === "admin").length,
-      color: "primary",
-    },
-    {
-      label: "Nhân viên",
-      value: users.filter((u) => u.role === "staff").length,
-      color: "warning",
-    },
-    {
-      label: "Khách hàng",
-      value: users.filter((u) => u.role === "customer").length,
-      color: "success",
-    },
+    { label: "Quản trị viên", value: users.filter(u => u.role === "admin").length, color: "primary" },
+    { label: "Nhân viên", value: users.filter(u => u.role === "staff").length, color: "warning" },
+    { label: "Khách hàng", value: users.filter(u => u.role === "customer").length, color: "success" },
   ];
 
   return (
     <Box>
-      <Box
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          mb: 3,
-        }}
-      >
+      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 3 }}>
         <Box>
           <Typography variant="h4" fontWeight="bold" gutterBottom>
             Quản lý người dùng
@@ -427,37 +354,34 @@ const UserManagement = () => {
                 placeholder="Tìm kiếm theo tên, email hoặc số điện thoại"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                try {
-                  const result = await changeUserRole(userToChangeRole.userId, newRole);
-                  if (result.success) {
-                    setSnackbar({
-                      open: true,
-                      message: `Đã thay đổi vai trò thành ${newRole}`,
-                      severity: "success",
-                    });
-                    setRoleDialogOpen(false);
-                    setUserToChangeRole(null);
-                    setNewRole("");
-                    // Refresh users list to ensure UI is updated
-                    await fetchUsers();
-                  } else {
-                    setSnackbar({
-                      open: true,
-                      message: result.error || "Lỗi thay đổi vai trò",
-                      severity: "error",
-                    });
-                  }
-                } catch (error) {
-                  setSnackbar({
-                    open: true,
-                    message: error.message || "Có lỗi xảy ra",
-                    severity: "error",
-                  });
-                }
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Search />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Grid>
+            <Grid item xs={12} md={3}>
+              <FormControl fullWidth>
+                <InputLabel>Vai trò</InputLabel>
+                <Select value={roleFilter} label="Vai trò" onChange={(e) => setRoleFilter(e.target.value)}>
+                  <MenuItem value="all">Tất cả</MenuItem>
+                  {roleOptions.map((r) => (
+                    <MenuItem key={r.value} value={r.value}>{r.label}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+          </Grid>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardContent>
           {loading ? (
-            <Box sx={{ display: "flex", justifyContent: "center", py: 5 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 5 }}>
               <CircularProgress />
             </Box>
           ) : (
@@ -477,8 +401,8 @@ const UserManagement = () => {
                     <TableRow>
                       <TableCell colSpan={5} align="center" sx={{ py: 5 }}>
                         <Typography color="text.secondary">
-                          {query || roleFilter !== "all"
-                            ? "Không tìm thấy người dùng phù hợp"
+                          {query || roleFilter !== "all" 
+                            ? "Không tìm thấy người dùng phù hợp" 
                             : "Chưa có người dùng nào"}
                         </Typography>
                       </TableCell>
@@ -487,27 +411,13 @@ const UserManagement = () => {
                     filteredUsers.map((u) => (
                       <TableRow key={u.userId} hover>
                         <TableCell>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 1.5,
-                            }}
-                          >
-                            <Avatar src={u.avatarUrl}>
-                              {(u.fullName || "?")[0].toUpperCase()}
-                            </Avatar>
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                            <Avatar src={u.avatarUrl}>{(u.fullName || "?")[0].toUpperCase()}</Avatar>
                             <Box>
-                              <Typography
-                                variant="subtitle2"
-                                fontWeight="medium"
-                              >
+                              <Typography variant="subtitle2" fontWeight="medium">
                                 {u.fullName}
                               </Typography>
-                              <Typography
-                                variant="caption"
-                                color="text.secondary"
-                              >
+                              <Typography variant="caption" color="text.secondary">
                                 ID: {u.userId}
                               </Typography>
                             </Box>
@@ -520,9 +430,9 @@ const UserManagement = () => {
                         </TableCell>
                         <TableCell align="center">
                           <Tooltip title="Chỉnh sửa">
-                            <IconButton
-                              size="small"
-                              color="primary"
+                            <IconButton 
+                              size="small" 
+                              color="primary" 
                               onClick={() => {
                                 if (u.role === "staff") {
                                   // Mở dialog đặc biệt cho Staff
@@ -531,11 +441,7 @@ const UserManagement = () => {
                                     ...form,
                                     email: u.email,
                                     firstName: u.fullName?.split(" ")[0] || "",
-                                    lastName:
-                                      u.fullName
-                                        ?.split(" ")
-                                        .slice(1)
-                                        .join(" ") || "",
+                                    lastName: u.fullName?.split(" ").slice(1).join(" ") || "",
                                     phone: u.phoneNumber || "",
                                     role: u.role,
                                     employeeId: u.employeeId || "",
@@ -545,9 +451,7 @@ const UserManagement = () => {
                                     location: u.location || "Hà Nội",
                                   });
                                   // Load assigned stations
-                                  setSelectedStations(
-                                    u.assignedStationIds || []
-                                  );
+                                  setSelectedStations(u.assignedStationIds || []);
                                   setStaffEditTab(0);
                                   setStaffEditDialogOpen(true);
                                 } else {
@@ -560,20 +464,12 @@ const UserManagement = () => {
                             </IconButton>
                           </Tooltip>
                           <Tooltip title="Thay đổi vai trò">
-                            <IconButton
-                              size="small"
-                              color="warning"
-                              onClick={() => openRoleDialog(u)}
-                            >
+                            <IconButton size="small" color="warning" onClick={() => openRoleDialog(u)}>
                               <SwapHoriz />
                             </IconButton>
                           </Tooltip>
                           <Tooltip title="Xóa">
-                            <IconButton
-                              size="small"
-                              color="error"
-                              onClick={() => openDeleteDialog(u)}
-                            >
+                            <IconButton size="small" color="error" onClick={() => openDeleteDialog(u)}>
                               <Delete />
                             </IconButton>
                           </Tooltip>
@@ -588,15 +484,8 @@ const UserManagement = () => {
         </CardContent>
       </Card>
 
-      <Dialog
-        open={dialogOpen}
-        onClose={() => setDialogOpen(false)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>
-          {editUser ? "Chỉnh sửa người dùng" : "Thêm người dùng mới"}
-        </DialogTitle>
+      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>{editUser ? "Chỉnh sửa người dùng" : "Thêm người dùng mới"}</DialogTitle>
         <DialogContent dividers>
           <Grid container spacing={2}>
             <Grid item xs={12} md={6}>
@@ -604,9 +493,7 @@ const UserManagement = () => {
                 fullWidth
                 label="Tên *"
                 value={form.firstName}
-                onChange={(e) =>
-                  setForm({ ...form, firstName: e.target.value })
-                }
+                onChange={(e) => setForm({ ...form, firstName: e.target.value })}
                 required
               />
             </Grid>
@@ -675,20 +562,14 @@ const UserManagement = () => {
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
-      <Dialog
-        open={deleteDialogOpen}
-        onClose={() => setDeleteDialogOpen(false)}
-        maxWidth="xs"
-        fullWidth
-      >
+      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} maxWidth="xs" fullWidth>
         <DialogTitle>Xác nhận xóa</DialogTitle>
         <DialogContent>
           <Alert severity="warning" icon={<Warning />} sx={{ mb: 2 }}>
             Hành động này không thể hoàn tác!
           </Alert>
           <Typography>
-            Bạn có chắc chắn muốn xóa người dùng{" "}
-            <strong>{userToDelete?.fullName}</strong> ({userToDelete?.email})?
+            Bạn có chắc chắn muốn xóa người dùng <strong>{userToDelete?.fullName}</strong> ({userToDelete?.email})?
           </Typography>
         </DialogContent>
         <DialogActions>
@@ -700,12 +581,7 @@ const UserManagement = () => {
       </Dialog>
 
       {/* Change Role Dialog */}
-      <Dialog
-        open={roleDialogOpen}
-        onClose={() => setRoleDialogOpen(false)}
-        maxWidth="xs"
-        fullWidth
-      >
+      <Dialog open={roleDialogOpen} onClose={() => setRoleDialogOpen(false)} maxWidth="xs" fullWidth>
         <DialogTitle>Thay đổi vai trò</DialogTitle>
         <DialogContent>
           <Box sx={{ mb: 2 }}>
@@ -718,14 +594,10 @@ const UserManagement = () => {
           </Box>
           <FormControl fullWidth>
             <InputLabel>Vai trò mới</InputLabel>
-            <Select
-              value={newRole}
-              label="Vai trò mới"
-              onChange={(e) => setNewRole(e.target.value)}
-            >
+            <Select value={newRole} label="Vai trò mới" onChange={(e) => setNewRole(e.target.value)}>
               {roleOptions.map((r) => (
                 <MenuItem key={r.value} value={r.value}>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     {r.icon}
                     {r.label}
                   </Box>
@@ -743,10 +615,10 @@ const UserManagement = () => {
       </Dialog>
 
       {/* Dialog chỉnh sửa Staff - Giống trang Profile */}
-      <Dialog
-        open={staffEditDialogOpen}
-        onClose={() => setStaffEditDialogOpen(false)}
-        maxWidth="md"
+      <Dialog 
+        open={staffEditDialogOpen} 
+        onClose={() => setStaffEditDialogOpen(false)} 
+        maxWidth="md" 
         fullWidth
       >
         <DialogTitle>
@@ -754,45 +626,22 @@ const UserManagement = () => {
         </DialogTitle>
         <DialogContent dividers>
           {/* Header Card với Avatar và Stats */}
-          <Card sx={{ mb: 3, bgcolor: "primary.50" }}>
+          <Card sx={{ mb: 3, bgcolor: 'primary.50' }}>
             <CardContent>
-              <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-                <Avatar
-                  sx={{
-                    width: 100,
-                    height: 100,
-                    mr: 3,
-                    bgcolor: "primary.main",
-                    fontSize: 40,
-                  }}
-                >
-                  {(form.firstName || "N")[0].toUpperCase()}
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                <Avatar sx={{ width: 100, height: 100, mr: 3, bgcolor: 'primary.main', fontSize: 40 }}>
+                  {(form.firstName || 'N')[0].toUpperCase()}
                 </Avatar>
                 <Box sx={{ flex: 1 }}>
                   <Typography variant="h5" fontWeight="bold">
                     {form.firstName} {form.lastName}
                   </Typography>
-                  <Typography
-                    variant="body1"
-                    color="text.secondary"
-                    gutterBottom
-                  >
-                    {form.position || "Kỹ thuật viên trạm sạc"} •{" "}
-                    {form.department || "Vận hành"}
+                  <Typography variant="body1" color="text.secondary" gutterBottom>
+                    {form.position || 'Kỹ thuật viên trạm sạc'} • {form.department || 'Vận hành'}
                   </Typography>
-                  <Box sx={{ display: "flex", gap: 1, mt: 1 }}>
-                    <Chip
-                      icon={<Badge />}
-                      label={`ID: ${form.employeeId || "ST001"}`}
-                      size="small"
-                      color="primary"
-                    />
-                    <Chip
-                      icon={<LocationOn />}
-                      label={form.location || "Hà Nội"}
-                      size="small"
-                      color="info"
-                    />
+                  <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+                    <Chip icon={<Badge />} label={`ID: ${form.employeeId || 'ST001'}`} size="small" color="primary" />
+                    <Chip icon={<LocationOn />} label={form.location || 'Hà Nội'} size="small" color="info" />
                   </Box>
                 </Box>
               </Box>
@@ -800,87 +649,27 @@ const UserManagement = () => {
               {/* Stats Row */}
               <Grid container spacing={2}>
                 <Grid item xs={3}>
-                  <Box
-                    sx={{
-                      textAlign: "center",
-                      p: 1.5,
-                      bgcolor: "white",
-                      borderRadius: 1,
-                    }}
-                  >
-                    <Typography
-                      variant="h5"
-                      fontWeight="bold"
-                      color="success.main"
-                    >
-                      8
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Trạm quản lý
-                    </Typography>
+                  <Box sx={{ textAlign: 'center', p: 1.5, bgcolor: 'white', borderRadius: 1 }}>
+                    <Typography variant="h5" fontWeight="bold" color="success.main">8</Typography>
+                    <Typography variant="caption" color="text.secondary">Trạm quản lý</Typography>
                   </Box>
                 </Grid>
                 <Grid item xs={3}>
-                  <Box
-                    sx={{
-                      textAlign: "center",
-                      p: 1.5,
-                      bgcolor: "white",
-                      borderRadius: 1,
-                    }}
-                  >
-                    <Typography
-                      variant="h5"
-                      fontWeight="bold"
-                      color="primary.main"
-                    >
-                      45
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Bảo trì hoàn thành
-                    </Typography>
+                  <Box sx={{ textAlign: 'center', p: 1.5, bgcolor: 'white', borderRadius: 1 }}>
+                    <Typography variant="h5" fontWeight="bold" color="primary.main">45</Typography>
+                    <Typography variant="caption" color="text.secondary">Bảo trì hoàn thành</Typography>
                   </Box>
                 </Grid>
                 <Grid item xs={3}>
-                  <Box
-                    sx={{
-                      textAlign: "center",
-                      p: 1.5,
-                      bgcolor: "white",
-                      borderRadius: 1,
-                    }}
-                  >
-                    <Typography
-                      variant="h5"
-                      fontWeight="bold"
-                      color="info.main"
-                    >
-                      12m
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Thời gian phản hồi TB
-                    </Typography>
+                  <Box sx={{ textAlign: 'center', p: 1.5, bgcolor: 'white', borderRadius: 1 }}>
+                    <Typography variant="h5" fontWeight="bold" color="info.main">12m</Typography>
+                    <Typography variant="caption" color="text.secondary">Thời gian phản hồi TB</Typography>
                   </Box>
                 </Grid>
                 <Grid item xs={3}>
-                  <Box
-                    sx={{
-                      textAlign: "center",
-                      p: 1.5,
-                      bgcolor: "white",
-                      borderRadius: 1,
-                    }}
-                  >
-                    <Typography
-                      variant="h5"
-                      fontWeight="bold"
-                      color="warning.main"
-                    >
-                      4.8/5
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Đánh giá khách hàng
-                    </Typography>
+                  <Box sx={{ textAlign: 'center', p: 1.5, bgcolor: 'white', borderRadius: 1 }}>
+                    <Typography variant="h5" fontWeight="bold" color="warning.main">4.8/5</Typography>
+                    <Typography variant="caption" color="text.secondary">Đánh giá khách hàng</Typography>
                   </Box>
                 </Grid>
               </Grid>
@@ -888,7 +677,7 @@ const UserManagement = () => {
           </Card>
 
           {/* Tabs */}
-          <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
+          <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
             <Tabs value={staffEditTab} onChange={(e, v) => setStaffEditTab(v)}>
               <Tab label="THÔNG TIN CÁ NHÂN & CÔNG VIỆC" />
               <Tab label="PHÂN QUYỀN TRẠM SẠC" />
@@ -909,13 +698,9 @@ const UserManagement = () => {
                     fullWidth
                     label="Họ"
                     value={form.firstName}
-                    onChange={(e) =>
-                      setForm({ ...form, firstName: e.target.value })
-                    }
+                    onChange={(e) => setForm({ ...form, firstName: e.target.value })}
                     InputProps={{
-                      startAdornment: (
-                        <Person sx={{ mr: 1, color: "text.secondary" }} />
-                      ),
+                      startAdornment: <Person sx={{ mr: 1, color: 'text.secondary' }} />
                     }}
                   />
                 </Grid>
@@ -924,13 +709,9 @@ const UserManagement = () => {
                     fullWidth
                     label="Tên"
                     value={form.lastName}
-                    onChange={(e) =>
-                      setForm({ ...form, lastName: e.target.value })
-                    }
+                    onChange={(e) => setForm({ ...form, lastName: e.target.value })}
                     InputProps={{
-                      startAdornment: (
-                        <Person sx={{ mr: 1, color: "text.secondary" }} />
-                      ),
+                      startAdornment: <Person sx={{ mr: 1, color: 'text.secondary' }} />
                     }}
                   />
                 </Grid>
@@ -939,13 +720,9 @@ const UserManagement = () => {
                     fullWidth
                     label="Email"
                     value={form.email}
-                    onChange={(e) =>
-                      setForm({ ...form, email: e.target.value })
-                    }
+                    onChange={(e) => setForm({ ...form, email: e.target.value })}
                     InputProps={{
-                      startAdornment: (
-                        <Email sx={{ mr: 1, color: "text.secondary" }} />
-                      ),
+                      startAdornment: <Email sx={{ mr: 1, color: 'text.secondary' }} />
                     }}
                   />
                 </Grid>
@@ -954,13 +731,9 @@ const UserManagement = () => {
                     fullWidth
                     label="Số điện thoại"
                     value={form.phone}
-                    onChange={(e) =>
-                      setForm({ ...form, phone: e.target.value })
-                    }
+                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
                     InputProps={{
-                      startAdornment: (
-                        <Phone sx={{ mr: 1, color: "text.secondary" }} />
-                      ),
+                      startAdornment: <Phone sx={{ mr: 1, color: 'text.secondary' }} />
                     }}
                   />
                 </Grid>
@@ -969,13 +742,9 @@ const UserManagement = () => {
                     fullWidth
                     label="Địa điểm"
                     value={form.location}
-                    onChange={(e) =>
-                      setForm({ ...form, location: e.target.value })
-                    }
+                    onChange={(e) => setForm({ ...form, location: e.target.value })}
                     InputProps={{
-                      startAdornment: (
-                        <LocationOn sx={{ mr: 1, color: "text.secondary" }} />
-                      ),
+                      startAdornment: <LocationOn sx={{ mr: 1, color: 'text.secondary' }} />
                     }}
                   />
                 </Grid>
@@ -985,16 +754,10 @@ const UserManagement = () => {
                     label="Ngày vào làm"
                     type="date"
                     value={form.joinDate}
-                    onChange={(e) =>
-                      setForm({ ...form, joinDate: e.target.value })
-                    }
+                    onChange={(e) => setForm({ ...form, joinDate: e.target.value })}
                     InputLabelProps={{ shrink: true }}
                     InputProps={{
-                      startAdornment: (
-                        <CalendarToday
-                          sx={{ mr: 1, color: "text.secondary" }}
-                        />
-                      ),
+                      startAdornment: <CalendarToday sx={{ mr: 1, color: 'text.secondary' }} />
                     }}
                   />
                 </Grid>
@@ -1015,13 +778,9 @@ const UserManagement = () => {
                     fullWidth
                     label="Mã nhân viên"
                     value={form.employeeId}
-                    onChange={(e) =>
-                      setForm({ ...form, employeeId: e.target.value })
-                    }
+                    onChange={(e) => setForm({ ...form, employeeId: e.target.value })}
                     InputProps={{
-                      startAdornment: (
-                        <Badge sx={{ mr: 1, color: "text.secondary" }} />
-                      ),
+                      startAdornment: <Badge sx={{ mr: 1, color: 'text.secondary' }} />
                     }}
                   />
                 </Grid>
@@ -1030,13 +789,9 @@ const UserManagement = () => {
                     fullWidth
                     label="Phòng ban"
                     value={form.department}
-                    onChange={(e) =>
-                      setForm({ ...form, department: e.target.value })
-                    }
+                    onChange={(e) => setForm({ ...form, department: e.target.value })}
                     InputProps={{
-                      startAdornment: (
-                        <Work sx={{ mr: 1, color: "text.secondary" }} />
-                      ),
+                      startAdornment: <Work sx={{ mr: 1, color: 'text.secondary' }} />
                     }}
                   />
                 </Grid>
@@ -1045,13 +800,9 @@ const UserManagement = () => {
                     fullWidth
                     label="Chức vụ"
                     value={form.position}
-                    onChange={(e) =>
-                      setForm({ ...form, position: e.target.value })
-                    }
+                    onChange={(e) => setForm({ ...form, position: e.target.value })}
                     InputProps={{
-                      startAdornment: (
-                        <Work sx={{ mr: 1, color: "text.secondary" }} />
-                      ),
+                      startAdornment: <Work sx={{ mr: 1, color: 'text.secondary' }} />
                     }}
                   />
                 </Grid>
@@ -1067,87 +818,53 @@ const UserManagement = () => {
                   Phân quyền trạm sạc cho nhân viên
                 </Typography>
                 <Typography variant="body2" color="text.secondary" gutterBottom>
-                  Chọn các trạm sạc mà nhân viên{" "}
-                  <strong>
-                    {form.firstName} {form.lastName}
-                  </strong>{" "}
-                  có quyền quản lý
+                  Chọn các trạm sạc mà nhân viên <strong>{form.firstName} {form.lastName}</strong> có quyền quản lý
                 </Typography>
-                <Chip
-                  label={`Đã chọn: ${selectedStations.length} trạm`}
-                  color="primary"
-                  size="small"
+                <Chip 
+                  label={`Đã chọn: ${selectedStations.length} trạm`} 
+                  color="primary" 
+                  size="small" 
                   sx={{ mt: 1 }}
                   icon={<CheckCircle />}
                 />
               </Box>
 
               {stations.length === 0 ? (
-                <Alert severity="info">
-                  Chưa có trạm sạc nào trong hệ thống
-                </Alert>
+                <Alert severity="info">Chưa có trạm sạc nào trong hệ thống</Alert>
               ) : (
                 <Grid container spacing={2}>
                   {stations.map((station) => (
                     <Grid item xs={12} sm={6} key={station.stationId}>
-                      <Card
+                      <Card 
                         variant="outlined"
-                        sx={{
-                          cursor: "pointer",
-                          border: selectedStations.includes(station.stationId)
-                            ? 2
-                            : 1,
-                          borderColor: selectedStations.includes(
-                            station.stationId
-                          )
-                            ? "success.main"
-                            : "divider",
-                          bgcolor: selectedStations.includes(station.stationId)
-                            ? "success.50"
-                            : "transparent",
-                          transition: "all 0.2s",
-                          "&:hover": {
-                            borderColor: "success.main",
-                            transform: "translateY(-2px)",
-                            boxShadow: 2,
-                          },
+                        sx={{ 
+                          cursor: 'pointer',
+                          border: selectedStations.includes(station.stationId) ? 2 : 1,
+                          borderColor: selectedStations.includes(station.stationId) ? 'success.main' : 'divider',
+                          bgcolor: selectedStations.includes(station.stationId) ? 'success.50' : 'transparent',
+                          transition: 'all 0.2s',
+                          '&:hover': {
+                            borderColor: 'success.main',
+                            transform: 'translateY(-2px)',
+                            boxShadow: 2
+                          }
                         }}
-                        onClick={() =>
-                          toggleStationSelection(station.stationId)
-                        }
+                        onClick={() => toggleStationSelection(station.stationId)}
                       >
                         <CardContent>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "flex-start",
-                              justifyContent: "space-between",
-                            }}
-                          >
+                          <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
                             <Box sx={{ flex: 1 }}>
-                              <Typography
-                                variant="subtitle2"
-                                fontWeight="bold"
-                                gutterBottom
-                              >
+                              <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
                                 {station.name}
                               </Typography>
-                              <Typography
-                                variant="caption"
-                                color="text.secondary"
-                                sx={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: 0.5,
-                                }}
-                              >
+                              <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                                 <LocationOn fontSize="inherit" />
                                 {station.address}
                               </Typography>
                               <Box sx={{ mt: 1 }}>
-                                <Chip
-                                  label={`${station.totalChargers || 0} bộ sạc`}
-                                  size="small"
+                                <Chip 
+                                  label={`${station.totalChargers || 0} bộ sạc`} 
+                                  size="small" 
                                   variant="outlined"
                                 />
                               </Box>
@@ -1179,7 +896,10 @@ const UserManagement = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setStaffEditDialogOpen(false)}>Hủy</Button>
-          <Button variant="contained" onClick={handleSaveStaff}>
+          <Button 
+            variant="contained" 
+            onClick={handleSaveStaff}
+          >
             Lưu thay đổi
           </Button>
         </DialogActions>
@@ -1190,12 +910,12 @@ const UserManagement = () => {
         open={snackbar.open}
         autoHideDuration={6000}
         onClose={() => setSnackbar({ ...snackbar, open: false })}
-        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
       >
         <Alert
           onClose={() => setSnackbar({ ...snackbar, open: false })}
           severity={snackbar.severity}
-          sx={{ width: "100%" }}
+          sx={{ width: '100%' }}
         >
           {snackbar.message}
         </Alert>
