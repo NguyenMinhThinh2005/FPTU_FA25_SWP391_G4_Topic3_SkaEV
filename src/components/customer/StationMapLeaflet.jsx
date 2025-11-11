@@ -128,7 +128,16 @@ const RouteDrawer = ({ userLocation, destination }) => {
   const [routeCoords, setRouteCoords] = useState([]);
 
   useEffect(() => {
+    console.log("🚗 RouteDrawer: userLocation=", userLocation, "destination=", destination);
+    
     if (!userLocation || !destination) {
+      console.warn("⚠️ RouteDrawer: Missing userLocation or destination");
+      setRouteCoords([]);
+      return;
+    }
+
+    if (!userLocation.lat || !userLocation.lng || !destination.lat || !destination.lng) {
+      console.warn("⚠️ RouteDrawer: Invalid coordinates", { userLocation, destination });
       setRouteCoords([]);
       return;
     }
@@ -137,19 +146,30 @@ const RouteDrawer = ({ userLocation, destination }) => {
       try {
         // Use OSRM (Open Source Routing Machine) - free routing service
         const url = `https://router.project-osrm.org/route/v1/driving/${userLocation.lng},${userLocation.lat};${destination.lng},${destination.lat}?overview=full&geometries=geojson`;
+        console.log("🌐 Fetching route from OSRM:", url);
+        
         const response = await fetch(url);
         const data = await response.json();
+        console.log("📦 OSRM response:", data);
 
         if (data.code === "Ok" && data.routes && data.routes.length > 0) {
           const coords = data.routes[0].geometry.coordinates.map((coord) => [
             coord[1],
             coord[0],
           ]);
+          console.log("✅ Route fetched successfully, coords count:", coords.length);
           setRouteCoords(coords);
+        } else {
+          console.warn("⚠️ OSRM returned no routes, using fallback straight line");
+          setRouteCoords([
+            [userLocation.lat, userLocation.lng],
+            [destination.lat, destination.lng],
+          ]);
         }
       } catch (error) {
-        console.error("Error fetching route:", error);
+        console.error("❌ Error fetching route:", error);
         // Fallback: draw straight line
+        console.log("🔄 Using fallback: straight line");
         setRouteCoords([
           [userLocation.lat, userLocation.lng],
           [destination.lat, destination.lng],
@@ -163,15 +183,28 @@ const RouteDrawer = ({ userLocation, destination }) => {
   if (routeCoords.length === 0) return null;
 
   return (
-    <Polyline
-      positions={routeCoords}
-      pathOptions={{
-        color: "#2196f3",
-        weight: 4,
-        opacity: 0.7,
-        dashArray: "10, 10",
-      }}
-    />
+    <>
+      {/* Outer border for better visibility */}
+      <Polyline
+        positions={routeCoords}
+        pathOptions={{
+          color: "#ffffff",
+          weight: 10,
+          opacity: 0.8,
+        }}
+      />
+      {/* Main route line */}
+      <Polyline
+        positions={routeCoords}
+        pathOptions={{
+          color: "#1976d2",  // Darker blue for better contrast
+          weight: 6,
+          opacity: 1,
+          lineJoin: "round",
+          lineCap: "round",
+        }}
+      />
+    </>
   );
 };
 
@@ -184,7 +217,13 @@ const getStationCoords = (station) => {
   return { lat, lng };
 };
 
-const StationMapLeaflet = ({ stations, onStationSelect }) => {
+const StationMapLeaflet = ({ 
+  stations, 
+  onStationSelect,
+  userLocation: externalUserLocation = null,  // Accept external user location
+  showRoute: externalShowRoute = false,        // Accept external showRoute flag
+  centerOnStation = false                       // Accept centerOnStation flag
+}) => {
   const [userLocation, setUserLocation] = useState(null);
   const [selectedStation, setSelectedStation] = useState(null);
   const [selectedFromList, setSelectedFromList] = useState(false);
@@ -379,6 +418,37 @@ const StationMapLeaflet = ({ stations, onStationSelect }) => {
       );
     }
   }, []);
+
+  // Handle external user location prop
+  useEffect(() => {
+    if (externalUserLocation) {
+      console.log("🎯 Using external user location:", externalUserLocation);
+      setUserLocation(externalUserLocation);
+    }
+  }, [externalUserLocation]);
+
+  // Handle external showRoute prop and auto-select first station for navigation
+  useEffect(() => {
+    if (externalShowRoute && stations && stations.length > 0) {
+      console.log("🗺️ External showRoute enabled, auto-selecting first station for navigation");
+      setSelectedStation(stations[0]);
+      setShowRoute(true);
+      
+      // Center map on station if requested
+      if (centerOnStation && mapRef.current) {
+        const coords = getStationCoords(stations[0]);
+        if (coords.lat && coords.lng) {
+          setTimeout(() => {
+            try {
+              mapRef.current.setView([coords.lat, coords.lng], 15, { animate: true });
+            } catch (err) {
+              console.error("Error centering on station:", err);
+            }
+          }, 500);
+        }
+      }
+    }
+  }, [externalShowRoute, stations, centerOnStation]);
 
   // Calculate map center and bounds
   const { center, bounds } = useMemo(() => {
