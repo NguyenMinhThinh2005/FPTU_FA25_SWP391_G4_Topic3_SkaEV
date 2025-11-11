@@ -151,57 +151,19 @@ const useAuthStore = create(
         set({ error: null });
       },
 
-      updateProfile: async (profileUpdates) => {
+      setUser: (userData) => {
+        set({ user: userData });
+      },
+
+      updateProfile: (profileData) => {
         const currentUser = get().user;
-        if (!currentUser) {
-          return { success: false, error: "Người dùng chưa đăng nhập" };
-        }
-
-        set({ loading: true, error: null });
-
-        try {
-          const response = await authAPI.updateProfile(profileUpdates);
-
-          const updatedUser = {
-            ...currentUser,
-            // Normalize common fields so both camelCase & snake_case consumers work
-            fullName: response.fullName ?? currentUser.fullName,
-            full_name: response.fullName ?? currentUser.full_name,
-            phoneNumber: response.phoneNumber ?? currentUser.phoneNumber,
-            phone_number: response.phoneNumber ?? currentUser.phone_number,
-            profile: {
-              ...(currentUser.profile || {}),
-              address:
-                response.address ??
-                response.profile?.address ??
-                currentUser.profile?.address,
-              city: response.city ?? currentUser.profile?.city,
-              preferredPaymentMethod:
-                response.preferredPaymentMethod ??
-                currentUser.profile?.preferredPaymentMethod,
-              notificationPreferences:
-                response.notificationPreferences ??
-                currentUser.profile?.notificationPreferences,
-              dateOfBirth:
-                response.dateOfBirth ?? currentUser.profile?.dateOfBirth,
-              updatedAt: response.updatedAt ?? currentUser.profile?.updatedAt,
-            },
-          };
-
+        if (currentUser) {
           set({
-            user: updatedUser,
-            loading: false,
+            user: {
+              ...currentUser,
+              ...profileData,
+            },
           });
-
-          return { success: true, data: response };
-        } catch (error) {
-          const errorMessage =
-            error.response?.data?.message ||
-            error.message ||
-            "Cập nhật hồ sơ không thành công";
-
-          set({ loading: false, error: errorMessage });
-          return { success: false, error: errorMessage };
         }
       },
 
