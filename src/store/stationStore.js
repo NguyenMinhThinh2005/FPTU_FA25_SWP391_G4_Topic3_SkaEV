@@ -3,133 +3,180 @@ import { stationsAPI } from "../services/api";
 import { calculateDistance } from "../utils/helpers";
 
 // Transform API response to frontend format
-const transformStationData = (apiStation, stationPosts = []) => {
+const transformStationData = (apiStation, slotsData = null) => {
   try {
-    const stationId = apiStation.stationId ?? apiStation.id;
-    const normalizeStatus = (status) => {
-      if (!status) return "unknown";
-      const value = status.toString().trim().toLowerCase();
-      if (["available", "occupied", "maintenance", "offline"].includes(value)) {
-        return value;
-      }
-      return value || "unknown";
-    };
+    // API may still provide legacy totals named 'totalPosts' / 'availablePosts'.
+    // Map them to frontend-friendly pole/port names and keep backwards fallback.
+  let totalPoles = apiStation.totalPoles ?? apiStation.totalPosts ?? 0;
+  let availablePoles = apiStation.availablePoles ?? apiStation.availablePosts ?? 0;
 
-    const derivePostsFromSlots = (slotList) => {
-      const grouped = new Map();
-      slotList.forEach((slot) => {
-        const postId = slot.postId ?? slot.chargingPostId;
-        if (!postId) return;
-        if (!grouped.has(postId)) {
-          grouped.set(postId, {
-            postId,
-            postNumber: slot.postNumber ?? postId,
-            postType: slot.postType,
-            powerOutput: slot.maxPower,
-            status: slot.status,
-            slots: [],
+    let poles = [];
+
+    // Use real slots data if provided, otherwise leave empty to avoid mock fabrication
+    if (slotsData && Array.isArray(slotsData) && slotsData.length > 0) {
+      const postMap = new Map();
+
+      slotsData.forEach((slot) => {
+        // Backend returns maxPower instead of powerKw
+        const powerKw = slot.powerKw || slot.maxPower || 0;
+        const postId = slot.chargingPostId || slot.postId;
+        const postNumber = slot.postNumber || `POST-${postId}`;
+        
+        if (!postMap.has(postId)) {
+          postMap.set(postId, {
+            id: `${apiStation.stationId}-post${postId}`,
+            poleId: `${apiStation.stationId}-post${postId}`,
+            name: postNumber,
+            poleNumber: postId,
+            type: powerKw >= 50 ? "DC" : "AC",
+            power: powerKw,
+            voltage: powerKw >= 50 ? 400 : 220,
+            status: slot.status || "active",
+            ports: [],
+            totalPorts: 0,
+            availablePorts: 0,
           });
         }
 
-        grouped.get(postId).slots.push(slot);
+        const post = postMap.get(postId);
+        post.ports.push({
+          id: `${apiStation.stationId}-slot${slot.slotId}`,
+          portId: `${apiStation.stationId}-slot${slot.slotId}`,
+          slotId: slot.slotId,
+          portNumber: slot.slotNumber || slot.slotId,
+          connectorType:
+            slot.connectorType || (powerKw >= 50 ? "CCS2" : "Type 2"),
+          maxPower: powerKw,
+          status: slot.status === "available" ? "available" : "occupied",
+          currentRate: powerKw >= 50 ? 5000 : 3000,
+        });
+        post.totalPorts += 1;
+        if (slot.status === "available") {
+          post.availablePorts += 1;
+        }
       });
 
-      return Array.from(grouped.values()).map((post) => ({
-        ...post,
-        totalSlots: post.slots.length,
-        availableSlots: post.slots.filter(
-          (slot) => normalizeStatus(slot.status) === "available"
-        ).length,
-      }));
-    };
+      poles = Array.from(postMap.values());
+      console.log(
+        `✅ Loaded ${poles.length} poles from real database slots for station ${apiStation.stationId}`
+      );
+    }
 
-    const posts = (() => {
-      if (!Array.isArray(stationPosts) || stationPosts.length === 0) {
-        return [];
-      }
+    let totalPorts = poles.reduce((sum, pole) => sum + pole.totalPorts, 0);
+    let availablePorts = poles.reduce((sum, pole) => sum + pole.availablePorts, 0);
 
-      const firstItem = stationPosts[0];
-      if (firstItem && typeof firstItem === "object" && "slots" in firstItem) {
-        return stationPosts;
-      }
+    if (poles.length === 0) {
+      const aggregatedTotalPorts =
+        apiStation.totalPorts ??
+        apiStation.totalSlots ??
+        totalPoles ??
+        (apiStation.ports ? apiStation.ports.length : 0) ??
+        0;
+      const aggregatedAvailablePorts =
+        apiStation.availablePorts ??
+        apiStation.availableSlots ??
+        apiStation.availablePoles ??
+        availablePoles ??
+        0;
 
-      if (firstItem && typeof firstItem === "object" && "slotId" in firstItem) {
-        return derivePostsFromSlots(stationPosts);
-      }
+      totalPorts = aggregatedTotalPorts;
+      availablePorts = aggregatedAvailablePorts;
+    }
 
-      return [];
-    })();
+    if (poles.length > 0) {
+      totalPoles = poles.length;
+      availablePoles = poles.filter((pole) => pole.availablePorts > 0).length;
+    }
 
-    const poles = posts.map((post) => {
-      const slots = Array.isArray(post.slots) ? post.slots : [];
+    const statusNormalized = (apiStation.status || "").toLowerCase();
+    if (statusNormalized !== "active") {
+      availablePorts = 0;
+      availablePoles = 0;
+    }
 
-      const ports = slots.map((slot, index) => {
-        const slotStatus = normalizeStatus(slot.status);
-        return {
-          id: `${stationId}-slot${slot.slotId ?? index + 1}`,
-          portId: `${stationId}-slot${slot.slotId ?? index + 1}`,
-          slotId: slot.slotId ?? slot.slotNumber ?? index + 1,
-          portNumber: slot.slotNumber ?? slot.slotId ?? index + 1,
-          connectorType: slot.connectorType ?? null,
-          maxPower: slot.powerKw ?? slot.maxPower ?? post.powerOutput ?? null,
-          status: slotStatus,
-          currentRate: null,
-        };
+    availablePorts = Math.max(0, Math.min(availablePorts, totalPorts));
+
+    const totalPolesCount = poles.length > 0 ? poles.length : totalPoles;
+
+    const maxPowerFromPoles =
+      poles.length > 0 ? Math.max(...poles.map((p) => p.power), 0) : 0;
+    const maxPower =
+      maxPowerFromPoles ||
+      apiStation.maxPowerKw ||
+      apiStation.totalPowerCapacityKw ||
+      apiStation.capacityKw ||
+      0;
+
+    const connectorTypesSet = new Set();
+    poles.forEach((pole) => {
+      pole.ports.forEach((port) => {
+        if (port.connectorType) {
+          connectorTypesSet.add(port.connectorType);
+        }
       });
-
-      const portsCount = ports.length > 0 ? ports.length : post.totalSlots ?? 0;
-      const availablePortCount =
-        ports.length > 0
-          ? ports.filter((port) => port.status === "available").length
-          : post.availableSlots ?? 0;
-
-      const poleType =
-        post.postType ??
-        (post.powerOutput && post.powerOutput >= 50 ? "DC" : "AC");
-
-      return {
-        id: `${stationId}-post${post.postId}`,
-        poleId: `${stationId}-post${post.postId}`,
-        name: post.postNumber || `Trụ sạc ${post.postId}`,
-        poleNumber: post.postNumber ?? post.postId,
-        type: poleType,
-        power: post.powerOutput ?? null,
-        voltage: poleType === "DC" ? 400 : poleType === "AC" ? 220 : null,
-        status:
-          normalizeStatus(post.status) ||
-          (availablePortCount > 0 ? "available" : "occupied"),
-        ports,
-        totalPorts: portsCount,
-        availablePorts: availablePortCount,
-      };
     });
 
-    const totalPorts = poles.reduce(
-      (sum, pole) => sum + (pole.totalPorts || 0),
-      0
-    );
-    const availablePorts = poles.reduce(
-      (sum, pole) => sum + (pole.availablePorts || 0),
-      0
-    );
-    const maxPower = poles.reduce((currentMax, pole) => {
-      const polePower = Number(pole.power) || 0;
-      return polePower > currentMax ? polePower : currentMax;
-    }, 0);
+    const apiConnectorTypes =
+      apiStation.connectorTypes ??
+      apiStation.supportedConnectors ??
+      apiStation.connectors ??
+      [];
 
-    const connectorTypes = Array.from(
-      new Set(
-        poles.flatMap((pole) =>
-          (pole.ports || [])
-            .map((port) => port.connectorType)
-            .filter((connector) => connector && typeof connector === "string")
-        )
-      )
-    );
+    if (typeof apiConnectorTypes === "string") {
+      apiConnectorTypes
+        .split(",")
+        .map((c) => c.trim())
+        .filter(Boolean)
+        .forEach((c) => connectorTypesSet.add(c));
+    } else if (Array.isArray(apiConnectorTypes)) {
+      apiConnectorTypes.filter(Boolean).forEach((c) => connectorTypesSet.add(c));
+    }
 
+    const connectorTypes = Array.from(connectorTypesSet);
+
+    const managerUserId =
+      apiStation.managerUserId ??
+      apiStation.manager?.userId ??
+      apiStation.managerID ??
+      apiStation.manager?.id ??
+      null;
+    const managerName =
+      apiStation.managerName ??
+      apiStation.manager?.name ??
+      apiStation.managerFullName ??
+      null;
+    const managerEmail =
+      apiStation.managerEmail ??
+      apiStation.manager?.email ??
+      null;
+    const managerPhone =
+      apiStation.managerPhoneNumber ??
+      apiStation.manager?.phone ??
+      apiStation.manager?.phoneNumber ??
+      null;
+
+    const manager =
+      managerUserId || managerName || managerEmail || managerPhone
+        ? {
+            userId: managerUserId ?? null,
+            name: managerName ?? null,
+            email: managerEmail ?? null,
+            phone: managerPhone ?? null,
+          }
+        : null;
+    
+    // Debug log to check final values
+    console.log(`🔍 Station ${apiStation.stationId} - Final values:`, {
+      totalPoles: totalPolesCount,
+      availablePoles,
+      totalPorts,
+      availablePorts: availablePorts,
+      polesCount: poles.length
+    });
+    
     return {
-      id: stationId,
-      stationId: stationId,
+      id: apiStation.stationId,
+      stationId: apiStation.stationId,
       name: apiStation.stationName || apiStation.name,
       status: apiStation.status || "active",
       location: {
@@ -141,24 +188,23 @@ const transformStationData = (apiStation, stationPosts = []) => {
         },
       },
       charging: {
-        totalPoles:
-          poles.length || apiStation.totalPoles || apiStation.totalPosts || 0,
-        totalPorts: totalPorts,
-        availablePorts: availablePorts,
-        poles: poles,
-        maxPower: maxPower,
+        totalPoles: totalPolesCount,
+        availablePoles,
+        totalPorts,
+        availablePorts,
+        poles,
+        maxPower,
         connectorTypes,
         pricing: {
-          acRate: apiStation.acRate ?? 0,
-          dcRate: apiStation.dcRate ?? 0,
-          dcFastRate: apiStation.dcFastRate ?? 0,
-          parkingFee: apiStation.parkingFee ?? 0,
+          acRate: 3500,
+          dcRate: 5000,
+          dcFastRate: 7000,
         },
       },
       stats: {
         total: totalPorts,
         available: availablePorts,
-        occupied: totalPorts - availablePorts,
+        occupied: Math.max(totalPorts - availablePorts, 0),
       },
       amenities: apiStation.amenities || [],
       operatingHours: apiStation.operatingHours || "00:00-24:00",
@@ -167,6 +213,19 @@ const transformStationData = (apiStation, stationPosts = []) => {
         overall: 4.5,
         totalReviews: 0,
       },
+      manager,
+      managerUserId: manager?.userId ?? null,
+      managerName: manager?.name ?? null,
+      managerEmail: manager?.email ?? null,
+      managerPhoneNumber: manager?.phone ?? null,
+      contact: manager
+        ? {
+            manager: manager.name,
+            managerId: manager.userId,
+            email: manager.email,
+            phone: manager.phone,
+          }
+        : null,
     };
   } catch (error) {
     console.error("❌ Transform error for station:", apiStation, error);
@@ -232,28 +291,27 @@ const useStationStore = create((set, get) => ({
         console.log("📊 Raw stations from API:", rawStations.length);
 
         // Transform API data to frontend format
-        // First pass: transform without slots data
+        // Try to fetch slots for each station to get real-time data
         const stations = await Promise.all(
           rawStations.map(async (station) => {
             try {
-              console.log(
-                `🔌 Fetching posts for station ${station.stationId}...`
-              );
-              const postsResponse = await stationsAPI.getAvailablePosts(
-                station.stationId
-              );
-              const postsPayload = postsResponse?.data ?? postsResponse;
-              const postsData = Array.isArray(postsPayload) ? postsPayload : [];
-              console.log(
-                `✅ Loaded ${postsData.length} posts for station ${station.stationId}`
-              );
-              return transformStationData(station, postsData);
-            } catch (postError) {
-              console.error(
-                `❌ Could not fetch posts for station ${station.stationId}:`,
-                postError.message
-              );
-              return transformStationData(station, []);
+              // Try to fetch slots for each station
+              // axios interceptor returns response.data, so slotsResponse = {success: true, data: [...]}
+              const slotsResponse = await stationsAPI.getStationSlots(station.stationId);
+              
+              // Extract slots array from response
+              const slotsData = slotsResponse?.data || [];
+              
+              if (Array.isArray(slotsData) && slotsData.length > 0) {
+                console.log(`✅ Loaded ${slotsData.length} slots for station ${station.stationId} (${station.stationName})`);
+                return transformStationData(station, slotsData);
+              } else {
+                console.warn(`⚠️ No slots data for station ${station.stationId}, using station totals`);
+                return transformStationData(station, null);
+              }
+            } catch (slotError) {
+              console.warn(`⚠️ Could not fetch slots for station ${station.stationId}:`, slotError.message);
+              return transformStationData(station, null);
             }
           })
         );
@@ -276,7 +334,9 @@ const useStationStore = create((set, get) => ({
       const errorMessage = error.message || "Đã xảy ra lỗi khi tải trạm sạc";
       console.error("❌ Fetch stations error:", errorMessage);
       console.error("❌ Full error:", error);
-      set({ error: errorMessage, loading: false, stations: [] });
+      
+      // IMPORTANT: Do NOT clear existing stations on error - preserve current data
+      set({ error: errorMessage, loading: false });
       return { success: false, error: errorMessage };
     }
   },
@@ -291,24 +351,8 @@ const useStationStore = create((set, get) => ({
           ? response.data
           : response.data.stations || [];
 
-        const nearby = await Promise.all(
-          rawNearby.map(async (station) => {
-            try {
-              const postsResponse = await stationsAPI.getAvailablePosts(
-                station.stationId
-              );
-              const postsPayload = postsResponse?.data ?? postsResponse;
-              const postsData = Array.isArray(postsPayload) ? postsPayload : [];
-              return transformStationData(station, postsData);
-            } catch (error) {
-              console.error(
-                `❌ Could not load posts for nearby station ${station.stationId}:`,
-                error.message
-              );
-              return transformStationData(station, []);
-            }
-          })
-        );
+        // Transform API data to frontend format
+        const nearby = rawNearby.map(transformStationData);
 
         // If API doesn't provide distance, calculate it locally
         const nearbyWithDistance = nearby.map((station) => {
@@ -379,12 +423,8 @@ const useStationStore = create((set, get) => ({
 
       if (connectorFilters.length > 0) {
         const stationConnectors = station.charging?.connectorTypes || [];
-        console.log(
-          `   - Filter connectors: ${JSON.stringify(connectorFilters)}`
-        );
-        console.log(
-          `   - Station connectors: ${JSON.stringify(stationConnectors)}`
-        );
+        console.log(`   - Filter connectors: ${JSON.stringify(connectorFilters)}`);
+        console.log(`   - Station connectors: ${JSON.stringify(stationConnectors)}`);
 
         const hasMatchingConnector = connectorFilters.some((filterType) => {
           const match = stationConnectors.includes(filterType);
@@ -392,9 +432,7 @@ const useStationStore = create((set, get) => ({
           return match;
         });
 
-        console.log(
-          `   - Has matching connector: ${hasMatchingConnector ? "✅" : "❌"}`
-        );
+        console.log(`   - Has matching connector: ${hasMatchingConnector ? "✅" : "❌"}`);
         if (!hasMatchingConnector) return false;
       }
 
