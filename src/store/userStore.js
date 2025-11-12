@@ -44,6 +44,7 @@ const useUserStore = create(
             fullName: `${data.firstName || ""} ${data.lastName || ""}`.trim(),
             phoneNumber: data.phone || "",
             role: data.role || "customer",
+            managedStationId: data.managedStationId ? Number(data.managedStationId) : undefined,
           };
           const response = await usersAPI.create(userData);
           // Backend returns created user directly
@@ -72,6 +73,9 @@ const useUserStore = create(
               : undefined,
             phoneNumber: updates.phone,
             role: updates.role,
+            managedStationId: updates.managedStationId !== undefined
+              ? (updates.managedStationId === null ? null : Number(updates.managedStationId))
+              : undefined,
           };
           // Remove undefined fields
           Object.keys(updateData).forEach(key => 
@@ -105,6 +109,26 @@ const useUserStore = create(
         } catch (error) {
           const errorMessage = error.message || "Error deleting user";
           console.error("Delete user error:", errorMessage);
+          set({ error: errorMessage, loading: false });
+          return { success: false, error: errorMessage };
+        }
+      },
+
+      changeUserRole: async (userId, newRole) => {
+        set({ loading: true, error: null });
+        try {
+          const response = await usersAPI.updateRole(userId, { role: newRole });
+          // Backend returns updated user
+          if (response) {
+            const updatedUser = response;
+            set((s) => ({ users: s.users.map((u) => u.userId === userId ? updatedUser : u), loading: false }));
+            return { success: true, data: updatedUser };
+          } else {
+            throw new Error("Cannot change user role");
+          }
+        } catch (error) {
+          const errorMessage = error.message || "Error changing user role";
+          console.error("Change role error:", errorMessage);
           set({ error: errorMessage, loading: false });
           return { success: false, error: errorMessage };
         }

@@ -2011,9 +2011,11 @@ BEGIN
             actual_start_time = GETDATE()
         WHERE booking_id = @booking_id;
         
-        -- Update slot status
+        -- Update slot status AND link booking
         UPDATE charging_slots
-        SET status = 'occupied'
+        SET status = 'occupied',
+            current_booking_id = @booking_id,  -- ← FIX: Link booking to slot
+            updated_at = GETDATE()
         WHERE slot_id = (SELECT slot_id FROM bookings WHERE booking_id = @booking_id);
         
         COMMIT TRANSACTION;
@@ -2083,3 +2085,4 @@ USE [master]
 GO
 ALTER DATABASE [SkaEV_DB] SET  READ_WRITE 
 GO
+    

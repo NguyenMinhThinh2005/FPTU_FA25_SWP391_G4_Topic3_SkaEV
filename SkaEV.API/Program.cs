@@ -5,6 +5,7 @@ using Microsoft.OpenApi.Models;
 using System.Text;
 using SkaEV.API.Infrastructure.Data;
 using SkaEV.API.Application.Services;
+using SkaEV.API.Hubs;
 using Serilog;
 using Serilog.Events;
 
@@ -91,7 +92,7 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddAuthorization();
 
-// Configure CORS
+// Configure CORS (with SignalR support)
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
@@ -105,7 +106,8 @@ builder.Services.AddCors(options =>
         )
         .AllowAnyHeader()
         .AllowAnyMethod()
-        .AllowCredentials();
+        .AllowCredentials()
+        .SetIsOriginAllowed(_ => true); // For SignalR compatibility
     });
 });
 
@@ -115,6 +117,7 @@ builder.Services.AddScoped<IStationService, StationService>();
 builder.Services.AddScoped<IBookingService, BookingService>();
 builder.Services.AddScoped<IPaymentMethodService, PaymentMethodService>();
 builder.Services.AddScoped<IReportService, ReportService>();
+builder.Services.AddScoped<IStaffDashboardService, StaffDashboardService>();
 
 // New Services
 builder.Services.AddScoped<IInvoiceService, InvoiceService>();
@@ -127,6 +130,22 @@ builder.Services.AddScoped<ISlotService, SlotService>();
 builder.Services.AddScoped<IUserProfileService, UserProfileService>();
 builder.Services.AddScoped<IAdminUserService, AdminUserService>();
 builder.Services.AddScoped<IIssueService, IssueService>(); // Optional - requires 08_ADD_ISSUES_TABLE.sql
+builder.Services.AddScoped<IncidentService>(); // Incident management service
+builder.Services.AddScoped<StationAnalyticsService>(); // Station analytics service
+
+// Real-time SignalR Notification Service
+builder.Services.AddScoped<IStationNotificationService, StationNotificationService>();
+
+// Admin Management Services
+builder.Services.AddScoped<IAdminStationManagementService, AdminStationManagementService>();
+// Temporarily commented out - services not implemented yet
+// builder.Services.AddScoped<IMonitoringService, MonitoringService>(); // Real-time monitoring
+// builder.Services.AddScoped<IDemandForecastingService, DemandForecastingService>(); // AI demand forecasting
+// builder.Services.AddScoped<IAdvancedAnalyticsService, AdvancedAnalyticsService>(); // Advanced ML analytics
+
+// Background Simulation Services (for student project demo) - DISABLED to prevent crashes
+// builder.Services.AddHostedService<SkaEV.API.Services.ChargingSimulationService>();
+// builder.Services.AddHostedService<SkaEV.API.Services.SystemEventsSimulationService>();
 
 // Configure Swagger
 builder.Services.AddEndpointsApiExplorer();
@@ -230,18 +249,31 @@ app.MapControllers();
 
 app.MapHealthChecks("/health");
 
+// Map SignalR Hub for real-time updates
+app.MapHub<StationMonitoringHub>("/hubs/station-monitoring");
+
 try
 {
     Log.Information("Starting SkaEV API...");
-    await app.RunAsync();
-    Log.Information("SkaEV API stopped cleanly.");
+    Log.Information("Environment: {0}", app.Environment.EnvironmentName);
+
+    // Start the application asynchronously
+    _ = app.RunAsync();
+
+    Log.Information("Backend is now running. Press ENTER to stop...");
+
+    // Keep console alive
+    Console.ReadLine();
+
+    // Initiate shutdown
+    await app.StopAsync();
 }
 catch (Exception ex)
 {
     Log.Fatal(ex, "SkaEV API terminated unexpectedly!");
-    throw;
 }
 finally
 {
+    Log.Information("Shutting down...");
     await Log.CloseAndFlushAsync();
 }

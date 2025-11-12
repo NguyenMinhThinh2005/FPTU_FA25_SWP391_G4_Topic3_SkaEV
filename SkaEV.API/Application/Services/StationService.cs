@@ -1,7 +1,12 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Data.SqlClient;
 using SkaEV.API.Infrastructure.Data;
 using SkaEV.API.Application.DTOs.Stations;
+using SkaEV.API.Application.DTOs.Slots;
+using SkaEV.API.Domain.Entities;
 using Newtonsoft.Json;
 
 namespace SkaEV.API.Application.Services;
@@ -14,7 +19,19 @@ public interface IStationService
     Task<StationDto> CreateStationAsync(CreateStationDto dto);
     Task<bool> UpdateStationAsync(int stationId, UpdateStationDto dto);
     Task<bool> DeleteStationAsync(int stationId);
+    Task<List<SlotDetailDto>> GetStationSlotsDetailsAsync(int stationId);
 }
+
+internal record StationAggregates(
+    int TotalPosts,
+    int AvailablePosts,
+    int TotalSlots,
+    int AvailableSlots,
+    int OccupiedSlots,
+    int ActiveSessions,
+    decimal TotalPowerCapacityKw,
+    decimal CurrentPowerUsageKw,
+    decimal UtilizationRate);
 
 public class StationService : IStationService
 {
@@ -23,6 +40,148 @@ public class StationService : IStationService
     public StationService(SkaEVDbContext context)
     {
         _context = context;
+    }
+
+    private static readonly StringComparer StatusComparer = StringComparer.OrdinalIgnoreCase;
+
+    private static bool IsSlotAvailable(string? status) => StatusComparer.Equals(status, "available");
+
+    private static bool IsSlotMaintenance(string? status) => StatusComparer.Equals(status, "maintenance");
+
+    private static bool IsSlotOccupied(string? status) =>
+        StatusComparer.Equals(status, "occupied") ||
+        StatusComparer.Equals(status, "charging") ||
+        StatusComparer.Equals(status, "in_use") ||
+        StatusComparer.Equals(status, "in-progress") ||
+        StatusComparer.Equals(status, "in_progress") ||
+        StatusComparer.Equals(status, "busy");
+
+    private static bool IsSlotReserved(string? status) => StatusComparer.Equals(status, "reserved");
+
+    private static List<string> ParseAmenities(string? rawAmenities)
+    {
+        if (string.IsNullOrWhiteSpace(rawAmenities))
+            return new List<string>();
+
+        try
+        {
+            var trimmed = rawAmenities.Trim();
+            if (trimmed.StartsWith("[") && trimmed.EndsWith("]"))
+            {
+                var parsed = JsonConvert.DeserializeObject<List<string>>(rawAmenities);
+                if (parsed != null)
+                {
+                    return parsed
+                        .Where(a => !string.IsNullOrWhiteSpace(a))
+                        .Select(a => a.Trim())
+                        .ToList();
+                }
+            }
+        }
+        catch
+        {
+            // Fallback to comma separated parsing below
+        }
+
+        return rawAmenities
+            .Split(',', StringSplitOptions.RemoveEmptyEntries)
+            .Select(a => a.Trim().Trim('"'))
+            .Where(a => !string.IsNullOrWhiteSpace(a))
+            .ToList();
+    }
+
+    private static StationAggregates CalculateAggregates(
+        IEnumerable<ChargingPost>? posts,
+        int activeSessions,
+        string stationStatus)
+    {
+        var postList = posts?.ToList() ?? new List<ChargingPost>();
+        var slotList = postList.SelectMany(post => post.ChargingSlots).ToList();
+
+        var totalPosts = postList.Count;
+        var totalSlots = slotList.Count;
+
+        var availableSlotCount = slotList.Count(slot => IsSlotAvailable(slot.Status));
+        var maintenanceSlotCount = slotList.Count(slot => IsSlotMaintenance(slot.Status));
+        var occupiedSlotCount = slotList.Count(slot => IsSlotOccupied(slot.Status));
+        var reservedSlotCount = slotList.Count(slot => IsSlotReserved(slot.Status));
+
+        var accountedSlots = availableSlotCount + maintenanceSlotCount + occupiedSlotCount + reservedSlotCount;
+        if (accountedSlots < totalSlots)
+        {
+            occupiedSlotCount += totalSlots - accountedSlots;
+        }
+
+        availableSlotCount = Math.Clamp(availableSlotCount, 0, totalSlots);
+
+        var statusIsActive = StatusComparer.Equals(stationStatus, "active");
+        if (!statusIsActive)
+        {
+            availableSlotCount = 0;
+        }
+
+        var availablePosts = postList.Count(post =>
+            StatusComparer.Equals(post.Status, "available") &&
+            post.ChargingSlots.Any(slot => IsSlotAvailable(slot.Status)));
+
+        if (!statusIsActive)
+        {
+            availablePosts = 0;
+        }
+
+        var currentPowerUsageKw = postList
+            .Where(post => post.ChargingSlots.Any(slot => IsSlotOccupied(slot.Status)))
+            .Sum(post => post.PowerOutput);
+
+        var totalPowerCapacityKw = postList.Sum(post => post.PowerOutput);
+
+        var utilizationRate = totalSlots > 0
+            ? Math.Round(((decimal)(totalSlots - availableSlotCount) / totalSlots) * 100, 2)
+            : 0;
+
+        return new StationAggregates(
+            TotalPosts: totalPosts,
+            AvailablePosts: availablePosts,
+            TotalSlots: totalSlots,
+            AvailableSlots: availableSlotCount,
+            OccupiedSlots: Math.Clamp(occupiedSlotCount, 0, totalSlots),
+            ActiveSessions: activeSessions,
+            TotalPowerCapacityKw: totalPowerCapacityKw,
+            CurrentPowerUsageKw: currentPowerUsageKw,
+            UtilizationRate: utilizationRate);
+    }
+
+    private static StationDto ComposeStationDto(
+        ChargingStation station,
+        StationAggregates aggregates,
+        StationStaff? assignment)
+    {
+        return new StationDto
+        {
+            StationId = station.StationId,
+            StationName = station.StationName,
+            Address = station.Address,
+            City = station.City,
+            Latitude = station.Latitude,
+            Longitude = station.Longitude,
+            TotalPosts = aggregates.TotalPosts,
+            AvailablePosts = aggregates.AvailablePosts,
+            TotalSlots = aggregates.TotalSlots,
+            AvailableSlots = aggregates.AvailableSlots,
+            OccupiedSlots = aggregates.OccupiedSlots,
+            ActiveSessions = aggregates.ActiveSessions,
+            TotalPowerCapacityKw = aggregates.TotalPowerCapacityKw,
+            CurrentPowerUsageKw = aggregates.CurrentPowerUsageKw,
+            UtilizationRate = aggregates.UtilizationRate,
+            OperatingHours = station.OperatingHours,
+            Amenities = ParseAmenities(station.Amenities),
+            StationImageUrl = station.StationImageUrl,
+            Status = station.Status,
+            ManagerUserId = assignment?.StaffUserId,
+            ManagerName = assignment?.StaffUser.FullName,
+            ManagerEmail = assignment?.StaffUser.Email,
+            ManagerPhoneNumber = assignment?.StaffUser.PhoneNumber
+        };
     }
 
     public async Task<List<StationDto>> SearchStationsByLocationAsync(SearchStationsRequestDto request)
@@ -36,24 +195,44 @@ public class StationService : IStationService
 
         var stationsRaw = await _context.ChargingStations
             .FromSqlRaw(sql, latParam, lonParam, radiusParam)
+            .AsNoTracking()
             .ToListAsync();
 
-        var stations = stationsRaw.Select(s => new StationDto
+        if (stationsRaw.Count == 0)
         {
-            StationId = s.StationId,
-            StationName = s.StationName,
-            Address = s.Address,
-            City = s.City,
-            Latitude = s.Latitude,
-            Longitude = s.Longitude,
-            TotalPosts = s.TotalPosts,
-            AvailablePosts = s.AvailablePosts,
-            OperatingHours = s.OperatingHours,
-            Amenities = !string.IsNullOrEmpty(s.Amenities) 
-                ? s.Amenities.Split(',').Select(a => a.Trim()).ToList() 
-                : new List<string>(),
-            StationImageUrl = s.StationImageUrl,
-            Status = s.Status
+            return new List<StationDto>();
+        }
+
+        var stationIds = stationsRaw.Select(s => s.StationId).Distinct().ToList();
+
+        var postsLookup = await _context.ChargingPosts
+            .Where(post => stationIds.Contains(post.StationId))
+            .Include(post => post.ChargingSlots)
+            .AsNoTracking()
+            .ToListAsync();
+
+        var postsByStation = postsLookup
+            .GroupBy(post => post.StationId)
+            .ToDictionary(group => group.Key, group => (IEnumerable<ChargingPost>)group.ToList());
+
+        var activeBookingCounts = await _context.Bookings
+            .Where(booking => stationIds.Contains(booking.StationId) && booking.DeletedAt == null && booking.Status == "in_progress")
+            .GroupBy(booking => booking.StationId)
+            .Select(group => new { group.Key, Count = group.Count() })
+            .ToDictionaryAsync(x => x.Key, x => x.Count);
+
+        var managerAssignments = await GetActiveManagerAssignmentsAsync(stationIds);
+
+        var stations = stationsRaw.Select(station =>
+        {
+            managerAssignments.TryGetValue(station.StationId, out var assignment);
+            postsByStation.TryGetValue(station.StationId, out var stationPosts);
+            var activeSessions = activeBookingCounts.TryGetValue(station.StationId, out var count)
+                ? count
+                : 0;
+
+            var aggregates = CalculateAggregates(stationPosts, activeSessions, station.Status);
+            return ComposeStationDto(station, aggregates, assignment);
         }).ToList();
 
         return stations;
@@ -63,28 +242,26 @@ public class StationService : IStationService
     {
         var stationEntity = await _context.ChargingStations
             .Where(s => s.StationId == stationId)
+            .Include(s => s.ChargingPosts)
+                .ThenInclude(post => post.ChargingSlots)
+            .Include(s => s.Bookings.Where(b => b.DeletedAt == null && b.Status == "in_progress"))
+            .AsSplitQuery()
+            .AsNoTracking()
             .FirstOrDefaultAsync();
 
         if (stationEntity == null)
             return null;
 
-        return new StationDto
-        {
-            StationId = stationEntity.StationId,
-            StationName = stationEntity.StationName,
-            Address = stationEntity.Address,
-            City = stationEntity.City,
-            Latitude = stationEntity.Latitude,
-            Longitude = stationEntity.Longitude,
-            TotalPosts = stationEntity.TotalPosts,
-            AvailablePosts = stationEntity.AvailablePosts,
-            OperatingHours = stationEntity.OperatingHours,
-            Amenities = !string.IsNullOrEmpty(stationEntity.Amenities) 
-                ? stationEntity.Amenities.Split(',').Select(a => a.Trim()).ToList() 
-                : new List<string>(),
-            StationImageUrl = stationEntity.StationImageUrl,
-            Status = stationEntity.Status
-        };
+        var assignment = await _context.StationStaff
+            .Include(ss => ss.StaffUser)
+            .Where(ss => ss.StationId == stationId && ss.IsActive)
+            .OrderByDescending(ss => ss.AssignedAt)
+            .AsNoTracking()
+            .FirstOrDefaultAsync();
+
+        var activeSessions = stationEntity.Bookings?.Count ?? 0;
+        var aggregates = CalculateAggregates(stationEntity.ChargingPosts, activeSessions, stationEntity.Status);
+        return ComposeStationDto(stationEntity, aggregates, assignment);
     }
 
     public async Task<List<StationDto>> GetAllStationsAsync(string? city = null, string? status = null)
@@ -101,27 +278,48 @@ public class StationService : IStationService
             query = query.Where(s => s.Status == status);
         }
 
-        var stationsRaw = await query.ToListAsync();
+        var stationsRaw = await query
+            .Include(s => s.ChargingPosts)
+                .ThenInclude(post => post.ChargingSlots)
+            .Include(s => s.Bookings.Where(b => b.DeletedAt == null && b.Status == "in_progress"))
+            .AsSplitQuery()
+            .AsNoTracking()
+            .ToListAsync();
 
-        var stations = stationsRaw.Select(s => new StationDto
+        if (stationsRaw.Count == 0)
         {
-            StationId = s.StationId,
-            StationName = s.StationName,
-            Address = s.Address,
-            City = s.City,
-            Latitude = s.Latitude,
-            Longitude = s.Longitude,
-            TotalPosts = s.TotalPosts,
-            AvailablePosts = s.AvailablePosts,
-            OperatingHours = s.OperatingHours,
-            Amenities = !string.IsNullOrEmpty(s.Amenities) 
-                ? s.Amenities.Split(',').Select(a => a.Trim()).ToList() 
-                : new List<string>(),
-            StationImageUrl = s.StationImageUrl,
-            Status = s.Status
+            return new List<StationDto>();
+        }
+
+        var stationIds = stationsRaw.Select(s => s.StationId).ToList();
+        var managerAssignments = await GetActiveManagerAssignmentsAsync(stationIds);
+
+        var stations = stationsRaw.Select(station =>
+        {
+            managerAssignments.TryGetValue(station.StationId, out var assignment);
+            var activeSessions = station.Bookings?.Count ?? 0;
+            var aggregates = CalculateAggregates(station.ChargingPosts, activeSessions, station.Status);
+            return ComposeStationDto(station, aggregates, assignment);
         }).ToList();
 
         return stations;
+    }
+
+    private async Task<Dictionary<int, StationStaff>> GetActiveManagerAssignmentsAsync(IEnumerable<int> stationIds)
+    {
+        var stationIdList = stationIds?.Distinct().ToList() ?? new List<int>();
+        if (stationIdList.Count == 0)
+            return new Dictionary<int, StationStaff>();
+
+        var assignments = await _context.StationStaff
+            .Where(ss => stationIdList.Contains(ss.StationId) && ss.IsActive)
+            .Include(ss => ss.StaffUser)
+            .OrderByDescending(ss => ss.AssignedAt)
+            .ToListAsync();
+
+        return assignments
+            .GroupBy(ss => ss.StationId)
+            .ToDictionary(g => g.Key, g => g.First());
     }
 
     public async Task<StationDto> CreateStationAsync(CreateStationDto dto)
@@ -146,21 +344,8 @@ public class StationService : IStationService
         _context.ChargingStations.Add(station);
         await _context.SaveChangesAsync();
 
-        return new StationDto
-        {
-            StationId = station.StationId,
-            StationName = station.StationName,
-            Address = station.Address,
-            City = station.City,
-            Latitude = station.Latitude,
-            Longitude = station.Longitude,
-            TotalPosts = station.TotalPosts,
-            AvailablePosts = station.AvailablePosts,
-            OperatingHours = station.OperatingHours,
-            Amenities = dto.Amenities,
-            StationImageUrl = station.StationImageUrl,
-            Status = station.Status
-        };
+        var aggregates = CalculateAggregates(Enumerable.Empty<ChargingPost>(), 0, station.Status);
+        return ComposeStationDto(station, aggregates, null);
     }
 
     public async Task<bool> UpdateStationAsync(int stationId, UpdateStationDto dto)
@@ -200,5 +385,37 @@ public class StationService : IStationService
         _context.ChargingStations.Remove(station);
         await _context.SaveChangesAsync();
         return true;
+    }
+
+    public async Task<List<SlotDetailDto>> GetStationSlotsDetailsAsync(int stationId)
+    {
+        var slotsQuery = from slot in _context.ChargingSlots
+                         join post in _context.ChargingPosts on slot.PostId equals post.PostId
+                         where post.StationId == stationId
+                         join booking in _context.Bookings on slot.CurrentBookingId equals booking.BookingId into bookings
+                         from booking in bookings.DefaultIfEmpty()
+                         join user in _context.Users on booking.UserId equals user.UserId into users
+                         from user in users.DefaultIfEmpty()
+                         join socTracking in _context.SocTrackings on booking.BookingId equals socTracking.BookingId into socTrackings
+                         from latestSoc in socTrackings.OrderByDescending(s => s.Timestamp).Take(1).DefaultIfEmpty()
+                         select new SlotDetailDto
+                         {
+                             SlotId = slot.SlotId,
+                             PostId = post.PostId,
+                             PostNumber = post.PostNumber,
+                             SlotNumber = slot.SlotNumber,
+                             ConnectorType = slot.ConnectorType,
+                             MaxPower = slot.MaxPower,
+                             Status = slot.Status,
+                             CurrentBookingId = slot.CurrentBookingId,
+                             CurrentPowerUsage = latestSoc != null ? latestSoc.Power : null,
+                             CurrentSoc = latestSoc != null ? latestSoc.CurrentSoc : null,
+                             CurrentUserName = user != null ? user.FullName : null,
+                             BookingStartTime = booking != null ? booking.ActualStartTime : null,
+                             CreatedAt = slot.CreatedAt,
+                             UpdatedAt = slot.UpdatedAt
+                         };
+
+        return await slotsQuery.ToListAsync();
     }
 }

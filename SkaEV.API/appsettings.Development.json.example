@@ -8,10 +8,8 @@
     }
   },
   "ConnectionStrings": {
-    "DefaultConnection": "REPLACE_WITH_YOUR_CONNECTION_STRING"
+    "DefaultConnection": "Server=YOUR_SERVER_NAME\\YOUR_INSTANCE;Database=SkaEV_DB;Trusted_Connection=True;TrustServerCertificate=True;MultipleActiveResultSets=true"
   },
-  "JwtSettings": {
-    "SecretKey": "SkaEV_Development_Secret_Key_For_Testing_Only_Do_Not_Use_In_Production_12345678",
-    "ExpiryHours": 24
-  }
+  "DetailedErrors": true,
+  "AllowedHosts": "*"
 }

@@ -1,0 +1,319 @@
+import axiosInstance from '../axiosConfig';
+
+/**
+ * Staff API - Calls StaffIssuesController and MonitoringController
+ * Requires Staff/Admin role authorization
+ */
+const staffAPI = {
+  // ==================== DASHBOARD OVERVIEW ====================
+
+  /**
+   * Load station overview for the authenticated staff member
+   */
+  getDashboardOverview: async () => {
+    const response = await axiosInstance.get('/staff/dashboard');
+    return response.data;
+  },
+
+  // ==================== ISSUES MANAGEMENT ====================
+  
+  /**
+   * Get all issues with optional filters
+   * @param {Object} params - { stationId?, status?, priority?, assignedTo? }
+   */
+  getAllIssues: async (params = {}) => {
+    const queryParams = new URLSearchParams();
+    if (params.stationId) queryParams.append('stationId', params.stationId);
+    if (params.status) queryParams.append('status', params.status);
+    if (params.priority) queryParams.append('priority', params.priority);
+    if (params.assignedTo) queryParams.append('assignedTo', params.assignedTo);
+    
+    const response = await axiosInstance.get(`/StaffIssues?${queryParams}`);
+    return response.data?.data ?? [];
+  },
+
+  /**
+   * Get issues assigned to current staff member
+   */
+  getMyIssues: async () => {
+    const response = await axiosInstance.get('/StaffIssues/my-issues');
+    return response.data?.data ?? [];
+  },
+
+  /**
+   * Get single issue details
+   */
+  getIssueById: async (issueId) => {
+    const response = await axiosInstance.get(`/StaffIssues/${issueId}`);
+    return response.data;
+  },
+
+  /**
+   * Create new issue report
+   * @param {Object} issueData - { stationId, title, description, priority, category }
+   */
+  createIssue: async (issueData) => {
+    const response = await axiosInstance.post('/StaffIssues', issueData);
+    return response.data;
+  },
+
+  /**
+   * Update issue details
+   */
+  updateIssue: async (issueId, updateData) => {
+    const response = await axiosInstance.put(`/StaffIssues/${issueId}`, updateData);
+    return response.data;
+  },
+
+  /**
+   * Assign issue to staff member (admin only)
+   */
+  assignIssue: async (issueId, staffId) => {
+    const response = await axiosInstance.patch(`/StaffIssues/${issueId}/assign`, { assignedToUserId: staffId });
+    return response.data;
+  },
+
+  /**
+   * Update issue status
+   * @param {string} status - 'reported' | 'in_progress' | 'resolved' | 'closed'
+   */
+  updateIssueStatus: async (issueId, status, resolution = null) => {
+    const response = await axiosInstance.patch(`/StaffIssues/${issueId}/status`, { status, resolution });
+    return response.data;
+  },
+
+  /**
+   * Add comment to issue
+   */
+  addComment: async (issueId, comment) => {
+    const response = await axiosInstance.post(`/StaffIssues/${issueId}/comments`, {
+      comment
+    });
+    return response.data;
+  },
+
+  /**
+   * Upload attachment to issue
+   */
+  uploadAttachment: async (issueId, file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const response = await axiosInstance.post(
+      `/StaffIssues/${issueId}/attachments`,
+      formData,
+      {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      }
+    );
+    return response.data;
+  },
+
+  /**
+   * Delete issue (admin only)
+   */
+  deleteIssue: async (issueId) => {
+    const response = await axiosInstance.delete(`/StaffIssues/${issueId}`);
+    return response.data;
+  },
+
+  /**
+   * Get issue statistics
+   */
+  getIssueStatistics: async (stationId = null) => {
+    const params = stationId ? `?stationId=${stationId}` : '';
+    const response = await axiosInstance.get(`/StaffIssues/statistics${params}`);
+    return response.data;
+  },
+
+  /**
+   * Get maintenance schedule
+   */
+  getMaintenanceSchedule: async (stationId = null, daysAhead = 30) => {
+    const params = new URLSearchParams();
+    if (stationId) params.append('stationId', stationId);
+    params.append('daysAhead', daysAhead);
+    
+    const response = await axiosInstance.get(`/StaffIssues/maintenance-schedule?${params}`);
+    return response.data;
+  },
+
+  // ==================== STATION MONITORING ====================
+
+  /**
+   * Get all stations status for monitoring
+   */
+  getStationsStatus: async () => {
+    const response = await axiosInstance.get('/stations');
+    return response.data?.data ?? [];
+  },
+
+  /**
+   * Get single station detailed status
+   */
+  getStationDetails: async (stationId) => {
+    const response = await axiosInstance.get(`/stations/${stationId}`);
+    return response.data;
+  },
+
+  /**
+   * Get charging slots for a station
+   */
+  getStationSlots: async (stationId) => {
+    const response = await axiosInstance.get(`/stations/${stationId}/slots`);
+    return response.data?.data ?? [];
+  },
+
+  /**
+   * Broadcast station status update (triggers SignalR)
+   */
+  broadcastStationStatus: async (stationId) => {
+    const response = await axiosInstance.post(`/monitoring/station/${stationId}/broadcast`);
+    return response.data;
+  },
+
+  /**
+   * Broadcast slot status update (triggers SignalR)
+   */
+  broadcastSlotStatus: async (slotId) => {
+    const response = await axiosInstance.post(`/monitoring/slot/${slotId}/broadcast`);
+    return response.data;
+  },
+
+  /**
+   * Update slot status (for emergency stop / maintenance)
+   * @param {number} slotId - Charging slot ID
+   * @param {string} status - New status: 'maintenance', 'unavailable', 'available'
+   * @param {string} reason - Reason for status change
+   */
+  updateSlotStatus: async (slotId, status, reason = '') => {
+    const response = await axiosInstance.patch(`/slots/${slotId}/status`, {
+      status,
+      reason
+    });
+    return response.data;
+  },
+
+  /**
+   * Broadcast alert (triggers SignalR)
+   */
+  broadcastAlert: async (alertData) => {
+    const response = await axiosInstance.post('/monitoring/alert', alertData);
+    return response.data;
+  },
+
+  // ==================== CHARGING SESSIONS ====================
+
+  /**
+   * Get all active charging sessions
+   */
+  getActiveSessions: async () => {
+    const response = await axiosInstance.get('/bookings/active');
+    return response.data;
+  },
+
+  /**
+   * Get booking/session details
+   */
+  getBookingDetails: async (bookingId) => {
+    const response = await axiosInstance.get(`/bookings/${bookingId}`);
+    return response.data;
+  },
+
+  /**
+   * Start charging session (Staff/Admin)
+   */
+  startCharging: async (bookingId, initialSoc = 20) => {
+    const response = await axiosInstance.put(`/bookings/${bookingId}/start`, {
+      initialSoc
+    });
+    return response.data;
+  },
+
+  /**
+   * Complete charging session (Staff/Admin)
+   */
+  completeCharging: async (bookingId, sessionData) => {
+    const response = await axiosInstance.put(`/bookings/${bookingId}/complete`, {
+      finalSoc: sessionData.finalSoc,
+      totalEnergyKwh: sessionData.totalEnergyKwh,
+      unitPrice: sessionData.unitPrice || 3500
+    });
+    return response.data;
+  },
+
+  /**
+   * Get bookings history with filters
+   */
+  getBookingsHistory: async (params = {}) => {
+    const queryParams = new URLSearchParams();
+    if (params.stationId) queryParams.append('stationId', params.stationId);
+    if (params.status) queryParams.append('status', params.status);
+    if (params.startDate) queryParams.append('startDate', params.startDate);
+    if (params.endDate) queryParams.append('endDate', params.endDate);
+    
+    const response = await axiosInstance.get(`/bookings?${queryParams}`);
+    return response.data;
+  },
+
+  // ==================== PAYMENT PROCESSING ====================
+
+  /**
+   * Get invoice for booking (required before payment processing)
+   */
+  getInvoiceByBooking: async (bookingId) => {
+    const response = await axiosInstance.get(`/invoices/booking/${bookingId}`);
+    return response.data;
+  },
+
+  /**
+   * Process payment at counter (Staff) - Uses Invoice API
+   * @param {number} invoiceId - Invoice ID (get from getInvoiceByBooking)
+   * @param {Object} paymentData - { method: 'cash'|'card'|'qr', amount: number }
+   */
+  processPayment: async (invoiceId, paymentData) => {
+    const response = await axiosInstance.post(`/invoices/${invoiceId}/process-payment`, {
+      method: paymentData.method || 'cash',
+      amount: paymentData.amount,
+      notes: paymentData.notes || '',
+      transactionReference: paymentData.transactionReference || null
+    });
+    return response.data;
+  },
+
+  /**
+   * Get all unpaid invoices (for payment processing view)
+   */
+  getUnpaidInvoices: async () => {
+    const response = await axiosInstance.get('/invoices/unpaid');
+    return response.data?.data ?? [];
+  },
+
+  /**
+   * Get invoice details by ID
+   */
+  getInvoiceById: async (invoiceId) => {
+    const response = await axiosInstance.get(`/invoices/${invoiceId}`);
+    return response.data;
+  },
+
+  /**
+   * Get payment history for an invoice
+   */
+  getPaymentHistory: async (invoiceId) => {
+    const response = await axiosInstance.get(`/invoices/${invoiceId}/payment-history`);
+    return response.data?.data ?? [];
+  },
+
+  /**
+   * Download invoice PDF
+   */
+  downloadInvoicePDF: async (invoiceId) => {
+    const response = await axiosInstance.get(`/invoices/${invoiceId}/download`, {
+      responseType: 'blob'
+    });
+    return response.data;
+  },
+};
+
+export default staffAPI;

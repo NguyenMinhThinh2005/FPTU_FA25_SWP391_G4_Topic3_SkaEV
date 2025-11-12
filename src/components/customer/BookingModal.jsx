@@ -29,11 +29,13 @@ import {
   Close,
 } from "@mui/icons-material";
 import useBookingStore from "../../store/bookingStore";
+import useStationStore from "../../store/stationStore";
 import ChargingDateTimePicker from "../ui/ChargingDateTimePicker/ChargingDateTimePicker";
 import notificationService from "../../services/notificationService";
 
 const BookingModal = ({ open, onClose, station, onSuccess }) => {
   const { createBooking } = useBookingStore();
+  const { initializeData } = useStationStore();
   const [activeStep, setActiveStep] = useState(0);
   const [selectedChargingType, setSelectedChargingType] = useState(null); // Step 1: Choose charging type
   const [selectedPort, setSelectedPort] = useState(null); // Step 2: Choose specific port
@@ -196,6 +198,7 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
           connectorType: selectedPort.connectorType,
           poleId: selectedPort.poleId,
           poleName: selectedPort.poleName,
+          slotId: selectedPort.slotId, // Real slot ID from database
         },
         pricing: {
           baseRate,
@@ -250,9 +253,30 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
       setTimeout(() => {
         handleClose();
       }, 3000);
-    } catch {
+    } catch (error) {
+      console.error('❌ Booking error:', error);
       setBookingResult("error");
-      setResultMessage("Có lỗi xảy ra khi đặt chỗ. Vui lòng thử lại.");
+      
+      // Check for specific error messages
+      const errorMessage = error?.response?.data?.message || error?.message || '';
+      
+      if (errorMessage.includes('Slot is not available') || errorMessage.includes('not available')) {
+        setResultMessage(
+          "❌ Cổng sạc này hiện không còn trống!\n\n" +
+          "Vui lòng chọn cổng sạc khác hoặc trạm khác.\n" +
+          "Danh sách trạm sẽ được làm mới sau khi đóng."
+        );
+        
+        // Refresh stations list after closing
+        setTimeout(() => {
+          initializeData();
+        }, 3500);
+      } else {
+        setResultMessage(
+          "❌ Có lỗi xảy ra khi đặt chỗ\n\n" +
+          (errorMessage || "Vui lòng thử lại hoặc chọn trạm khác.")
+        );
+      }
     } finally {
       setLoading(false);
     }

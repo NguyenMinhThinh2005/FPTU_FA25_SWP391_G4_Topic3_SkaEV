@@ -1,44 +1,33 @@
 // Image assets management for SkaEV
 // This file provides a centralized way to manage all image assets
 
-// Default placeholders - you can replace these with actual images
+// Default placeholders - using inline SVG to avoid external dependencies
 export const PLACEHOLDER_IMAGES = {
-  // User avatars
-  AVATAR_DEFAULT: "https://via.placeholder.com/150x150/1379FF/white?text=User",
-  AVATAR_ADMIN: "https://via.placeholder.com/150x150/EF4444/white?text=Admin",
-  AVATAR_OWNER: "https://via.placeholder.com/150x150/F59E0B/white?text=Owner",
-  AVATAR_CUSTOMER:
-    "https://via.placeholder.com/150x150/10B981/white?text=Customer",
+  // User avatars (inline SVG data URIs)
+  AVATAR_DEFAULT: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="150" height="150"%3E%3Crect fill="%231379FF" width="150" height="150"/%3E%3Ctext fill="white" x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="18"%3EUser%3C/text%3E%3C/svg%3E',
+  AVATAR_ADMIN: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="150" height="150"%3E%3Crect fill="%23EF4444" width="150" height="150"/%3E%3Ctext fill="white" x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="18"%3EAdmin%3C/text%3E%3C/svg%3E',
+  AVATAR_OWNER: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="150" height="150"%3E%3Crect fill="%23F59E0B" width="150" height="150"/%3E%3Ctext fill="white" x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="18"%3EOwner%3C/text%3E%3C/svg%3E',
+  AVATAR_CUSTOMER: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="150" height="150"%3E%3Crect fill="%2310B981" width="150" height="150"/%3E%3Ctext fill="white" x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="16"%3ECustomer%3C/text%3E%3C/svg%3E',
 
-  // Charging stations
-  STATION_DEFAULT:
-    "https://via.placeholder.com/400x200/1379FF/white?text=Charging+Station",
-  STATION_GREEN_MALL:
-    "https://via.placeholder.com/400x200/10B981/white?text=Green+Mall+Hub",
-  STATION_TECH_PARK:
-    "https://via.placeholder.com/400x200/3B82F6/white?text=Tech+Park+SuperCharger",
-  STATION_ECO_PARK:
-    "https://via.placeholder.com/400x200/B5FF3D/black?text=EcoPark+Station",
+  // Charging stations (inline SVG data URIs)
+  STATION_DEFAULT: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="200"%3E%3Crect fill="%231379FF" width="400" height="200"/%3E%3Ctext fill="white" x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="20"%3ECharging Station%3C/text%3E%3C/svg%3E',
+  STATION_GREEN_MALL: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="200"%3E%3Crect fill="%2310B981" width="400" height="200"/%3E%3Ctext fill="white" x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="18"%3EGreen Mall Hub%3C/text%3E%3C/svg%3E',
+  STATION_TECH_PARK: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="200"%3E%3Crect fill="%233B82F6" width="400" height="200"/%3E%3Ctext fill="white" x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="16"%3ETech Park SuperCharger%3C/text%3E%3C/svg%3E',
+  STATION_ECO_PARK: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="200"%3E%3Crect fill="%23B5FF3D" width="400" height="200"/%3E%3Ctext fill="%23333333" x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="18"%3EEcoPark Station%3C/text%3E%3C/svg%3E',
 
   // Logos and branding
   LOGO_SKAEV: "/assets/images/skaev-logo.png",
   LOGO_ICON: "/assets/images/skaev-icon.png",
 
-  // Hero and marketing images
-  HERO_ELECTRIC_CAR:
-    "https://via.placeholder.com/800x400/1379FF/white?text=Electric+Vehicle",
-  HERO_CHARGING:
-    "https://via.placeholder.com/800x400/B5FF3D/black?text=Fast+Charging",
+  // Hero and marketing images (inline SVG data URIs)
+  HERO_ELECTRIC_CAR: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="800" height="400"%3E%3Crect fill="%231379FF" width="800" height="400"/%3E%3Ctext fill="white" x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="32"%3EElectric Vehicle%3C/text%3E%3C/svg%3E',
+  HERO_CHARGING: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="800" height="400"%3E%3Crect fill="%23B5FF3D" width="800" height="400"/%3E%3Ctext fill="%23333333" x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="32"%3EFast Charging%3C/text%3E%3C/svg%3E',
 
-  // Feature illustrations
-  FEATURE_FAST_CHARGING:
-    "https://via.placeholder.com/300x200/1379FF/white?text=Fast+Charging",
-  FEATURE_NETWORK:
-    "https://via.placeholder.com/300x200/10B981/white?text=Wide+Network",
-  FEATURE_GREEN_ENERGY:
-    "https://via.placeholder.com/300x200/B5FF3D/black?text=Green+Energy",
-  FEATURE_SECURE:
-    "https://via.placeholder.com/300x200/3B82F6/white?text=Secure+Payment",
+  // Feature illustrations (inline SVG data URIs)
+  FEATURE_FAST_CHARGING: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="300" height="200"%3E%3Crect fill="%231379FF" width="300" height="200"/%3E%3Ctext fill="white" x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="18"%3EFast Charging%3C/text%3E%3C/svg%3E',
+  FEATURE_NETWORK: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="300" height="200"%3E%3Crect fill="%2310B981" width="300" height="200"/%3E%3Ctext fill="white" x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="18"%3EWide Network%3C/text%3E%3C/svg%3E',
+  FEATURE_GREEN_ENERGY: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="300" height="200"%3E%3Crect fill="%23B5FF3D" width="300" height="200"/%3E%3Ctext fill="%23333333" x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="18"%3EGreen Energy%3C/text%3E%3C/svg%3E',
+  FEATURE_SECURE: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="300" height="200"%3E%3Crect fill="%233B82F6" width="300" height="200"/%3E%3Ctext fill="white" x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="18"%3ESecure Payment%3C/text%3E%3C/svg%3E',
 };
 
 // Image paths for actual assets (when you have real images)

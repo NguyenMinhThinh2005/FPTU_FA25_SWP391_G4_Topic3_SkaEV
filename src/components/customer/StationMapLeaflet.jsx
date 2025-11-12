@@ -180,11 +180,12 @@ const StationMapLeaflet = ({ stations, onStationSelect }) => {
     const [nearbyStations, setNearbyStations] = useState([]);
     const [showUserPopup, setShowUserPopup] = useState(false);
     const [findNearbyError, setFindNearbyError] = useState(null);
+    const [shouldZoomToUser, setShouldZoomToUser] = useState(false);
 
     const FitBoundsRunner = ({ bounds }) => {
         const map = useMap();
         useEffect(() => {
-            if (!bounds || !map) return;
+            if (!bounds || !map || !shouldZoomToUser) return;
             try {
                 if (typeof map.invalidateSize === 'function') map.invalidateSize();
                 if (typeof map.fitBounds === 'function') {
@@ -194,12 +195,15 @@ const StationMapLeaflet = ({ stations, onStationSelect }) => {
                 }
                 // briefly show user popup
                 setShowUserPopup(true);
-                const t = setTimeout(() => setShowUserPopup(false), 2500);
+                const t = setTimeout(() => {
+                    setShowUserPopup(false);
+                    setShouldZoomToUser(false); // Reset flag after zooming
+                }, 2500);
                 return () => clearTimeout(t);
             } catch (err) {
                 console.error('FitBoundsRunner error', err);
             }
-        }, [bounds, map]);
+        }, [bounds, map, shouldZoomToUser]);
         return null;
     };
 
@@ -265,6 +269,7 @@ const StationMapLeaflet = ({ stations, onStationSelect }) => {
         // Set nearby stations and bounds; FitBoundsRunner (child) will perform fit when MapContainer is ready
         setNearbyStations(result);
         setNearbyBounds(boundsLatLngs);
+        setShouldZoomToUser(true); // Enable zoom to user location
         // Also try immediate mapRef if available
         const map = mapRef.current;
         if (map) {
@@ -496,6 +501,11 @@ const StationMapLeaflet = ({ stations, onStationSelect }) => {
                                             <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
                                                 📍 {station.location?.address || station.address}
                                             </Typography>
+                                            {station.distanceFromUser !== undefined && (
+                                                <Typography variant="caption" color="primary.main" display="block" sx={{ mb: 1, fontWeight: 'bold' }}>
+                                                    🧭 Cách bạn {station.distanceFromUser.toFixed(1)} km
+                                                </Typography>
+                                            )}
                                             <Box sx={{ mb: 1 }}>
                                                 <Chip
                                                     label={`${station.stats?.available} / ${station.stats?.total} cổng đang trống`}
@@ -674,7 +684,7 @@ const StationMapLeaflet = ({ stations, onStationSelect }) => {
                 📋 Danh sách trạm ({stations.length})
             </Typography>
             <Box>
-                {stations.map((station) => {
+                {stations.map((station, index) => {
                     const isAvailable = station.stats?.available > 0;
                     const maxPower = station.charging?.maxPower || 150;
                     const pricePerKwh = station.id === 'station-001' ? 8500 :
@@ -687,7 +697,7 @@ const StationMapLeaflet = ({ stations, onStationSelect }) => {
                             onClick={() => handleListSelect(station)}
                             sx={{
                                 borderRadius: 2,
-                                mb: 1,
+                                mb: 1.5,
                                 border: 1,
                                 borderColor: selectedStation?.id === station.id ? 'primary.main' : 'divider',
                                 p: 2,
@@ -695,83 +705,106 @@ const StationMapLeaflet = ({ stations, onStationSelect }) => {
                                 transition: 'all 0.2s',
                                 '&:hover': {
                                     backgroundColor: 'grey.50',
-                                    borderColor: 'primary.light'
+                                    borderColor: 'primary.light',
+                                    boxShadow: 1
                                 }
                             }}
                         >
-                            <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
-                                {/* Icon xe */}
+                            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                                {/* Icon xe - căn giữa theo chiều dọc */}
                                 <Box
                                     sx={{
-                                        width: 60,
-                                        height: 60,
+                                        width: 56,
+                                        height: 56,
                                         borderRadius: '50%',
-                                        bgcolor: 'grey.200',
+                                        bgcolor: 'grey.100',
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
-                                        flexShrink: 0
+                                        flexShrink: 0,
+                                        border: '2px solid',
+                                        borderColor: 'grey.300'
                                     }}
                                 >
-                                    <ElectricCar sx={{ fontSize: 32, color: 'grey.600' }} />
+                                    <ElectricCar sx={{ fontSize: 28, color: 'primary.main' }} />
                                 </Box>
 
                                 {/* Thông tin trạm */}
-                                <Box sx={{ flex: 1 }}>
-                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', mb: 1 }}>
-                                        <Typography variant="h6" fontWeight="bold">
+                                <Box sx={{ flex: 1, minWidth: 0 }}>
+                                    {/* Tên trạm và khoảng cách */}
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5, flexWrap: 'wrap' }}>
+                                        <Typography variant="subtitle1" fontWeight="bold" sx={{ color: 'text.primary' }}>
                                             {station.name}
                                         </Typography>
-                                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0.5 }}>
+                                        {station.distanceFromUser !== undefined && (
                                             <Chip
-                                                label={`${station.stats?.available}/${station.stats?.total} cổng đang trống`}
+                                                label={`Cách ${station.distanceFromUser.toFixed(1)} km`}
                                                 size="small"
-                                                color={isAvailable ? 'success' : 'error'}
-                                                sx={{ borderRadius: '16px' }}
+                                                color="primary"
+                                                variant="outlined"
+                                                sx={{ 
+                                                    fontWeight: 600,
+                                                    fontSize: '0.75rem'
+                                                }}
                                             />
-                                            {station.operatingHours && (
-                                                <Typography variant="caption" color="text.secondary">
-                                                    {formatOperatingHours(station.operatingHours)}
-                                                </Typography>
-                                            )}
-                                        </Box>
+                                        )}
                                     </Box>
 
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1, flexWrap: 'wrap' }}>
-                                        <LocationOn sx={{ fontSize: 16, color: 'text.secondary' }} />
-                                        <Typography variant="body2" color="text.secondary" sx={{ mr: 2 }}>
+                                    {/* Địa chỉ */}
+                                    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5, mb: 1 }}>
+                                        <LocationOn sx={{ fontSize: 16, color: 'text.secondary', mt: 0.2 }} />
+                                        <Typography variant="body2" color="text.secondary" sx={{ flex: 1 }}>
                                             {station.location?.address || station.address}
                                         </Typography>
-                                        {/* operating hours displayed only under availability chip on the right */}
                                     </Box>
 
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                    {/* Thông tin chi tiết */}
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                                             <Speed sx={{ fontSize: 16, color: 'primary.main' }} />
-                                            <Typography variant="body2">
+                                            <Typography variant="body2" color="text.secondary">
                                                 Sạc nhanh lên đến {maxPower} kW
                                             </Typography>
                                         </Box>
-                                        <Typography variant="body2" sx={{ color: 'success.main', fontWeight: 'medium' }}>
+                                        <Typography variant="body2" sx={{ color: 'success.main', fontWeight: 600 }}>
                                             Từ {pricePerKwh.toLocaleString('vi-VN')} ₫/kWh
                                         </Typography>
                                     </Box>
                                 </Box>
 
-                                {/* Nút */}
-                                <Button
-                                    variant="contained"
-                                    size="medium"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        if (onStationSelect) {
-                                            onStationSelect(station);
-                                        }
-                                    }}
-                                    sx={{ ml: 2 }}
-                                >
-                                    Đặt ngay
-                                </Button>
+                                {/* Trạng thái và nút đặt */}
+                                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1, ml: 'auto' }}>
+                                    <Chip
+                                        label={`${station.stats?.available}/${station.stats?.total} cổng đang trống`}
+                                        size="small"
+                                        color={isAvailable ? 'success' : 'error'}
+                                        sx={{ 
+                                            borderRadius: '16px',
+                                            fontWeight: 600
+                                        }}
+                                    />
+                                    {station.operatingHours && (
+                                        <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'right' }}>
+                                            {formatOperatingHours(station.operatingHours)}
+                                        </Typography>
+                                    )}
+                                    <Button
+                                        variant="contained"
+                                        size="small"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (onStationSelect) {
+                                                onStationSelect(station);
+                                            }
+                                        }}
+                                        sx={{ 
+                                            minWidth: 90,
+                                            fontWeight: 600
+                                        }}
+                                    >
+                                        Đặt ngay
+                                    </Button>
+                                </Box>
                             </Box>
                         </Box>
                     );

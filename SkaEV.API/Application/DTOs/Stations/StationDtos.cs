@@ -10,11 +10,22 @@ public class StationDto
     public decimal Longitude { get; set; }
     public int TotalPosts { get; set; }
     public int AvailablePosts { get; set; }
+    public int TotalSlots { get; set; }
+    public int AvailableSlots { get; set; }
+    public int OccupiedSlots { get; set; }
+    public int ActiveSessions { get; set; }
+    public decimal TotalPowerCapacityKw { get; set; }
+    public decimal CurrentPowerUsageKw { get; set; }
+    public decimal UtilizationRate { get; set; }
     public string? OperatingHours { get; set; }
     public List<string>? Amenities { get; set; }
     public string? StationImageUrl { get; set; }
     public string Status { get; set; } = string.Empty;
     public decimal? DistanceKm { get; set; }
+    public int? ManagerUserId { get; set; }
+    public string? ManagerName { get; set; }
+    public string? ManagerEmail { get; set; }
+    public string? ManagerPhoneNumber { get; set; }
 }
 
 public class SearchStationsRequestDto

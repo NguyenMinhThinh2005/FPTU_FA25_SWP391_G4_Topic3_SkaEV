@@ -24,6 +24,7 @@ const useAuthStore = create(
             user_id: response.userId,
             email: response.email,
             full_name: response.fullName,
+            phone_number: response.phoneNumber || null,
             role: response.role.toLowerCase(), // Normalize role to lowercase
           };
 
@@ -151,13 +152,17 @@ const useAuthStore = create(
         set({ error: null });
       },
 
+      setUser: (userData) => {
+        set({ user: userData });
+      },
+
       updateProfile: (profileData) => {
         const currentUser = get().user;
         if (currentUser) {
           set({
             user: {
               ...currentUser,
-              profile: { ...currentUser.profile, ...profileData },
+              ...profileData,
             },
           });
         }

@@ -2,6 +2,104 @@
 import { persist } from "zustand/middleware";
 import { bookingsAPI } from "../services/api";
 
+const normalizeTimestamp = (value) => {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+};
+
+const calculateDurationMinutes = (startIso, endIso) => {
+  if (!startIso || !endIso) return null;
+  const start = new Date(startIso).getTime();
+  const end = new Date(endIso).getTime();
+  if (Number.isNaN(start) || Number.isNaN(end) || end < start) return null;
+  return Math.round((end - start) / 60000);
+};
+
+const addMinutes = (isoString, minutes) => {
+  if (!isoString || minutes == null) return null;
+  const base = new Date(isoString);
+  if (Number.isNaN(base.getTime())) return null;
+  const end = new Date(base.getTime() + minutes * 60000);
+  return end.toISOString();
+};
+
+const mapApiBookingToStore = (apiBooking) => {
+  // Backend returns PascalCase, handle both PascalCase and camelCase
+  const bookingId = apiBooking.BookingId || apiBooking.bookingId;
+  const createdAt = normalizeTimestamp(apiBooking.CreatedAt || apiBooking.createdAt);
+  const scheduledStart = normalizeTimestamp(apiBooking.ScheduledStartTime || apiBooking.scheduledStartTime);
+  const estimatedArrival = normalizeTimestamp(apiBooking.EstimatedArrival || apiBooking.estimatedArrival);
+  const actualStart = normalizeTimestamp(apiBooking.ActualStartTime || apiBooking.actualStartTime);
+  const actualEnd = normalizeTimestamp(apiBooking.ActualEndTime || apiBooking.actualEndTime);
+  const chargingDuration = calculateDurationMinutes(actualStart, actualEnd);
+  const estimatedDuration = (apiBooking.EstimatedDuration ?? apiBooking.estimatedDuration) ?? null;
+  const durationMinutes = chargingDuration ?? estimatedDuration ?? null;
+  const effectiveStart = actualStart || scheduledStart || estimatedArrival || createdAt;
+  const projectedEnd =
+    effectiveStart && (estimatedDuration ?? durationMinutes) != null
+      ? addMinutes(effectiveStart, estimatedDuration ?? durationMinutes)
+      : null;
+  const estimatedEndTime = actualEnd || projectedEnd;
+  const baseCost = Number(
+    apiBooking.totalAmount ?? apiBooking.totalCost ?? apiBooking.finalAmount ?? 0
+  );
+  const deliveredEnergy = Number(
+    apiBooking.energyDelivered ?? apiBooking.energyKwh ?? apiBooking.totalEnergy ?? 0
+  );
+
+  return {
+    id: bookingId,
+    bookingId: bookingId,
+    apiId: bookingId,
+    userId: apiBooking.UserId || apiBooking.userId,
+    customerName: apiBooking.CustomerName || apiBooking.customerName,
+    stationId: apiBooking.StationId || apiBooking.stationId,
+    stationName: apiBooking.StationName || apiBooking.stationName,
+    stationAddress: apiBooking.StationAddress || apiBooking.stationAddress,
+    slotId: apiBooking.SlotId || apiBooking.slotId,
+    slotNumber: apiBooking.SlotNumber || apiBooking.slotNumber,
+    schedulingType: ((apiBooking.SchedulingType || apiBooking.schedulingType) || "immediate").toLowerCase(),
+    status: ((apiBooking.Status || apiBooking.status) || "pending").toLowerCase(),
+    statusRaw: apiBooking.Status || apiBooking.status,
+    bookingCode: `BK-${bookingId}`,
+    bookingTime: createdAt,
+    createdAt,
+    bookingDate: createdAt,
+    scheduledDateTime: scheduledStart,
+    scheduledTime: scheduledStart,
+    scheduledDate: scheduledStart ? scheduledStart.split("T")[0] : null,
+    estimatedArrival,
+    estimatedDuration,
+    duration: durationMinutes,
+    durationMinutes,
+    sessionDurationMinutes: durationMinutes,
+    actualStartTime: actualStart,
+    actualEndTime: actualEnd,
+    startTime: effectiveStart,
+    endTime: actualEnd || estimatedEndTime,
+    estimatedEndTime,
+    chargingStarted: Boolean(actualStart),
+    chargingEndedAt: actualEnd,
+    chargingDuration,
+    vehicleId: apiBooking.VehicleId || apiBooking.vehicleId,
+    vehicleType: apiBooking.VehicleType || apiBooking.vehicleType,
+    licensePlate: apiBooking.LicensePlate || apiBooking.licensePlate,
+    portNumber: apiBooking.SlotNumber || apiBooking.slotNumber,
+    slotName: apiBooking.SlotNumber || apiBooking.slotNumber,
+    targetSOC: (apiBooking.TargetSoc ?? apiBooking.targetSoc) ?? null,
+    currentSOC: (apiBooking.CurrentSoc ?? apiBooking.currentSoc) ?? null,
+  cost: baseCost,
+  totalAmount: baseCost,
+    chargingRate: null,
+  energyDelivered: deliveredEnergy,
+    powerDelivered: null,
+    qrScanned: false,
+    chargingStartedAt: actualStart,
+    notes: null,
+  };
+};
+
 const useBookingStore = create(
   persist(
     (set, get) => ({
@@ -15,6 +113,35 @@ const useBookingStore = create(
       error: null,
 
       // Actions
+      fetchBookings: async (params = {}) => {
+        set({ loading: true, error: null });
+        try {
+          const response = await bookingsAPI.getAll({ limit: 200, offset: 0, ...params });
+          const apiBookings = Array.isArray(response?.data) ? response.data : [];
+          const transformed = apiBookings.map(mapApiBookingToStore);
+
+          // Sort by creation date desc
+          transformed.sort((a, b) => {
+            const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+            const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+            return bTime - aTime;
+          });
+
+          set({
+            bookings: transformed,
+            bookingHistory: transformed,
+            loading: false,
+          });
+
+          return { success: true, data: transformed };
+        } catch (error) {
+          const errorMessage = error.message || "Error fetching bookings";
+          console.error("Fetch bookings error:", errorMessage, error);
+          set({ error: errorMessage, loading: false });
+          return { success: false, error: errorMessage };
+        }
+      },
+
       createBooking: async (bookingData) => {
         // API is enabled - database has sp_create_booking stored procedure
         const ENABLE_API = true; // Database is ready with stored procedure
@@ -80,9 +207,27 @@ const useBookingStore = create(
           try {
             set({ loading: true, error: null });
 
+            // Use real slot ID from database if available, otherwise fallback
+            let slotId = bookingData.port?.slotId || 3; // Use real slotId or default to 3
+            
+            if (bookingData.port?.slotId) {
+              console.log('✅ Using real slot ID from database:', slotId);
+            } else {
+              console.warn('⚠️ No real slot ID, using fallback slot:', slotId);
+              // Fallback: Extract from port ID format "stationId-slotX"
+              if (bookingData.port?.id) {
+                const portStr = bookingData.port.id.toString();
+                const slotMatch = portStr.match(/slot(\d+)/);
+                if (slotMatch) {
+                  slotId = parseInt(slotMatch[1]);
+                  console.log('🎯 Extracted slot ID from port string:', slotId);
+                }
+              }
+            }
+
             const apiPayload = {
               stationId: parseInt(bookingData.stationId) || 1,
-              slotId: 3, // Use actual slot ID from database (slot_id=3,4,5 are available)
+              slotId: slotId, // Use mapped slot ID
               vehicleId: 5, // Use actual vehicle ID from database (user has vehicle_id=5,6)
               scheduledStartTime:
                 bookingData.scheduledDateTime || new Date().toISOString(),
@@ -101,14 +246,19 @@ const useBookingStore = create(
             const response = await bookingsAPI.create(apiPayload);
             console.log("✅ API Response:", response);
 
+            // Backend returns PascalCase (BookingId), not camelCase (bookingId)
+            const numericId = response.BookingId || response.bookingId || response.id;
+            console.log("📊 Extracted booking ID from API:", numericId, "Type:", typeof numericId);
+
             // Merge API response
             booking = {
               ...booking,
-              id: response.bookingId || response.id, // Use numeric ID from API
+              id: numericId, // Use numeric ID from API (MUST be number for API calls)
               bookingCode: booking.id, // Keep BOOK... string as code for display
-              apiId: response.bookingId || response.id, // Keep for backward compatibility
-              status: response.status || booking.status,
-              createdAt: response.createdAt || booking.createdAt,
+              apiId: numericId, // Keep for backward compatibility
+              bookingId: numericId, // Also set bookingId for consistency
+              status: response.Status || response.status || booking.status,
+              createdAt: response.CreatedAt || response.createdAt || booking.createdAt,
             };
 
             set({ loading: false });
@@ -124,8 +274,8 @@ const useBookingStore = create(
 
         // Save to store
         set((state) => ({
-          bookings: [...state.bookings, booking],
-          bookingHistory: [...state.bookingHistory, booking],
+          bookings: [booking, ...state.bookings],
+          bookingHistory: [booking, ...state.bookingHistory],
           currentBooking: booking,
           socTracking: {
             ...state.socTracking,

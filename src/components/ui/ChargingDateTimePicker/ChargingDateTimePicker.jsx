@@ -270,20 +270,7 @@ const ChargingDateTimePicker = ({
                 color="primary"
                 disabled={disabled}
               />
-              <Chip
-                label="Thứ 2 tới"
-                onClick={() => {
-                  const today = new Date();
-                  const nextMonday = new Date(today);
-                  nextMonday.setDate(
-                    today.getDate() + ((1 + 7 - today.getDay()) % 7) || 7
-                  );
-                  setSelectedDate(nextMonday);
-                }}
-                variant="outlined"
-                color="primary"
-                disabled={disabled}
-              />
+              
             </Box>
 
             {/* Date Picker */}

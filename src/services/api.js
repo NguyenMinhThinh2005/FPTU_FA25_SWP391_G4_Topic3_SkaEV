@@ -119,11 +119,11 @@ export const authAPI = {
   },
 
   getProfile: () => {
-    return axiosInstance.get("/auth/profile");
+    return axiosInstance.get("/UserProfiles/me");
   },
 
   updateProfile: (profileData) => {
-    return axiosInstance.put("/auth/profile", profileData);
+    return axiosInstance.put("/UserProfiles/me", profileData);
   },
 };
 
@@ -162,6 +162,11 @@ export const stationsAPI = {
     return axiosInstance.get("/stations/search", {
       params: { q: searchQuery },
     });
+  },
+
+  // Get station slots (poles/ports) with real-time status
+  getStationSlots: (stationId) => {
+    return axiosInstance.get(`/stations/${stationId}/slots`);
   },
 };
 

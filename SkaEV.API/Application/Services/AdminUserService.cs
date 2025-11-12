@@ -2,10 +2,11 @@ using Microsoft.EntityFrameworkCore;
 using SkaEV.API.Application.DTOs.Admin;
 using SkaEV.API.Domain.Entities;
 using SkaEV.API.Infrastructure.Data;
+using BCrypt.Net;
 
 namespace SkaEV.API.Application.Services;
 
-public class AdminUserService : IAdminUserService
+public partial class AdminUserService : IAdminUserService
 {
     private readonly SkaEVDbContext _context;
     private readonly ILogger<AdminUserService> _logger;
@@ -41,7 +42,18 @@ public class AdminUserService : IAdminUserService
             .OrderByDescending(u => u.CreatedAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .Select(u => MapToDto(u))
+            .Select(u => new AdminUserDto
+            {
+                UserId = u.UserId,
+                Email = u.Email,
+                FullName = u.FullName,
+                PhoneNumber = u.PhoneNumber,
+                Role = u.Role,
+                Status = u.IsActive ? "active" : "inactive",
+                CreatedAt = u.CreatedAt,
+                UpdatedAt = u.UpdatedAt,
+                LastLoginAt = null
+            })
             .ToListAsync();
     }
 
@@ -103,34 +115,71 @@ public class AdminUserService : IAdminUserService
 
     public async Task<AdminUserDto> CreateUserAsync(CreateUserDto createDto)
     {
-        // Check if email already exists
-        var existingUser = await _context.Users
-            .FirstOrDefaultAsync(u => u.Email == createDto.Email);
-
-        if (existingUser != null)
-            throw new ArgumentException("Email already in use");
-
-        var validRoles = new[] { "customer", "staff", "admin" };
-        if (!validRoles.Contains(createDto.Role))
-            throw new ArgumentException("Invalid role");
-
-        var user = new User
+        try
         {
-            Email = createDto.Email,
-            PasswordHash = createDto.Password,
-            FullName = createDto.FullName,
-            PhoneNumber = createDto.PhoneNumber,
-            Role = createDto.Role,
-            IsActive = true,
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
-        };
+            _logger.LogInformation("Creating user with email: {Email}, role: {Role}", createDto.Email, createDto.Role);
 
-        _context.Users.Add(user);
-        await _context.SaveChangesAsync();
+            // Check if email already exists
+            var existingUser = await _context.Users
+                .FirstOrDefaultAsync(u => u.Email == createDto.Email);
 
-        _logger.LogInformation("Created user {UserId} with role {Role}", user.UserId, createDto.Role);
-        return MapToDto(user);
+            if (existingUser != null)
+            {
+                _logger.LogWarning("Email {Email} already exists", createDto.Email);
+                throw new ArgumentException("Email already in use");
+            }
+
+            var validRoles = new[] { "customer", "staff", "admin" };
+            if (!validRoles.Contains(createDto.Role))
+            {
+                _logger.LogWarning("Invalid role: {Role}", createDto.Role);
+                throw new ArgumentException("Invalid role");
+            }
+
+            _logger.LogInformation("Hashing password for user {Email}", createDto.Email);
+            var hashedPassword = BCrypt.Net.BCrypt.HashPassword(createDto.Password, 11);
+
+            var user = new User
+            {
+                Email = createDto.Email,
+                PasswordHash = hashedPassword,
+                FullName = createDto.FullName,
+                PhoneNumber = createDto.PhoneNumber,
+                Role = createDto.Role,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+
+            _logger.LogInformation("Adding user to database: {Email}", createDto.Email);
+            _context.Users.Add(user);
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("User created with ID: {UserId}, creating profile...", user.UserId);
+
+            // Create user profile
+            var profile = new UserProfile
+            {
+                UserId = user.UserId,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+
+            _context.UserProfiles.Add(profile);
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Successfully created user {UserId} with role {Role}", user.UserId, createDto.Role);
+            return MapToDto(user);
+        }
+        catch (ArgumentException)
+        {
+            throw; // Re-throw ArgumentException to be caught by controller
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating user {Email}: {Message}", createDto.Email, ex.Message);
+            throw new Exception($"Failed to create user: {ex.Message}", ex);
+        }
     }
 
     public async Task<AdminUserDto> UpdateUserAsync(int userId, UpdateUserDto updateDto)
@@ -237,13 +286,14 @@ public class AdminUserService : IAdminUserService
         if (hasActiveBookings)
             throw new ArgumentException("Cannot delete user with active bookings");
 
-        // Soft delete by deactivating
+        // Soft delete - mark as deleted with timestamp
         user.IsActive = false;
+        user.DeletedAt = DateTime.UtcNow;
         user.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
 
-        _logger.LogInformation("Deleted (soft) user {UserId}", userId);
+        _logger.LogInformation("Deleted (soft) user {UserId} at {DeletedAt}", userId, user.DeletedAt);
     }
 
     public async Task<ResetPasswordResultDto> ResetUserPasswordAsync(int userId)
@@ -256,12 +306,10 @@ public class AdminUserService : IAdminUserService
 
         // Generate temporary password
         var tempPassword = GenerateTemporaryPassword();
-    user.PasswordHash = tempPassword;
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(tempPassword, 11); // Hash password with BCrypt
         user.UpdatedAt = DateTime.UtcNow;
 
-        await _context.SaveChangesAsync();
-
-        _logger.LogInformation("Reset password for user {UserId}", userId);
+        await _context.SaveChangesAsync();        _logger.LogInformation("Reset password for user {UserId}", userId);
 
         return new ResetPasswordResultDto
         {

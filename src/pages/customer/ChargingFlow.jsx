@@ -21,7 +21,6 @@ import {
   DialogActions,
   List,
   ListItem,
-  ListItemText,
   ListItemIcon,
   Avatar,
   TextField,
@@ -42,7 +41,7 @@ import {
 } from "@mui/icons-material";
 import useBookingStore from "../../store/bookingStore";
 import useStationStore from "../../store/stationStore";
-import { formatCurrency } from "../../utils/helpers";
+import { formatCurrency, calculateDistance } from "../../utils/helpers";
 import StationMapLeaflet from "../../components/customer/StationMapLeaflet";
 import notificationService from "../../services/notificationService";
 import { qrCodesAPI, chargingAPI } from "../../services/api";
@@ -108,6 +107,10 @@ const ChargingFlow = () => {
   const bookingStore = useBookingStore;
   const { stations, initializeData, filters, updateFilters, loading } =
     useStationStore();
+  
+  // Debug log to check stations value
+  console.log("🔍 ChargingFlow - stations from store:", stations?.length || 0, "stations");
+  console.log("🔍 ChargingFlow - loading:", loading);
 
   // Lưu flowStep vào sessionStorage để giữ trạng thái khi chuyển tab
   const getInitialFlowStep = () => {
@@ -124,6 +127,10 @@ const ChargingFlow = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStation, setSelectedStation] = useState(null);
   const [viewMode, setViewMode] = useState("list"); // 'list' or 'map'
+  const [userLocation, setUserLocation] = useState({
+    lat: 10.8231, // Default to Ho Chi Minh City (HCMC)
+    lng: 106.6297,
+  });
 
   // Khôi phục currentBooking, chargingSession, flowStep từ sessionStorage khi mount (KHÔNG reset flowStep về 0 tự động)
   useEffect(() => {
@@ -373,8 +380,11 @@ const ChargingFlow = () => {
       if (stationList.length > 0) {
         console.log("   Stations:", stationList.map((s) => s.name).join(", "));
       }
-      // Add stats to each station
+      // Add stats and distance to each station
       stationList = stationList.map((station) => {
+        let updatedStation = { ...station };
+        
+        // Add stats if not present
         if (!station.stats && station.charging?.poles) {
           let totalPorts = 0;
           let availablePorts = 0;
@@ -385,28 +395,70 @@ const ChargingFlow = () => {
               (port) => port.status === "available"
             ).length;
           });
-          return {
-            ...station,
-            stats: {
-              total: totalPorts,
-              available: availablePorts,
-              occupied: totalPorts - availablePorts,
-            },
+          updatedStation.stats = {
+            total: totalPorts,
+            available: availablePorts,
+            occupied: totalPorts - availablePorts,
           };
         }
-        return station;
+        
+        // Calculate distance from user location
+        if (userLocation && station.location?.coordinates) {
+          const distance = calculateDistance(
+            userLocation.lat,
+            userLocation.lng,
+            station.location.coordinates.lat,
+            station.location.coordinates.lng
+          );
+          updatedStation.distanceFromUser = distance;
+        }
+        
+        return updatedStation;
       });
+      
+      // Sort by distance (ascending order) - nearest stations first
+      stationList.sort((a, b) => {
+        if (a.distanceFromUser !== undefined && b.distanceFromUser !== undefined) {
+          return a.distanceFromUser - b.distanceFromUser;
+        }
+        return 0;
+      });
+      
+      console.log("📍 Stations sorted by distance:", stationList.map(s => `${s.name} (${s.distanceFromUser?.toFixed(1)}km)`));
+      
       return stationList;
     } catch (error) {
       console.error("❌ Error filtering stations:", error);
       return [];
     }
-  }, [searchQuery, filters.connectorTypes, stations]);
+  }, [searchQuery, filters.connectorTypes, stations, userLocation]);
 
   useEffect(() => {
     console.log("🚀 ChargingFlow mounted - initializing data");
     initializeData();
   }, [initializeData]);
+
+  // Get user location
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const newLocation = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          };
+          console.log("📍 User location updated:", newLocation);
+          setUserLocation(newLocation);
+        },
+        (error) => {
+          console.warn("⚠️ Location access denied, using default location:", error);
+          // Keep default location (HCMC)
+        }
+      );
+    } else {
+      console.warn("⚠️ Geolocation not supported, using default location");
+    }
+  }, []);
 
   // Reset flow step to 0 if no active booking or charging session
   // Đã loại bỏ auto-reset flowStep về 0 khi mất currentBooking/changingSession để giữ đúng trạng thái flow khi quay lại
@@ -516,9 +568,10 @@ const ChargingFlow = () => {
         currentBooking
       );
 
-      // Try to call API to start charging session (may fail with 403 if not Staff)
-      // Use numeric ID from API response, not the BOOK... string
-      const bookingId = currentBooking.id;
+      // Use numeric booking ID from API (apiId) if available, otherwise use id
+      // API endpoint expects integer ID, not string "BOOK..."
+      const bookingId = currentBooking.apiId || currentBooking.bookingId || currentBooking.id;
+      console.log('📊 Using booking ID for API:', bookingId, 'Type:', typeof bookingId);
 
       try {
         const response = await chargingAPI.startCharging(bookingId);
@@ -671,85 +724,40 @@ const ChargingFlow = () => {
               }}
             >
               <CardContent sx={{ p: 3 }}>
-                <Grid container spacing={2.5} alignItems="center">
-                  {/* Search Input - wider on desktop so it pushes filter to the right */}
-                  <Grid item xs={12} md={9}>
-                    <TextField
-                      fullWidth
-                      placeholder="Tìm kiếm theo vị trí, tên trạm..."
-                      value={searchQuery}
-                      onChange={(e) => {
-                        const newValue = e.target.value;
-                        console.log("⌨️ TextField onChange:", newValue);
-                        setSearchQuery(newValue);
-                      }}
-                      InputProps={{
-                        startAdornment: (
-                          <Search sx={{ mr: 1, color: "text.secondary" }} />
-                        ),
-                      }}
-                      sx={{
-                        "& .MuiOutlinedInput-root": {
-                          borderRadius: 2,
-                          backgroundColor: "grey.50",
-                          "&:hover": {
-                            backgroundColor: "white",
-                          },
-                          "&.Mui-focused": {
-                            backgroundColor: "white",
-                          },
-                        },
-                      }}
-                    />
-                  </Grid>
-
-                  {/* Connector Type Filter */}
-                  <Grid item xs={12} sm={6} md={3}>
-                    <FormControl fullWidth>
-                      <InputLabel id="connector-label">
-                        Loại cổng sạc
-                      </InputLabel>
-                      <Select
-                        labelId="connector-label"
-                        id="connector-select"
-                        label="Loại cổng sạc"
-                        value={
-                          Array.isArray(filters.connectorTypes)
-                            ? filters.connectorTypes[0] || ""
-                            : filters.connectorTypes || ""
-                        }
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          console.log("🔌 Connector type changed:", value);
-                          // Store single string (or empty) in filters
-                          updateFilters({ connectorTypes: value || "" });
-                        }}
-                        renderValue={(selected) => (selected ? selected : null)}
-                        sx={{
-                          borderRadius: 2,
-                          backgroundColor: "grey.50",
-                          "&:hover": {
-                            backgroundColor: "white",
-                          },
-                          "&.Mui-focused": {
-                            backgroundColor: "white",
-                          },
-                        }}
-                      >
-                        <MenuItem value="">
-                          <em>Tất cả loại cổng</em>
-                        </MenuItem>
-                        {Object.values(CONNECTOR_TYPES).map((type) => (
-                          <MenuItem key={type} value={type}>
-                            {type}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                  </Grid>
-
-                  {/* View Mode removed — always show map */}
-                </Grid>
+                {/* Search Input - Full Width */}
+                <TextField
+                  fullWidth
+                  placeholder="Tìm kiếm theo tên trạm, địa chỉ, khu vực..."
+                  value={searchQuery}
+                  onChange={(e) => {
+                    const newValue = e.target.value;
+                    console.log("⌨️ TextField onChange:", newValue);
+                    setSearchQuery(newValue);
+                  }}
+                  InputProps={{
+                    startAdornment: (
+                      <Search sx={{ mr: 1, color: "text.secondary", fontSize: 24 }} />
+                    ),
+                  }}
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      borderRadius: 3,
+                      backgroundColor: "grey.50",
+                      fontSize: "1rem",
+                      "&:hover": {
+                        backgroundColor: "white",
+                        boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+                      },
+                      "&.Mui-focused": {
+                        backgroundColor: "white",
+                        boxShadow: "0 4px 12px rgba(0,0,0,0.12)",
+                      },
+                    },
+                    "& .MuiOutlinedInput-input": {
+                      padding: "16px 14px",
+                    },
+                  }}
+                />
               </CardContent>
             </Card>
           </Grid>
@@ -768,7 +776,7 @@ const ChargingFlow = () => {
                     textAlign: "center",
                   }}
                 >
-                  🗺️ Bản đồ trạm sạc ({filteredStations.length} trạm)
+                   Bản đồ trạm sạc 
                 </Typography>
                 <StationMapLeaflet
                   stations={filteredStations}
@@ -777,6 +785,9 @@ const ChargingFlow = () => {
               </CardContent>
             </Card>
           </Grid>
+
+          {/* Stations List with Distance and Ranking */}
+
         </Grid>
       )}
       {/* Step 2: QR Scan */}
@@ -1397,9 +1408,11 @@ const ChargingFlow = () => {
                   setCompletedSession(sessionEndData);
 
                   // 🚀 Call API to complete charging session
-                  // Use numeric ID from API response, not the BOOK... string
+                  // Use numeric booking ID from API (apiId), not string "BOOK..."
                   const bookingId =
+                    currentBooking?.apiId || currentBooking?.bookingId || 
                     currentBooking?.id || currentBookingData?.id;
+                  console.log('📊 Complete - Using booking ID:', bookingId, 'Type:', typeof bookingId);
                   if (bookingId) {
                     try {
                       console.log(
@@ -1686,6 +1699,25 @@ const ChargingFlow = () => {
                         }}
                       >
                         🏦 Chuyển khoản ngân hàng
+                      </Button>
+                      <Button
+                        variant={
+                          selectedPaymentMethod === "cash"
+                            ? "contained"
+                            : "outlined"
+                        }
+                        fullWidth
+                        onClick={() =>
+                          setSelectedPaymentMethod("cash")
+                        }
+                        sx={{
+                          justifyContent: "flex-start",
+                          p: 2,
+                          borderWidth: 2,
+                          "&:hover": { borderWidth: 2 },
+                        }}
+                      >
+                        💸 Thanh toán tại chỗ
                       </Button>
                     </Box>
 

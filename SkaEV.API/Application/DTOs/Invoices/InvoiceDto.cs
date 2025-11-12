@@ -21,8 +21,30 @@ public class InvoiceDto
 
 public class ProcessPaymentDto
 {
-    public int PaymentMethodId { get; set; }
+    /// <summary>
+    /// Payment method ID (if using saved payment method)
+    /// </summary>
+    public int? PaymentMethodId { get; set; }
+    
+    /// <summary>
+    /// Payment method name for counter payment (cash, card, qr, etc.)
+    /// Used when PaymentMethodId is null
+    /// </summary>
+    public string? Method { get; set; }
+    
+    /// <summary>
+    /// Payment amount
+    /// </summary>
     public decimal Amount { get; set; }
+    
+    /// <summary>
+    /// Transaction reference (for card/QR payments)
+    /// </summary>
+    public string? TransactionReference { get; set; }
+    
+    /// <summary>
+    /// Additional notes
+    /// </summary>
     public string? Notes { get; set; }
 }
 

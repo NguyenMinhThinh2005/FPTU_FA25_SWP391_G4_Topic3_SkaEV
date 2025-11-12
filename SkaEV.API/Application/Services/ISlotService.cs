@@ -13,4 +13,5 @@ public interface ISlotService
     Task<SlotDto> ToggleSlotBlockAsync(int slotId, bool isBlocked, string? reason);
     Task<SlotCalendarDto> GetSlotCalendarAsync(int postId, DateTime startDate, DateTime endDate);
     Task<IEnumerable<SlotDto>> BulkCreateSlotsAsync(BulkCreateSlotsDto bulkDto);
+    Task<SlotDto> UpdateSlotStatusAsync(int slotId, string status, string? reason);
 }
