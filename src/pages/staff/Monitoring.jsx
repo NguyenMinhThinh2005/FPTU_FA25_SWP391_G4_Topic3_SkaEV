@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import staffAPI from "../../services/api/staffAPI";
+import signalRService from "../../services/signalRService"; // 🔥 Import SignalR
 import {
   Box,
   Typography,
@@ -77,6 +78,39 @@ const Monitoring = () => {
     { value: "high", label: "Cao", color: "error" },
     { value: "urgent", label: "Khẩn cấp", color: "error" },
   ];
+
+  // 🔥 SignalR real-time updates
+  useEffect(() => {
+    const initSignalR = async () => {
+      try {
+        if (!signalRService.isConnected()) {
+          await signalRService.connect();
+          console.log('✅ Monitoring: SignalR connected');
+        }
+
+        // Listen for charging updates from Customer
+        const unsubscribeCharging = signalRService.onChargingUpdate((data) => {
+          console.log('🔌 Monitoring: Charging update received:', data);
+          loadMonitoringData(); // Reload để cập nhật connector status
+        });
+
+        // Listen for station updates
+        const unsubscribeStation = signalRService.onStationUpdate((data) => {
+          console.log('📡 Monitoring: Station update received:', data);
+          loadMonitoringData();
+        });
+
+        return () => {
+          unsubscribeCharging();
+          unsubscribeStation();
+        };
+      } catch (err) {
+        console.error('❌ Monitoring: SignalR connection error:', err);
+      }
+    };
+
+    initSignalR();
+  }, []);
 
   useEffect(() => {
     loadMonitoringData();

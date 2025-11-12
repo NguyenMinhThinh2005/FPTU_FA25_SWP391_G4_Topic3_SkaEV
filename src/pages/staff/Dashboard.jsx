@@ -38,6 +38,7 @@ import {
   Construction,
 } from "@mui/icons-material";
 import staffAPI from "../../services/api/staffAPI";
+import signalRService from "../../services/signalRService"; // 🔥 Import SignalR
 
 const StaffDashboard = () => {
   const navigate = useNavigate();
@@ -58,6 +59,47 @@ const StaffDashboard = () => {
   const [actionLoading, setActionLoading] = useState(false);
   const [actionReason, setActionReason] = useState('');
   const [maintenanceDuration, setMaintenanceDuration] = useState(2);
+
+  // 🔥 SignalR real-time updates
+  useEffect(() => {
+    const initSignalR = async () => {
+      try {
+        if (!signalRService.isConnected()) {
+          await signalRService.connect();
+          console.log('✅ Dashboard: SignalR connected');
+        }
+
+        // Subscribe to station if assigned
+        if (stationInfo?.id) {
+          await signalRService.subscribeToStation(stationInfo.id);
+          console.log(`✅ Dashboard: Subscribed to Station ${stationInfo.id}`);
+        }
+
+        // Listen for charging updates from Customer
+        const unsubscribeCharging = signalRService.onChargingUpdate((data) => {
+          console.log('🔌 Dashboard: Charging update received:', data);
+          
+          // Reload dashboard data để cập nhật UI
+          loadDashboardData();
+        });
+
+        // Listen for station updates
+        const unsubscribeStation = signalRService.onStationUpdate((data) => {
+          console.log('📡 Dashboard: Station update received:', data);
+          loadDashboardData();
+        });
+
+        return () => {
+          unsubscribeCharging();
+          unsubscribeStation();
+        };
+      } catch (err) {
+        console.error('❌ Dashboard: SignalR connection error:', err);
+      }
+    };
+
+    initSignalR();
+  }, [stationInfo?.id]);
 
   useEffect(() => {
     loadDashboardData();

@@ -13,12 +13,18 @@ namespace SkaEV.API.Controllers;
 public class BookingsController : ControllerBase
 {
     private readonly IBookingService _bookingService;
+    private readonly IStationNotificationService _notificationService;
     private readonly ILogger<BookingsController> _logger;
     private readonly IWebHostEnvironment _env;
 
-    public BookingsController(IBookingService bookingService, ILogger<BookingsController> logger, IWebHostEnvironment env)
+    public BookingsController(
+        IBookingService bookingService, 
+        IStationNotificationService notificationService,
+        ILogger<BookingsController> logger, 
+        IWebHostEnvironment env)
     {
         _bookingService = bookingService;
+        _notificationService = notificationService;
         _logger = logger;
         _env = env;
     }
@@ -197,7 +203,24 @@ public class BookingsController : ControllerBase
                 return BadRequest(new { message = "Failed to start charging" });
             }
 
-            return Ok(new { message = "Charging started successfully" });
+            // 🔥 Get booking details để broadcast SignalR
+            var booking = await _bookingService.GetBookingByIdAsync(id);
+            if (booking != null)
+            {
+                _logger.LogInformation(
+                    "📡 Broadcasting charging started - Booking {BookingId}, Station {StationId}, Slot {SlotId}",
+                    id, booking.StationId, booking.SlotId);
+
+                // Broadcast real-time notification to Staff Dashboard
+                await _notificationService.NotifyChargingStarted(
+                    bookingId: id,
+                    stationId: booking.StationId,
+                    slotId: booking.SlotId ?? 0,
+                    connectorCode: booking.SlotNumber ?? "N/A"
+                );
+            }
+
+            return Ok(new { message: "Charging started successfully" });
         }
         catch (Exception ex)
         {
@@ -237,6 +260,23 @@ public class BookingsController : ControllerBase
             if (!success)
             {
                 return BadRequest(new { message = "Failed to complete charging" });
+            }
+
+            // 🔥 Get booking details để broadcast SignalR
+            var booking = await _bookingService.GetBookingByIdAsync(id);
+            if (booking != null)
+            {
+                _logger.LogInformation(
+                    "📡 Broadcasting charging completed - Booking {BookingId}, Station {StationId}, Slot {SlotId}",
+                    id, booking.StationId, booking.SlotId);
+
+                // Broadcast real-time notification to Staff Dashboard
+                await _notificationService.NotifyChargingCompleted(
+                    bookingId: id,
+                    stationId: booking.StationId,
+                    slotId: booking.SlotId ?? 0,
+                    connectorCode: booking.SlotNumber ?? "N/A"
+                );
             }
 
             return Ok(new { message = "Charging completed successfully" });
