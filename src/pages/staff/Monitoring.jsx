@@ -131,11 +131,25 @@ const Monitoring = () => {
 
   const loadMonitoringData = async () => {
     try {
-      const stations = await staffAPI.getStationsStatus();
-      const stationList = Array.isArray(stations) ? stations : [];
+      // Load dashboard data to get assigned station
+      const dashboardData = await staffAPI.getDashboardOverview();
+      console.log("📊 Dashboard data:", dashboardData);
 
-      // Load all issues first to check which stations have active issues
-      const issues = await staffAPI.getAllIssues();
+      if (!dashboardData.hasAssignment || !dashboardData.station) {
+        setSnackbar({
+          open: true,
+          message: "Bạn chưa được phân công quản lý trạm nào. Vui lòng liên hệ quản trị viên.",
+          severity: "warning",
+        });
+        setConnectors([]);
+        setIncidents([]);
+        return;
+      }
+
+      const assignedStation = dashboardData.station;
+
+      // Load all issues for the assigned station
+      const issues = await staffAPI.getAllIssues({ stationId: assignedStation.stationId });
       const issueList = Array.isArray(issues) ? issues : [];
       
       console.log("📊 Issues loaded from API:", issueList);
@@ -147,39 +161,33 @@ const Monitoring = () => {
           .map(issue => issue.stationId)
       );
 
-      const connectorsByStation = await Promise.all(
-        stationList.map(async (station) => {
-          const slots = await staffAPI.getStationSlots(station.stationId);
-          const hasActiveIssue = stationsWithActiveIssues.has(station.stationId);
-          
-          return slots.map((slot) => {
-            // If station has active issue, override status to maintenance
-            const actualStatus = hasActiveIssue ? 'maintenance' : slot.status;
-            const status = mapSlotStatus(actualStatus);
-            
-            return {
-              id: `ST${station.stationId}-P${slot.postNumber}-S${slot.slotNumber}`,
-              stationId: station.stationId,
-              stationName: station.stationName,
-              slotId: slot.slotId,
-              postId: slot.postId,
-              postNumber: slot.postNumber,
-              slotNumber: slot.slotNumber,
-              type: slot.connectorType || "Không rõ",
-              maxPower: slot.maxPower || 0,
-              status: status.technical,
-              operationalStatus: status.operational,
-              currentPower: slot.currentPowerUsage ?? null,
-              currentSoc: slot.currentSoc ?? null,
-              currentUser: slot.currentUserName ?? null,
-              bookingStart: slot.bookingStartTime ? new Date(slot.bookingStartTime) : null,
-              hasActiveIssue, // Flag to show maintenance icon
-            };
-          });
-        })
-      );
-
-      const connectorsData = connectorsByStation.flat();
+      // Load slots from dashboard connectors (already loaded with active sessions)
+      const hasActiveIssue = stationsWithActiveIssues.has(assignedStation.stationId);
+      
+      const connectorsData = dashboardData.connectors.map((connector) => {
+        // If station has active issue, override status to maintenance
+        const actualStatus = hasActiveIssue ? 'maintenance' : (connector.technicalStatus || connector.operationalStatus);
+        const status = mapSlotStatus(actualStatus);
+        
+        return {
+          id: connector.connectorCode || `SLOT-${connector.slotId}`,
+          stationId: assignedStation.stationId,
+          stationName: assignedStation.stationName,
+          slotId: connector.slotId,
+          postId: null,
+          postNumber: null,
+          slotNumber: null,
+          type: connector.connectorType || "Không rõ",
+          maxPower: connector.maxPower || 0,
+          status: status.technical,
+          operationalStatus: status.operational,
+          currentPower: connector.activeSession?.energyConsumed ?? null,
+          currentSoc: connector.activeSession?.vehicleSOC ?? null,
+          currentUser: connector.activeSession?.customerName ?? null,
+          bookingStart: connector.activeSession?.startTime ?? null,
+          hasActiveIssue, // Flag to show maintenance icon
+        };
+      });
 
       const incidentsData = issueList.map((issue) => {
         const status = mapIssueStatus(issue.status);
@@ -625,7 +633,7 @@ const Monitoring = () => {
                   >
                     {connectors.map((c) => (
                       <MenuItem key={c.id} value={c.id}>
-                        {c.stationName} · Post {c.postNumber} · Slot {c.slotNumber} ({c.type} {c.maxPower}kW)
+                        {c.stationName} · {c.id} ({c.type} {c.maxPower}kW)
                       </MenuItem>
                     ))}
                   </Select>
