@@ -188,6 +188,43 @@ const staffAPI = {
     return response.data;
   },
 
+  // ==================== CONNECTOR CONTROL ====================
+
+  /**
+   * Emergency stop - Immediately stop charging and cut power
+   * @param {number} slotId - Charging slot ID
+   * @param {string} reason - Reason for emergency stop
+   */
+  emergencyStop: async (slotId, reason = 'Emergency stop initiated by staff') => {
+    const response = await axiosInstance.post(`/staff/connectors/${slotId}/emergency-stop`, {
+      reason
+    });
+    return response.data;
+  },
+
+  /**
+   * Set connector to maintenance mode
+   * @param {number} slotId - Charging slot ID
+   * @param {string} reason - Maintenance reason
+   * @param {number} estimatedDurationHours - Estimated maintenance duration
+   */
+  setMaintenance: async (slotId, reason, estimatedDurationHours = 2) => {
+    const response = await axiosInstance.post(`/staff/connectors/${slotId}/maintenance`, {
+      reason,
+      estimatedDurationHours
+    });
+    return response.data;
+  },
+
+  /**
+   * Resume connector from maintenance
+   * @param {number} slotId - Charging slot ID
+   */
+  resumeFromMaintenance: async (slotId) => {
+    const response = await axiosInstance.post(`/staff/connectors/${slotId}/resume`);
+    return response.data;
+  },
+
   // ==================== CHARGING SESSIONS ====================
 
   /**

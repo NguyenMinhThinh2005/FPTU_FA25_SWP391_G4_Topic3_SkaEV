@@ -13,6 +13,13 @@ import {
   Chip,
   Divider,
   Stack,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+  TextField,
+  CircularProgress,
 } from "@mui/material";
 import {
   ElectricCar,
@@ -27,6 +34,8 @@ import {
   Bolt,
   AccessTime,
   MonetizationOn,
+  Cancel,
+  Construction,
 } from "@mui/icons-material";
 import staffAPI from "../../services/api/staffAPI";
 
@@ -43,6 +52,13 @@ const StaffDashboard = () => {
   });
   const [alerts, setAlerts] = useState([]);
   const [error, setError] = useState(null);
+
+  // Dialog states for Emergency Stop and Maintenance
+  const [emergencyDialog, setEmergencyDialog] = useState({ open: false, connector: null });
+  const [maintenanceDialog, setMaintenanceDialog] = useState({ open: false, connector: null });
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionReason, setActionReason] = useState('');
+  const [maintenanceDuration, setMaintenanceDuration] = useState(2);
 
   useEffect(() => {
     loadDashboardData();
@@ -197,6 +213,85 @@ const StaffDashboard = () => {
     return "info";
   };
 
+  // ==================== CONNECTOR CONTROL HANDLERS ====================
+
+  const handleEmergencyStopClick = (connector) => {
+    setEmergencyDialog({ open: true, connector });
+    setActionReason(`Dừng khẩn cấp connector ${connector.code}`);
+  };
+
+  const handleMaintenanceClick = (connector) => {
+    setMaintenanceDialog({ open: true, connector });
+    setActionReason(`Bảo trì định kỳ connector ${connector.code}`);
+    setMaintenanceDuration(2);
+  };
+
+  const handleEmergencyStopConfirm = async () => {
+    const { connector } = emergencyDialog;
+    if (!connector || !connector.slotId) {
+      alert('Không tìm thấy thông tin connector');
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      await staffAPI.emergencyStop(connector.slotId, actionReason);
+      
+      // Close dialog
+      setEmergencyDialog({ open: false, connector: null });
+      setActionReason('');
+
+      // Show success message
+      alert(`✅ Đã dừng khẩn cấp connector ${connector.code}`);
+
+      // Reload dashboard to reflect changes
+      await loadDashboardData();
+    } catch (error) {
+      console.error('Emergency stop failed:', error);
+      alert(`❌ Lỗi khi dừng khẩn cấp: ${error.response?.data?.message || error.message}`);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleMaintenanceConfirm = async () => {
+    const { connector } = maintenanceDialog;
+    if (!connector || !connector.slotId) {
+      alert('Không tìm thấy thông tin connector');
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      await staffAPI.setMaintenance(connector.slotId, actionReason, maintenanceDuration);
+      
+      // Close dialog
+      setMaintenanceDialog({ open: false, connector: null });
+      setActionReason('');
+      setMaintenanceDuration(2);
+
+      // Show success message
+      alert(`✅ Đã chuyển connector ${connector.code} sang chế độ bảo trì`);
+
+      // Reload dashboard to reflect changes
+      await loadDashboardData();
+    } catch (error) {
+      console.error('Maintenance mode failed:', error);
+      alert(`❌ Lỗi khi chuyển sang bảo trì: ${error.response?.data?.message || error.message}`);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDialogClose = () => {
+    if (!actionLoading) {
+      setEmergencyDialog({ open: false, connector: null });
+      setMaintenanceDialog({ open: false, connector: null });
+      setActionReason('');
+      setMaintenanceDuration(2);
+    }
+  };
+
   const mapConnectorForDisplay = (connector) => {
     if (!connector) return null;
 
@@ -238,6 +333,7 @@ const StaffDashboard = () => {
 
     return {
       id: connector.connectorCode || `SLOT-${connector.slotId}`,
+      code: connector.connectorCode || `SLOT-${connector.slotId}`, // For display in dialogs
       slotId: connector.slotId,
       type: connector.connectorType,
       maxPower: Number(connector.maxPower || 0),
@@ -527,6 +623,32 @@ const StaffDashboard = () => {
                           </Typography>
                         </Box>
                       )}
+
+                      {/* Control Buttons */}
+                      <Box mt="auto" pt={2} display="flex" gap={1} flexDirection="column">
+                        <Button
+                          variant="contained"
+                          color="error"
+                          size="small"
+                          startIcon={<Cancel />}
+                          onClick={() => handleEmergencyStopClick(connector)}
+                          disabled={connector.status === 'Unavailable' || connector.status === 'Faulted'}
+                          fullWidth
+                        >
+                          Dừng khẩn cấp
+                        </Button>
+                        <Button
+                          variant="outlined"
+                          color="warning"
+                          size="small"
+                          startIcon={<Construction />}
+                          onClick={() => handleMaintenanceClick(connector)}
+                          disabled={connector.status === 'Unavailable' || connector.status === 'Faulted'}
+                          fullWidth
+                        >
+                          Bảo trì
+                        </Button>
+                      </Box>
                     </CardContent>
                   </Card>
                 </Grid>
@@ -535,6 +657,112 @@ const StaffDashboard = () => {
           </Grid>
         </CardContent>
       </Card>
+
+      {/* Emergency Stop Dialog */}
+      <Dialog
+        open={emergencyDialog.open}
+        onClose={handleDialogClose}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ bgcolor: 'error.main', color: 'white' }}>
+          <Cancel sx={{ mr: 1, verticalAlign: 'middle' }} />
+          Xác nhận Dừng Khẩn Cấp
+        </DialogTitle>
+        <DialogContent sx={{ mt: 2 }}>
+          <DialogContentText sx={{ mb: 2 }}>
+            Bạn có chắc chắn muốn <strong>DỪNG KHẨN CẤP</strong> connector{' '}
+            <strong>{emergencyDialog.connector?.code}</strong>?
+          </DialogContentText>
+          <Alert severity="error" sx={{ mb: 2 }}>
+            <AlertTitle>Cảnh báo</AlertTitle>
+            - Điện sẽ bị ngắt ngay lập tức<br />
+            - Phiên sạc sẽ kết thúc<br />
+            - Khách hàng sẽ nhận thông báo
+          </Alert>
+          <TextField
+            label="Lý do dừng khẩn cấp"
+            value={actionReason}
+            onChange={(e) => setActionReason(e.target.value)}
+            multiline
+            rows={3}
+            fullWidth
+            required
+            placeholder="Vui lòng nhập lý do..."
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleDialogClose} disabled={actionLoading}>
+            Hủy
+          </Button>
+          <Button
+            onClick={handleEmergencyStopConfirm}
+            variant="contained"
+            color="error"
+            disabled={actionLoading || !actionReason.trim()}
+            startIcon={actionLoading ? <CircularProgress size={20} /> : <Cancel />}
+          >
+            {actionLoading ? 'Đang xử lý...' : 'Dừng ngay'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Maintenance Dialog */}
+      <Dialog
+        open={maintenanceDialog.open}
+        onClose={handleDialogClose}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ bgcolor: 'warning.main', color: 'white' }}>
+          <Construction sx={{ mr: 1, verticalAlign: 'middle' }} />
+          Chuyển sang Chế độ Bảo trì
+        </DialogTitle>
+        <DialogContent sx={{ mt: 2 }}>
+          <DialogContentText sx={{ mb: 2 }}>
+            Chuyển connector <strong>{maintenanceDialog.connector?.code}</strong> sang chế độ bảo trì
+          </DialogContentText>
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            <AlertTitle>Lưu ý</AlertTitle>
+            - Connector sẽ không khả dụng<br />
+            - Khách hàng sẽ thấy trạng thái "Đang bảo trì"<br />
+            - Sự cố sẽ được tự động tạo trong hệ thống
+          </Alert>
+          <TextField
+            label="Lý do bảo trì"
+            value={actionReason}
+            onChange={(e) => setActionReason(e.target.value)}
+            multiline
+            rows={3}
+            fullWidth
+            required
+            placeholder="Vui lòng mô tả công việc bảo trì..."
+            sx={{ mb: 2 }}
+          />
+          <TextField
+            label="Thời gian dự kiến (giờ)"
+            type="number"
+            value={maintenanceDuration}
+            onChange={(e) => setMaintenanceDuration(Number(e.target.value))}
+            fullWidth
+            inputProps={{ min: 0.5, max: 48, step: 0.5 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleDialogClose} disabled={actionLoading}>
+            Hủy
+          </Button>
+          <Button
+            onClick={handleMaintenanceConfirm}
+            variant="contained"
+            color="warning"
+            disabled={actionLoading || !actionReason.trim()}
+            startIcon={actionLoading ? <CircularProgress size={20} /> : <Construction />}
+          >
+            {actionLoading ? 'Đang xử lý...' : 'Xác nhận'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

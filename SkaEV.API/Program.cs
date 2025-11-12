@@ -132,6 +132,7 @@ builder.Services.AddScoped<IAdminUserService, AdminUserService>();
 builder.Services.AddScoped<IIssueService, IssueService>(); // Optional - requires 08_ADD_ISSUES_TABLE.sql
 builder.Services.AddScoped<IncidentService>(); // Incident management service
 builder.Services.AddScoped<StationAnalyticsService>(); // Station analytics service
+builder.Services.AddScoped<IConnectorControlService, ConnectorControlService>(); // Connector emergency stop & maintenance
 
 // Admin Management Services
 builder.Services.AddScoped<IAdminStationManagementService, AdminStationManagementService>();
