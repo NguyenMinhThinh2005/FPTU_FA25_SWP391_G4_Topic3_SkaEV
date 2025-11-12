@@ -53,8 +53,7 @@ const StaffDashboard = () => {
   const [alerts, setAlerts] = useState([]);
   const [error, setError] = useState(null);
 
-  // Dialog states for Emergency Stop and Maintenance
-  const [emergencyDialog, setEmergencyDialog] = useState({ open: false, connector: null });
+  // Dialog states for Maintenance only
   const [maintenanceDialog, setMaintenanceDialog] = useState({ open: false, connector: null });
   const [actionLoading, setActionLoading] = useState(false);
   const [actionReason, setActionReason] = useState('');
@@ -215,45 +214,12 @@ const StaffDashboard = () => {
 
   // ==================== CONNECTOR CONTROL HANDLERS ====================
 
-  const handleEmergencyStopClick = (connector) => {
-    setEmergencyDialog({ open: true, connector });
-    setActionReason(`Dừng khẩn cấp connector ${connector.code}`);
-  };
-
   const handleMaintenanceClick = (connector) => {
     setMaintenanceDialog({ open: true, connector });
     setActionReason(`Bảo trì định kỳ connector ${connector.code}`);
     setMaintenanceDuration(2);
   };
 
-  const handleEmergencyStopConfirm = async () => {
-    const { connector } = emergencyDialog;
-    if (!connector || !connector.slotId) {
-      alert('Không tìm thấy thông tin connector');
-      return;
-    }
-
-    setActionLoading(true);
-    try {
-      // Update slot status to unavailable
-      await staffAPI.updateSlotStatus(connector.slotId, 'unavailable', actionReason);
-      
-      // Close dialog
-      setEmergencyDialog({ open: false, connector: null });
-      setActionReason('');
-
-      // Show success message
-      alert(`✅ Đã dừng khẩn cấp connector ${connector.id || connector.code}`);
-
-      // Reload dashboard to reflect changes
-      await loadDashboardData();
-    } catch (error) {
-      console.error('Emergency stop failed:', error);
-      alert(`❌ Lỗi khi dừng khẩn cấp: ${error.response?.data?.message || error.message}`);
-    } finally {
-      setActionLoading(false);
-    }
-  };
 
   const handleMaintenanceConfirm = async () => {
     const { connector } = maintenanceDialog;
@@ -291,7 +257,6 @@ const StaffDashboard = () => {
 
   const handleDialogClose = () => {
     if (!actionLoading) {
-      setEmergencyDialog({ open: false, connector: null });
       setMaintenanceDialog({ open: false, connector: null });
       setActionReason('');
       setMaintenanceDuration(2);
@@ -633,17 +598,6 @@ const StaffDashboard = () => {
                       {/* Control Buttons */}
                       <Box mt="auto" pt={2} display="flex" gap={1} flexDirection="column">
                         <Button
-                          variant="contained"
-                          color="error"
-                          size="small"
-                          startIcon={<Cancel />}
-                          onClick={() => handleEmergencyStopClick(connector)}
-                          disabled={connector.status === 'Unavailable' || connector.status === 'Faulted'}
-                          fullWidth
-                        >
-                          Dừng khẩn cấp
-                        </Button>
-                        <Button
                           variant="outlined"
                           color="warning"
                           size="small"
@@ -663,55 +617,6 @@ const StaffDashboard = () => {
           </Grid>
         </CardContent>
       </Card>
-
-      {/* Emergency Stop Dialog */}
-      <Dialog
-        open={emergencyDialog.open}
-        onClose={handleDialogClose}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle sx={{ bgcolor: 'error.main', color: 'white' }}>
-          <Cancel sx={{ mr: 1, verticalAlign: 'middle' }} />
-          Xác nhận Dừng Khẩn Cấp
-        </DialogTitle>
-        <DialogContent sx={{ mt: 2 }}>
-          <DialogContentText sx={{ mb: 2 }}>
-            Bạn có chắc chắn muốn <strong>DỪNG KHẨN CẤP</strong> connector{' '}
-            <strong>{emergencyDialog.connector?.code}</strong>?
-          </DialogContentText>
-          <Alert severity="error" sx={{ mb: 2 }}>
-            <AlertTitle>Cảnh báo</AlertTitle>
-            - Điện sẽ bị ngắt ngay lập tức<br />
-            - Phiên sạc sẽ kết thúc<br />
-            - Khách hàng sẽ nhận thông báo
-          </Alert>
-          <TextField
-            label="Lý do dừng khẩn cấp"
-            value={actionReason}
-            onChange={(e) => setActionReason(e.target.value)}
-            multiline
-            rows={3}
-            fullWidth
-            required
-            placeholder="Vui lòng nhập lý do..."
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleDialogClose} disabled={actionLoading}>
-            Hủy
-          </Button>
-          <Button
-            onClick={handleEmergencyStopConfirm}
-            variant="contained"
-            color="error"
-            disabled={actionLoading || !actionReason.trim()}
-            startIcon={actionLoading ? <CircularProgress size={20} /> : <Cancel />}
-          >
-            {actionLoading ? 'Đang xử lý...' : 'Dừng ngay'}
-          </Button>
-        </DialogActions>
-      </Dialog>
 
       {/* Maintenance Dialog */}
       <Dialog

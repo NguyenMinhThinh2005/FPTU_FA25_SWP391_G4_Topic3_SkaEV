@@ -34,7 +34,8 @@ import {
   Stop, 
   Payment,
   Info,
-  Print 
+  Print,
+  PlayArrow
 } from "@mui/icons-material";
 
 const ChargingSessionsSimple = () => {
@@ -46,7 +47,8 @@ const ChargingSessionsSimple = () => {
   // Dialog states
   const [stopDialogOpen, setStopDialogOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
-  const [detailDialogOpen, setDetailDialogOpen] = useState(false); // Thêm detail dialog
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [resumeDialogOpen, setResumeDialogOpen] = useState(false); // Thêm resume dialog
   const [selectedSession, setSelectedSession] = useState(null);
   
   // Payment form data
@@ -238,6 +240,40 @@ const ChargingSessionsSimple = () => {
       paymentMethod: 'cash'
     });
     setPaymentDialogOpen(true);
+  };
+
+  // Handle resume from maintenance
+  const handleResumeFromMaintenance = (session) => {
+    setSelectedSession(session);
+    setResumeDialogOpen(true);
+  };
+
+  // Confirm resume from maintenance
+  const confirmResumeFromMaintenance = async () => {
+    try {
+      console.log("🔄 Resuming slot from maintenance:", selectedSession.id);
+      
+      // Call API to update slot status to available
+      await staffAPI.updateSlotStatus(selectedSession.id, 'available', 'Đã hoàn tất bảo trì');
+      
+      setResumeDialogOpen(false);
+      setSnackbar({
+        open: true,
+        message: `✅ Connector ${selectedSession.connectorCode} đã hoạt động trở lại`,
+        severity: 'success'
+      });
+      
+      // Reload sessions to reflect changes
+      await loadSessions();
+      
+    } catch (err) {
+      console.error("❌ Error resuming from maintenance:", err);
+      setSnackbar({
+        open: true,
+        message: err.response?.data?.message || "Không thể khôi phục hoạt động",
+        severity: 'error'
+      });
+    }
   };
 
   // Process payment
@@ -620,8 +656,21 @@ const ChargingSessionsSimple = () => {
                           </Button>
                         )}
                         
+                        {/* Hoạt động lại button - Show for maintenance slots */}
+                        {!isActive && session.operationalStatus?.toLowerCase() === 'maintenance' && (
+                          <Button 
+                            size="small" 
+                            variant="contained"
+                            color="success"
+                            startIcon={<PlayArrow />}
+                            onClick={() => handleResumeFromMaintenance(session)}
+                          >
+                            Hoạt động lại
+                          </Button>
+                        )}
+                        
                         {/* Empty state for inactive connectors */}
-                        {!isActive && (
+                        {!isActive && session.operationalStatus?.toLowerCase() !== 'maintenance' && (
                           <Typography variant="caption" color="text.secondary">
                             -
                           </Typography>
@@ -928,6 +977,59 @@ const ChargingSessionsSimple = () => {
             size="large"
           >
             Xuất hóa đơn
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Resume from Maintenance Dialog */}
+      <Dialog 
+        open={resumeDialogOpen} 
+        onClose={() => setResumeDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ bgcolor: 'success.main', color: 'white' }}>
+          <Box display="flex" alignItems="center" gap={1}>
+            <PlayArrow />
+            <Typography variant="h6">Xác nhận Hoạt động lại</Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ mt: 2 }}>
+          <Alert severity="success" sx={{ mb: 2 }}>
+            <Typography variant="body2">
+              Bạn đang chuẩn bị khôi phục hoạt động cho connector{' '}
+              <strong>{selectedSession?.connectorCode}</strong>
+            </Typography>
+          </Alert>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Sau khi xác nhận, connector sẽ chuyển sang trạng thái "Sẵn sàng" và khách hàng có thể sử dụng trở lại.
+          </Typography>
+          <Box sx={{ p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>
+            <Typography variant="body2">
+              <strong>Thông tin connector:</strong>
+            </Typography>
+            <Typography variant="body2">
+              • Mã: {selectedSession?.connectorCode}
+            </Typography>
+            <Typography variant="body2">
+              • Loại: {selectedSession?.connectorType}
+            </Typography>
+            <Typography variant="body2">
+              • Công suất: {selectedSession?.maxPower} kW
+            </Typography>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setResumeDialogOpen(false)} variant="outlined">
+            Hủy
+          </Button>
+          <Button 
+            onClick={confirmResumeFromMaintenance} 
+            variant="contained"
+            color="success"
+            startIcon={<PlayArrow />}
+          >
+            Xác nhận hoạt động lại
           </Button>
         </DialogActions>
       </Dialog>
