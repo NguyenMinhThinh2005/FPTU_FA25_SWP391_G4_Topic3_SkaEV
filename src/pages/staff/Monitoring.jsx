@@ -30,6 +30,7 @@ import {
   IconButton,
   Snackbar,
   Stack,
+  Divider,
 } from "@mui/material";
 import {
   Warning,
@@ -40,6 +41,9 @@ import {
   Error,
   PowerOff,
   Build,
+  Info,
+  Schedule,
+  HourglassEmpty,
 } from "@mui/icons-material";
 
 const Monitoring = () => {
@@ -76,11 +80,20 @@ const Monitoring = () => {
 
   useEffect(() => {
     loadMonitoringData();
+    
+    // Auto-refresh every 30 seconds for real-time updates
+    const refreshInterval = setInterval(() => {
+      loadMonitoringData();
+    }, 30000); // 30 seconds
+
     // Handle navigation state
     if (location.state?.action === "report" && location.state?.connectorId) {
       setReportForm((prev) => ({ ...prev, connectorId: location.state.connectorId }));
       setReportDialog(true);
     }
+
+    // Cleanup interval on component unmount
+    return () => clearInterval(refreshInterval);
   }, [location.state]);
 
   const mapSlotStatus = (status = "") => {
@@ -121,11 +134,29 @@ const Monitoring = () => {
       const stations = await staffAPI.getStationsStatus();
       const stationList = Array.isArray(stations) ? stations : [];
 
+      // Load all issues first to check which stations have active issues
+      const issues = await staffAPI.getAllIssues();
+      const issueList = Array.isArray(issues) ? issues : [];
+      
+      console.log("📊 Issues loaded from API:", issueList);
+      
+      // Build a map of stations with active issues (reported or in_progress)
+      const stationsWithActiveIssues = new Set(
+        issueList
+          .filter(issue => issue.status && !['resolved', 'closed'].includes(issue.status.toLowerCase()))
+          .map(issue => issue.stationId)
+      );
+
       const connectorsByStation = await Promise.all(
         stationList.map(async (station) => {
           const slots = await staffAPI.getStationSlots(station.stationId);
+          const hasActiveIssue = stationsWithActiveIssues.has(station.stationId);
+          
           return slots.map((slot) => {
-            const status = mapSlotStatus(slot.status);
+            // If station has active issue, override status to maintenance
+            const actualStatus = hasActiveIssue ? 'maintenance' : slot.status;
+            const status = mapSlotStatus(actualStatus);
+            
             return {
               id: `ST${station.stationId}-P${slot.postNumber}-S${slot.slotNumber}`,
               stationId: station.stationId,
@@ -142,6 +173,7 @@ const Monitoring = () => {
               currentSoc: slot.currentSoc ?? null,
               currentUser: slot.currentUserName ?? null,
               bookingStart: slot.bookingStartTime ? new Date(slot.bookingStartTime) : null,
+              hasActiveIssue, // Flag to show maintenance icon
             };
           });
         })
@@ -149,14 +181,12 @@ const Monitoring = () => {
 
       const connectorsData = connectorsByStation.flat();
 
-  const issues = await staffAPI.getAllIssues();
-
-  const issueList = Array.isArray(issues) ? issues : [];
-
       const incidentsData = issueList.map((issue) => {
         const status = mapIssueStatus(issue.status);
         const resolvedAt = issue.resolvedAt ? new Date(issue.resolvedAt) : null;
-        const resolution = issue.resolution ?? (resolvedAt ? `Hoàn tất lúc ${resolvedAt.toLocaleString("vi-VN")}` : null);
+        const updatedAt = issue.updatedAt ? new Date(issue.updatedAt) : null;
+        const reportedAt = issue.reportedAt ? new Date(issue.reportedAt) : (issue.createdAt ? new Date(issue.createdAt) : new Date());
+        const resolution = issue.resolution ?? null;
         const priority = (issue.priority || "medium").toLowerCase();
 
         return {
@@ -168,12 +198,17 @@ const Monitoring = () => {
           status: status.key,
           statusLabel: status.label,
           stationName: issue.stationName,
+          stationId: issue.stationId,
           assignedTo: issue.assignedToUserName,
           reportedBy: issue.reportedByUserName,
-          reportedAt: new Date(issue.createdAt),
+          reportedAt: reportedAt,
+          updatedAt: updatedAt,
+          resolvedAt: resolvedAt,
           adminResponse: resolution,
         };
       });
+
+      console.log("📋 Processed incidents data:", incidentsData);
 
       setConnectors(connectorsData);
       setIncidents(incidentsData);
@@ -422,10 +457,21 @@ const Monitoring = () => {
                     </TableCell>
                     <TableCell align="center">
                       <Chip
-                        icon={getStatusIcon(connector.operationalStatus)}
-                        label={connector.operationalStatus}
+                        icon={
+                          connector.hasActiveIssue ? (
+                            <Build fontSize="small" />
+                          ) : (
+                            getStatusIcon(connector.operationalStatus)
+                          )
+                        }
+                        label={
+                          connector.hasActiveIssue 
+                            ? "Đang bảo trì" 
+                            : connector.operationalStatus
+                        }
                         size="small"
                         variant="outlined"
+                        color={connector.hasActiveIssue ? "warning" : "default"}
                       />
                     </TableCell>
                     <TableCell align="right">
@@ -472,65 +518,94 @@ const Monitoring = () => {
       </Typography>
       <Card>
         <CardContent>
-          <TableContainer component={Paper}>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Mã sự cố</TableCell>
-                  <TableCell>Trạm</TableCell>
-                  <TableCell>Loại sự cố</TableCell>
-                  <TableCell>Mô tả</TableCell>
-                  <TableCell align="center">Ưu tiên</TableCell>
-                  <TableCell align="center">Trạng thái</TableCell>
-                  <TableCell>Gán cho</TableCell>
-                  <TableCell>Phản hồi</TableCell>
-                  <TableCell>Thời gian</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {incidents.map((incident) => (
-                  <TableRow key={incident.id} hover>
-                    <TableCell fontWeight={600}>{incident.id}</TableCell>
-                    <TableCell>{incident.stationName || incident.connectorId}</TableCell>
-                    <TableCell>{incident.type}</TableCell>
-                    <TableCell>{incident.description}</TableCell>
-                    <TableCell align="center">
-                      <Chip
-                        label={priorityLevels.find((p) => p.value === incident.priority)?.label}
-                        color={priorityLevels.find((p) => p.value === incident.priority)?.color}
-                        size="small"
-                      />
-                    </TableCell>
-                    <TableCell align="center">
-                      <Chip 
-                        label={incident.statusLabel} 
-                        color={incident.status === "completed" ? "success" : "warning"}
-                        size="small" 
-                      />
-                    </TableCell>
-                    <TableCell>{incident.assignedTo || "Chưa phân công"}</TableCell>
-                    <TableCell>
-                      {incident.adminResponse ? (
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          color="primary"
-                          onClick={() => handleViewDetail(incident)}
-                        >
-                          Xem chi tiết
-                        </Button>
-                      ) : (
-                        <Typography variant="body2" color="text.secondary" fontStyle="italic">
-                          Chưa có phản hồi
-                        </Typography>
-                      )}
-                    </TableCell>
-                    <TableCell>{incident.reportedAt.toLocaleString("vi-VN")}</TableCell>
+          {incidents.length === 0 ? (
+            <Box sx={{ textAlign: 'center', py: 4 }}>
+              <Typography variant="body1" color="text.secondary">
+                Chưa có báo cáo sự cố nào
+              </Typography>
+            </Box>
+          ) : (
+            <TableContainer component={Paper}>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Mã sự cố</TableCell>
+                    <TableCell>Trạm</TableCell>
+                    <TableCell>Loại sự cố</TableCell>
+                    <TableCell>Mô tả</TableCell>
+                    <TableCell align="center">Ưu tiên</TableCell>
+                    <TableCell align="center">Trạng thái</TableCell>
+                    <TableCell>Gán cho</TableCell>
+                    <TableCell>Phản hồi Admin</TableCell>
+                    <TableCell>Thời gian báo cáo</TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
+                </TableHead>
+                <TableBody>
+                  {incidents.map((incident) => (
+                    <TableRow key={incident.id} hover>
+                      <TableCell fontWeight={600}>#{incident.id}</TableCell>
+                      <TableCell>{incident.stationName || incident.connectorId}</TableCell>
+                      <TableCell>{incident.type}</TableCell>
+                      <TableCell>
+                        <Typography variant="body2" noWrap sx={{ maxWidth: 200 }}>
+                          {incident.description}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="center">
+                        <Chip
+                          label={priorityLevels.find((p) => p.value === incident.priority)?.label || 'Trung bình'}
+                          color={priorityLevels.find((p) => p.value === incident.priority)?.color || 'default'}
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell align="center">
+                        <Chip 
+                          label={incident.statusLabel} 
+                          color={
+                            incident.status === "completed" ? "success" : 
+                            incident.status === "in_progress" ? "info" : 
+                            "warning"
+                          }
+                          size="small" 
+                        />
+                      </TableCell>
+                      <TableCell>
+                        {incident.assignedTo || (
+                          <Typography variant="body2" color="text.secondary" fontStyle="italic">
+                            Chưa phân công
+                          </Typography>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {incident.adminResponse ? (
+                          <Button
+                            size="small"
+                            variant="contained"
+                            color="primary"
+                            onClick={() => handleViewDetail(incident)}
+                          >
+                            Xem phản hồi
+                          </Button>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary" fontStyle="italic">
+                            Đang chờ xử lý...
+                          </Typography>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2">
+                          {incident.reportedAt.toLocaleDateString("vi-VN")}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {incident.reportedAt.toLocaleTimeString("vi-VN")}
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
         </CardContent>
       </Card>
 
@@ -636,17 +711,18 @@ const Monitoring = () => {
         </DialogTitle>
         <DialogContent dividers>
           {selectedIncident && (
-            <Box>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
               {/* Thông tin báo cáo */}
-              <Card sx={{ mb: 2, bgcolor: "grey.50" }}>
+              <Card variant="outlined">
                 <CardContent>
-                  <Typography variant="h6" fontWeight="bold" gutterBottom color="primary">
-                    Thông tin Báo cáo
+                  <Typography variant="h6" fontWeight="bold" gutterBottom color="primary" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Info /> Thông tin Báo cáo
                   </Typography>
+                  <Divider sx={{ mb: 2 }} />
                   <Grid container spacing={2}>
                     <Grid item xs={6}>
                       <Typography variant="caption" color="text.secondary">Mã sự cố:</Typography>
-                      <Typography variant="body1" fontWeight={600}>{selectedIncident.id}</Typography>
+                      <Typography variant="body1" fontWeight={600}>#{selectedIncident.id}</Typography>
                     </Grid>
                     <Grid item xs={6}>
                       <Typography variant="caption" color="text.secondary">Trạm:</Typography>
@@ -663,26 +739,32 @@ const Monitoring = () => {
                     <Grid item xs={6}>
                       <Typography variant="caption" color="text.secondary">Mức độ ưu tiên:</Typography>
                       <Chip
-                        label={priorityLevels.find((p) => p.value === selectedIncident.priority)?.label}
-                        color={priorityLevels.find((p) => p.value === selectedIncident.priority)?.color}
+                        label={priorityLevels.find((p) => p.value === selectedIncident.priority)?.label || 'Trung bình'}
+                        color={priorityLevels.find((p) => p.value === selectedIncident.priority)?.color || 'default'}
                         size="small"
-                      />
-                    </Grid>
-                    <Grid item xs={12}>
-                      <Typography variant="caption" color="text.secondary">Mô tả:</Typography>
-                      <Typography variant="body1">{selectedIncident.description}</Typography>
-                    </Grid>
-                    <Grid item xs={6}>
-                      <Typography variant="caption" color="text.secondary">Trạng thái:</Typography>
-                      <Chip 
-                        label={selectedIncident.statusLabel} 
-                        color={selectedIncident.status === "completed" ? "success" : "warning"}
-                        size="small" 
                       />
                     </Grid>
                     <Grid item xs={6}>
                       <Typography variant="caption" color="text.secondary">Người báo cáo:</Typography>
                       <Typography variant="body1">{selectedIncident.reportedBy || "Không rõ"}</Typography>
+                    </Grid>
+                    <Grid item xs={12}>
+                      <Typography variant="caption" color="text.secondary">Mô tả chi tiết:</Typography>
+                      <Paper variant="outlined" sx={{ p: 2, mt: 1, bgcolor: 'grey.50' }}>
+                        <Typography variant="body1">{selectedIncident.description}</Typography>
+                      </Paper>
+                    </Grid>
+                    <Grid item xs={6}>
+                      <Typography variant="caption" color="text.secondary">Trạng thái:</Typography>
+                      <Chip 
+                        label={selectedIncident.statusLabel} 
+                        color={
+                          selectedIncident.status === "resolved" || selectedIncident.status === "closed" ? "success" : 
+                          selectedIncident.status === "in_progress" ? "info" : 
+                          "warning"
+                        }
+                        size="small" 
+                      />
                     </Grid>
                     <Grid item xs={6}>
                       <Typography variant="caption" color="text.secondary">Người phụ trách:</Typography>
@@ -690,23 +772,66 @@ const Monitoring = () => {
                     </Grid>
                     <Grid item xs={6}>
                       <Typography variant="caption" color="text.secondary">Thời gian báo cáo:</Typography>
-                      <Typography variant="body1">
-                        {selectedIncident.reportedAt.toLocaleString("vi-VN")}
+                      <Typography variant="body2">
+                        {selectedIncident.reportedAt.toLocaleDateString("vi-VN")}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {selectedIncident.reportedAt.toLocaleTimeString("vi-VN")}
                       </Typography>
                     </Grid>
+                    {selectedIncident.updatedAt && selectedIncident.updatedAt.getTime() !== selectedIncident.reportedAt.getTime() && (
+                      <Grid item xs={6}>
+                        <Typography variant="caption" color="text.secondary">Cập nhật lần cuối:</Typography>
+                        <Typography variant="body2">
+                          {selectedIncident.updatedAt.toLocaleDateString("vi-VN")}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {selectedIncident.updatedAt.toLocaleTimeString("vi-VN")}
+                        </Typography>
+                      </Grid>
+                    )}
+                    {selectedIncident.resolvedAt && (
+                      <Grid item xs={6}>
+                        <Typography variant="caption" color="text.secondary">Giải quyết lúc:</Typography>
+                        <Typography variant="body2" color="success.main" fontWeight={600}>
+                          {selectedIncident.resolvedAt.toLocaleDateString("vi-VN")}
+                        </Typography>
+                        <Typography variant="caption" color="success.main">
+                          {selectedIncident.resolvedAt.toLocaleTimeString("vi-VN")}
+                        </Typography>
+                      </Grid>
+                    )}
                   </Grid>
                 </CardContent>
               </Card>
 
               {/* Phản hồi của Admin */}
-              {selectedIncident.adminResponse && (
-                <Card sx={{ bgcolor: "success.50" }}>
+              {selectedIncident.adminResponse ? (
+                <Card variant="outlined" sx={{ bgcolor: "success.50", borderColor: 'success.main' }}>
                   <CardContent>
-                    <Typography variant="h6" fontWeight="bold" gutterBottom color="success.main">
-                      Phản hồi từ Admin
+                    <Typography variant="h6" fontWeight="bold" gutterBottom color="success.main" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <CheckCircle /> Phản hồi từ Admin
                     </Typography>
-                    <Alert severity="success" sx={{ mt: 1 }}>
-                      <Typography variant="body1">{selectedIncident.adminResponse}</Typography>
+                    <Divider sx={{ mb: 2, borderColor: 'success.main' }} />
+                    <Alert severity="success" variant="outlined" sx={{ mb: 2 }}>
+                      <Typography variant="body1" fontWeight={500}>{selectedIncident.adminResponse}</Typography>
+                    </Alert>
+                    {selectedIncident.assignedTo && (
+                      <Typography variant="caption" color="text.secondary">
+                        Được xử lý bởi: <strong>{selectedIncident.assignedTo}</strong>
+                      </Typography>
+                    )}
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card variant="outlined" sx={{ bgcolor: "warning.50", borderColor: 'warning.main' }}>
+                  <CardContent>
+                    <Typography variant="h6" fontWeight="bold" gutterBottom color="warning.main" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <HourglassEmpty /> Chờ phản hồi
+                    </Typography>
+                    <Divider sx={{ mb: 2, borderColor: 'warning.main' }} />
+                    <Alert severity="warning" variant="outlined">
+                      <Typography variant="body1">Sự cố đang được xử lý, vui lòng chờ phản hồi từ quản trị viên.</Typography>
                     </Alert>
                   </CardContent>
                 </Card>

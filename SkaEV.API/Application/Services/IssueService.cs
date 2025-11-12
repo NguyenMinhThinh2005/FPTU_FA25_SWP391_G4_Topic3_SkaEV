@@ -18,27 +18,163 @@ public class IssueService : IIssueService
 
     public async Task<IEnumerable<IssueDto>> GetIssuesAsync(string? status, string? priority, int? stationId, int? assignedToUserId, int page, int pageSize)
     {
-        // Note: This requires the Issues table from 08_ADD_ISSUES_TABLE.sql
-        // Returning empty list if table doesn't exist
         try
         {
-            // Would implement once Issues table is created
-            return new List<IssueDto>();
+            var query = _context.Issues
+                .Include(i => i.Station)
+                .Include(i => i.ReportedByUser)
+                .Include(i => i.AssignedToUser)
+                .AsQueryable();
+
+            // Apply filters
+            if (!string.IsNullOrEmpty(status))
+            {
+                query = query.Where(i => i.Status.ToLower() == status.ToLower());
+            }
+
+            if (!string.IsNullOrEmpty(priority))
+            {
+                query = query.Where(i => i.Priority.ToLower() == priority.ToLower());
+            }
+
+            if (stationId.HasValue)
+            {
+                query = query.Where(i => i.StationId == stationId.Value);
+            }
+
+            if (assignedToUserId.HasValue)
+            {
+                query = query.Where(i => i.AssignedToUserId == assignedToUserId.Value);
+            }
+
+            // Order by most recent first
+            query = query.OrderByDescending(i => i.ReportedAt);
+
+            // Apply pagination
+            var issues = await query
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(i => new IssueDto
+                {
+                    IssueId = i.IssueId,
+                    StationId = i.StationId,
+                    StationName = i.Station != null ? i.Station.StationName : "Unknown",
+                    PostId = null, // PostId không tồn tại trong database
+                    PostName = null,
+                    Title = i.Title,
+                    Description = i.Description,
+                    Category = i.Category,
+                    Priority = i.Priority,
+                    Status = i.Status,
+                    Resolution = i.Resolution,
+                    ReportedByUserId = i.ReportedByUserId,
+                    ReportedByUserName = i.ReportedByUser != null ? i.ReportedByUser.FullName : "Unknown",
+                    AssignedToUserId = i.AssignedToUserId,
+                    AssignedToUserName = i.AssignedToUser != null ? i.AssignedToUser.FullName : null,
+                    ReportedAt = i.ReportedAt,
+                    AssignedAt = i.AssignedAt,
+                    StartedAt = i.StartedAt,
+                    ResolvedAt = i.ResolvedAt,
+                    ClosedAt = i.ClosedAt,
+                    CreatedAt = i.CreatedAt,
+                    UpdatedAt = i.UpdatedAt
+                })
+                .ToListAsync();
+
+            return issues;
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogError(ex, "Error getting issues");
             return new List<IssueDto>();
         }
     }
 
     public async Task<int> GetIssueCountAsync(string? status, string? priority, int? stationId, int? assignedToUserId)
     {
-        return 0; // Placeholder
+        try
+        {
+            var query = _context.Issues.AsQueryable();
+
+            if (!string.IsNullOrEmpty(status))
+            {
+                query = query.Where(i => i.Status.ToLower() == status.ToLower());
+            }
+
+            if (!string.IsNullOrEmpty(priority))
+            {
+                query = query.Where(i => i.Priority.ToLower() == priority.ToLower());
+            }
+
+            if (stationId.HasValue)
+            {
+                query = query.Where(i => i.StationId == stationId.Value);
+            }
+
+            if (assignedToUserId.HasValue)
+            {
+                query = query.Where(i => i.AssignedToUserId == assignedToUserId.Value);
+            }
+
+            return await query.CountAsync();
+        }
+        catch
+        {
+            return 0;
+        }
     }
 
     public async Task<IEnumerable<IssueDto>> GetUserAssignedIssuesAsync(int userId, string? status)
     {
-        return new List<IssueDto>(); // Placeholder
+        try
+        {
+            var query = _context.Issues
+                .Include(i => i.Station)
+                .Include(i => i.ReportedByUser)
+                .Include(i => i.AssignedToUser)
+                .Where(i => i.AssignedToUserId == userId);
+
+            if (!string.IsNullOrEmpty(status))
+            {
+                query = query.Where(i => i.Status.ToLower() == status.ToLower());
+            }
+
+            var issues = await query
+                .OrderByDescending(i => i.ReportedAt)
+                .Select(i => new IssueDto
+                {
+                    IssueId = i.IssueId,
+                    StationId = i.StationId,
+                    StationName = i.Station != null ? i.Station.StationName : "Unknown",
+                    PostId = null,
+                    PostName = null,
+                    Title = i.Title,
+                    Description = i.Description,
+                    Category = i.Category,
+                    Priority = i.Priority,
+                    Status = i.Status,
+                    Resolution = i.Resolution,
+                    ReportedByUserId = i.ReportedByUserId,
+                    ReportedByUserName = i.ReportedByUser != null ? i.ReportedByUser.FullName : "Unknown",
+                    AssignedToUserId = i.AssignedToUserId,
+                    AssignedToUserName = i.AssignedToUser != null ? i.AssignedToUser.FullName : null,
+                    ReportedAt = i.ReportedAt,
+                    AssignedAt = i.AssignedAt,
+                    StartedAt = i.StartedAt,
+                    ResolvedAt = i.ResolvedAt,
+                    ClosedAt = i.ClosedAt,
+                    CreatedAt = i.CreatedAt,
+                    UpdatedAt = i.UpdatedAt
+                })
+                .ToListAsync();
+
+            return issues;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting user assigned issues");
+            return new List<IssueDto>();
+        }
     }
 
     public async Task<IssueDetailDto?> GetIssueDetailAsync(int issueId)
