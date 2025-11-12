@@ -13,11 +13,7 @@ import {
     Paper,
     Chip,
     LinearProgress,
-    Alert,
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogActions,
+    Alert
 } from "@mui/material";
 import {
     QrCodeScanner,
@@ -28,9 +24,10 @@ import {
 } from "@mui/icons-material";
 import useBookingStore from "../../store/bookingStore";
 import { formatCurrency } from "../../utils/helpers";
+import QRCodeScanner from "../../components/ui/QRCodeScanner/QRCodeScanner";
 
 const ChargingSession = () => {
-    const { currentBooking, chargingSession, startCharging, socTracking } = useBookingStore();
+    const { currentBooking, chargingSession, startCharging, socTracking, scanQRCode } = useBookingStore();
     const [qrScanOpen, setQrScanOpen] = useState(false);
     const [activeStep, setActiveStep] = useState(0);
     const [scanResult, setScanResult] = useState("");
@@ -42,9 +39,28 @@ const ChargingSession = () => {
         "Hoàn thành"
     ];
 
-    const handleQRScan = (result) => {
-        console.log("QR Scanned:", result);
-        setScanResult(result);
+    const handleQRScan = async (result) => {
+        const qrValue = typeof result === "string" ? result : result?.qrData ?? result?.text;
+
+        if (!qrValue) {
+            console.warn("Không nhận được dữ liệu QR hợp lệ", result);
+            return;
+        }
+
+        console.log("QR Scanned:", qrValue);
+        setScanResult(qrValue);
+
+        if (currentBooking && typeof scanQRCode === "function") {
+            try {
+                const response = await scanQRCode(currentBooking.id, qrValue);
+                if (!response?.success && response?.error) {
+                    console.error("Scan QR failed:", response.error);
+                }
+            } catch (error) {
+                console.error("Failed to scan QR code:", error);
+            }
+        }
+
         setActiveStep(1);
         setQrScanOpen(false);
     };
@@ -113,7 +129,6 @@ const ChargingSession = () => {
                 {activeStep === 1 && (
                     <Grid item xs={12}>
                         <Paper sx={{ p: 4, textAlign: "center" }}>
-                            <ElectricCar sx={{ fontSize: 80, color: "success.main", mb: 2 }} />
                             <Typography variant="h5" gutterBottom>
                                 Kết nối xe điện với trụ sạc
                             </Typography>
@@ -240,30 +255,13 @@ const ChargingSession = () => {
                 )}
             </Grid>
 
-            {/* QR Scanner Dialog */}
-            <Dialog open={qrScanOpen} onClose={() => setQrScanOpen(false)} maxWidth="sm" fullWidth>
-                <DialogTitle>Quét mã QR trên trụ sạc</DialogTitle>
-                <DialogContent>
-                    <Box sx={{ textAlign: "center", py: 4 }}>
-                        <QrCodeScanner sx={{ fontSize: 120, color: "primary.main", mb: 2 }} />
-                        <Typography variant="body1" gutterBottom>
-                            Hướng camera về phía mã QR trên trụ sạc
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                            Demo: Nhấn nút bên dưới để mô phỏng quét QR thành công
-                        </Typography>
-                    </Box>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setQrScanOpen(false)}>Hủy</Button>
-                    <Button
-                        variant="contained"
-                        onClick={() => handleQRScan("SKAEV:STATION:ST001:A01")}
-                    >
-                        Demo: Quét thành công
-                    </Button>
-                </DialogActions>
-            </Dialog>
+            {/* QR Scanner Overlay */}
+            {qrScanOpen && (
+                <QRCodeScanner
+                    onScanSuccess={handleQRScan}
+                    onClose={() => setQrScanOpen(false)}
+                />
+            )}
         </Container>
     );
 };

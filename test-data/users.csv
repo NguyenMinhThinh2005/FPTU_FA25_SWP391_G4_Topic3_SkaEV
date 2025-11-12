@@ -1,0 +1,7 @@
+email,password,full_name,phone_number,role
+customer1@test.com,123456,Nguyen Van A,0901234567,customer
+customer2@test.com,123456,Tran Thi B,0912345678,customer
+customer3@test.com,123456,Le Van C,0923456789,customer
+staff1@test.com,123456,Pham Thi D,0934567890,staff
+staff2@test.com,123456,Hoang Van E,0945678901,staff
+admin1@test.com,123456,Vu Thi F,0956789012,admin

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SkaEV.API.Application.DTOs.Bookings;
 using SkaEV.API.Application.Services;
+using Microsoft.AspNetCore.Hosting;
 using System.Security.Claims;
 
 namespace SkaEV.API.Controllers;
@@ -13,11 +14,13 @@ public class BookingsController : ControllerBase
 {
     private readonly IBookingService _bookingService;
     private readonly ILogger<BookingsController> _logger;
+    private readonly IWebHostEnvironment _env;
 
-    public BookingsController(IBookingService bookingService, ILogger<BookingsController> logger)
+    public BookingsController(IBookingService bookingService, ILogger<BookingsController> logger, IWebHostEnvironment env)
     {
         _bookingService = bookingService;
         _logger = logger;
+        _env = env;
     }
 
     /// <summary>
@@ -90,6 +93,13 @@ public class BookingsController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error creating booking");
+
+            if (_env != null && _env.IsDevelopment())
+            {
+                // In development return detailed error to help debugging
+                return StatusCode(500, new { message = "An error occurred creating booking", detail = ex.Message, stack = ex.StackTrace });
+            }
+
             return StatusCode(500, new { message = "An error occurred creating booking" });
         }
     }

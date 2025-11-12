@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SkaEV.API.Application.DTOs.Auth;
+using SkaEV.API.Application.DTOs.UserProfiles;
 using SkaEV.API.Application.Services;
+using System.Security.Claims;
 
 namespace SkaEV.API.Controllers;
 
@@ -10,11 +12,13 @@ namespace SkaEV.API.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
+    private readonly IUserProfileService _userProfileService;
     private readonly ILogger<AuthController> _logger;
 
-    public AuthController(IAuthService authService, ILogger<AuthController> logger)
+    public AuthController(IAuthService authService, IUserProfileService userProfileService, ILogger<AuthController> logger)
     {
         _authService = authService;
+        _userProfileService = userProfileService;
         _logger = logger;
     }
 
@@ -102,6 +106,36 @@ public class AuthController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting user profile");
+            return StatusCode(500, new { message = "An error occurred" });
+        }
+    }
+
+    /// <summary>
+    /// Update current user profile
+    /// </summary>
+    [HttpPut("profile")]
+    [Authorize]
+    public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileDto updateDto)
+    {
+        try
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+            if (userIdClaim == null)
+            {
+                return Unauthorized();
+            }
+
+            var userId = int.Parse(userIdClaim.Value);
+            var updatedProfile = await _userProfileService.UpdateUserProfileAsync(userId, updateDto);
+            return Ok(updatedProfile);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating user profile");
             return StatusCode(500, new { message = "An error occurred" });
         }
     }

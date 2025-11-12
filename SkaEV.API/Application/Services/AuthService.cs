@@ -56,7 +56,10 @@ public class AuthService : IAuthService
         // === VALIDATION (FIX LỖI 500) ===
 
         // 1. Kiểm tra trường FullName (NOT NULL)
-     
+        if (string.IsNullOrWhiteSpace(request.FullName))
+        {
+            throw new InvalidOperationException("Full name is required");
+        }
 
         // 2. Kiểm tra trường Role (NOT NULL)
         if (string.IsNullOrWhiteSpace(request.Role))

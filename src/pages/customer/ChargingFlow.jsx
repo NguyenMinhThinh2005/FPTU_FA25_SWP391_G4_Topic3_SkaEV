@@ -1,4 +1,31 @@
 ﻿/* eslint-disable */
+/**
+ * ChargingFlow Component - Refactored Flow
+ * 
+ * CHANGES (Nov 2025):
+ * 1. Step 0 - Select Station: 
+ *    - REMOVED: Map view for station selection
+ *    - ADDED: List/Grid view with station cards showing all details
+ *    - Each card shows: name, address, distance, availability, slots, price, operating hours
+ * 
+ * 2. Step 1 - Navigation (NEW):
+ *    - ADDED: Map with directions to booked station
+ *    - Shows route from user location to selected station
+ *    - Used for navigation only, not for station selection
+ * 
+ * 3. Date/Time Restrictions:
+ *    - Only TODAY bookings allowed (Vietnam timezone UTC+7)
+ *    - Future date selection removed in ChargingDateTimePicker component
+ *    - Backend validation in BookingService.cs rejects non-today bookings
+ * 
+ * Flow Steps:
+ * 0. Select Station (List/Grid) 
+ * 1. Navigation Map (after booking)
+ * 2. QR Scan
+ * 3. Connect Vehicle
+ * 4. Charging
+ * 5. Complete
+ */
 import React, { useState, useEffect } from "react";
 import {
   Box,
@@ -21,7 +48,6 @@ import {
   DialogActions,
   List,
   ListItem,
-  ListItemText,
   ListItemIcon,
   Avatar,
   TextField,
@@ -29,6 +55,7 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  CircularProgress,
   Checkbox,
 } from "@mui/material";
 import {
@@ -39,13 +66,16 @@ import {
   LocationOn,
   Speed,
   Search,
+  Directions,
+  AccessTime,
+  Refresh,
 } from "@mui/icons-material";
 import useBookingStore from "../../store/bookingStore";
 import useStationStore from "../../store/stationStore";
-import { formatCurrency } from "../../utils/helpers";
+import { formatCurrency, calculateDistance } from "../../utils/helpers";
 import StationMapLeaflet from "../../components/customer/StationMapLeaflet";
 import notificationService from "../../services/notificationService";
-import { qrCodesAPI, chargingAPI } from "../../services/api";
+import { qrCodesAPI, chargingAPI, stationsAPI } from "../../services/api";
 
 // Helper function to normalize Vietnamese text for search
 const normalize = (text) => {
@@ -88,6 +118,85 @@ const formatTime = (minutes) => {
   }
   return `${hours} giờ ${remainingMinutes} phút`;
 };
+
+const stripHtml = (value) => {
+  if (!value) return "";
+  return String(value)
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+};
+
+const formatDistanceFromMeters = (meters) => {
+  if (meters == null || Number.isNaN(meters)) return "";
+  if (meters >= 1000) {
+    const km = meters / 1000;
+    return `${km >= 10 ? Math.round(km) : km.toFixed(1)} km`;
+  }
+  return `${Math.round(meters)} m`;
+};
+
+const formatDurationFromSeconds = (seconds) => {
+  if (seconds == null || Number.isNaN(seconds)) return "";
+  const totalMinutes = Math.max(1, Math.round(seconds / 60));
+  if (totalMinutes < 60) {
+    return `${totalMinutes} phút`;
+  }
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (minutes === 0) {
+    return `${hours} giờ`;
+  }
+  return `${hours} giờ ${minutes} phút`;
+};
+
+const extractStationCoordinates = (station) => {
+  if (!station || !station.location) return null;
+
+  const raw = station.location.coordinates;
+  let lat = null;
+  let lng = null;
+
+  const toNumber = (value) => {
+    if (value === null || value === undefined || value === "") return null;
+    const num = Number(value);
+    return Number.isFinite(num) ? num : null;
+  };
+
+  if (Array.isArray(raw) && raw.length >= 2) {
+    lng = toNumber(raw[0]);
+    lat = toNumber(raw[1]);
+  } else if (raw && typeof raw === "object") {
+    lat = toNumber(raw.lat ?? raw.latitude);
+    lng = toNumber(raw.lng ?? raw.longitude);
+  } else {
+    lat = toNumber(station.location.lat ?? station.lat ?? station.latitude);
+    lng = toNumber(station.location.lng ?? station.lng ?? station.longitude);
+  }
+
+  if (
+    (lat == null || lat < -90 || lat > 90) &&
+    lng != null &&
+    lng >= -90 &&
+    lng <= 90
+  ) {
+    const temp = lat;
+    lat = lng;
+    lng = temp;
+  }
+
+  if (
+    lat == null ||
+    lng == null ||
+    Number.isNaN(lat) ||
+    Number.isNaN(lng)
+  ) {
+    return null;
+  }
+
+  return { lat, lng };
+};
 import { getStationImage } from "../../utils/imageAssets";
 import { CONNECTOR_TYPES } from "../../utils/constants";
 import BookingModal from "../../components/customer/BookingModal";
@@ -97,7 +206,7 @@ const ChargingFlow = () => {
   // Các bước của flow booking sạc xe
   const flowSteps = [
     "Chọn trạm",
-    "Đặt lịch",
+    "Chỉ đường",
     "Quét QR",
     "Kết nối",
     "Đang sạc",
@@ -123,7 +232,84 @@ const ChargingFlow = () => {
   };
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStation, setSelectedStation] = useState(null);
-  const [viewMode, setViewMode] = useState("list"); // 'list' or 'map'
+  const [persistedStationId, setPersistedStationId] = useState(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      return sessionStorage.getItem("chargingSelectedStationId");
+    } catch (error) {
+      console.warn("Không thể đọc chargingSelectedStationId từ sessionStorage", error);
+      return null;
+    }
+  });
+  const [directionsData, setDirectionsData] = useState({
+    loading: false,
+    info: null,
+    error: null,
+  });
+  const [navigationRequestId, setNavigationRequestId] = useState(0);
+  // viewMode removed - always use list/grid view in step 0, map only for navigation in step 1
+  const [userLocation, setUserLocation] = useState({
+    lat: 10.8231, // Default to Ho Chi Minh City (HCMC)
+    lng: 106.6297,
+  });
+
+  // State to store stations with real-time stats from API
+  const [stationsWithStats, setStationsWithStats] = useState([]);
+
+  // Fetch real-time stats from API for each station
+  useEffect(() => {
+    const fetchStationsStats = async () => {
+      if (!stations || stations.length === 0) return;
+
+      try {
+        const stationsWithRealStats = await Promise.all(
+          stations.map(async (station) => {
+            try {
+              // Call API to get available posts and slots for this station
+              const response = await stationsAPI.getAvailablePosts(station.id);
+              const posts = response.data?.data || response.data || [];
+
+              // Calculate stats from real API data
+              let totalSlots = 0;
+              let availableSlots = 0;
+
+              posts.forEach((post) => {
+                totalSlots += post.totalSlots || 0;
+                availableSlots += post.availableSlots || 0;
+              });
+
+              const occupiedSlots = totalSlots - availableSlots;
+
+              return {
+                ...station,
+                stats: {
+                  total: totalSlots,
+                  available: availableSlots,
+                  occupied: occupiedSlots,
+                },
+              };
+            } catch (error) {
+              console.error(
+                `Error fetching stats for station ${station.id}:`,
+                error
+              );
+              // Return station with empty stats on error
+              return {
+                ...station,
+                stats: { total: 0, available: 0, occupied: 0 },
+              };
+            }
+          })
+        );
+
+        setStationsWithStats(stationsWithRealStats);
+      } catch (error) {
+        console.error("Error fetching stations stats:", error);
+      }
+    };
+
+    fetchStationsStats();
+  }, [stations]);
 
   // Khôi phục currentBooking, chargingSession, flowStep từ sessionStorage khi mount (KHÔNG reset flowStep về 0 tự động)
   useEffect(() => {
@@ -253,6 +439,45 @@ const ChargingFlow = () => {
     else sessionStorage.removeItem("chargingSessionData");
   };
 
+  useEffect(() => {
+    if (selectedStation) return;
+    if (!stationsWithStats || stationsWithStats.length === 0) return;
+
+    const sourceId =
+      currentBooking?.stationId ||
+      currentBookingData?.stationId ||
+      persistedStationId;
+
+    if (!sourceId) return;
+
+    const matchedStation = stationsWithStats.find(
+      (station) => station.id === sourceId
+    );
+
+    if (matchedStation) {
+      setSelectedStation(matchedStation);
+      if (matchedStation.id !== persistedStationId) {
+        setPersistedStationId(matchedStation.id);
+        if (typeof window !== "undefined") {
+          try {
+            sessionStorage.setItem(
+              "chargingSelectedStationId",
+              matchedStation.id
+            );
+          } catch (error) {
+            console.warn("Không thể lưu chargingSelectedStationId", error);
+          }
+        }
+      }
+    }
+  }, [
+    selectedStation,
+    stationsWithStats,
+    currentBooking,
+    currentBookingData,
+    persistedStationId,
+  ]);
+
   // Khôi phục state khi flowStep >= 2
   useEffect(() => {
     const saved = sessionStorage.getItem("chargingFlowStep");
@@ -279,10 +504,13 @@ const ChargingFlow = () => {
       );
     }
   }, []);
-  // Filter and search stations (useMemo)
+  // Filter and search stations (useMemo) - Use stationsWithStats instead of stations
   const filteredStations = React.useMemo(() => {
     try {
-      let stationList = stations ? [...stations] : [];
+      // Use stationsWithStats if available, otherwise fallback to stations
+      let stationList =
+        stationsWithStats.length > 0 ? [...stationsWithStats] : [];
+
       const query = normalize(searchQuery.trim());
       if (query) {
         stationList = stationList.filter((station) => {
@@ -343,24 +571,8 @@ const ChargingFlow = () => {
             );
             return true;
           }
-          // Check poles/ports if connectorTypes not available
-          if (station.charging.poles && Array.isArray(station.charging.poles)) {
-            const hasInPoles = station.charging.poles.some(
-              (pole) =>
-                pole &&
-                pole.ports &&
-                Array.isArray(pole.ports) &&
-                pole.ports.some(
-                  (port) =>
-                    port && connectorFilters.includes(port.connectorType)
-                )
-            );
-            if (hasInPoles) {
-              console.log("✅ Connector match in poles:", station.name);
-              return true;
-            }
-          }
-          console.log("❌ No connector match:", station.name);
+          // Fallback: check if station has connector info in charging object
+          // Fallback: check if station has connector info in charging object
           return false;
         });
         console.log(
@@ -373,40 +585,101 @@ const ChargingFlow = () => {
       if (stationList.length > 0) {
         console.log("   Stations:", stationList.map((s) => s.name).join(", "));
       }
-      // Add stats to each station
+
+      // Calculate distance from user location (stats already included from API)
       stationList = stationList.map((station) => {
-        if (!station.stats && station.charging?.poles) {
-          let totalPorts = 0;
-          let availablePorts = 0;
-          station.charging.poles.forEach((pole) => {
-            const ports = pole.ports || [];
-            totalPorts += ports.length;
-            availablePorts += ports.filter(
-              (port) => port.status === "available"
-            ).length;
-          });
-          return {
-            ...station,
-            stats: {
-              total: totalPorts,
-              available: availablePorts,
-              occupied: totalPorts - availablePorts,
-            },
-          };
+        let updatedStation = { ...station };
+
+        // Calculate distance from user location
+        if (userLocation && station.location?.coordinates) {
+          const distance = calculateDistance(
+            userLocation.lat,
+            userLocation.lng,
+            station.location.coordinates.lat,
+            station.location.coordinates.lng
+          );
+          updatedStation.distanceFromUser = distance;
         }
-        return station;
+
+        return updatedStation;
       });
+
+      // Sort by distance (ascending order) - nearest stations first
+      stationList.sort((a, b) => {
+        if (
+          a.distanceFromUser !== undefined &&
+          b.distanceFromUser !== undefined
+        ) {
+          return a.distanceFromUser - b.distanceFromUser;
+        }
+        return 0;
+      });
+
+      console.log(
+        "📍 Stations sorted by distance:",
+        stationList.map(
+          (s) => `${s.name} (${s.distanceFromUser?.toFixed(1)}km)`
+        )
+      );
+
       return stationList;
     } catch (error) {
       console.error("❌ Error filtering stations:", error);
       return [];
     }
-  }, [searchQuery, filters.connectorTypes, stations]);
+  }, [searchQuery, filters.connectorTypes, stationsWithStats, userLocation]);
+
+  const selectedStationCoords = React.useMemo(
+    () => extractStationCoordinates(selectedStation),
+    [selectedStation]
+  );
+
+  const navigationSummary = directionsData.info;
+  const navigationWarnings = navigationSummary?.warnings || [];
 
   useEffect(() => {
     console.log("🚀 ChargingFlow mounted - initializing data");
     initializeData();
   }, [initializeData]);
+
+  // Get user location
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const newLocation = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          };
+          console.log("📍 User location updated:", newLocation);
+          setUserLocation(newLocation);
+        },
+        (error) => {
+          console.warn(
+            "⚠️ Location access denied, using default location:",
+            error
+          );
+          // Keep default location (HCMC)
+        }
+      );
+    } else {
+      console.warn("⚠️ Geolocation not supported, using default location");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (flowStep === 1 && selectedStation?.id) {
+      setDirectionsData((prev) => ({
+        loading: true,
+        error: null,
+        info:
+          prev.info && prev.info.stationId === selectedStation.id
+            ? prev.info
+            : null,
+      }));
+      setNavigationRequestId((prev) => prev + 1);
+    }
+  }, [flowStep, selectedStation?.id, userLocation?.lat, userLocation?.lng]);
 
   // Reset flow step to 0 if no active booking or charging session
   // Đã loại bỏ auto-reset flowStep về 0 khi mất currentBooking/changingSession để giữ đúng trạng thái flow khi quay lại
@@ -439,14 +712,144 @@ const ChargingFlow = () => {
 
   const handleStationSelect = (station) => {
     setSelectedStation(station);
+    setPersistedStationId(station?.id || null);
+    if (typeof window !== "undefined") {
+      try {
+        if (station?.id) {
+          sessionStorage.setItem("chargingSelectedStationId", station.id);
+        } else {
+          sessionStorage.removeItem("chargingSelectedStationId");
+        }
+      } catch (error) {
+        console.warn("Không thể lưu chargingSelectedStationId", error);
+      }
+    }
     setBookingModalOpen(true);
   };
+
+  const handleRetryDirections = React.useCallback(() => {
+    if (!selectedStation?.id) return;
+    setDirectionsData((prev) => ({
+      loading: true,
+      error: null,
+      info:
+        prev.info && prev.info.stationId === selectedStation.id
+          ? prev.info
+          : null,
+    }));
+    setNavigationRequestId((prev) => prev + 1);
+  }, [selectedStation?.id]);
+
+  const handleOpenGoogleMaps = React.useCallback(() => {
+    if (!selectedStationCoords) return;
+    const destinationParam = `${selectedStationCoords.lat},${selectedStationCoords.lng}`;
+    const hasOrigin =
+      userLocation &&
+      typeof userLocation.lat === "number" &&
+      typeof userLocation.lng === "number";
+    const originParam = hasOrigin
+      ? `${userLocation.lat},${userLocation.lng}`
+      : "";
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
+      destinationParam
+    )}${
+      originParam ? `&origin=${encodeURIComponent(originParam)}` : ""
+    }&travelmode=driving`;
+    if (typeof window !== "undefined") {
+      window.open(url, "_blank", "noopener,noreferrer");
+    }
+  }, [selectedStationCoords, userLocation]);
+
+  const handleDirectionsReady = React.useCallback(
+    (info) => {
+      if (!info) return;
+      if (
+        info.requestId != null &&
+        info.requestId !== navigationRequestId
+      ) {
+        return;
+      }
+
+      const normalizedSteps = Array.isArray(info.steps)
+        ? info.steps.map((step, index) => {
+            const instructionHtml =
+              step.instructionHtml ||
+              step.instruction ||
+              step.instructionText ||
+              "";
+            const instructionText =
+              step.instructionText ||
+              stripHtml(instructionHtml) ||
+              `Bước ${index + 1}`;
+            return {
+              ...step,
+              index: step.index ?? index,
+              instructionHtml,
+              instructionText,
+              distanceText:
+                step.distanceText ||
+                formatDistanceFromMeters(step.distanceMeters),
+              durationText:
+                step.durationText ||
+                formatDurationFromSeconds(step.durationSeconds),
+            };
+          })
+        : [];
+
+      const normalizedInfo = {
+        ...info,
+        stationId: selectedStation?.id || info.stationId || null,
+        distanceText:
+          info.distanceText ||
+          formatDistanceFromMeters(info.distanceMeters),
+        durationText:
+          info.durationText ||
+          formatDurationFromSeconds(info.durationSeconds),
+        steps: normalizedSteps,
+        warnings: Array.isArray(info.warnings) ? info.warnings : [],
+      };
+
+      setDirectionsData({
+        loading: false,
+        error: null,
+        info: normalizedInfo,
+      });
+    },
+    [navigationRequestId, selectedStation?.id]
+  );
+
+  const handleDirectionsError = React.useCallback(
+    (errorInfo) => {
+      const requestId =
+        typeof errorInfo === "object" && errorInfo !== null
+          ? errorInfo.requestId
+          : undefined;
+      if (requestId != null && requestId !== navigationRequestId) {
+        return;
+      }
+
+      const message =
+        typeof errorInfo === "string"
+          ? errorInfo
+          : errorInfo?.message || "Không thể tải chỉ đường.";
+
+      setDirectionsData((prev) => ({
+        loading: false,
+        info:
+          prev.info && prev.info.stationId === selectedStation?.id
+            ? prev.info
+            : null,
+        error: message,
+      }));
+    },
+    [navigationRequestId, selectedStation?.id]
+  );
 
   const handleBookingComplete = (booking) => {
     console.log("🎯 Booking completed:", booking);
     setCurrentBookingData(booking);
     setBookingModalOpen(false);
-    setFlowStep(2); // Move to QR scan step
+    setFlowStep(1); // Move to navigation/direction map step
 
     // Initialize session data based on booking
     const energyNeeded = (sessionData.targetSOC - sessionData.startSOC) * 0.6; // 60kWh battery
@@ -658,7 +1061,7 @@ const ChargingFlow = () => {
           </Stepper>
         </CardContent>
       </Card>
-      {/* Step 0: Find Stations */}
+      {/* Step 0: Select Station - LIST/GRID VIEW (Map removed) */}
       {flowStep === 0 && (
         <Grid container spacing={3}>
           {/* Search and Filters */}
@@ -671,90 +1074,47 @@ const ChargingFlow = () => {
               }}
             >
               <CardContent sx={{ p: 3 }}>
-                <Grid container spacing={2.5} alignItems="center">
-                  {/* Search Input - wider on desktop so it pushes filter to the right */}
-                  <Grid item xs={12} md={9}>
-                    <TextField
-                      fullWidth
-                      placeholder="Tìm kiếm theo vị trí, tên trạm..."
-                      value={searchQuery}
-                      onChange={(e) => {
-                        const newValue = e.target.value;
-                        console.log("⌨️ TextField onChange:", newValue);
-                        setSearchQuery(newValue);
-                      }}
-                      InputProps={{
-                        startAdornment: (
-                          <Search sx={{ mr: 1, color: "text.secondary" }} />
-                        ),
-                      }}
-                      sx={{
-                        "& .MuiOutlinedInput-root": {
-                          borderRadius: 2,
-                          backgroundColor: "grey.50",
-                          "&:hover": {
-                            backgroundColor: "white",
-                          },
-                          "&.Mui-focused": {
-                            backgroundColor: "white",
-                          },
-                        },
-                      }}
-                    />
-                  </Grid>
-
-                  {/* Connector Type Filter */}
-                  <Grid item xs={12} sm={6} md={3}>
-                    <FormControl fullWidth>
-                      <InputLabel id="connector-label">
-                        Loại cổng sạc
-                      </InputLabel>
-                      <Select
-                        labelId="connector-label"
-                        id="connector-select"
-                        label="Loại cổng sạc"
-                        value={
-                          Array.isArray(filters.connectorTypes)
-                            ? filters.connectorTypes[0] || ""
-                            : filters.connectorTypes || ""
-                        }
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          console.log("🔌 Connector type changed:", value);
-                          // Store single string (or empty) in filters
-                          updateFilters({ connectorTypes: value || "" });
-                        }}
-                        renderValue={(selected) => (selected ? selected : null)}
-                        sx={{
-                          borderRadius: 2,
-                          backgroundColor: "grey.50",
-                          "&:hover": {
-                            backgroundColor: "white",
-                          },
-                          "&.Mui-focused": {
-                            backgroundColor: "white",
-                          },
-                        }}
-                      >
-                        <MenuItem value="">
-                          <em>Tất cả loại cổng</em>
-                        </MenuItem>
-                        {Object.values(CONNECTOR_TYPES).map((type) => (
-                          <MenuItem key={type} value={type}>
-                            {type}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                  </Grid>
-
-                  {/* View Mode removed — always show map */}
-                </Grid>
+                {/* Search Input - Full Width */}
+                <TextField
+                  fullWidth
+                  placeholder="Tìm kiếm theo tên trạm, địa chỉ, khu vực..."
+                  value={searchQuery}
+                  onChange={(e) => {
+                    const newValue = e.target.value;
+                    console.log("⌨️ TextField onChange:", newValue);
+                    setSearchQuery(newValue);
+                  }}
+                  InputProps={{
+                    startAdornment: (
+                      <Search
+                        sx={{ mr: 1, color: "text.secondary", fontSize: 24 }}
+                      />
+                    ),
+                  }}
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      borderRadius: 3,
+                      backgroundColor: "grey.50",
+                      fontSize: "1rem",
+                      "&:hover": {
+                        backgroundColor: "white",
+                        boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+                      },
+                      "&.Mui-focused": {
+                        backgroundColor: "white",
+                        boxShadow: "0 4px 12px rgba(0,0,0,0.12)",
+                      },
+                    },
+                    "& .MuiOutlinedInput-input": {
+                      padding: "16px 14px",
+                    },
+                  }}
+                />
               </CardContent>
             </Card>
           </Grid>
 
-          {/* Stations List or Map */}
+          {/* Stations List/Grid View - MAP REMOVED */}
           <Grid item xs={12}>
             <Card>
               <CardContent>
@@ -765,20 +1125,505 @@ const ChargingFlow = () => {
                     fontWeight: "bold",
                     color: "black",
                     mb: 3,
-                    textAlign: "center",
                   }}
                 >
-                  🗺️ Bản đồ trạm sạc ({filteredStations.length} trạm)
+                  📍 Danh sách trạm sạc ({filteredStations.length} trạm)
                 </Typography>
-                <StationMapLeaflet
-                  stations={filteredStations}
-                  onStationSelect={handleStationSelect}
-                />
+
+                {loading ? (
+                  <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+                    <Typography>Đang tải danh sách trạm...</Typography>
+                  </Box>
+                ) : filteredStations.length === 0 ? (
+                  <Box sx={{ textAlign: "center", py: 4 }}>
+                    <Typography variant="body1" color="text.secondary">
+                      Không tìm thấy trạm sạc phù hợp
+                    </Typography>
+                  </Box>
+                ) : (
+                  <Grid container spacing={2}>
+                    {filteredStations.map((station, index) => {
+                      const isAvailable = station.stats?.available > 0;
+                      const distance = station.distanceFromUser?.toFixed(1) || "N/A";
+                      const pricing = station.charging?.pricing?.acRate || 
+                                     station.charging?.pricing?.dcRate || 0;
+
+                      return (
+                        <Grid item xs={12} md={6} key={station.id}>
+                          <Card
+                            sx={{
+                              height: "100%",
+                              cursor: "pointer",
+                              transition: "all 0.3s",
+                              border: "2px solid",
+                              borderColor: "divider",
+                              "&:hover": {
+                                borderColor: "primary.main",
+                                boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                                transform: "translateY(-4px)",
+                              },
+                            }}
+                            onClick={() => handleStationSelect(station)}
+                          >
+                            <CardContent>
+                              {/* Station Header */}
+                              <Box sx={{ display: "flex", alignItems: "start", mb: 2 }}>
+                                {/* Station Number Badge */}
+                                <Box
+                                  sx={{
+                                    minWidth: 40,
+                                    height: 40,
+                                    borderRadius: "50%",
+                                    backgroundColor: "primary.main",
+                                    color: "white",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    fontWeight: "bold",
+                                    fontSize: "1.1rem",
+                                    mr: 2,
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  {index + 1}
+                                </Box>
+
+                                {/* Station Avatar */}
+                                <Avatar
+                                  src={getStationImage(station)}
+                                  sx={{ width: 60, height: 60, mr: 2 }}
+                                  onError={(e) => {
+                                    e.target.onerror = null;
+                                    e.target.src =
+                                      'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="60" height="60"%3E%3Crect fill="%231379FF" width="60" height="60"/%3E%3Ctext fill="white" x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="12"%3EStation%3C/text%3E%3C/svg%3E';
+                                  }}
+                                >
+                                  <ElectricCar />
+                                </Avatar>
+
+                                {/* Station Info */}
+                                <Box sx={{ flex: 1 }}>
+                                  <Typography variant="h6" fontWeight="bold" sx={{ mb: 0.5 }}>
+                                    {station.name}
+                                  </Typography>
+                                  <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mb: 1 }}>
+                                    <Chip
+                                      label={`${distance} km`}
+                                      size="small"
+                                      color="primary"
+                                      variant="outlined"
+                                    />
+                                    <Chip
+                                      label={isAvailable ? "Còn chỗ" : "Đầy"}
+                                      size="small"
+                                      color={isAvailable ? "success" : "error"}
+                                    />
+                                  </Box>
+                                </Box>
+                              </Box>
+
+                              {/* Station Details */}
+                              <Box sx={{ mb: 2 }}>
+                                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mb: 1 }}>
+                                  <LocationOn sx={{ fontSize: 18, color: "text.secondary" }} />
+                                  <Typography variant="body2" color="text.secondary">
+                                    {station.location?.address}
+                                  </Typography>
+                                </Box>
+
+                                <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+                                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                                    <Speed sx={{ fontSize: 18, color: "primary.main" }} />
+                                    <Typography variant="body2">
+                                      Tối đa {station.charging?.maxPower || 0}kW
+                                    </Typography>
+                                  </Box>
+
+                                  <Typography variant="body2" color="text.secondary">
+                                    ⚡ {station.stats?.available || 0}/{station.stats?.total || 0} cổng trống
+                                  </Typography>
+                                </Box>
+
+                                {station.operatingHours && (
+                                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                                    🕐 {formatOperatingHours(station.operatingHours)}
+                                  </Typography>
+                                )}
+
+                                {pricing > 0 && (
+                                  <Typography variant="body2" color="success.main" sx={{ mt: 0.5, fontWeight: "bold" }}>
+                                    💰 Từ {formatCurrency(pricing)}/kWh
+                                  </Typography>
+                                )}
+                              </Box>
+
+                              {/* Action Button */}
+                              <Button
+                                fullWidth
+                                variant="contained"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleStationSelect(station);
+                                }}
+                                disabled={!isAvailable}
+                              >
+                                {isAvailable ? "Chọn trạm này" : "Hết chỗ"}
+                              </Button>
+                            </CardContent>
+                          </Card>
+                        </Grid>
+                      );
+                    })}
+                  </Grid>
+                )}
               </CardContent>
             </Card>
           </Grid>
         </Grid>
       )}
+
+      {/* Step 1: Navigation/Direction Map - Show route to booked station */}
+      {flowStep === 1 && selectedStation && (
+        <Grid container spacing={3}>
+          <Grid item xs={12}>
+            <Card>
+              <CardContent>
+                <Typography variant="h5" gutterBottom sx={{ fontWeight: "bold", mb: 2 }}>
+                  ✅ Đặt lịch thành công!
+                </Typography>
+                <Alert severity="success" sx={{ mb: 3 }}>
+                  Bạn đã đặt trạm <strong>{selectedStation.name}</strong> thành công. 
+                  Hãy di chuyển đến trạm và quét QR để bắt đầu sạc.
+                </Alert>
+
+                {/* Station Info Summary */}
+                <Card variant="outlined" sx={{ mb: 3, p: 2 }}>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} md={6}>
+                      <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+                        <Avatar
+                          src={getStationImage(selectedStation)}
+                          sx={{ width: 60, height: 60, mr: 2 }}
+                        >
+                          <ElectricCar />
+                        </Avatar>
+                        <Box>
+                          <Typography variant="h6" fontWeight="bold">
+                            {selectedStation.name}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {selectedStation.location?.address}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </Grid>
+                    <Grid item xs={12} md={6}>
+                      <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                        <Chip
+                          icon={<LocationOn />}
+                          label={`${selectedStation.distanceFromUser?.toFixed(1) || "N/A"} km`}
+                          color="primary"
+                          variant="outlined"
+                        />
+                        <Chip
+                          icon={<Speed />}
+                          label={`${selectedStation.charging?.maxPower || 0}kW`}
+                          color="primary"
+                          variant="outlined"
+                        />
+                        {selectedStation.operatingHours && (
+                          <Chip
+                            label={formatOperatingHours(selectedStation.operatingHours)}
+                            color="default"
+                            variant="outlined"
+                          />
+                        )}
+                      </Box>
+                    </Grid>
+                  </Grid>
+                </Card>
+
+                {/* Map with directions */}
+                <Typography
+                  variant="h6"
+                  gutterBottom
+                  sx={{ fontWeight: "bold", mb: 2 }}
+                >
+                  🗺️ Chỉ đường đến trạm
+                </Typography>
+                <Grid container spacing={2} sx={{ mb: 1 }}>
+                  <Grid item xs={12} md={8}>
+                    <Box
+                      sx={{
+                        height: 500,
+                        border: "1px solid",
+                        borderColor: "divider",
+                        borderRadius: 2,
+                        overflow: "hidden",
+                      }}
+                    >
+                      <StationMapLeaflet
+                        stations={[selectedStation]}
+                        onStationSelect={() => {}}
+                        userLocation={userLocation}
+                        showRoute={true}
+                        centerOnStation={true}
+                        onDirectionsReady={handleDirectionsReady}
+                        onDirectionsError={handleDirectionsError}
+                        routeRequestId={navigationRequestId}
+                      />
+                    </Box>
+                  </Grid>
+                  <Grid item xs={12} md={4}>
+                    <Paper
+                      variant="outlined"
+                      sx={{
+                        height: "100%",
+                        p: 2.5,
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 2,
+                      }}
+                    >
+                      <Typography variant="subtitle1" fontWeight="bold">
+                        Lộ trình đề xuất
+                      </Typography>
+
+                      {directionsData.loading && (
+                        <Box
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 1,
+                          }}
+                        >
+                          <CircularProgress size={20} />
+                          <Typography
+                            variant="body2"
+                            color="text.secondary"
+                          >
+                            Đang tải chỉ đường...
+                          </Typography>
+                        </Box>
+                      )}
+
+                      {directionsData.error && (
+                        <Alert severity="warning">{directionsData.error}</Alert>
+                      )}
+
+                      {navigationSummary && (
+                        <>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              flexWrap: "wrap",
+                              gap: 1,
+                            }}
+                          >
+                            {navigationSummary.distanceText && (
+                              <Chip
+                                icon={<Directions fontSize="small" />}
+                                label={`Quãng đường: ${navigationSummary.distanceText}`}
+                                size="small"
+                                color="primary"
+                                variant="outlined"
+                              />
+                            )}
+                            {navigationSummary.durationText && (
+                              <Chip
+                                icon={<AccessTime fontSize="small" />}
+                                label={`Thời gian: ${navigationSummary.durationText}`}
+                                size="small"
+                                color="primary"
+                                variant="outlined"
+                              />
+                            )}
+                          </Box>
+
+                          {navigationWarnings.map((warning, index) => (
+                            <Alert
+                              key={`nav-warning-${index}`}
+                              severity={
+                                navigationSummary.provider === "fallback" ||
+                                navigationSummary.usedFallback
+                                  ? "warning"
+                                  : "info"
+                              }
+                              sx={{ mb: 1 }}
+                            >
+                              {warning}
+                            </Alert>
+                          ))}
+
+                          {navigationSummary.steps &&
+                          navigationSummary.steps.length > 0 ? (
+                            <List
+                              dense
+                              sx={{
+                                flex: 1,
+                                maxHeight: "400px",
+                                overflowY: "auto",
+                                pr: 1,
+                                // Custom scrollbar styling
+                                "&::-webkit-scrollbar": {
+                                  width: "8px",
+                                },
+                                "&::-webkit-scrollbar-track": {
+                                  backgroundColor: "rgba(0,0,0,0.05)",
+                                  borderRadius: "4px",
+                                },
+                                "&::-webkit-scrollbar-thumb": {
+                                  backgroundColor: "rgba(0,0,0,0.2)",
+                                  borderRadius: "4px",
+                                  "&:hover": {
+                                    backgroundColor: "rgba(0,0,0,0.3)",
+                                  },
+                                },
+                              }}
+                            >
+                              {navigationSummary.steps.map((step, idx) => (
+                                <ListItem
+                                  key={`direction-step-${
+                                    step.index ?? idx
+                                  }`}
+                                  alignItems="flex-start"
+                                  sx={{ py: 1 }}
+                                >
+                                  <ListItemIcon sx={{ minWidth: 36 }}>
+                                    <Avatar
+                                      sx={{
+                                        width: 28,
+                                        height: 28,
+                                        fontSize: "0.75rem",
+                                        backgroundColor: "primary.main",
+                                        color: "white",
+                                      }}
+                                    >
+                                      {(step.index ?? 0) + 1}
+                                    </Avatar>
+                                  </ListItemIcon>
+                                  <Box sx={{ flex: 1 }}>
+                                    <Typography
+                                      variant="body2"
+                                      fontWeight="medium"
+                                    >
+                                      {step.instructionText}
+                                    </Typography>
+                                    {(step.distanceText || step.durationText) && (
+                                      <Typography
+                                        variant="caption"
+                                        color="text.secondary"
+                                      >
+                                        {[
+                                          step.distanceText,
+                                          step.durationText,
+                                        ]
+                                          .filter(Boolean)
+                                          .join(" • ")}
+                                      </Typography>
+                                    )}
+                                  </Box>
+                                </ListItem>
+                              ))}
+                            </List>
+                          ) : (
+                            <Typography
+                              variant="body2"
+                              color="text.secondary"
+                            >
+                              Không có hướng dẫn chi tiết. Nhấn “Mở Google Maps”
+                              để xem đường đi trực tiếp.
+                            </Typography>
+                          )}
+                        </>
+                      )}
+
+                      {!directionsData.loading &&
+                        !navigationSummary &&
+                        !directionsData.error && (
+                          <Typography
+                            variant="body2"
+                            color="text.secondary"
+                          >
+                            Chúng tôi sẽ hiển thị chỉ đường ngay khi có dữ liệu.
+                          </Typography>
+                        )}
+
+                      <Box
+                        sx={{
+                          display: "flex",
+                          flexDirection: { xs: "column", sm: "row" },
+                          gap: 1,
+                          mt: "auto",
+                        }}
+                      >
+                        <Button
+                          variant="contained"
+                          startIcon={<Directions />}
+                          onClick={handleOpenGoogleMaps}
+                          disabled={!selectedStationCoords}
+                          fullWidth
+                        >
+                          Mở Google Maps
+                        </Button>
+                        <Button
+                          variant="outlined"
+                          startIcon={<Refresh />}
+                          onClick={handleRetryDirections}
+                          disabled={directionsData.loading || !selectedStation?.id}
+                          fullWidth
+                        >
+                          Làm mới
+                        </Button>
+                      </Box>
+                    </Paper>
+                  </Grid>
+                </Grid>
+
+                {/* Action Buttons */}
+                <Box sx={{ display: "flex", gap: 2, mt: 3, justifyContent: "center" }}>
+                  <Button
+                    variant="outlined"
+                    onClick={() => {
+                      setFlowStep(0);
+                      setSelectedStation(null);
+                      setPersistedStationId(null);
+                      setDirectionsData({
+                        loading: false,
+                        info: null,
+                        error: null,
+                      });
+                      if (typeof window !== "undefined") {
+                        try {
+                          sessionStorage.removeItem(
+                            "chargingSelectedStationId"
+                          );
+                        } catch (error) {
+                          console.warn(
+                            "Không thể xóa chargingSelectedStationId",
+                            error
+                          );
+                        }
+                      }
+                    }}
+                  >
+                    Chọn trạm khác
+                  </Button>
+                  <Button
+                    variant="contained"
+                    size="large"
+                    onClick={() => setFlowStep(2)}
+                    startIcon={<QrCodeScanner />}
+                  >
+                    Tôi đã đến trạm - Quét QR
+                  </Button>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+      )}
+
       {/* Step 2: QR Scan */}
       {flowStep === 2 && (
         <Grid item xs={12}>
@@ -2008,6 +2853,24 @@ const ChargingFlow = () => {
                     resetFlowState();
                     setFlowStep(0);
                     setSelectedStation(null);
+                    setPersistedStationId(null);
+                    setDirectionsData({
+                      loading: false,
+                      info: null,
+                      error: null,
+                    });
+                    if (typeof window !== "undefined") {
+                      try {
+                        sessionStorage.removeItem(
+                          "chargingSelectedStationId"
+                        );
+                      } catch (error) {
+                        console.warn(
+                          "Không thể xóa chargingSelectedStationId",
+                          error
+                        );
+                      }
+                    }
                     setScanResult("");
                     setCompletedSession(null);
                     setCurrentBookingData(null);
@@ -2087,6 +2950,22 @@ const ChargingFlow = () => {
           setTimeout(() => {
             setFlowStep(0);
             setSelectedStation(null);
+            setPersistedStationId(null);
+            setDirectionsData({
+              loading: false,
+              info: null,
+              error: null,
+            });
+            if (typeof window !== "undefined") {
+              try {
+                sessionStorage.removeItem("chargingSelectedStationId");
+              } catch (error) {
+                console.warn(
+                  "Không thể xóa chargingSelectedStationId",
+                  error
+                );
+              }
+            }
             setScanResult("");
             setCompletedSession(null);
           }, 1000);

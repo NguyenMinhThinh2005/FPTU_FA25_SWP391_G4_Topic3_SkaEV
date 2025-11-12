@@ -123,7 +123,7 @@ export const authAPI = {
   },
 
   updateProfile: (profileData) => {
-    return axiosInstance.put("/auth/profile", profileData);
+    return axiosInstance.put("/UserProfiles/me", profileData);
   },
 };
 
@@ -144,6 +144,14 @@ export const stationsAPI = {
 
   getAvailability: (id) => {
     return axiosInstance.get(`/stations/${id}/availability`);
+  },
+
+  getAvailableSlots: (stationId) => {
+    return axiosInstance.get(`/stations/${stationId}/slots`);
+  },
+
+  getAvailablePosts: (stationId) => {
+    return axiosInstance.get(`/stations/${stationId}/posts`);
   },
 
   create: (stationData) => {
@@ -174,8 +182,9 @@ export const bookingsAPI = {
     return axiosInstance.get(`/bookings/${id}`);
   },
 
-  getUserBookings: () => {
-    return axiosInstance.get("/bookings/my-bookings");
+  getUserBookings: (params = {}) => {
+    // Backend GET /bookings returns user's own bookings (auth required)
+    return axiosInstance.get("/bookings", { params });
   },
 
   create: (bookingData) => {
@@ -188,6 +197,11 @@ export const bookingsAPI = {
 
   cancel: (id, reason) => {
     return axiosInstance.post(`/bookings/${id}/cancel`, { reason });
+  },
+
+  start: (id) => {
+    // Start charging session
+    return axiosInstance.put(`/bookings/${id}/start`);
   },
 
   complete: (id, completeData) => {
@@ -302,6 +316,61 @@ export const paymentsAPI = {
   },
 };
 
+export const paymentMethodsAPI = {
+  getMine: () => {
+    return axiosInstance.get("/paymentmethods");
+  },
+
+  getById: (id) => {
+    return axiosInstance.get(`/paymentmethods/${id}`);
+  },
+
+  create: (payload) => {
+    return axiosInstance.post("/paymentmethods", payload);
+  },
+
+  update: (id, payload) => {
+    return axiosInstance.put(`/paymentmethods/${id}`, payload);
+  },
+
+  remove: (id) => {
+    return axiosInstance.delete(`/paymentmethods/${id}`);
+  },
+
+  setDefault: (id) => {
+    return axiosInstance.patch(`/paymentmethods/${id}/set-default`);
+  },
+
+  getDefault: () => {
+    return axiosInstance.get("/paymentmethods/default");
+  },
+};
+
+export const invoicesAPI = {
+  getMyInvoices: (params) => {
+    return axiosInstance.get("/invoices/my-invoices", { params });
+  },
+
+  getById: (id) => {
+    return axiosInstance.get(`/invoices/${id}`);
+  },
+
+  getByBooking: (bookingId) => {
+    return axiosInstance.get(`/invoices/booking/${bookingId}`);
+  },
+
+  download: (id) => {
+    return axiosInstance.get(`/invoices/${id}/download`, {
+      responseType: "blob",
+      headers: { Accept: "application/pdf" },
+    });
+  },
+
+  getPaymentHistory: (id) => {
+    return axiosInstance.get(`/invoices/${id}/payment-history`);
+  },
+};
+
 export const vehiclesAPI = {
   getAll: (params) => {
     return axiosInstance.get("/vehicles", { params });
@@ -312,7 +381,7 @@ export const vehiclesAPI = {
   },
 
   getUserVehicles: () => {
-    return axiosInstance.get("/vehicles/my-vehicles");
+    return axiosInstance.get("/vehicles"); // GET /api/vehicles returns user's vehicles
   },
 
   create: (vehicleData) => {
@@ -329,6 +398,36 @@ export const vehiclesAPI = {
 
   setDefault: (id) => {
     return axiosInstance.post(`/vehicles/${id}/set-default`);
+  },
+};
+
+export const reviewsAPI = {
+  getStationReviews: (stationId, params = {}) => {
+    return axiosInstance.get(`/reviews/station/${stationId}`, { params });
+  },
+
+  getStationSummary: (stationId) => {
+    return axiosInstance.get(`/reviews/station/${stationId}/summary`);
+  },
+
+  getMyReviews: (params = {}) => {
+    return axiosInstance.get("/reviews/my-reviews", { params });
+  },
+
+  getById: (reviewId) => {
+    return axiosInstance.get(`/reviews/${reviewId}`);
+  },
+
+  create: (payload) => {
+    return axiosInstance.post("/reviews", payload);
+  },
+
+  update: (reviewId, payload) => {
+    return axiosInstance.put(`/reviews/${reviewId}`, payload);
+  },
+
+  delete: (reviewId) => {
+    return axiosInstance.delete(`/reviews/${reviewId}`);
   },
 };
 

@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using SkaEV.API.Application.DTOs.UserProfiles;
 using SkaEV.API.Domain.Entities;
 using SkaEV.API.Infrastructure.Data;
+using System.Text.Json;
 
 namespace SkaEV.API.Application.Services;
 
@@ -31,6 +32,8 @@ public class UserProfileService : IUserProfileService
 
     public async Task<UserProfileDto> UpdateUserProfileAsync(int userId, UpdateProfileDto updateDto)
     {
+        _logger.LogInformation("Received profile update for user {UserId}: {@UpdateDto}", userId, updateDto);
+
         var user = await _context.Users
             .Include(u => u.UserProfile)
             .FirstOrDefaultAsync(u => u.UserId == userId);
@@ -44,6 +47,38 @@ public class UserProfileService : IUserProfileService
         if (updateDto.PhoneNumber != null)
             user.PhoneNumber = updateDto.PhoneNumber;
 
+        // Ensure the user profile entity exists before updating profile-specific fields
+        var profile = user.UserProfile;
+        if (profile == null)
+        {
+            profile = new UserProfile
+            {
+                UserId = userId,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+            user.UserProfile = profile;
+            _context.UserProfiles.Add(profile);
+        }
+
+        if (updateDto.DateOfBirth.HasValue)
+            profile.DateOfBirth = updateDto.DateOfBirth.Value.Date;
+
+        if (updateDto.Address != null)
+            profile.Address = NormalizeOrNull(updateDto.Address);
+
+        if (updateDto.City != null)
+            profile.City = NormalizeOrNull(updateDto.City);
+
+        if (updateDto.PreferredPaymentMethod != null)
+            profile.PreferredPaymentMethod = NormalizeOrNull(updateDto.PreferredPaymentMethod);
+
+        if (updateDto.NotificationPreferences != null)
+        {
+            profile.NotificationPreferences = SerializePreferences(updateDto.NotificationPreferences);
+        }
+
+        profile.UpdatedAt = DateTime.UtcNow;
         user.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
@@ -166,8 +201,20 @@ public class UserProfileService : IUserProfileService
         if (user == null)
             throw new ArgumentException("User not found");
 
-        // Notification preferences would be stored in UserProfile or separate table
-        // For now, just update the timestamp
+        var profile = user.UserProfile;
+        if (profile == null)
+        {
+            profile = new UserProfile
+            {
+                UserId = userId,
+                CreatedAt = DateTime.UtcNow
+            };
+            user.UserProfile = profile;
+            _context.UserProfiles.Add(profile);
+        }
+
+        profile.NotificationPreferences = SerializePreferences(preferencesDto);
+        profile.UpdatedAt = DateTime.UtcNow;
         user.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
@@ -225,6 +272,21 @@ public class UserProfileService : IUserProfileService
 
     private UserProfileDto MapToDto(User user)
     {
+        var preferences = user.UserProfile?.NotificationPreferences;
+        NotificationPreferencesDto? parsedPreferences = null;
+
+        if (!string.IsNullOrWhiteSpace(preferences))
+        {
+            try
+            {
+                parsedPreferences = JsonSerializer.Deserialize<NotificationPreferencesDto>(preferences ?? string.Empty);
+            }
+            catch (JsonException ex)
+            {
+                _logger.LogWarning(ex, "Failed to parse notification preferences for user {UserId}", user.UserId);
+            }
+        }
+
         return new UserProfileDto
         {
             UserId = user.UserId,
@@ -232,19 +294,29 @@ public class UserProfileService : IUserProfileService
             FullName = user.FullName,
             PhoneNumber = user.PhoneNumber,
             AvatarUrl = user.UserProfile?.AvatarUrl,
+            DateOfBirth = user.UserProfile?.DateOfBirth,
+            Address = user.UserProfile?.Address,
+            City = user.UserProfile?.City,
+            PreferredPaymentMethod = user.UserProfile?.PreferredPaymentMethod,
             Role = user.Role,
             Status = user.IsActive ? "active" : "inactive",
             CreatedAt = user.CreatedAt,
             UpdatedAt = user.UpdatedAt,
-            NotificationPreferences = new NotificationPreferencesDto
-            {
-                EmailNotifications = true,
-                SmsNotifications = false,
-                PushNotifications = true,
-                BookingReminders = true,
-                PaymentReminders = true,
-                PromotionalEmails = false
-            }
+            NotificationPreferences = parsedPreferences ?? new NotificationPreferencesDto()
         };
+    }
+
+    private static string? NormalizeOrNull(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    private static string SerializePreferences(NotificationPreferencesDto preferences)
+    {
+        return JsonSerializer.Serialize(preferences, new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            WriteIndented = false
+        });
     }
 }

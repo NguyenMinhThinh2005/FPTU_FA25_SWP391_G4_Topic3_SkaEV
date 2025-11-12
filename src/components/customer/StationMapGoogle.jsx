@@ -1,4 +1,4 @@
-﻿import React, { useState, useCallback, useMemo } from 'react';
+﻿import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
     Box,
     Card,
@@ -110,7 +110,7 @@ const StationMarker = ({ station, selected, onClick }) => {
 };
 
 // Custom InfoWindow cho station
-const StationInfoWindow = ({ station, onClose, onBooking }) => {
+const StationInfoWindow = ({ station, onClose, onBooking, onRequestDirections }) => {
     // Prefer the normalized poles/ports model
     const hasAvailableSlots = station.charging?.poles?.some(
         pole => (pole.availablePorts || 0) > 0
@@ -132,12 +132,6 @@ const StationInfoWindow = ({ station, onClose, onBooking }) => {
         const open = String(oh.open || '').toLowerCase();
         if (open === '24/7') return 'Cả ngày';
         return oh.open && oh.close ? `${oh.open} - ${oh.close}` : 'Không rõ';
-    };
-
-    const getDirections = () => {
-        const { lat, lng } = station.location.coordinates;
-        const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
-        window.open(url, '_blank');
     };
 
     return (
@@ -239,7 +233,7 @@ const StationInfoWindow = ({ station, onClose, onBooking }) => {
                         variant="outlined"
                         size="small"
                         startIcon={<DirectionsIcon />}
-                        onClick={getDirections}
+                        onClick={() => onRequestDirections?.(station)}
                         fullWidth
                         sx={{ fontSize: '0.75rem' }}
                     >
@@ -249,7 +243,7 @@ const StationInfoWindow = ({ station, onClose, onBooking }) => {
                         variant="contained"
                         size="small"
                         startIcon={<ElectricCar />}
-                        onClick={() => onBooking(station)}
+                        onClick={() => onBooking?.(station)}
                         disabled={!hasAvailableSlots}
                         fullWidth
                         sx={{ fontSize: '0.75rem' }}
@@ -260,6 +254,90 @@ const StationInfoWindow = ({ station, onClose, onBooking }) => {
             </Box>
         </InfoWindow>
     );
+};
+
+// Directions overlay renders Google Directions API results on the map
+const DirectionsOverlay = ({ origin, destination, onRouteCalculated }) => {
+    const map = useMap();
+    const rendererRef = useRef(null);
+    const serviceRef = useRef(null);
+
+    useEffect(() => {
+        if (!map || !origin || !destination) {
+            return;
+        }
+
+        if (!window.google || !window.google.maps) {
+            console.error("Google Maps JavaScript API is not available");
+            return;
+        }
+
+        if (!serviceRef.current) {
+            serviceRef.current = new window.google.maps.DirectionsService();
+        }
+
+        if (!rendererRef.current) {
+            rendererRef.current = new window.google.maps.DirectionsRenderer({
+                map,
+                suppressMarkers: true,
+                polylineOptions: {
+                    strokeColor: "#1976d2",
+                    strokeOpacity: 0.9,
+                    strokeWeight: 6,
+                },
+            });
+        } else {
+            rendererRef.current.setMap(map);
+        }
+
+        const request = {
+            origin,
+            destination,
+            travelMode: window.google.maps.TravelMode.DRIVING,
+            provideRouteAlternatives: false,
+        };
+
+        serviceRef.current.route(request, (result, status) => {
+            if (status === window.google.maps.DirectionsStatus.OK || status === "OK") {
+                rendererRef.current?.setDirections(result);
+                const leg = result?.routes?.[0]?.legs?.[0];
+                if (leg) {
+                    const steps = (leg.steps || []).map((step, idx) => ({
+                        id: idx,
+                        instruction: step.instructions,
+                        distance: step.distance?.text ?? "",
+                        duration: step.duration?.text ?? "",
+                    }));
+
+                    onRouteCalculated?.({
+                        distanceText: leg.distance?.text ?? "",
+                        durationText: leg.duration?.text ?? "",
+                        startAddress: leg.start_address ?? "",
+                        endAddress: leg.end_address ?? "",
+                        steps,
+                    });
+
+                    try {
+                        if (result.routes?.[0]?.bounds) {
+                            map.fitBounds(result.routes[0].bounds, { padding: 24 });
+                        }
+                    } catch (fitErr) {
+                        console.warn("Could not fit bounds for route", fitErr);
+                    }
+                }
+            } else {
+                console.error("Directions request failed", status, result);
+                onRouteCalculated?.(null);
+                rendererRef.current?.setDirections({ routes: [] });
+            }
+        });
+
+        return () => {
+            rendererRef.current?.setMap(null);
+        };
+    }, [map, origin?.lat, origin?.lng, destination?.lat, destination?.lng, onRouteCalculated]);
+
+    return null;
 };
 
 // Main Component
@@ -276,10 +354,20 @@ const StationMapGoogle = ({
     const [mapZoom, setMapZoom] = useState(13);
     const [selectedStationId, setSelectedStationId] = useState(selectedStation?.id || null);
     const [userPos, setUserPos] = useState(userLocation);
+    const [routeDestination, setRouteDestination] = useState(null);
+    const [routeInfo, setRouteInfo] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
     const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+
+    // Sync external user location when provided
+    useEffect(() => {
+        if (userLocation && typeof userLocation.lat === 'number' && typeof userLocation.lng === 'number') {
+            setUserPos(userLocation);
+            setMapCenter(userLocation);
+        }
+    }, [userLocation?.lat, userLocation?.lng]);
 
     // Handle marker click
     const handleStationClick = useCallback((station) => {
@@ -290,6 +378,8 @@ const StationMapGoogle = ({
         });
         setMapZoom(15);
         onStationSelect(station);
+        setRouteDestination(null);
+        setRouteInfo(null);
     }, [onStationSelect]);
 
     // Handle info window close
@@ -345,6 +435,32 @@ const StationMapGoogle = ({
 
         handleStationClick(nearest);
     }, [userPos, stations, handleStationClick]);
+
+    const handleRouteCalculated = useCallback((info) => {
+        setRouteInfo(info);
+    }, []);
+
+    const handleRequestDirections = useCallback((station) => {
+        if (!station?.location?.coordinates) {
+            return;
+        }
+
+        const destinationCoords = {
+            lat: station.location.coordinates.lat,
+            lng: station.location.coordinates.lng,
+        };
+
+        setSelectedStationId(station.id);
+        setRouteDestination(destinationCoords);
+        setRouteInfo(null);
+        setMapCenter(destinationCoords);
+        setMapZoom(14);
+        onStationSelect(station);
+
+        if (!userPos) {
+            handleGetUserLocation();
+        }
+    }, [handleGetUserLocation, onStationSelect, userPos]);
 
     const selectedStationData = useMemo(() => 
         stations.find(s => s.id === selectedStationId),
@@ -418,6 +534,15 @@ const StationMapGoogle = ({
                             station={selectedStationData}
                             onClose={handleInfoWindowClose}
                             onBooking={onBookingClick}
+                            onRequestDirections={handleRequestDirections}
+                        />
+                    )}
+
+                    {userPos && routeDestination && (
+                        <DirectionsOverlay
+                            origin={userPos}
+                            destination={routeDestination}
+                            onRouteCalculated={handleRouteCalculated}
                         />
                     )}
                 </Map>

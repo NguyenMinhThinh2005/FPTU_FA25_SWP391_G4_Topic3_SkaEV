@@ -15,7 +15,14 @@ import {
   IconButton,
   InputAdornment,
 } from "@mui/material";
-import { ElectricCar, Login, Google, Phone, Visibility, VisibilityOff } from "@mui/icons-material";
+import {
+  ElectricCar,
+  Login,
+  Google,
+  Phone,
+  Visibility,
+  VisibilityOff,
+} from "@mui/icons-material";
 import { useNavigate, Link as RouterLink } from "react-router-dom";
 import useAuthStore from "../../store/authStore";
 import { authAPI } from "../../services/api";
@@ -117,35 +124,6 @@ const LoginPage = () => {
 
   const handlePhoneLoginSuccess = (response) => {
     console.log("Phone login successful:", response);
-  };
-
-  const demoAccounts = [
-    {
-      email: "admin@skaev.com",
-      password: "Admin123!",
-      role: getText("users.admin"),
-      color: "error",
-    },
-    {
-      email: "staff@skaev.com",
-      password: "Staff123!",
-      role: getText("users.staff"),
-      color: "info",
-    },
-    {
-      email: "nguyenvanan@gmail.com",
-      password: "Customer123!",
-      role: getText("users.customer"),
-      color: "success",
-    },
-  ];
-
-  const fillDemoAccount = (account) => {
-    setFormData({
-      email: account.email,
-      password: account.password,
-    });
-    if (error) clearError();
   };
 
   return (
@@ -308,7 +286,7 @@ const LoginPage = () => {
             </Typography>
           </Box>
           {/* Social Login */}
-          <Divider sx={{ my: 3 }}>
+          {/* <Divider sx={{ my: 3 }}>
             <Typography variant="body2" color="text.secondary">
               Hoặc đăng nhập với
             </Typography>
@@ -362,49 +340,7 @@ const LoginPage = () => {
                 Số điện thoại
               </Button>
             </Grid>
-          </Grid>
-          <Divider sx={{ my: 3 }}>
-            <Typography variant="body2" color="text.secondary">
-              {getText("auth.demoAccounts")}
-            </Typography>
-          </Divider>{" "}
-          {/* Demo Accounts */}
-          <Grid container spacing={2}>
-            {demoAccounts.map((account, index) => (
-              <Grid item xs={12} key={index}>
-                <Button
-                  fullWidth
-                  variant="outlined"
-                  onClick={() => fillDemoAccount(account)}
-                  disabled={loading}
-                  sx={{
-                    justifyContent: "space-between",
-                    textTransform: "none",
-                    py: 1.5,
-                  }}
-                >
-                  <Box sx={{ textAlign: "left" }}>
-                    <Typography variant="body2" fontWeight="medium">
-                      {account.email}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {account.password}
-                    </Typography>
-                  </Box>
-                  <Chip
-                    label={account.role}
-                    color={account.color}
-                    size="small"
-                  />
-                </Button>
-              </Grid>
-            ))}
-          </Grid>
-          <Box sx={{ textAlign: "center", mt: 3 }}>
-            <Typography variant="body2" color="text.secondary">
-              {getText("auth.clickToFill")}
-            </Typography>
-          </Box>
+          </Grid> */}
         </CardContent>
       </Card>
 

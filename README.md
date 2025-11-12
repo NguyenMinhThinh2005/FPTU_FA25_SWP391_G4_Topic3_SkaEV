@@ -50,7 +50,26 @@ npm run dev
 
 ---
 
-## 📋 Yêu Cầu Hệ Thống
+## � Hướng Dẫn Setup Chi Tiết
+
+### 🎯 Dành cho Thành Viên Mới
+- **[QUICK_START.md](./QUICK_START.md)** - Setup trong 5 phút ⚡
+- **[SETUP_FOR_TEAM.md](./SETUP_FOR_TEAM.md)** - Hướng dẫn chi tiết từng bước 📖
+- **[CONFIG_CHECKLIST.md](./CONFIG_CHECKLIST.md)** - Checklist trước khi push/pull ✅
+
+### 🔑 Thông Tin Quan Trọng
+- **[ACCOUNT_PASSWORDS.md](./ACCOUNT_PASSWORDS.md)** - Tài khoản test & đăng nhập 🔐
+- **[SETUP_DATABASE.md](./SETUP_DATABASE.md)** - Setup database chi tiết 💾
+
+### ⚙️ File Cấu Hình Mẫu
+- `.env.example` - Frontend configuration template
+- `SkaEV.API/appsettings.template.json` - Backend configuration template
+
+> **⚠️ Lưu ý:** Các file config thật (`.env`, `appsettings.json`) KHÔNG được commit lên Git!
+
+---
+
+## �📋 Yêu Cầu Hệ Thống
 
 | Phần mềm | Version | Download |
 |----------|---------|----------|

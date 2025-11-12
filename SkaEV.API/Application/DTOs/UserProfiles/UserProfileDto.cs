@@ -7,6 +7,10 @@ public class UserProfileDto
     public string FullName { get; set; } = string.Empty;
     public string? PhoneNumber { get; set; }
     public string? AvatarUrl { get; set; }
+    public DateTime? DateOfBirth { get; set; }
+    public string? Address { get; set; }
+    public string? City { get; set; }
+    public string? PreferredPaymentMethod { get; set; }
     public string Role { get; set; } = string.Empty;
     public string Status { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; }
@@ -18,6 +22,11 @@ public class UpdateProfileDto
 {
     public string? FullName { get; set; }
     public string? PhoneNumber { get; set; }
+    public DateTime? DateOfBirth { get; set; }
+    public string? Address { get; set; }
+    public string? City { get; set; }
+    public string? PreferredPaymentMethod { get; set; }
+    public NotificationPreferencesDto? NotificationPreferences { get; set; }
 }
 
 public class ChangePasswordDto

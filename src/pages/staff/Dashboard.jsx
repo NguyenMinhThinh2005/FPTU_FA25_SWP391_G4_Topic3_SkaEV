@@ -1,850 +1,540 @@
-﻿/* eslint-disable */
+/* eslint-disable */
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Box,
   Grid,
+  Typography,
   Card,
   CardContent,
-  Typography,
   Button,
-  Chip,
-  IconButton,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
   Alert,
-  LinearProgress,
-  Avatar,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Paper,
+  AlertTitle,
+  Chip,
   Divider,
-  Snackbar,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemIcon,
+  Stack,
 } from "@mui/material";
 import {
-  Dashboard as DashboardIcon,
   ElectricCar,
-  LocationOn,
+  BatteryChargingFull,
   Warning,
   CheckCircle,
   Build,
+  PowerOff,
   Refresh,
-  Add,
-  Visibility,
-  Edit,
-  Search,
-  Settings,
+  Notifications,
+  Error,
+  Bolt,
+  AccessTime,
   MonetizationOn,
-  PowerSettingsNew,
 } from "@mui/icons-material";
+import staffAPI from "../../services/api/staffAPI";
 
-// TODO: Fetch from backend API instead of mock data
 const StaffDashboard = () => {
-  const [stations, setStations] = useState([]);
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [stationInfo, setStationInfo] = useState(null);
+  const [connectors, setConnectors] = useState([]);
+  const [dailyStats, setDailyStats] = useState({
+    revenue: 0,
+    completedSessions: 0,
+    energyConsumed: 0,
+    activeSessions: 0,
+  });
   const [alerts, setAlerts] = useState([]);
-  const [selectedStation, setSelectedStation] = useState(null);
-  const [detailsDialog, setDetailsDialog] = useState(false);
-  const [maintenanceDialog, setMaintenanceDialog] = useState(false);
-  const [maintenanceForm, setMaintenanceForm] = useState({
-    pole: "",
-    port: "",
-    issue: "",
-    notes: "",
-  });
+  const [error, setError] = useState(null);
 
-  // New states for driver-like flow
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [selectedStationForDetail, setSelectedStationForDetail] =
-    useState(null);
-  const [actionDialog, setActionDialog] = useState({
-    open: false,
-    type: "",
-    station: null,
-  });
-  const [successMessage, setSuccessMessage] = useState("");
-  const [showSuccess, setShowSuccess] = useState(false);
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
 
-  // Calculate overall statistics from poles/ports
-  const calculateStationStats = (stations) => {
-    let totalPoles = 0;
-    let activePoles = 0;
-    let maintenancePoles = 0;
-    let offlinePoles = 0;
-    let totalPorts = 0;
-    let occupiedPorts = 0;
+  const loadDashboardData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await staffAPI.getDashboardOverview();
+      console.log("📊 Dashboard API Response:", response);
 
-    stations.forEach((station) => {
-      (station.charging?.poles || []).forEach((pole) => {
-        totalPoles++;
-        const portsCount = pole.totalPorts || (pole.ports || []).length;
-        totalPorts += portsCount;
-        const available = typeof pole.availablePorts === 'number' ? pole.availablePorts : (pole.ports || []).filter(p=>p.status==='available').length;
-        occupiedPorts += Math.max(0, portsCount - available);
+      if (!response || typeof response !== "object") {
+        throw new Error("Không nhận được dữ liệu dashboard");
+      }
 
-        switch (pole.status) {
-          case "active":
-          case "occupied":
-            activePoles++;
-            break;
-          case "maintenance":
-            maintenancePoles++;
-            break;
-          case "offline":
-            offlinePoles++;
-            break;
+      const {
+        hasAssignment,
+        station,
+        staff,
+        connectors: connectorPayload = [],
+        dailyStats: dailyStatsPayload,
+        alerts: alertPayload = [],
+      } = response;
+
+      console.log("📈 Daily Stats from API:", dailyStatsPayload);
+      console.log("🔌 Connectors from API:", connectorPayload);
+
+      if (hasAssignment && station) {
+        setStationInfo({
+          id: station.stationId,
+          name: station.stationName,
+          address: `${station.address}${station.city ? `, ${station.city}` : ""}`,
+          staffName: staff?.fullName || "",
+        });
+      } else {
+        setStationInfo(null);
+      }
+
+      const normalizedConnectors = Array.isArray(connectorPayload)
+        ? connectorPayload
+            .map((connector) => mapConnectorForDisplay(connector))
+            .filter(Boolean)
+        : [];
+      setConnectors(normalizedConnectors);
+
+      // Calculate comprehensive stats
+      let calculatedStats = {
+        revenue: 0,
+        completedSessions: 0,
+        energyConsumed: 0,
+        activeSessions: 0,
+      };
+
+      // Start with API stats if provided
+      if (dailyStatsPayload) {
+        calculatedStats.revenue = Number(dailyStatsPayload.revenue || 0);
+        calculatedStats.completedSessions = Number(dailyStatsPayload.completedSessions || 0);
+        calculatedStats.energyConsumed = Number(dailyStatsPayload.energyDeliveredKwh || 0);
+        calculatedStats.activeSessions = Number(dailyStatsPayload.activeSessions || 0);
+      }
+
+      // Calculate current active sessions from connectors
+      let currentActiveSessions = 0;
+      let currentActiveEnergy = 0;
+      let currentActiveRevenue = 0;
+
+      normalizedConnectors.forEach((connector) => {
+        console.log("🔍 Checking connector:", connector.code, "hasActiveSession:", !!connector.activeSession);
+        if (connector.activeSession) {
+          currentActiveSessions += 1;
+          const session = connector.activeSession;
+          console.log("  ✅ Active session found:", session);
+          
+          // Calculate energy consumed from SOC change or direct value
+          const energyKwh = Number(session.energyConsumedKwh || 0);
+          currentActiveEnergy += energyKwh;
+          
+          // Calculate revenue based on energy and rate
+          const rate = Number(session.unitPrice || 5000); // Default rate VND/kWh
+          currentActiveRevenue += energyKwh * rate;
         }
       });
-    });
+
+      console.log("📊 Calculated from connectors:", {
+        activeSessions: currentActiveSessions,
+        energy: currentActiveEnergy,
+        revenue: currentActiveRevenue
+      });
+
+      // Update stats with current active data
+      calculatedStats.activeSessions = currentActiveSessions;
+      
+      // Add active session energy to total (if not already counted in dailyStats)
+      if (!dailyStatsPayload || dailyStatsPayload.energyDeliveredKwh === 0) {
+        calculatedStats.energyConsumed += currentActiveEnergy;
+      }
+
+      // If no revenue from API, use calculated from active sessions
+      if (calculatedStats.revenue === 0 && currentActiveRevenue > 0) {
+        calculatedStats.revenue = currentActiveRevenue;
+      }
+
+      console.log("✅ Final calculated stats:", calculatedStats);
+      setDailyStats(calculatedStats);
+
+      const normalizedAlerts = Array.isArray(alertPayload)
+        ? alertPayload.map((alert) => ({
+            id: alert.alertId ?? safeRandomId(),
+            type: normalizeAlertSeverity(alert.severity),
+            message: alert.message,
+            timestamp: alert.createdAtUtc ? new Date(alert.createdAtUtc) : new Date(),
+          }))
+        : [];
+      setAlerts(normalizedAlerts);
+    } catch (error) {
+      console.error("Error loading dashboard:", error);
+      setError(error.message || "Không thể tải dashboard nhân viên");
+      setStationInfo(null);
+      setConnectors([]);
+      setDailyStats({ revenue: 0, completedSessions: 0, energyConsumed: 0 });
+      setAlerts([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case "Available":
+        return <CheckCircle color="success" />;
+      case "Charging":
+        return <BatteryChargingFull color="primary" />;
+      case "Faulted":
+        return <Warning color="error" />;
+      case "Unavailable":
+        return <PowerOff color="disabled" />;
+      default:
+        return <Build color="warning" />;
+    }
+  };
+
+  const safeRandomId = () =>
+    typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `alert-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+  const normalizeAlertSeverity = (severity) => {
+    const normalized = (severity || "info").toString().toLowerCase();
+    if (normalized === "error" || normalized === "critical") return "error";
+    if (normalized === "warning" || normalized === "warn") return "warning";
+    return "info";
+  };
+
+  const mapConnectorForDisplay = (connector) => {
+    if (!connector) return null;
+
+    const rawStatus = (connector.operationalStatus || connector.technicalStatus || "").trim();
+    const statusKey = rawStatus.toLowerCase();
+
+    const statusMap = {
+      available: { status: "Available", label: "Rảnh", color: "success" },
+      charging: { status: "Charging", label: "Đang sạc", color: "primary" },
+      in_use: { status: "Charging", label: "Đang sạc", color: "primary" },
+      maintenance: { status: "Faulted", label: "Bảo trì", color: "warning" },
+      faulted: { status: "Faulted", label: "Lỗi", color: "error" },
+      offline: { status: "Faulted", label: "Offline", color: "error" },
+      unavailable: { status: "Unavailable", label: "Không khả dụng", color: "default" },
+      reserved: { status: "Reserved", label: "Đã giữ chỗ", color: "info" },
+    };
+
+    const mapped = statusMap[statusKey] || {
+      status: "Unknown",
+      label: rawStatus || "Không xác định",
+      color: "default",
+    };
+
+    let currentSession = null;
+    if (connector.activeSession) {
+      const session = connector.activeSession;
+      currentSession = {
+        id: `SES-${session.bookingId}`,
+        startTime: session.startedAt ? new Date(session.startedAt) : null,
+        energyConsumed: Number(session.energyDelivered || 0),
+        vehicleSOC:
+          session.currentSoc !== undefined && session.currentSoc !== null
+            ? Number(session.currentSoc)
+            : null,
+        customerName: session.customerName,
+        vehicleInfo: session.vehicleInfo,
+      };
+    }
 
     return {
-      totalPoles,
-      activePoles,
-      maintenancePoles,
-      offlinePoles,
-      totalPorts,
-      occupiedPorts,
-      availablePorts: totalPorts - occupiedPorts,
+      id: connector.connectorCode || `SLOT-${connector.slotId}`,
+      slotId: connector.slotId,
+      type: connector.connectorType,
+      maxPower: Number(connector.maxPower || 0),
+      status: mapped.status,
+      statusLabel: mapped.label,
+      statusColor: mapped.color,
+      technicalStatus: connector.technicalStatus,
+      voltage: connector.voltage,
+      current: connector.current,
+      temperature: connector.temperature,
+      currentSession,
     };
   };
 
-  const stats = calculateStationStats(stations);
-  const totalRevenue = stations.reduce(
-    (sum, station) => sum + station.dailyRevenue,
-    0
-  );
-  const totalSessions = stations.reduce(
-    (sum, station) => sum + station.dailySessions,
-    0
-  );
-
-  // Filter stations based on search and status like driver flow
-  const filteredStations = stations.filter((station) => {
-    const matchesSearch =
-      station.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      station.location.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus =
-      statusFilter === "all" || station.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
-
-  // Handle station actions like driver flow
-  const handleStationAction = (action, station) => {
-    if (action === "view") {
-      setSelectedStationForDetail(station);
-    } else if (action === "maintenance") {
-      setActionDialog({ open: true, type: "maintenance", station });
-    }
-  };
-
-  const handleActionComplete = (actionType, stationName) => {
-    setSuccessMessage(
-      `${actionType} completed successfully for ${stationName}!`
-    );
-    setShowSuccess(true);
-    setActionDialog({ open: false, type: "", station: null });
-    setMaintenanceDialog(false);
-  };
-
-  const getDistanceToStation = (station) => {
-    // Mock distance calculation for staff view
-    return (Math.random() * 5 + 0.5).toFixed(1);
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case "operational":
-        return "success";
-      case "warning":
-        return "warning";
-      case "error":
-        return "error";
-      default:
-        return "default";
-    }
-  };
-
-  const getPriorityColor = (priority) => {
-    switch (priority) {
-      case "high":
-        return "error";
-      case "medium":
-        return "warning";
-      case "low":
-        return "info";
-      default:
-        return "default";
-    }
-  };
-
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat("vi-VN", {
-      style: "currency",
-      currency: "VND",
-    }).format(amount);
-  };
+  // Statistics
+  const totalConnectors = connectors.length;
+  const availableConnectors = connectors.filter((c) => c.status === "Available").length;
+  const chargingConnectors = connectors.filter((c) => c.status === "Charging").length;
+  const faultedConnectors = connectors.filter((c) => c.status === "Faulted").length;
+  const onlineConnectors = connectors.filter((c) => c.status === "Available" || c.status === "Charging").length;
+  const offlineConnectors = connectors.filter((c) => c.status === "Faulted" || c.status === "Unavailable").length;
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Box>
       {/* Header */}
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" fontWeight="bold" gutterBottom>
-          Staff Dashboard ⚡
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          Monitor and manage charging stations, poles (trụ), and ports (cổng)
-        </Typography>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+        <Box>
+          <Typography variant="h4" fontWeight="bold" gutterBottom>
+            Quản lý Trạm sạc
+          </Typography>
+          {stationInfo ? (
+            <Typography variant="body1" color="text.secondary">
+              {stationInfo.name} - {stationInfo.address}
+            </Typography>
+          ) : (
+            <Typography variant="body2" color="text.secondary">
+              Chưa có trạm được giao phụ trách
+            </Typography>
+          )}
+        </Box>
+        <Button
+          variant="outlined"
+          startIcon={<Refresh />}
+          onClick={loadDashboardData}
+          disabled={loading}
+        >
+          Làm mới
+        </Button>
       </Box>
 
-      {/* Search & Filters - Driver-like flow */}
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Grid container spacing={3} alignItems="center">
-            {/* Search Bar */}
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                placeholder="Search stations by name or location..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                InputProps={{
-                  startAdornment: (
-                    <Search sx={{ mr: 1, color: "text.secondary" }} />
-                  ),
-                }}
-              />
-            </Grid>
+      {error && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {error}
+        </Alert>
+      )}
 
-            {/* Status Filter */}
-            <Grid item xs={12} md={3}>
-              <FormControl fullWidth>
-                <InputLabel>Station Status</InputLabel>
-                <Select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                >
-                  <MenuItem value="all">All Status</MenuItem>
-                  <MenuItem value="operational">Operational</MenuItem>
-                  <MenuItem value="warning">Warning</MenuItem>
-                  <MenuItem value="error">Error</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
+      {/* Staff Info Alert */}
+      {stationInfo && (
+        <Alert severity="info" icon={<ElectricCar />} sx={{ mb: 3 }}>
+          Nhân viên: <strong>{stationInfo.staffName}</strong> - Trạm:{" "}
+          <strong>{stationInfo.name}</strong>
+        </Alert>
+      )}
 
-            {/* Results Count */}
-            <Grid item xs={12} md={3}>
-              <Typography variant="body2" color="text.secondary">
-                {filteredStations.length} stations found
-              </Typography>
-            </Grid>
-          </Grid>
-        </CardContent>
-      </Card>
-
-      {/* Overview Statistics */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
+      {/* Statistics Cards - 4 chỉ số chính */}
+      <Grid container spacing={3} mb={3}>
+        {/* Doanh thu hôm nay */}
         <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-                <Avatar sx={{ bgcolor: "primary.main", mr: 2 }}>
-                  <ElectricCar />
-                </Avatar>
-                <Box>
-                  <Typography variant="h4" fontWeight="bold">
-                    {stats.totalPoles}
+          <Card sx={{ 
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            color: 'white',
+            height: '100%',
+            minHeight: 140
+          }}>
+            <CardContent sx={{ height: '100%', display: 'flex', alignItems: 'center' }}>
+              <Box display="flex" alignItems="center" justifyContent="space-between" width="100%">
+                <Box flex={1}>
+                  <Typography variant="body2" sx={{ opacity: 0.9, mb: 1, fontSize: '0.875rem' }}>
+                    Doanh thu hôm nay (VNĐ)
                   </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Trụ sạc (Poles)
+                  <Typography variant="h4" fontWeight="bold" sx={{ fontSize: { xs: '1.75rem', md: '2.125rem' } }}>
+                    {Number(dailyStats.revenue || 0).toLocaleString('vi-VN')}
                   </Typography>
                 </Box>
+                <MonetizationOn sx={{ fontSize: { xs: 40, md: 48 }, opacity: 0.8, ml: 1 }} />
               </Box>
-              <LinearProgress
-                variant="determinate"
-                value={(stats.activePoles / Math.max(1, stats.totalPoles)) * 100}
-                sx={{ height: 8, borderRadius: 4 }}
-              />
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{ mt: 1 }}
-              >
-                {stats.activePoles} active, {stats.maintenancePoles}{" "}
-                maintenance, {stats.offlinePoles} offline • {stats.totalPorts}{" "}
-                total ports
-              </Typography>
             </CardContent>
           </Card>
         </Grid>
 
+        {/* Phiên hoàn thành */}
         <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-                <Avatar sx={{ bgcolor: "success.main", mr: 2 }}>
-                  <CheckCircle />
-                </Avatar>
-                <Box>
-                  <Typography
-                    variant="h4"
-                    fontWeight="bold"
-                    color="success.main"
-                  >
-                    {stats.availablePorts}
+          <Card sx={{ 
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            color: 'white',
+            height: '100%',
+            minHeight: 140
+          }}>
+            <CardContent sx={{ height: '100%', display: 'flex', alignItems: 'center' }}>
+              <Box display="flex" alignItems="center" justifyContent="space-between" width="100%">
+                <Box flex={1}>
+                  <Typography variant="body2" sx={{ opacity: 0.9, mb: 1, fontSize: '0.875rem' }}>
+                    Phiên hoàn thành
                   </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Cổng có sẵn (Available Ports)
+                  <Typography variant="h4" fontWeight="bold" sx={{ fontSize: { xs: '1.75rem', md: '2.125rem' } }}>
+                    {Number(dailyStats.completedSessions || 0).toLocaleString('vi-VN')}
                   </Typography>
                 </Box>
+                <CheckCircle sx={{ fontSize: { xs: 40, md: 48 }, opacity: 0.8, ml: 1 }} />
               </Box>
-              <Chip
-                label={`${(
-                  (stats.availablePorts / Math.max(1, stats.totalPorts)) *
-                  100
-                ).toFixed(1)}% Available`}
-                color="success"
-                size="small"
-              />
             </CardContent>
           </Card>
         </Grid>
 
+        {/* Năng lượng tiêu thụ */}
         <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-                <Avatar sx={{ bgcolor: "info.main", mr: 2 }}>
-                  {formatCurrency(totalRevenue).slice(0, -2)}
-                </Avatar>
-                <Box>
-                  <Typography variant="h6" fontWeight="bold">
-                    {formatCurrency(totalRevenue)}
+          <Card sx={{ 
+            background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+            color: 'white',
+            height: '100%',
+            minHeight: 140
+          }}>
+            <CardContent sx={{ height: '100%', display: 'flex', alignItems: 'center' }}>
+              <Box display="flex" alignItems="center" justifyContent="space-between" width="100%">
+                <Box flex={1}>
+                  <Typography variant="body2" sx={{ opacity: 0.9, mb: 1, fontSize: '0.875rem' }}>
+                    Năng lượng tiêu thụ (kWh)
                   </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Today's Revenue
+                  <Typography variant="h4" fontWeight="bold" sx={{ fontSize: { xs: '1.75rem', md: '2.125rem' } }}>
+                    {Number(dailyStats.energyConsumed || 0).toFixed(1)}
                   </Typography>
                 </Box>
+                <Bolt sx={{ fontSize: { xs: 40, md: 48 }, opacity: 0.8, ml: 1 }} />
               </Box>
-              <Typography variant="caption" color="text.secondary">
-                From {totalSessions} charging sessions
-              </Typography>
             </CardContent>
           </Card>
         </Grid>
 
+        {/* Số lượng Xe đang sạc */}
         <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-                <Avatar sx={{ bgcolor: "warning.main", mr: 2 }}>
-                  <Warning />
-                </Avatar>
-                <Box>
-                  <Typography
-                    variant="h4"
-                    fontWeight="bold"
-                    color="warning.main"
-                  >
-                    {alerts.filter((a) => a.priority === "high").length}
+          <Card sx={{ 
+            background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+            color: 'white',
+            height: '100%',
+            minHeight: 140
+          }}>
+            <CardContent sx={{ height: '100%', display: 'flex', alignItems: 'center' }}>
+              <Box display="flex" alignItems="center" justifyContent="space-between" width="100%">
+                <Box flex={1}>
+                  <Typography variant="body2" sx={{ opacity: 0.9, mb: 1, fontSize: '0.875rem' }}>
+                    Số lượng Xe đang sạc
                   </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    High Priority Alerts
+                  <Typography variant="h4" fontWeight="bold" sx={{ fontSize: { xs: '1.75rem', md: '2.125rem' } }}>
+                    {Number(dailyStats.activeSessions || chargingConnectors || 0).toLocaleString('vi-VN')}
                   </Typography>
                 </Box>
+                <BatteryChargingFull sx={{ fontSize: { xs: 40, md: 48 }, opacity: 0.8, ml: 1 }} />
               </Box>
-              <Typography variant="caption" color="text.secondary">
-                {alerts.length} total alerts
-              </Typography>
             </CardContent>
           </Card>
         </Grid>
       </Grid>
 
-      {/* Station List & Details - Driver-like flow */}
-      <Grid container spacing={3}>
-        {/* Station List */}
-        <Grid item xs={12} md={8}>
-          <Card>
-            <CardContent>
-              <Box
-                sx={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  mb: 2,
-                }}
-              >
-                <Typography variant="h6" gutterBottom>
-                  {filteredStations.length} Stations Found
-                </Typography>
-                <Button
-                  startIcon={<Refresh />}
-                  onClick={() => window.location.reload()}
-                >
-                  Refresh
-                </Button>
-              </Box>
-
-              <Box sx={{ maxHeight: 600, overflowY: "auto" }}>
-                {filteredStations.map((station, index) => (
-                  <Box key={station.id}>
-                    <Paper
-                      sx={{
-                        p: 2,
-                        mb: 2,
-                        border:
-                          selectedStationForDetail?.id === station.id ? 2 : 1,
-                        borderColor:
-                          selectedStationForDetail?.id === station.id
-                            ? "primary.main"
-                            : "divider",
-                        "&:hover": {
-                          backgroundColor: "grey.50",
-                          cursor: "pointer",
-                        },
-                      }}
-                      onClick={() => setSelectedStationForDetail(station)}
-                    >
-                      <Box
-                        sx={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 2,
-                          mb: 2,
-                        }}
-                      >
-                        <Avatar
-                          sx={{
-                            bgcolor: "success.main",
-                            width: 60,
-                            height: 60,
-                          }}
-                        >
-                          <LocationOn />
-                        </Avatar>
-
-                        <Box sx={{ flexGrow: 1 }}>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "start",
-                              mb: 1,
-                            }}
-                          >
-                            <Typography variant="h6" fontWeight="bold">
-                              {station.name}
-                            </Typography>
-                            <Chip
-                              label={station.status}
-                              color={getStatusColor(station.status)}
-                              size="small"
-                            />
-                          </Box>
-
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 1,
-                              mb: 1,
-                            }}
-                          >
-                            <LocationOn
-                              sx={{ fontSize: 16, color: "text.secondary" }}
-                            />
-                            <Typography variant="body2" color="text.secondary">
-                              {station.location} •{" "}
-                              {getDistanceToStation(station)}km away
-                            </Typography>
-                          </Box>
-
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 3,
-                              mb: 1,
-                            }}
-                          >
-                            <Box
-                              sx={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 1,
-                              }}
-                            >
-                                        <ElectricCar
-                                          sx={{ fontSize: 16, color: "primary.main" }}
-                                        />
-                                        <Typography variant="body2">
-                                          {station.charging?.poles?.length || 0} trụ,{" "}
-                                          {(station.charging?.poles || []).reduce(
-                                            (sum, pole) => sum + (pole.totalPorts || (pole.ports || []).length),
-                                            0
-                                          )}{" "}
-                                          cổng
-                                        </Typography>
-                            </Box>
-                            <Box
-                              sx={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 1,
-                              }}
-                            >
-                              <MonetizationOn
-                                sx={{ fontSize: 16, color: "success.main" }}
-                              />
-                              <Typography variant="body2">
-                                {formatCurrency(station.dailyRevenue)} revenue
-                              </Typography>
-                            </Box>
-                          </Box>
-
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 2,
-                            }}
-                          >
-                            <Box
-                              sx={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 1,
-                              }}
-                            >
-                              <Typography
-                                variant="caption"
-                                color="text.secondary"
-                              >
-                                Available:{" "}
-                                {station.charging?.poles?.reduce(
-                                  (sum, pole) =>
-                                    sum + (pole.availablePorts ?? (pole.ports || []).filter(p=>p.status==='available').length),
-                                  0
-                                )}
-                                /
-                                {station.charging?.poles?.reduce(
-                                  (sum, pole) => sum + (pole.totalPorts ?? (pole.ports || []).length),
-                                  0
-                                )}
-                              </Typography>
-                              <LinearProgress
-                                variant="determinate"
-                                value={
-                                  (station.charging?.poles?.reduce(
-                                    (sum, pole) =>
-                                      sum + ((pole.totalPorts ?? (pole.ports || []).length) - (pole.availablePorts ?? (pole.ports || []).filter(p=>p.status==='available').length)),
-                                    0
-                                  ) /
-                                    Math.max(1, station.charging?.poles?.reduce(
-                                      (sum, pole) => sum + (pole.totalPorts ?? (pole.ports || []).length),
-                                      0
-                                    ))) *
-                                  100
-                                }
-                                sx={{ width: 60, height: 4 }}
-                              />
-                            </Box>
-                            <Chip
-                              label={`${station.dailySessions} sessions`}
-                              size="small"
-                              variant="outlined"
-                            />
-                            <Chip
-                              label={`${
-                                station.charging?.poles?.filter(
-                                  (p) => p.status === "active" || p.status === "occupied"
-                                ).length
-                              } active poles`}
-                              color="success"
-                              size="small"
-                            />
-                          </Box>
-                        </Box>
-
-                        <Box
-                          sx={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: 1,
-                          }}
-                        >
-                          <Button
-                            variant="contained"
-                            size="small"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleStationAction("view", station);
-                            }}
-                            startIcon={<Visibility />}
-                          >
-                            Monitor
-                          </Button>
-                          <Button
-                            variant="outlined"
-                            size="small"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleStationAction("maintenance", station);
-                            }}
-                            startIcon={<Build />}
-                          >
-                            Maintenance
-                          </Button>
-                        </Box>
-                      </Box>
-                    </Paper>
-                  </Box>
-                ))}
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        {/* Station Details & Alerts Panel */}
-        <Grid item xs={12} md={4}>
-          {selectedStationForDetail ? (
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  {selectedStationForDetail.name}
-                </Typography>
-
-                <Box sx={{ mb: 2 }}>
-                  <Avatar
-                    sx={{
-                      width: "100%",
-                      height: 120,
-                      borderRadius: 2,
-                      bgcolor: "success.main",
-                    }}
-                  >
-                    <LocationOn sx={{ fontSize: 40 }} />
-                  </Avatar>
-                </Box>
-
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    color: "text.secondary",
-                    fontSize: "0.875rem",
-                    mb: 1,
-                  }}
-                >
-                  <LocationOn sx={{ fontSize: 16, mr: 0.5 }} />
-                  {selectedStationForDetail.location}
-                </Box>
-
-                <Typography variant="body2" color="text.secondary" gutterBottom>
-                  Distance: {getDistanceToStation(selectedStationForDetail)}km
-                  away
-                </Typography>
-
-                <Divider sx={{ my: 2 }} />
-
-                <Typography variant="subtitle2" gutterBottom>
-                  Trạng thái Trụ & Cổng
-                </Typography>
-                {selectedStationForDetail.charging?.poles?.map((pole) => (
-                    <Box key={pole.id} sx={{ fontSize: "0.875rem", mb: 1 }}>
-                    • Trụ {pole.name}: {pole.availablePorts ?? (pole.ports || []).filter(p=>p.status==='available').length}/{pole.totalPorts ?? (pole.ports || []).length} cổng trống ({pole.status})
-                  </Box>
-                ))}
-
-                <Divider sx={{ my: 2 }} />
-
-                <Typography variant="subtitle2" gutterBottom>
-                  Performance Today
-                </Typography>
-                <Box sx={{ fontSize: "0.875rem", mb: 1 }}>
-                  • Revenue:{" "}
-                  {formatCurrency(selectedStationForDetail.dailyRevenue)}
-                </Box>
-                <Box sx={{ fontSize: "0.875rem", mb: 1 }}>
-                  • Sessions: {selectedStationForDetail.dailySessions}
-                </Box>
-
-                <Box
-                  sx={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 1,
-                    mt: 2,
-                  }}
-                >
-                  <Button
-                    fullWidth
-                    variant="contained"
-                    onClick={() =>
-                      handleStationAction(
-                        "maintenance",
-                        selectedStationForDetail
-                      )
-                    }
-                  >
-                    Schedule Maintenance
-                  </Button>
-                </Box>
-              </CardContent>
-            </Card>
+      {/* THÊM PHẦN BÁO LỖI - Đặt thẻ Báo lỗi */}
+      <Typography variant="h5" fontWeight={600} mb={2}>
+        Báo lỗi
+      </Typography>
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          {alerts.length === 0 ? (
+            <Alert severity="success" icon={<CheckCircle />}>
+              Không có lỗi nào. Tất cả điểm sạc đang hoạt động bình thường.
+            </Alert>
           ) : (
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Select a Station
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Choose a station from the list to see detailed information and
-                  perform maintenance actions.
-                </Typography>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Quick Alerts */}
-          <Card sx={{ mt: 3 }}>
-            <CardContent>
-              <Typography variant="h6" fontWeight="bold" gutterBottom>
-                Priority Alerts
-              </Typography>
-              {alerts.slice(0, 3).map((alert) => (
+            <Stack spacing={2}>
+              {alerts.map((alert) => (
                 <Alert
                   key={alert.id}
-                  severity={getPriorityColor(alert.priority)}
-                  sx={{ mb: 1 }}
-                  size="small"
+                  severity={alert.type}
+                  icon={alert.type === "warning" ? <Warning /> : alert.type === "error" ? <Error /> : <Notifications />}
+                  action={
+                    <Button
+                      size="small"
+                      onClick={() => {
+                        // Điểm sạc Offline (hiện tại là 1) và Điểm sạc có lỗi/Cảnh báo
+                        if (alert.type === "warning" && alert.message.includes("Offline")) {
+                          navigate("/staff/monitoring");
+                        } else {
+                          navigate("/staff/charging-sessions");
+                        }
+                      }}
+                    >
+                      Chi tiết
+                    </Button>
+                  }
                 >
-                  <Typography variant="caption" fontWeight="bold">
-                    {alert.station} - Trụ: {alert.pole || alert.chargingPost}
-                  </Typography>
-                  <Typography variant="caption" display="block">
-                    {alert.message}
+                  <AlertTitle sx={{ fontWeight: 600 }}>
+                    {alert.type === "warning" ? "Cảnh báo" : alert.type === "error" ? "Lỗi" : "Thông báo"}
+                  </AlertTitle>
+                  <Typography variant="body2">{alert.message}</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {alert.timestamp.toLocaleString("vi-VN")}
                   </Typography>
                 </Alert>
               ))}
-              <Button variant="outlined" fullWidth size="small" sx={{ mt: 1 }}>
-                View All Alerts
-              </Button>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
+            </Stack>
+          )}
+        </CardContent>
+      </Card>
 
-      {/* Action Dialogs - Driver-like flow */}
-      <Dialog
-        open={actionDialog.open && actionDialog.type === "maintenance"}
-        onClose={() =>
-          setActionDialog({ open: false, type: "", station: null })
-        }
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>
-          Schedule Maintenance: {actionDialog.station?.name}
-        </DialogTitle>
-        <DialogContent>
-            <Typography variant="body2" sx={{ mb: 2 }}>
-            Schedule maintenance for poles and ports.
+      {/* DANH SÁCH ĐIỂM SẠC - Góp thành một danh sách duy nhất và dùng ký hiệu trực quan */}
+      <Typography variant="h5" fontWeight={600} mb={2}>
+        Danh sách Điểm sạc
+      </Typography>
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Liệt kê tất cả các Điểm sạc (CON-01, CON-02, CON-03, CON-04) theo thứ tự và sử dụng{" "}
+            <strong>màu sắc/biểu tượng lớn hơn</strong> để thể hiện trạng thái (Xanh lá – Rảnh, Xanh dương = Đang sạc, 
+            Đỏ = Lỗi/Offline).
           </Typography>
-          <FormControl fullWidth sx={{ mb: 2 }}>
-            <InputLabel>Pole</InputLabel>
-            <Select
-              value={maintenanceForm.pole}
-              onChange={(e) =>
-                setMaintenanceForm({
-                  ...maintenanceForm,
-                  pole: e.target.value,
-                })
-              }
-            >
-              {actionDialog.station?.charging?.poles?.map((pole) => (
-                <MenuItem key={pole.id} value={pole.id}>
-                  {pole.name} ({pole.type} - {pole.power}kW)
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <TextField
-            fullWidth
-            label="Port ID"
-            value={maintenanceForm.port}
-            onChange={(e) =>
-              setMaintenanceForm({ ...maintenanceForm, port: e.target.value })
-            }
-            sx={{ mb: 2 }}
-            placeholder="e.g., Port 1, Port 2, All ports"
-          />
-          <TextField
-            fullWidth
-            label="Issue Description"
-            value={maintenanceForm.issue}
-            onChange={(e) =>
-              setMaintenanceForm({ ...maintenanceForm, issue: e.target.value })
-            }
-            sx={{ mb: 2 }}
-          />
-          <TextField
-            fullWidth
-            multiline
-            rows={3}
-            label="Additional Notes"
-            value={maintenanceForm.notes}
-            onChange={(e) =>
-              setMaintenanceForm({ ...maintenanceForm, notes: e.target.value })
-            }
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={() =>
-              setActionDialog({ open: false, type: "", station: null })
-            }
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="contained"
-            onClick={() =>
-              handleActionComplete(
-                "Maintenance scheduling",
-                actionDialog.station?.name
-              )
-            }
-          >
-            Schedule Maintenance
-          </Button>
-        </DialogActions>
-      </Dialog>
+          <Grid container spacing={2}>
+            {connectors.map((connector) => {
+              // Xác định màu và biểu tượng dựa trên status
+              let cardBgColor = "white";
+              let borderColor = "grey.300";
+              let icon = getStatusIcon(connector.status);
+              let statusText = connector.statusLabel;
+              let textColor = "text.primary";
 
-      {/* Success Snackbar - Driver-like flow */}
-      <Snackbar
-        open={showSuccess}
-        autoHideDuration={4000}
-        onClose={() => setShowSuccess(false)}
-        anchorOrigin={{ vertical: "top", horizontal: "center" }}
-      >
-        <Alert
-          onClose={() => setShowSuccess(false)}
-          severity="success"
-          variant="filled"
-          sx={{ width: "100%" }}
-        >
-          {successMessage}
-        </Alert>
-      </Snackbar>
+              if (connector.status === "Available") {
+                cardBgColor = "success.50";
+                borderColor = "success.main";
+                statusText = "🟢 Rảnh";
+                textColor = "success.main";
+              } else if (connector.status === "Charging") {
+                cardBgColor = "primary.50";
+                borderColor = "primary.main";
+                statusText = "🔵 Đang sạc";
+                textColor = "primary.main";
+              } else if (connector.status === "Faulted" || connector.status === "Unavailable") {
+                cardBgColor = "error.50";
+                borderColor = "error.main";
+                statusText = "🔴 Lỗi/Offline";
+                textColor = "error.main";
+              }
+
+              return (
+                <Grid item xs={12} sm={6} md={3} key={connector.id}>
+                  <Card
+                    sx={{
+                      bgcolor: cardBgColor,
+                      border: 2,
+                      borderColor: borderColor,
+                      height: '100%', // Chiều cao 100% của Grid item
+                      minHeight: 180, // Chiều cao tối thiểu cố định
+                      display: 'flex',
+                      flexDirection: 'column',
+                      transition: "all 0.3s",
+                      "&:hover": {
+                        boxShadow: 4,
+                        transform: "translateY(-4px)",
+                      },
+                    }}
+                  >
+                    <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
+                      <Box display="flex" alignItems="center" justifyContent="space-between" mb={1}>
+                        <Typography variant="h5" fontWeight="bold" color={textColor}>
+                          {connector.id}
+                        </Typography>
+                        <Box sx={{ fontSize: 40 }}>{icon}</Box>
+                      </Box>
+                      <Typography variant="body2" color="text.secondary" gutterBottom>
+                        {connector.type} - {connector.maxPower} kW
+                      </Typography>
+                      <Divider sx={{ my: 1 }} />
+                      <Typography variant="subtitle1" fontWeight={600} color={textColor}>
+                        {statusText}
+                      </Typography>
+                      {connector.currentSession && (
+                        <Box mt={1}>
+                          <Typography variant="body2" color="text.secondary">
+                            Phiên: {connector.currentSession.id}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            SOC: {connector.currentSession.vehicleSOC}%
+                          </Typography>
+                        </Box>
+                      )}
+                    </CardContent>
+                  </Card>
+                </Grid>
+              );
+            })}
+          </Grid>
+        </CardContent>
+      </Card>
     </Box>
   );
 };

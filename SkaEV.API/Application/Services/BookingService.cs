@@ -28,6 +28,31 @@ public class BookingService : IBookingService
 
     public async Task<int> CreateBookingAsync(CreateBookingDto dto)
     {
+        // Validate: Only allow bookings for today (UTC+7 Vietnam timezone)
+        if (dto.ScheduledStartTime.HasValue)
+        {
+            var vietnamTimeZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
+            var nowInVietnam = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, vietnamTimeZone);
+            var todayInVietnam = nowInVietnam.Date;
+            
+            var scheduledTimeUtc = dto.ScheduledStartTime.Value;
+            var scheduledTimeInVietnam = TimeZoneInfo.ConvertTimeFromUtc(scheduledTimeUtc, vietnamTimeZone);
+            var scheduledDate = scheduledTimeInVietnam.Date;
+            
+            // Check if scheduled date is not today
+            if (scheduledDate != todayInVietnam)
+            {
+                throw new InvalidOperationException("Chỉ cho phép đặt trạm sạc trong ngày hôm nay. Không thể đặt trước cho ngày khác.");
+            }
+            
+            // Check if scheduled time is at least 30 minutes in the future
+            var minimumTime = nowInVietnam.AddMinutes(30);
+            if (scheduledTimeInVietnam < minimumTime)
+            {
+                throw new InvalidOperationException($"Thời gian đặt phải ít nhất 30 phút từ bây giờ. Vui lòng chọn sau {minimumTime:HH:mm}.");
+            }
+        }
+        
         // Use stored procedure sp_create_booking
         var userIdParam = new SqlParameter("@user_id", dto.UserId);
         var vehicleIdParam = new SqlParameter("@vehicle_id", dto.VehicleId);
@@ -65,6 +90,7 @@ public class BookingService : IBookingService
             .Include(b => b.ChargingSlot)
             .Include(b => b.ChargingStation)
             .Include(b => b.SocTrackings)
+            .Include(b => b.Invoice)
             .Where(b => b.BookingId == bookingId)
             .Select(b => new BookingDto
             {
@@ -88,7 +114,18 @@ public class BookingService : IBookingService
                 TargetSoc = b.TargetSoc,
                 CurrentSoc = b.SocTrackings.OrderByDescending(s => s.Timestamp).Select(s => s.CurrentSoc).FirstOrDefault(),
                 EstimatedDuration = b.EstimatedDuration,
-                CreatedAt = b.CreatedAt
+                CreatedAt = b.CreatedAt,
+                TotalEnergyKwh = b.Invoice != null ? b.Invoice.TotalEnergyKwh : null,
+                EnergyDelivered = b.SocTrackings.OrderByDescending(s => s.Timestamp).Select(s => s.EnergyDelivered).FirstOrDefault(),
+                TotalAmount = b.Invoice != null ? b.Invoice.TotalAmount : null,
+                Subtotal = b.Invoice != null ? b.Invoice.Subtotal : null,
+                TaxAmount = b.Invoice != null ? b.Invoice.TaxAmount : null,
+                UnitPrice = b.Invoice != null ? b.Invoice.UnitPrice : null,
+                ChargingDurationMinutes = b.ActualStartTime != null && b.ActualEndTime != null
+                    ? EF.Functions.DateDiffMinute(b.ActualStartTime.Value, b.ActualEndTime.Value)
+                    : b.EstimatedDuration,
+                FinalSoc = b.SocTrackings.OrderByDescending(s => s.Timestamp).Select(s => s.CurrentSoc).FirstOrDefault(),
+                CompletedAt = b.ActualEndTime
             })
             .FirstOrDefaultAsync();
 
@@ -102,6 +139,7 @@ public class BookingService : IBookingService
             .Include(b => b.Vehicle)
             .Include(b => b.ChargingSlot)
             .Include(b => b.ChargingStation)
+            .Include(b => b.Invoice)
             .Where(b => b.UserId == userId)
             .OrderByDescending(b => b.CreatedAt)
             .Skip(offset)
@@ -120,12 +158,26 @@ public class BookingService : IBookingService
                 StationName = b.ChargingStation.StationName,
                 StationAddress = b.ChargingStation.Address,
                 SchedulingType = b.SchedulingType,
+                EstimatedArrival = b.EstimatedArrival,
                 ScheduledStartTime = b.ScheduledStartTime,
                 ActualStartTime = b.ActualStartTime,
                 ActualEndTime = b.ActualEndTime,
                 Status = b.Status,
                 TargetSoc = b.TargetSoc,
-                CreatedAt = b.CreatedAt
+                CurrentSoc = b.SocTrackings.OrderByDescending(s => s.Timestamp).Select(s => s.CurrentSoc).FirstOrDefault(),
+                CreatedAt = b.CreatedAt,
+                EstimatedDuration = b.EstimatedDuration,
+                TotalEnergyKwh = b.Invoice != null ? b.Invoice.TotalEnergyKwh : null,
+                EnergyDelivered = b.SocTrackings.OrderByDescending(s => s.Timestamp).Select(s => s.EnergyDelivered).FirstOrDefault(),
+                TotalAmount = b.Invoice != null ? b.Invoice.TotalAmount : null,
+                Subtotal = b.Invoice != null ? b.Invoice.Subtotal : null,
+                TaxAmount = b.Invoice != null ? b.Invoice.TaxAmount : null,
+                UnitPrice = b.Invoice != null ? b.Invoice.UnitPrice : null,
+                ChargingDurationMinutes = b.ActualStartTime != null && b.ActualEndTime != null
+                    ? EF.Functions.DateDiffMinute(b.ActualStartTime.Value, b.ActualEndTime.Value)
+                    : b.EstimatedDuration,
+                FinalSoc = b.SocTrackings.OrderByDescending(s => s.Timestamp).Select(s => s.CurrentSoc).FirstOrDefault(),
+                CompletedAt = b.ActualEndTime
             })
             .ToListAsync();
 

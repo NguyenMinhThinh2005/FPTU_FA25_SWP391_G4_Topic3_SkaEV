@@ -1,0 +1,6 @@
+station_name,location_address,latitude,longitude,total_slots,available_slots,operating_hours,contact_phone
+EV Station Hanoi Central,123 Ba Dinh Street Hanoi,21.0285,105.8542,10,8,00:00-23:59,0243123456
+EV Station HCMC District 1,456 Nguyen Hue Street HCMC,10.7769,106.7009,15,12,06:00-22:00,0283456789
+EV Station Da Nang Beach,789 Vo Nguyen Giap Da Nang,16.0544,108.2022,8,6,24/7,02363789012
+EV Station Hanoi Cau Giay,321 Cau Giay Hanoi,21.0333,105.7950,12,10,06:00-23:00,0243234567
+EV Station HCMC Tan Binh,654 Truong Chinh HCMC,10.8006,106.6529,10,8,00:00-23:59,0283567890

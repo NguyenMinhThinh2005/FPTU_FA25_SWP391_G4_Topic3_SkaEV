@@ -31,14 +31,14 @@ public class AdminReportsController : ControllerBase
     [HttpGet("revenue")]
     [ProducesResponseType(typeof(IEnumerable<RevenueReportDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetRevenueReports(
-        [FromQuery] int? stationId = null, 
-        [FromQuery] int? year = null, 
+        [FromQuery] int? stationId = null,
+        [FromQuery] int? year = null,
         [FromQuery] int? month = null)
     {
         try
         {
             var reports = await _reportService.GetRevenueReportsAsync(stationId, year, month);
-            
+
             var totalRevenue = reports.Sum(r => r.TotalRevenue);
             var totalEnergy = reports.Sum(r => r.TotalEnergySoldKwh);
             var totalTransactions = reports.Sum(r => r.TotalTransactions);
@@ -71,8 +71,8 @@ public class AdminReportsController : ControllerBase
     [HttpGet("usage")]
     [ProducesResponseType(typeof(IEnumerable<UsageReportDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetUsageReports(
-        [FromQuery] int? stationId = null, 
-        [FromQuery] int? year = null, 
+        [FromQuery] int? stationId = null,
+        [FromQuery] int? year = null,
         [FromQuery] int? month = null)
     {
         try
@@ -131,7 +131,7 @@ public class AdminReportsController : ControllerBase
     [HttpGet("top-stations")]
     [ProducesResponseType(typeof(IEnumerable<RevenueReportDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetTopStations(
-        [FromQuery] int? year = null, 
+        [FromQuery] int? year = null,
         [FromQuery] int? month = null,
         [FromQuery] int limit = 10)
     {
@@ -204,7 +204,7 @@ public class AdminReportsController : ControllerBase
         {
             var csvContent = await _reportService.ExportRevenueReportToCsvAsync(stationId, year, month);
             var fileName = $"revenue_report_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
-            
+
             return File(
                 System.Text.Encoding.UTF8.GetBytes(csvContent),
                 "text/csv",
@@ -215,6 +215,62 @@ public class AdminReportsController : ControllerBase
         {
             _logger.LogError(ex, "Error exporting revenue report");
             return StatusCode(500, new { message = "An error occurred" });
+        }
+    }
+
+    /// <summary>
+    /// Get peak hours analysis
+    /// </summary>
+    [HttpGet("peak-hours")]
+    public async Task<IActionResult> GetPeakHoursAnalysis(
+        [FromQuery] int? stationId = null,
+        [FromQuery] string? dateRange = "last30days")
+    {
+        try
+        {
+            var peakHours = await _reportService.GetPeakHoursAnalysisAsync(stationId, dateRange);
+            return Ok(new { success = true, data = peakHours });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting peak hours analysis");
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
+    }
+
+    /// <summary>
+    /// Get system health metrics
+    /// </summary>
+    [HttpGet("system-health")]
+    public async Task<IActionResult> GetSystemHealth()
+    {
+        try
+        {
+            var health = await _reportService.GetSystemHealthAsync();
+            return Ok(new { success = true, data = health });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting system health");
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
+    }
+
+    /// <summary>
+    /// Get user growth analytics
+    /// </summary>
+    [HttpGet("user-growth")]
+    public async Task<IActionResult> GetUserGrowth([FromQuery] string? dateRange = "last30days")
+    {
+        try
+        {
+            var growth = await _reportService.GetUserGrowthAsync(dateRange);
+            return Ok(new { success = true, data = growth });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting user growth");
+            return StatusCode(500, new { success = false, message = "An error occurred" });
         }
     }
 }

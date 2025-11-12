@@ -151,13 +151,17 @@ const useAuthStore = create(
         set({ error: null });
       },
 
+      setUser: (userData) => {
+        set({ user: userData });
+      },
+
       updateProfile: (profileData) => {
         const currentUser = get().user;
         if (currentUser) {
           set({
             user: {
               ...currentUser,
-              profile: { ...currentUser.profile, ...profileData },
+              ...profileData,
             },
           });
         }

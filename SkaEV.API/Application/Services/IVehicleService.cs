@@ -9,5 +9,5 @@ public interface IVehicleService
     Task<VehicleDto> CreateVehicleAsync(int userId, CreateVehicleDto createDto);
     Task<VehicleDto> UpdateVehicleAsync(int vehicleId, UpdateVehicleDto updateDto);
     Task DeleteVehicleAsync(int vehicleId);
-    Task<VehicleDto> SetDefaultVehicleAsync(int vehicleId, int userId);
+    Task<VehicleDto> SetDefaultVehicleAsync(int userId, int vehicleId);
 }
