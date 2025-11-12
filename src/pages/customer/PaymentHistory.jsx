@@ -25,6 +25,8 @@ import {
   Alert,
   IconButton,
   Tooltip,
+  CircularProgress,
+  Snackbar,
 } from "@mui/material";
 import {
   Receipt,
@@ -42,118 +44,90 @@ import {
   LocalAtm,
 } from "@mui/icons-material";
 import { formatCurrency } from "../../utils/helpers";
-import { useMasterDataSync } from "../../hooks/useMasterDataSync";
+import { invoicesAPI, paymentsAPI } from "../../services/api";
 
 const PaymentHistory = () => {
   const [selectedPayment, setSelectedPayment] = useState(null);
   const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
-  const { bookingHistory, completedBookings, isDataReady } =
-    useMasterDataSync();
+  const [invoices, setInvoices] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null);
 
-  // Transform booking data to payment history with realistic logic
-  const paymentHistory = (bookingHistory || [])
-    .filter(
-      (booking) =>
-        booking &&
-        booking.status === "completed" &&
-        (booking.totalAmount > 0 || booking.energyDelivered > 0) &&
-        booking.id
-    )
-    .map((booking) => {
-      const parkingFee = (booking.chargingDuration || 45) * 500; // 500 VND per minute
-      const energyCost =
-        booking.totalAmount || (booking.energyDelivered || 15) * 8500;
-      const totalCost = energyCost + parkingFee;
+  // Fetch invoices on mount
+  useEffect(() => {
+    fetchInvoices();
+  }, []);
 
-      const paymentMethods = [
-        {
-          name: "SkaEV Wallet",
-          icon: <AccountBalanceWallet />,
-          color: "primary",
-        },
-        { name: "Visa ****1234", icon: <CreditCard />, color: "info" },
-        {
-          name: "MoMo Wallet",
-          icon: <AccountBalanceWallet />,
-          color: "success",
-        },
-        { name: "Banking Transfer", icon: <LocalAtm />, color: "warning" },
-      ];
-      const randomMethod =
-        paymentMethods[Math.floor(Math.random() * paymentMethods.length)];
+  const fetchInvoices = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await invoicesAPI.getMyInvoices();
+      const data = response?.data || response || [];
+      setInvoices(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Error fetching invoices:", err);
+      setError(err.message || "Không thể tải lịch sử thanh toán");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      return {
-        id: `PAY-${booking.id || Date.now()}`,
-        date: booking.bookingDate || new Date().toISOString().split("T")[0],
-        amount: totalCost,
-        method: randomMethod.name,
-        methodIcon: randomMethod.icon,
-        methodColor: randomMethod.color,
-        status: "completed",
-        description: `Sạc tại ${booking.stationName || "Trạm sạc"}`,
-        session: {
-          stationName: `${booking.stationName || "Trạm sạc"} - ${
-            booking.connector?.location || "Trụ A01"
-          }`,
-          energy: `${booking.energyDelivered || 15} kWh`,
-          duration: `${booking.chargingDuration || 45} phút`,
-          connector: "CCS2",
-          startTime: booking.createdAt
-            ? new Date(booking.createdAt).toLocaleTimeString("vi-VN", {
-                hour: "2-digit",
-                minute: "2-digit",
-              })
-            : "10:00",
-          endTime: booking.completedAt
-            ? new Date(booking.completedAt).toLocaleTimeString("vi-VN", {
-                hour: "2-digit",
-                minute: "2-digit",
-              })
-            : "11:00",
-          energyCost: energyCost,
-          parkingFee: parkingFee,
-        },
-        invoiceNumber: `INV-${(booking.bookingDate || "2025-09-01").replace(
-          /-/g,
-          ""
-        )}-${String(booking.id || 1).padStart(3, "0")}`,
-        taxInfo: {
-          subtotal: Math.round(totalCost / 1.1),
-          tax: Math.round(totalCost * 0.1),
-          total: totalCost,
-        },
-      };
-    });
-
-  // Add subscription payment for variety
-  const subscriptionPayments = [
-    {
-      id: "PAY-SUB-001",
-      date: "2025-09-01",
-      amount: 199000,
-      method: "Banking Transfer",
-      methodIcon: <LocalAtm />,
-      methodColor: "warning",
-      status: "completed",
-      description: "Gói Tiết kiệm - Thanh toán hàng tháng",
-      session: null,
-      subscription: {
-        packageName: "Gói Tiết kiệm",
-        period: "09/2025",
-        sessions: 20,
-        discount: "15%",
+  // Transform invoice data to payment history format
+  const paymentHistory = invoices.map((invoice) => {
+    const paymentMethods = [
+      {
+        name: "SkaEV Wallet",
+        icon: <AccountBalanceWallet />,
+        color: "primary",
       },
-      invoiceNumber: "INV-2025-09-SUB-001",
+      { name: "Visa ****1234", icon: <CreditCard />, color: "info" },
+      {
+        name: "MoMo Wallet",
+        icon: <AccountBalanceWallet />,
+        color: "success",
+      },
+      { name: "Banking Transfer", icon: <LocalAtm />, color: "warning" },
+    ];
+    
+    // Get payment method from invoice or use random for demo
+    const methodIndex = invoice.paymentMethodId 
+      ? invoice.paymentMethodId % paymentMethods.length 
+      : Math.floor(Math.random() * paymentMethods.length);
+    const method = paymentMethods[methodIndex];
+
+    return {
+      id: `PAY-${invoice.invoiceId || invoice.id}`,
+      invoiceId: invoice.invoiceId || invoice.id,
+      date: invoice.invoiceDate || invoice.createdAt || new Date().toISOString().split("T")[0],
+      amount: invoice.totalAmount || invoice.total || 0,
+      method: method.name,
+      methodIcon: method.icon,
+      methodColor: method.color,
+      status: invoice.paymentStatus || invoice.status || "completed",
+      description: invoice.description || `Sạc tại trạm`,
+      session: {
+        stationName: invoice.stationName || "Trạm sạc",
+        energy: `${invoice.energyDelivered || invoice.energy || 0} kWh`,
+        duration: `${invoice.chargingDuration || invoice.duration || 0} phút`,
+        connector: invoice.connectorType || "CCS2",
+        startTime: invoice.startTime || "10:00",
+        endTime: invoice.endTime || "11:00",
+        energyCost: invoice.energyCost || invoice.subtotal || 0,
+        parkingFee: invoice.parkingFee || 0,
+      },
+      invoiceNumber: invoice.invoiceNumber || `INV-${invoice.invoiceId}`,
       taxInfo: {
-        subtotal: 180909,
-        tax: 18091,
-        total: 199000,
+        subtotal: invoice.subtotal || Math.round((invoice.totalAmount || 0) / 1.1),
+        tax: invoice.taxAmount || Math.round((invoice.totalAmount || 0) * 0.1),
+        total: invoice.totalAmount || invoice.total || 0,
       },
-    },
-  ];
+    };
+  });
 
-  // Combine all payments and sort by date (newest first)
-  const allPayments = [...paymentHistory, ...subscriptionPayments].sort(
+  // Sort payments by date (newest first)
+  const allPayments = paymentHistory.sort(
     (a, b) => new Date(b.date) - new Date(a.date)
   );
 
@@ -189,18 +163,79 @@ const PaymentHistory = () => {
     setReceiptDialogOpen(true);
   };
 
-  const handleDownloadReceipt = (payment) => {
-    console.log("Downloading receipt for:", payment.invoiceNumber);
-    alert(`Đã tải xuống hóa đơn ${payment.invoiceNumber}`);
+  const handleDownloadReceipt = async (payment) => {
+    if (!payment.invoiceId) {
+      setError("Không tìm thấy ID hóa đơn");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const blob = await invoicesAPI.download(payment.invoiceId);
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${payment.invoiceNumber}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      setSuccessMessage(`Đã tải xuống hóa đơn ${payment.invoiceNumber}`);
+    } catch (err) {
+      console.error("Error downloading invoice:", err);
+      setError(err.message || "Không thể tải xuống hóa đơn");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handlePrintReceipt = (payment) => {
-    console.log("Printing receipt for:", payment.invoiceNumber);
-    alert(`Đã in hóa đơn ${payment.invoiceNumber}`);
+  const handlePrintReceipt = () => {
+    if (selectedPayment) {
+      window.print();
+      setSuccessMessage("Đã gửi lệnh in hóa đơn");
+    }
   };
 
   return (
     <Container maxWidth="lg" sx={{ py: 3 }}>
+      {/* Loading Overlay */}
+      {loading && (
+        <Box
+          sx={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            bgcolor: 'rgba(0,0,0,0.3)',
+            zIndex: 9999,
+          }}
+        >
+          <CircularProgress />
+        </Box>
+      )}
+
+      {/* Success Message */}
+      <Snackbar
+        open={!!successMessage}
+        autoHideDuration={3000}
+        onClose={() => setSuccessMessage(null)}
+        message={successMessage}
+      />
+
+      {/* Error Alert */}
+      {error && (
+        <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 3 }}>
+          {error}
+        </Alert>
+      )}
+
       {/* Header */}
       <Box
         sx={{
@@ -371,92 +406,114 @@ const PaymentHistory = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {(allPayments || []).map((payment) => (
-                  <TableRow key={payment.id} hover>
-                    <TableCell>
-                      <Typography variant="body2">
-                        {new Date(payment.date).toLocaleDateString("vi-VN")}
+                {loading && invoices.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} align="center" sx={{ py: 8 }}>
+                      <CircularProgress />
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                        Đang tải lịch sử thanh toán...
                       </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {payment.invoiceNumber}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" fontWeight="medium">
-                        {payment.description}
-                      </Typography>
-                      {payment.session && (
-                        <Typography variant="caption" color="text.secondary">
-                          {payment.session.energy} • {payment.session.duration}
-                        </Typography>
-                      )}
-                      {payment.subscription && (
-                        <Typography variant="caption" color="text.secondary">
-                          {payment.subscription.packageName} •{" "}
-                          {payment.subscription.sessions} phiên
-                        </Typography>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                      >
-                        <Avatar
-                          sx={{
-                            width: 24,
-                            height: 24,
-                            bgcolor: `${payment.methodColor}.main`,
-                          }}
-                        >
-                          {payment.methodIcon}
-                        </Avatar>
-                        <Typography variant="body2">
-                          {payment.method}
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell align="right">
-                      <Typography variant="body2" fontWeight="medium">
-                        {formatCurrency(payment.amount)}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>{getStatusChip(payment.status)}</TableCell>
-                    <TableCell align="center">
-                      <Box
-                        sx={{
-                          display: "flex",
-                          gap: 1,
-                          justifyContent: "center",
-                        }}
-                      >
-                        <Tooltip title="Xem chi tiết">
-                          <IconButton
-                            size="small"
-                            onClick={() => handleViewReceipt(payment)}
-                          >
-                            <Visibility />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Tải xuống">
-                          <IconButton
-                            size="small"
-                            onClick={() => handleDownloadReceipt(payment)}
-                          >
-                            <Download />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="In hóa đơn">
-                          <IconButton
-                            size="small"
-                            onClick={() => handlePrintReceipt(payment)}
-                          >
-                            <Print />
-                          </IconButton>
-                        </Tooltip>
-                      </Box>
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : !loading && allPayments.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} align="center" sx={{ py: 8 }}>
+                      <Typography variant="body1" color="text.secondary">
+                        Chưa có lịch sử thanh toán
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                        Các giao dịch của bạn sẽ hiển thị tại đây
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  (allPayments || []).map((payment) => (
+                    <TableRow key={payment.id} hover>
+                      <TableCell>
+                        <Typography variant="body2">
+                          {new Date(payment.date).toLocaleDateString("vi-VN")}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {payment.invoiceNumber}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" fontWeight="medium">
+                          {payment.description}
+                        </Typography>
+                        {payment.session && (
+                          <Typography variant="caption" color="text.secondary">
+                            {payment.session.energy} • {payment.session.duration}
+                          </Typography>
+                        )}
+                        {payment.subscription && (
+                          <Typography variant="caption" color="text.secondary">
+                            {payment.subscription.packageName} •{" "}
+                            {payment.subscription.sessions} phiên
+                          </Typography>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Box
+                          sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                        >
+                          <Avatar
+                            sx={{
+                              width: 24,
+                              height: 24,
+                              bgcolor: `${payment.methodColor}.main`,
+                            }}
+                          >
+                            {payment.methodIcon}
+                          </Avatar>
+                          <Typography variant="body2">
+                            {payment.method}
+                          </Typography>
+                        </Box>
+                      </TableCell>
+                      <TableCell align="right">
+                        <Typography variant="body2" fontWeight="medium">
+                          {formatCurrency(payment.amount)}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>{getStatusChip(payment.status)}</TableCell>
+                      <TableCell align="center">
+                        <Box
+                          sx={{
+                            display: "flex",
+                            gap: 1,
+                            justifyContent: "center",
+                          }}
+                        >
+                          <Tooltip title="Xem chi tiết">
+                            <IconButton
+                              size="small"
+                              onClick={() => handleViewReceipt(payment)}
+                            >
+                              <Visibility />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Tải xuống">
+                            <IconButton
+                              size="small"
+                              onClick={() => handleDownloadReceipt(payment)}
+                            >
+                              <Download />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="In hóa đơn">
+                            <IconButton
+                              size="small"
+                              onClick={() => handlePrintReceipt(payment)}
+                            >
+                              <Print />
+                            </IconButton>
+                          </Tooltip>
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </TableContainer>
