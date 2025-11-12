@@ -35,6 +35,7 @@ import "leaflet/dist/leaflet.css";
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
+import { getDrivingDirections } from "../../services/directionsService";
 
 // Fix for default marker icons in Leaflet
 delete L.Icon.Default.prototype._getIconUrl;
@@ -144,32 +145,69 @@ const RouteDrawer = ({ userLocation, destination }) => {
 
     const fetchRoute = async () => {
       try {
-        // Use OSRM (Open Source Routing Machine) - free routing service
-        const url = `https://router.project-osrm.org/route/v1/driving/${userLocation.lng},${userLocation.lat};${destination.lng},${destination.lat}?overview=full&geometries=geojson`;
-        console.log("🌐 Fetching route from OSRM:", url);
-        
-        const response = await fetch(url);
-        const data = await response.json();
-        console.log("📦 OSRM response:", data);
+        console.log("🌐 Fetching route from Google Directions API via backend...");
+        const { success, route, error } = await getDrivingDirections({
+          origin: userLocation,
+          destination,
+        });
 
-        if (data.code === "Ok" && data.routes && data.routes.length > 0) {
-          const coords = data.routes[0].geometry.coordinates.map((coord) => [
-            coord[1],
-            coord[0],
-          ]);
-          console.log("✅ Route fetched successfully, coords count:", coords.length);
+        if (success && route?.polyline?.length) {
+          // Defensive: verify ordering of decoded points. Google should return {lat, lng}.
+          // But if something upstream swapped them, detect and correct here.
+          const rawPoints = route.polyline;
+          const sample = rawPoints[0];
+          console.log("✅ Google route fetched - sample point:", sample);
+
+          let coords = [];
+
+          // Heuristic checks: lat must be in [-90,90], lng in [-180,180]. If sample looks like it's reversed, swap.
+          const looksLikeLatLng = (p) => {
+            if (!p) return false;
+            const { lat, lng } = p;
+            return (
+              typeof lat === "number" && typeof lng === "number" &&
+              Math.abs(lat) <= 90 && Math.abs(lng) <= 180
+            );
+          };
+
+          const looksLikeLngLat = (p) => {
+            if (!p) return false;
+            const { lat, lng } = p;
+            // If 'lat' is outside [-90,90] but 'lng' looks like a latitude, assume swapped
+            return (
+              (typeof lat === "number" && Math.abs(lat) > 90) &&
+              (typeof lng === "number" && Math.abs(lng) <= 90)
+            );
+          };
+
+          if (looksLikeLatLng(sample)) {
+            coords = rawPoints.map((point) => [point.lat, point.lng]);
+            console.log("ℹ️ Polyline appears to be lat/lng order. Using [lat,lng].");
+          } else if (looksLikeLngLat(sample)) {
+            coords = rawPoints.map((point) => [point.lng, point.lat]);
+            console.warn("⚠️ Detected polyline likely in [lng,lat] order — swapping to [lat,lng].");
+          } else {
+            // Fallback: try lat/lng first, but log warning so we can inspect the values
+            coords = rawPoints.map((point) => [point.lat, point.lng]);
+            console.warn("⚠️ Unable to confidently determine polyline order; using [lat,lng] fallback.", sample);
+          }
+
+          // Log head/tail for quick verification in browser console
+          if (coords.length > 0) {
+            console.log("🔹 Route first coord:", coords[0], "last:", coords[coords.length - 1]);
+          }
+
+          console.log("✅ Google route fetched successfully, coords count:", coords.length);
           setRouteCoords(coords);
         } else {
-          console.warn("⚠️ OSRM returned no routes, using fallback straight line");
+          console.warn("⚠️ Directions API did not return a route:", error);
           setRouteCoords([
             [userLocation.lat, userLocation.lng],
             [destination.lat, destination.lng],
           ]);
         }
       } catch (error) {
-        console.error("❌ Error fetching route:", error);
-        // Fallback: draw straight line
-        console.log("🔄 Using fallback: straight line");
+        console.error("❌ Error fetching Google directions:", error);
         setRouteCoords([
           [userLocation.lat, userLocation.lng],
           [destination.lat, destination.lng],
@@ -210,10 +248,47 @@ const RouteDrawer = ({ userLocation, destination }) => {
 
 // Helper function to get coordinates from station
 const getStationCoords = (station) => {
-  const lat =
-    station.location?.coordinates?.lat || station.location?.lat || station.lat;
-  const lng =
-    station.location?.coordinates?.lng || station.location?.lng || station.lng;
+  const toNumber = (v) => {
+    if (v === null || v === undefined || v === "") return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const isValidLat = (v) => typeof v === "number" && v >= -90 && v <= 90;
+  const isValidLng = (v) => typeof v === "number" && v >= -180 && v <= 180;
+
+  if (!station) return { lat: null, lng: null };
+
+  // Support multiple shapes: { coordinates: { lat, lng } }, { coordinates: [lng, lat] }, or flat fields
+  const rawCoords = station.location?.coordinates;
+  let lat = null;
+  let lng = null;
+
+  if (Array.isArray(rawCoords) && rawCoords.length >= 2) {
+    // GeoJSON style: [lng, lat]
+    lng = toNumber(rawCoords[0]);
+    lat = toNumber(rawCoords[1]);
+  } else if (rawCoords && typeof rawCoords === "object") {
+    lat = toNumber(rawCoords.lat ?? rawCoords.latitude ?? station.latitude ?? station.lat);
+    lng = toNumber(rawCoords.lng ?? rawCoords.longitude ?? station.longitude ?? station.lng);
+  } else {
+    lat = toNumber(station.location?.lat ?? station.latitude ?? station.lat);
+    lng = toNumber(station.location?.lng ?? station.longitude ?? station.lng);
+  }
+
+  // Heuristic: if values look swapped (lat outside range but lng looks like lat), swap them
+  if ((!isValidLat(lat) || !isValidLng(lng)) && isValidLat(lng) && isValidLng(lat)) {
+    console.warn("🔁 Swapping lat/lng for station (detected swapped values):", { stationId: station.id, lat, lng });
+    const tmp = lat;
+    lat = lng;
+    lng = tmp;
+  }
+
+  if (!isValidLat(lat) || !isValidLng(lng)) {
+    console.warn("⚠️ Station has invalid coordinates and will be skipped on map:", station.id, { lat, lng });
+    return { lat: null, lng: null };
+  }
+
   return { lat, lng };
 };
 
@@ -631,6 +706,11 @@ const StationMapLeaflet = ({
           {stations.map((station) => {
             const isAvailable = station.stats?.available > 0;
             const coords = getStationCoords(station);
+            // Skip markers for stations with invalid coordinates
+            if (coords.lat == null || coords.lng == null) {
+              console.warn("Skipping station marker due to invalid coords:", station.id, coords);
+              return null;
+            }
             return (
               <Marker
                 key={station.id}
