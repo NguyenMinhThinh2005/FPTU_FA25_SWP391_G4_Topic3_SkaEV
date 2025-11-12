@@ -85,6 +85,8 @@ const ChargingSessionsSimple = () => {
       
       if (dashboardData?.connectors && Array.isArray(dashboardData.connectors)) {
         dashboardData.connectors.forEach((connector) => {
+          console.log(`🔌 Processing connector ${connector.connectorCode}:`, connector);
+          
           // Map connector data to session format
           const session = {
             // Basic connector info
@@ -93,7 +95,7 @@ const ChargingSessionsSimple = () => {
             connectorType: connector.connectorType || 'N/A',
             maxPower: connector.maxPower || 0,
             
-            // Status from backend
+            // Status from backend - Use BOTH currentSession and activeSession
             technicalStatus: connector.technicalStatus || 'unknown',
             operationalStatus: connector.operationalStatus || 'Available',
             
@@ -102,31 +104,34 @@ const ChargingSessionsSimple = () => {
             current: connector.current,
             temperature: connector.temperature,
             
-            // Booking/Session info (null if no active session)
-            activeSession: connector.activeSession,
+            // Use activeSession (which comes from backend with session data)
+            activeSession: connector.activeSession || connector.currentSession,
           };
           
           // If has active session, add customer & vehicle info
-          if (connector.activeSession) {
-            const activeSession = connector.activeSession;
-            session.bookingId = activeSession.bookingId;
-            session.customerId = activeSession.customerId;
-            session.customerName = activeSession.customerName || 'N/A';
-            session.vehicleInfo = activeSession.vehicleInfo || 'N/A';
-            session.startedAt = activeSession.startedAt;
-            session.currentSoc = activeSession.currentSoc;
-            session.power = activeSession.power;
-            session.energyDelivered = activeSession.energyDelivered || 0;
+          const sessionData = connector.activeSession || connector.currentSession;
+          if (sessionData) {
+            console.log(`  ✅ Found session for ${connector.connectorCode}:`, sessionData);
+            session.bookingId = sessionData.bookingId;
+            session.customerId = sessionData.customerId;
+            session.customerName = sessionData.customerName || 'N/A';
+            session.vehicleInfo = sessionData.vehicleInfo || 'N/A';
+            session.startedAt = sessionData.startedAt;
+            session.currentSoc = sessionData.currentSoc;
+            session.power = sessionData.power;
+            session.energyDelivered = sessionData.energyDelivered || sessionData.energyConsumed || 0;
             
             // Calculate charging duration
-            if (activeSession.startedAt) {
-              const startTime = new Date(activeSession.startedAt);
+            if (sessionData.startedAt) {
+              const startTime = new Date(sessionData.startedAt);
               const now = new Date();
               const durationMs = now - startTime;
               const hours = Math.floor(durationMs / (1000 * 60 * 60));
               const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
               session.duration = `${hours}h ${minutes}m`;
             }
+          } else {
+            console.log(`  ℹ️ No session for ${connector.connectorCode}`);
           }
           
           allSessions.push(session);

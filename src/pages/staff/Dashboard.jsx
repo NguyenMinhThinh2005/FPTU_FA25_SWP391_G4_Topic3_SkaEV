@@ -126,14 +126,15 @@ const StaffDashboard = () => {
       let currentActiveRevenue = 0;
 
       normalizedConnectors.forEach((connector) => {
-        console.log("🔍 Checking connector:", connector.code, "hasCurrentSession:", !!connector.currentSession);
-        if (connector.currentSession) {
+        console.log("🔍 Checking connector:", connector.code, "hasActiveSession:", !!connector.activeSession);
+        // Use activeSession (from backend) instead of currentSession
+        if (connector.activeSession) {
           currentActiveSessions += 1;
-          const session = connector.currentSession;
+          const session = connector.activeSession;
           console.log("  ✅ Active session found:", session);
           
           // Calculate energy consumed from SOC change or direct value
-          const energyKwh = Number(session.energyConsumed || session.energyConsumedKwh || 0);
+          const energyKwh = Number(session.energyConsumed || session.energyConsumedKwh || session.energyDelivered || 0);
           currentActiveEnergy += energyKwh;
           
           // Calculate revenue based on energy and rate
@@ -315,7 +316,8 @@ const StaffDashboard = () => {
       voltage: connector.voltage,
       current: connector.current,
       temperature: connector.temperature,
-      currentSession,
+      activeSession: currentSession, // Store as activeSession for consistency
+      currentSession, // Keep for backward compatibility
     };
   };
 
@@ -584,14 +586,19 @@ const StaffDashboard = () => {
                       <Typography variant="subtitle1" fontWeight={600} color={textColor}>
                         {statusText}
                       </Typography>
-                      {connector.currentSession && (
+                      {(connector.activeSession || connector.currentSession) && (
                         <Box mt={1}>
                           <Typography variant="body2" color="text.secondary">
-                            Phiên: {connector.currentSession.id}
+                            Phiên: {(connector.activeSession || connector.currentSession).id}
                           </Typography>
                           <Typography variant="body2" color="text.secondary">
-                            SOC: {connector.currentSession.vehicleSOC}%
+                            Khách: {(connector.activeSession || connector.currentSession).customerName}
                           </Typography>
+                          {(connector.activeSession || connector.currentSession).vehicleSOC && (
+                            <Typography variant="body2" color="text.secondary">
+                              SOC: {(connector.activeSession || connector.currentSession).vehicleSOC}%
+                            </Typography>
+                          )}
                         </Box>
                       )}
 

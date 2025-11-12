@@ -196,9 +196,7 @@ const Monitoring = () => {
         // Use the status from Dashboard directly (already mapped in Dashboard)
         const rawStatus = connector.operationalStatus || connector.technicalStatus || connector.statusLabel || connector.status || "Unknown";
         
-        // NOTE: Currently we don't have connector-specific issue tracking
-        // So we DON'T override individual connector status to maintenance
-        // Instead, we show station-level warning in alerts section
+        // Use actual status from backend (don't override based on station-level issues)
         const actualStatus = rawStatus;
         const status = mapSlotStatus(actualStatus);
         
@@ -226,7 +224,7 @@ const Monitoring = () => {
           currentSoc: connector.currentSession?.vehicleSOC ?? connector.activeSession?.vehicleSOC ?? null,
           currentUser: connector.currentSession?.customerName ?? connector.activeSession?.customerName ?? null,
           bookingStart: connector.currentSession?.startTime ?? connector.activeSession?.startTime ?? null,
-          hasActiveIssue: hasStationActiveIssues, // Flag for station-level issues
+          hasActiveIssue: false, // Don't override connector status - use actual status from backend
         };
       });
 
@@ -518,21 +516,11 @@ const Monitoring = () => {
                     </TableCell>
                     <TableCell align="center">
                       <Chip
-                        icon={
-                          connector.hasActiveIssue ? (
-                            <Build fontSize="small" />
-                          ) : (
-                            getStatusIcon(connector.operationalStatus)
-                          )
-                        }
-                        label={
-                          connector.hasActiveIssue 
-                            ? "Đang bảo trì" 
-                            : connector.operationalStatus
-                        }
+                        icon={getStatusIcon(connector.operationalStatus)}
+                        label={connector.operationalStatus}
                         size="small"
                         variant="outlined"
-                        color={connector.hasActiveIssue ? "warning" : "default"}
+                        color="default"
                       />
                     </TableCell>
                     <TableCell align="right">
