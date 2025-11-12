@@ -170,18 +170,18 @@ const Monitoring = () => {
       
       console.log("📊 Issues loaded from API:", issueList);
       
-      // Build a map of stations with active issues (reported or in_progress)
-      const stationsWithActiveIssues = new Set(
-        issueList
-          .filter(issue => issue.status && !['resolved', 'closed'].includes(issue.status.toLowerCase()))
-          .map(issue => issue.stationId)
+      // Build a map of CONNECTORS with active issues (not whole stations)
+      // Note: Since issues are station-level (no specific connector/slot ID in Issue table),
+      // we check if ANY connector at this station has an active issue
+      const hasStationActiveIssues = issueList.some(
+        issue => issue.status && !['resolved', 'closed'].includes(issue.status.toLowerCase())
       );
 
+      console.log("🚨 Station has active issues:", hasStationActiveIssues);
+
       // Load slots from dashboard connectors (already loaded with active sessions)
-      const hasActiveIssue = stationsWithActiveIssues.has(assignedStation.stationId);
       
       console.log("🔌 Dashboard connectors:", dashboardData.connectors);
-      console.log("🚨 Has active issue:", hasActiveIssue);
       
       const connectorsData = dashboardData.connectors.map((connector) => {
         console.log(`🔍 Processing connector ${connector.connectorCode}:`, {
@@ -193,10 +193,12 @@ const Monitoring = () => {
         });
         
         // Use the status from Dashboard directly (already mapped in Dashboard)
-        const rawStatus = connector.status || connector.statusLabel || connector.operationalStatus || "Unknown";
+        const rawStatus = connector.operationalStatus || connector.technicalStatus || connector.statusLabel || connector.status || "Unknown";
         
-        // If station has active issue, override to maintenance
-        const actualStatus = hasActiveIssue ? 'maintenance' : rawStatus;
+        // NOTE: Currently we don't have connector-specific issue tracking
+        // So we DON'T override individual connector status to maintenance
+        // Instead, we show station-level warning in alerts section
+        const actualStatus = rawStatus;
         const status = mapSlotStatus(actualStatus);
         
         console.log(`  → Mapped status:`, { rawStatus, actualStatus, result: status });
@@ -217,7 +219,7 @@ const Monitoring = () => {
           currentSoc: connector.currentSession?.vehicleSOC ?? connector.activeSession?.vehicleSOC ?? null,
           currentUser: connector.currentSession?.customerName ?? connector.activeSession?.customerName ?? null,
           bookingStart: connector.currentSession?.startTime ?? connector.activeSession?.startTime ?? null,
-          hasActiveIssue, // Flag to show maintenance icon
+          hasActiveIssue: hasStationActiveIssues, // Flag for station-level issues
         };
       });
 
@@ -457,6 +459,18 @@ const Monitoring = () => {
           </Card>
         </Grid>
       </Grid>
+
+      {/* Active Issues Alert */}
+      {incidents.filter(i => !['resolved', 'closed'].includes(i.status.toLowerCase())).length > 0 && (
+        <Alert severity="warning" icon={<Warning />} sx={{ mb: 3 }}>
+          <Typography variant="body1" fontWeight={600}>
+            Cảnh báo: Có {incidents.filter(i => !['resolved', 'closed'].includes(i.status.toLowerCase())).length} sự cố đang chờ xử lý tại trạm này
+          </Typography>
+          <Typography variant="body2">
+            Vui lòng kiểm tra phần "Lịch sử Báo cáo Sự cố" bên dưới để xem chi tiết và theo dõi tiến độ xử lý.
+          </Typography>
+        </Alert>
+      )}
 
       {/* Connector Status Table */}
       <Typography variant="h5" fontWeight={600} mb={2}>
