@@ -18,6 +18,18 @@ public class DirectionsLegDto
     public int DistanceMeters { get; set; }
     public string DurationText { get; set; } = string.Empty;
     public int DurationSeconds { get; set; }
+    public IReadOnlyList<DirectionsStepDto> Steps { get; set; } = Array.Empty<DirectionsStepDto>();
+}
+
+public class DirectionsStepDto
+{
+    public int Index { get; set; }
+    public string InstructionText { get; set; } = string.Empty;
+    public string InstructionHtml { get; set; } = string.Empty;
+    public string DistanceText { get; set; } = string.Empty;
+    public int DistanceMeters { get; set; }
+    public string DurationText { get; set; } = string.Empty;
+    public int DurationSeconds { get; set; }
 }
 
 public class DirectionsRouteDto

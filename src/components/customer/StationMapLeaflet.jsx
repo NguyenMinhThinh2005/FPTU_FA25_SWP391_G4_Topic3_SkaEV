@@ -7,7 +7,6 @@ import {
   Typography,
   Button,
   Chip,
-  Stack,
   IconButton,
   Tooltip,
   Alert,
@@ -44,6 +43,8 @@ L.Icon.Default.mergeOptions({
   iconUrl: markerIcon,
   shadowUrl: markerShadow,
 });
+
+const noop = () => {};
 
 // Custom icons for different station statuses
 const createStationIcon = (isAvailable) => {
@@ -90,6 +91,571 @@ const userIcon = L.divIcon({
   iconAnchor: [10, 10],
 });
 
+const haversineDistance = (lat1, lon1, lat2, lon2) => {
+  if (
+    lat1 == null ||
+    lon1 == null ||
+    lat2 == null ||
+    lon2 == null ||
+    Number.isNaN(lat1) ||
+    Number.isNaN(lon1) ||
+    Number.isNaN(lat2) ||
+    Number.isNaN(lon2)
+  ) {
+    return null;
+  }
+
+  const toRad = (v) => (v * Math.PI) / 180;
+  const R = 6371000; // meters
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) *
+      Math.cos(toRad(lat2)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+};
+
+const stripHtmlTags = (value) => {
+  if (!value) return "";
+  return String(value)
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+};
+
+const formatDistanceText = (distance) => {
+  if (distance === null || distance === undefined) return "";
+  if (typeof distance === "string") return distance;
+  if (typeof distance === "number") {
+    if (distance >= 1000) {
+      const km = distance / 1000;
+      return `${km >= 10 ? Math.round(km) : km.toFixed(1)} km`;
+    }
+    return `${Math.round(distance)} m`;
+  }
+  if (typeof distance === "object") {
+    if (distance.text) return String(distance.text);
+    if (typeof distance.value === "number") return formatDistanceText(distance.value);
+    if (typeof distance.meters === "number") return formatDistanceText(distance.meters);
+  }
+  return "";
+};
+
+const formatDurationText = (duration) => {
+  if (duration === null || duration === undefined) return "";
+  if (typeof duration === "string") return duration;
+  const toText = (seconds) => {
+    if (seconds === null || seconds === undefined) return "";
+    const totalMinutes = Math.max(1, Math.round(seconds / 60));
+    if (totalMinutes < 60) {
+      return `${totalMinutes} phút`;
+    }
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    if (minutes === 0) {
+      return `${hours} giờ`;
+    }
+    return `${hours} giờ ${minutes} phút`;
+  };
+
+  if (typeof duration === "number") {
+    return toText(duration);
+  }
+  if (typeof duration === "object") {
+    if (duration.text) return String(duration.text);
+    if (typeof duration.value === "number") return toText(duration.value);
+    if (typeof duration.seconds === "number") return toText(duration.seconds);
+    if (typeof duration.duration === "number") return toText(duration.duration);
+  }
+  return "";
+};
+
+const buildRouteSummary = (route) => {
+  if (!route) return null;
+
+  const summary = {
+    provider: route.provider || "google",
+    summary: route.summary || "",
+    warnings: Array.isArray(route.warnings) ? route.warnings : [],
+    steps: [],
+    distanceMeters: null,
+    durationSeconds: null,
+    distanceText: "",
+    durationText: "",
+    startAddress: route.startAddress || "",
+    endAddress: route.endAddress || "",
+  };
+
+  const processedLegs = new Set();
+
+  const applyLegData = (leg) => {
+    if (!leg || processedLegs.has(leg)) return;
+    processedLegs.add(leg);
+
+    summary.startAddress = summary.startAddress || leg.start_address || leg.startAddress || "";
+    summary.endAddress = summary.endAddress || leg.end_address || leg.endAddress || "";
+    if (summary.distanceMeters == null && leg.distance) {
+      summary.distanceMeters =
+        typeof leg.distance.value === "number"
+          ? leg.distance.value
+          : typeof leg.distance === "number"
+          ? leg.distance
+          : typeof leg.distance.meters === "number"
+          ? leg.distance.meters
+          : summary.distanceMeters;
+    }
+    if (summary.durationSeconds == null && leg.duration) {
+      summary.durationSeconds =
+        typeof leg.duration.value === "number"
+          ? leg.duration.value
+          : typeof leg.duration === "number"
+          ? leg.duration
+          : typeof leg.duration.seconds === "number"
+          ? leg.duration.seconds
+          : summary.durationSeconds;
+    }
+    summary.distanceText = summary.distanceText || formatDistanceText(leg.distance);
+    summary.durationText = summary.durationText || formatDurationText(leg.duration);
+
+    if (Array.isArray(leg.steps)) {
+      const baseIndex = summary.steps.length;
+      const legSteps = leg.steps.map((step, index) => {
+        const instructionHtml =
+          step.html_instructions ||
+          step.instructionHtml ||
+          step.instruction ||
+          step.narrative ||
+          step.maneuver ||
+          "";
+        const instructionText = stripHtmlTags(instructionHtml) || `Bước ${index + 1}`;
+        return {
+          index: baseIndex + index,
+          instructionHtml,
+          instructionText,
+          distanceText: formatDistanceText(step.distance),
+          durationText: formatDurationText(step.duration),
+        };
+      });
+      if (legSteps.length) {
+        summary.steps = summary.steps.concat(legSteps);
+      }
+    }
+  };
+
+  const candidateRoutes = [];
+  if (route.route) candidateRoutes.push(route.route);
+  if (route.data) candidateRoutes.push(route.data);
+  if (route.result) candidateRoutes.push(route.result);
+  if (Array.isArray(route.routes)) candidateRoutes.push(...route.routes);
+  if (Array.isArray(route.data?.routes)) candidateRoutes.push(...route.data.routes);
+  candidateRoutes.push(route);
+
+  candidateRoutes.forEach((candidate) => {
+    if (!candidate) return;
+
+    summary.provider = summary.provider || candidate.provider || "google";
+    summary.summary = summary.summary || candidate.summary || candidate.summaryText || "";
+    if (!summary.warnings.length && Array.isArray(candidate.warnings)) {
+      summary.warnings = candidate.warnings;
+    }
+
+    if (Array.isArray(candidate.legs) && candidate.legs.length > 0) {
+      candidate.legs.forEach((leg) => applyLegData(leg));
+    }
+
+    summary.distanceText =
+      summary.distanceText ||
+      formatDistanceText(
+        candidate.distance ||
+          candidate.distanceMeters ||
+          candidate.overview_distance ||
+          candidate.total_distance
+      );
+    summary.durationText =
+      summary.durationText ||
+      formatDurationText(
+        candidate.duration ||
+          candidate.durationSeconds ||
+          candidate.overview_duration ||
+          candidate.total_duration
+      );
+
+    if (summary.distanceMeters == null) {
+      const candidateDistance =
+        (candidate.distance && candidate.distance.value) ??
+        candidate.distance ??
+        candidate.distanceMeters ??
+        candidate.total_distance;
+      if (typeof candidateDistance === "number") {
+        summary.distanceMeters = candidateDistance;
+      }
+    }
+
+    if (summary.durationSeconds == null) {
+      const candidateDuration =
+        (candidate.duration && candidate.duration.value) ??
+        candidate.duration ??
+        candidate.durationSeconds ??
+        candidate.total_duration;
+      if (typeof candidateDuration === "number") {
+        summary.durationSeconds = candidateDuration;
+      }
+    }
+
+    if (!summary.steps.length && Array.isArray(candidate.steps)) {
+      const baseIndex = summary.steps.length;
+      const directSteps = candidate.steps.map((step, index) => {
+        const instructionHtml =
+          step.html_instructions || step.instructionHtml || step.instruction || "";
+        return {
+          index: baseIndex + index,
+          instructionHtml,
+          instructionText: stripHtmlTags(instructionHtml) || `Bước ${index + 1}`,
+          distanceText: formatDistanceText(step.distance),
+          durationText: formatDurationText(step.duration),
+        };
+      });
+      if (directSteps.length) {
+        summary.steps = summary.steps.concat(directSteps);
+      }
+    }
+  });
+
+  summary.distanceText = summary.distanceText || formatDistanceText(route.distance);
+  summary.durationText = summary.durationText || formatDurationText(route.duration);
+
+  if (summary.distanceMeters == null) {
+    if (route.distance && typeof route.distance.value === "number") {
+      summary.distanceMeters = route.distance.value;
+    } else if (typeof route.distanceMeters === "number") {
+      summary.distanceMeters = route.distanceMeters;
+    }
+  }
+
+  if (summary.durationSeconds == null) {
+    if (route.duration && typeof route.duration.value === "number") {
+      summary.durationSeconds = route.duration.value;
+    } else if (typeof route.durationSeconds === "number") {
+      summary.durationSeconds = route.durationSeconds;
+    }
+  }
+
+  if (!summary.steps.length && Array.isArray(route.steps)) {
+    const baseIndex = summary.steps.length;
+    const routeSteps = route.steps.map((step, index) => {
+      const instructionHtml =
+        step.html_instructions || step.instructionHtml || step.instruction || "";
+      return {
+        index: baseIndex + index,
+        instructionHtml,
+        instructionText: stripHtmlTags(instructionHtml) || `Bước ${index + 1}`,
+        distanceText: formatDistanceText(step.distance),
+        durationText: formatDurationText(step.duration),
+      };
+    });
+    if (routeSteps.length) {
+      summary.steps = summary.steps.concat(routeSteps);
+    }
+  }
+
+  return summary;
+};
+
+const buildFallbackSummary = (origin, destination, requestId) => {
+  if (!origin || !destination) return null;
+  const polyline = [
+    [origin.lat, origin.lng],
+    [destination.lat, destination.lng],
+  ];
+  const distanceMeters = haversineDistance(
+    origin.lat,
+    origin.lng,
+    destination.lat,
+    destination.lng
+  );
+  const durationSeconds = distanceMeters
+    ? Math.round(((distanceMeters / 1000) / 40) * 3600)
+    : null; // assume 40 km/h for fallback estimate
+
+  return {
+    requestId,
+    origin,
+    destination,
+    provider: "fallback",
+    usedFallback: true,
+    polyline,
+    distanceMeters,
+    distanceText: formatDistanceText(distanceMeters),
+    durationSeconds,
+    durationText: formatDurationText(durationSeconds),
+    steps: [],
+    warnings: [
+      "Không thể tải chỉ đường chi tiết. Đang hiển thị tuyến đường gần đúng.",
+    ],
+  };
+};
+
+const decodePolyline = (encoded) => {
+  if (!encoded || typeof encoded !== "string") return [];
+
+  let index = 0;
+  const length = encoded.length;
+  const coordinates = [];
+  let lat = 0;
+  let lng = 0;
+
+  while (index < length) {
+    let result = 0;
+    let shift = 0;
+    let byte = null;
+
+    do {
+      byte = encoded.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20 && index < length);
+
+    const deltaLat = result & 1 ? ~(result >> 1) : result >> 1;
+    lat += deltaLat;
+
+    result = 0;
+    shift = 0;
+
+    do {
+      byte = encoded.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20 && index < length);
+
+    const deltaLng = result & 1 ? ~(result >> 1) : result >> 1;
+    lng += deltaLng;
+
+    coordinates.push([lat / 1e5, lng / 1e5]);
+  }
+
+  return coordinates;
+};
+
+const coerceNumber = (value) => {
+  if (value === null || value === undefined || value === "") return null;
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+};
+
+const isValidLat = (value) => typeof value === "number" && value >= -90 && value <= 90;
+const isValidLng = (value) => typeof value === "number" && value >= -180 && value <= 180;
+
+const normalizeLatLngTuple = (lat, lng) => {
+  const normalizedLat = coerceNumber(lat);
+  const normalizedLng = coerceNumber(lng);
+
+  if (isValidLat(normalizedLat) && isValidLng(normalizedLng)) {
+    return [normalizedLat, normalizedLng];
+  }
+
+  if (isValidLat(normalizedLng) && isValidLng(normalizedLat)) {
+    return [normalizedLng, normalizedLat];
+  }
+
+  return null;
+};
+
+const parsePointToTuple = (point) => {
+  if (!point) return null;
+
+  if (Array.isArray(point) && point.length >= 2) {
+    return normalizeLatLngTuple(point[0], point[1]);
+  }
+
+  if (typeof point === "object") {
+    const tupleByKey = normalizeLatLngTuple(
+      point.lat ?? point.latitude ?? point.y ?? point[1],
+      point.lng ?? point.lon ?? point.longitude ?? point.x ?? point[0]
+    );
+    if (tupleByKey) return tupleByKey;
+
+    if (typeof point.latLng === "string") {
+      const parts = point.latLng.split(",");
+      if (parts.length >= 2) {
+        return normalizeLatLngTuple(parts[0], parts[1]);
+      }
+    }
+  }
+
+  if (typeof point === "string") {
+    const parts = point.split(",");
+    if (parts.length >= 2) {
+      return normalizeLatLngTuple(parts[0], parts[1]);
+    }
+  }
+
+  return null;
+};
+
+const extractCoordsFromArray = (points) => {
+  if (!Array.isArray(points)) return [];
+  const tuples = points
+    .map((pt) => parsePointToTuple(pt))
+    .filter((tuple) => Array.isArray(tuple) && tuple.length === 2);
+  return tuples.length >= 2 ? tuples : [];
+};
+
+const mergeCoordinateSegments = (segments) => {
+  if (!Array.isArray(segments)) return [];
+  const merged = [];
+  const epsilon = 1e-6;
+
+  const areSamePoint = (a, b) =>
+    a &&
+    b &&
+    Math.abs(a[0] - b[0]) < epsilon &&
+    Math.abs(a[1] - b[1]) < epsilon;
+
+  segments.forEach((segment) => {
+    if (!Array.isArray(segment)) return;
+
+    segment.forEach((coord, index) => {
+      if (!Array.isArray(coord) || coord.length !== 2) return;
+      if (!Number.isFinite(coord[0]) || !Number.isFinite(coord[1])) return;
+
+      if (merged.length) {
+        const last = merged[merged.length - 1];
+        if (index === 0 && areSamePoint(last, coord)) {
+          return;
+        }
+      }
+
+      merged.push(coord);
+    });
+  });
+
+  return merged;
+};
+
+const collectCoordsFromSteps = (steps) => {
+  if (!Array.isArray(steps)) return [];
+
+  const segments = steps
+    .map((step) => {
+      if (!step) return [];
+
+      if (typeof step.polyline === "string") {
+        return decodePolyline(step.polyline);
+      }
+
+      if (step.polyline && typeof step.polyline.points === "string") {
+        return decodePolyline(step.polyline.points);
+      }
+
+      if (Array.isArray(step.polyline)) {
+        return extractCoordsFromArray(step.polyline);
+      }
+
+      const start = parsePointToTuple(step.start_location || step.startLocation);
+      const end = parsePointToTuple(step.end_location || step.endLocation);
+      if (start && end) {
+        return [start, end];
+      }
+
+      return [];
+    })
+    .filter((segment) => Array.isArray(segment) && segment.length);
+
+  return mergeCoordinateSegments(segments);
+};
+
+const extractPolylineFromRoute = (route, origin, destination) => {
+  const fallbackResult = { coords: [], usedFallback: true };
+
+  if (!route) {
+    const originTuple = parsePointToTuple(origin);
+    const destinationTuple = parsePointToTuple(destination);
+    if (originTuple && destinationTuple) {
+      return { coords: [originTuple, destinationTuple], usedFallback: true };
+    }
+    return fallbackResult;
+  }
+
+  const candidates = [];
+  if (route.route) candidates.push(route.route);
+  if (route.data) candidates.push(route.data);
+  if (route.result) candidates.push(route.result);
+  if (Array.isArray(route.routes)) candidates.push(...route.routes);
+  if (Array.isArray(route.data?.routes)) candidates.push(...route.data.routes);
+  candidates.push(route);
+
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+
+    let coords = extractCoordsFromArray(candidate.polyline);
+
+    if (!coords.length && typeof candidate.polyline === "string") {
+      coords = decodePolyline(candidate.polyline);
+    }
+
+    if (!coords.length && candidate.polyline && typeof candidate.polyline.points === "string") {
+      coords = decodePolyline(candidate.polyline.points);
+    }
+
+    if (!coords.length && candidate.overview_polyline?.points) {
+      coords = decodePolyline(candidate.overview_polyline.points);
+    }
+
+    if (!coords.length && candidate.overviewPolyline?.points) {
+      coords = decodePolyline(candidate.overviewPolyline.points);
+    }
+
+    if (!coords.length && Array.isArray(candidate.path)) {
+      coords = extractCoordsFromArray(candidate.path);
+    }
+
+    if (!coords.length && Array.isArray(candidate.points)) {
+      coords = extractCoordsFromArray(candidate.points);
+    }
+
+    if (!coords.length && Array.isArray(candidate.steps)) {
+      coords = collectCoordsFromSteps(candidate.steps);
+    }
+
+    if (!coords.length && Array.isArray(candidate.legs)) {
+      const legSegments = candidate.legs
+        .map((leg) => {
+          const stepCoords = collectCoordsFromSteps(leg.steps);
+          if (stepCoords.length) {
+            return stepCoords;
+          }
+
+          const start = parsePointToTuple(leg.start_location || leg.startLocation);
+          const end = parsePointToTuple(leg.end_location || leg.endLocation);
+          const legCoords = [];
+          if (start) legCoords.push(start);
+          if (end) legCoords.push(end);
+          return legCoords.length >= 2 ? legCoords : [];
+        })
+        .filter((segment) => segment.length >= 2);
+
+      coords = mergeCoordinateSegments(legSegments);
+    }
+
+    if (coords.length >= 2) {
+      return { coords, usedFallback: false };
+    }
+  }
+
+  const originTuple = parsePointToTuple(origin);
+  const destinationTuple = parsePointToTuple(destination);
+  if (originTuple && destinationTuple) {
+    return { coords: [originTuple, destinationTuple], usedFallback: true };
+  }
+
+  return fallbackResult;
+};
+
 // Helper to render operating hours safely
 const formatOperatingHours = (oh) => {
   if (!oh) return "";
@@ -125,121 +691,236 @@ const MapBoundsSetter = ({ bounds }) => {
 };
 
 // Component to handle route drawing
-const RouteDrawer = ({ userLocation, destination }) => {
+const RouteDrawer = ({
+  userLocation,
+  destination,
+  requestId,
+  onRouteReady = noop,
+  onRouteError = noop,
+}) => {
   const [routeCoords, setRouteCoords] = useState([]);
+  const [isFallbackRoute, setIsFallbackRoute] = useState(false);
 
   useEffect(() => {
-    console.log("🚗 RouteDrawer: userLocation=", userLocation, "destination=", destination);
-    
+    console.log(
+      "🚗 RouteDrawer: userLocation=",
+      userLocation,
+      "destination=",
+      destination,
+      "requestId=",
+      requestId
+    );
+
     if (!userLocation || !destination) {
       console.warn("⚠️ RouteDrawer: Missing userLocation or destination");
       setRouteCoords([]);
+      setIsFallbackRoute(false);
+      onRouteError({
+        message: "Thiếu thông tin vị trí để vẽ tuyến đường.",
+        requestId,
+      });
       return;
     }
 
-    if (!userLocation.lat || !userLocation.lng || !destination.lat || !destination.lng) {
-      console.warn("⚠️ RouteDrawer: Invalid coordinates", { userLocation, destination });
+    if (
+      !userLocation.lat ||
+      !userLocation.lng ||
+      !destination.lat ||
+      !destination.lng
+    ) {
+      console.warn("⚠️ RouteDrawer: Invalid coordinates", {
+        userLocation,
+        destination,
+      });
       setRouteCoords([]);
+      setIsFallbackRoute(false);
+      onRouteError({
+        message: "Tọa độ không hợp lệ để chỉ đường.",
+        requestId,
+      });
       return;
     }
 
     const fetchRoute = async () => {
       try {
         console.log("🌐 Fetching route from Google Directions API via backend...");
-        const { success, route, error } = await getDrivingDirections({
+        console.log("Origin:", userLocation);
+        console.log("Destination:", destination);
+        
+        const response = await getDrivingDirections({
           origin: userLocation,
           destination,
         });
+        
+        console.log("📦 Full Backend response:", JSON.stringify(response, null, 2));
+        
+        const { success, route, error } = response;
+        
+        console.log("Success:", success);
+        console.log("Route:", route);
+        console.log("Error:", error);
+        console.log("Route.polyline:", route?.polyline);
 
-        if (success && route?.polyline?.length) {
-          // Defensive: verify ordering of decoded points. Google should return {lat, lng}.
-          // But if something upstream swapped them, detect and correct here.
-          const rawPoints = route.polyline;
-          const sample = rawPoints[0];
-          console.log("✅ Google route fetched - sample point:", sample);
-
-          let coords = [];
-
-          // Heuristic checks: lat must be in [-90,90], lng in [-180,180]. If sample looks like it's reversed, swap.
-          const looksLikeLatLng = (p) => {
-            if (!p) return false;
-            const { lat, lng } = p;
-            return (
-              typeof lat === "number" && typeof lng === "number" &&
-              Math.abs(lat) <= 90 && Math.abs(lng) <= 180
-            );
+        // Check if backend returned decoded polyline directly
+        if (success && route?.polyline && Array.isArray(route.polyline) && route.polyline.length >= 2) {
+          console.log("✅ Using decoded polyline from backend, points:", route.polyline.length);
+          
+          // Convert backend polyline format [{lat, lng}] to Leaflet format [[lat, lng]]
+          const coords = route.polyline.map(point => [point.lat, point.lng]);
+          
+          const summarySource = {
+            provider: "google",
+            summary: route.leg?.summary || "",
+            warnings: route.warnings || [],
+            steps: route.leg?.steps || [],
+            distanceMeters: route.leg?.distanceMeters || null,
+            durationSeconds: route.leg?.durationSeconds || null,
+            distanceText: route.leg?.distanceText || "",
+            durationText: route.leg?.durationText || "",
+            polyline: coords,
+            requestId: requestId,
+            origin: userLocation,
+            destination: destination,
+            usedFallback: false,
           };
 
-          const looksLikeLngLat = (p) => {
-            if (!p) return false;
-            const { lat, lng } = p;
-            // If 'lat' is outside [-90,90] but 'lng' looks like a latitude, assume swapped
-            return (
-              (typeof lat === "number" && Math.abs(lat) > 90) &&
-              (typeof lng === "number" && Math.abs(lng) <= 90)
-            );
-          };
-
-          if (looksLikeLatLng(sample)) {
-            coords = rawPoints.map((point) => [point.lat, point.lng]);
-            console.log("ℹ️ Polyline appears to be lat/lng order. Using [lat,lng].");
-          } else if (looksLikeLngLat(sample)) {
-            coords = rawPoints.map((point) => [point.lng, point.lat]);
-            console.warn("⚠️ Detected polyline likely in [lng,lat] order — swapping to [lat,lng].");
-          } else {
-            // Fallback: try lat/lng first, but log warning so we can inspect the values
-            coords = rawPoints.map((point) => [point.lat, point.lng]);
-            console.warn("⚠️ Unable to confidently determine polyline order; using [lat,lng] fallback.", sample);
-          }
-
-          // Log head/tail for quick verification in browser console
-          if (coords.length > 0) {
-            console.log("🔹 Route first coord:", coords[0], "last:", coords[coords.length - 1]);
-          }
-
-          console.log("✅ Google route fetched successfully, coords count:", coords.length);
           setRouteCoords(coords);
+          setIsFallbackRoute(false);
+          onRouteReady(summarySource);
+          return;
+        }
+
+        // Fallback: try extracting from legacy format
+        const { coords, usedFallback } = extractPolylineFromRoute(
+          route,
+          userLocation,
+          destination
+        );
+
+        if (success && coords.length >= 2 && !usedFallback) {
+          console.log("✅ Using extracted polyline, points:", coords.length);
+          const summarySource =
+            buildRouteSummary(route) || {};
+          summarySource.polyline = coords;
+          summarySource.requestId = requestId;
+          summarySource.origin = userLocation;
+          summarySource.destination = destination;
+          summarySource.usedFallback = false;
+
+          if (summarySource.distanceMeters == null && coords.length >= 2) {
+            summarySource.distanceMeters = haversineDistance(
+              coords[0][0],
+              coords[0][1],
+              coords[coords.length - 1][0],
+              coords[coords.length - 1][1]
+            );
+            summarySource.distanceText =
+              summarySource.distanceText ||
+              formatDistanceText(summarySource.distanceMeters);
+          }
+
+          if (
+            summarySource.durationSeconds == null &&
+            summarySource.distanceMeters != null
+          ) {
+            const estimatedSeconds = Math.round(
+              ((summarySource.distanceMeters / 1000) / 40) * 3600
+            );
+            summarySource.durationSeconds = estimatedSeconds;
+            summarySource.durationText =
+              summarySource.durationText ||
+              formatDurationText(estimatedSeconds);
+          }
+
+          setRouteCoords(coords);
+          setIsFallbackRoute(false);
+          onRouteReady(summarySource);
         } else {
-          console.warn("⚠️ Directions API did not return a route:", error);
-          setRouteCoords([
-            [userLocation.lat, userLocation.lng],
-            [destination.lat, destination.lng],
-          ]);
+          console.warn(
+            "⚠️ Directions API did not return detailed geometry:",
+            error || (success ? "NO_GEOMETRY" : "REQUEST_FAILED")
+          );
+          const fallbackSummary = buildFallbackSummary(
+            userLocation,
+            destination,
+            requestId
+          );
+          if (fallbackSummary) {
+            if (success && usedFallback) {
+              const warningText =
+                "Không tìm thấy lộ trình chi tiết. Đang hiển thị tuyến đường gần đúng.";
+              if (!fallbackSummary.warnings.includes(warningText)) {
+                fallbackSummary.warnings = [
+                  ...fallbackSummary.warnings,
+                  warningText,
+                ];
+              }
+            }
+            setRouteCoords(fallbackSummary.polyline);
+            setIsFallbackRoute(true);
+            onRouteReady(fallbackSummary);
+          } else {
+            onRouteError({
+              message: error || "Không thể tìm thấy tuyến đường phù hợp.",
+              requestId,
+            });
+            setRouteCoords([]);
+            setIsFallbackRoute(false);
+          }
         }
       } catch (error) {
         console.error("❌ Error fetching Google directions:", error);
-        setRouteCoords([
-          [userLocation.lat, userLocation.lng],
-          [destination.lat, destination.lng],
-        ]);
+        const fallbackSummary = buildFallbackSummary(
+          userLocation,
+          destination,
+          requestId
+        );
+        if (fallbackSummary) {
+          setRouteCoords(fallbackSummary.polyline);
+          setIsFallbackRoute(true);
+          onRouteReady(fallbackSummary);
+        } else {
+          onRouteError({
+            message: error?.message || "Không thể tải chỉ đường.",
+            requestId,
+          });
+          setRouteCoords([]);
+          setIsFallbackRoute(false);
+        }
       }
     };
 
     fetchRoute();
-  }, [userLocation, destination]);
+  }, [
+    userLocation?.lat,
+    userLocation?.lng,
+    destination?.lat,
+    destination?.lng,
+    requestId,
+  ]);
 
   if (routeCoords.length === 0) return null;
 
   return (
     <>
-      {/* Outer border for better visibility */}
       <Polyline
         positions={routeCoords}
         pathOptions={{
-          color: "#ffffff",
+          color: isFallbackRoute ? "#9ca3af" : "#ffffff",
           weight: 10,
-          opacity: 0.8,
+          opacity: isFallbackRoute ? 0.6 : 0.8,
+          dashArray: isFallbackRoute ? "12 12" : undefined,
         }}
       />
-      {/* Main route line */}
       <Polyline
         positions={routeCoords}
         pathOptions={{
-          color: "#1976d2",  // Darker blue for better contrast
+          color: isFallbackRoute ? "#6b7280" : "#1976d2",
           weight: 6,
-          opacity: 1,
+          opacity: isFallbackRoute ? 0.8 : 1,
           lineJoin: "round",
           lineCap: "round",
+          dashArray: isFallbackRoute ? "8 8" : undefined,
         }}
       />
     </>
@@ -292,12 +973,15 @@ const getStationCoords = (station) => {
   return { lat, lng };
 };
 
-const StationMapLeaflet = ({ 
-  stations, 
+const StationMapLeaflet = ({
+  stations,
   onStationSelect,
-  userLocation: externalUserLocation = null,  // Accept external user location
-  showRoute: externalShowRoute = false,        // Accept external showRoute flag
-  centerOnStation = false                       // Accept centerOnStation flag
+  userLocation: externalUserLocation = null, // Accept external user location
+  showRoute: externalShowRoute = false, // Accept external showRoute flag
+  centerOnStation = false, // Accept centerOnStation flag
+  onDirectionsReady = noop,
+  onDirectionsError = noop,
+  routeRequestId = 0,
 }) => {
   const [userLocation, setUserLocation] = useState(null);
   const [selectedStation, setSelectedStation] = useState(null);
@@ -335,22 +1019,6 @@ const StationMapLeaflet = ({
       }
     }, [bounds, map, shouldZoomToUser]);
     return null;
-  };
-
-  // Haversine formula to compute distance in meters between two lat/lng points
-  const haversineDistance = (lat1, lon1, lat2, lon2) => {
-    const toRad = (v) => (v * Math.PI) / 180;
-    const R = 6371000; // meters
-    const dLat = toRad(lat2 - lat1);
-    const dLon = toRad(lon2 - lon1);
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(toRad(lat1)) *
-        Math.cos(toRad(lat2)) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
   };
 
   // Find nearby stations and fit bounds to include user + those stations
@@ -875,6 +1543,9 @@ const StationMapLeaflet = ({
                 <RouteDrawer
                   userLocation={userLocation}
                   destination={destCoords}
+                  requestId={routeRequestId}
+                  onRouteReady={onDirectionsReady}
+                  onRouteError={onDirectionsError}
                 />
               );
             })()}

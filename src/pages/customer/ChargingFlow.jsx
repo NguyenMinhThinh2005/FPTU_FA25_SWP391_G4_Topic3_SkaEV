@@ -55,6 +55,7 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  CircularProgress,
   Checkbox,
 } from "@mui/material";
 import {
@@ -65,6 +66,9 @@ import {
   LocationOn,
   Speed,
   Search,
+  Directions,
+  AccessTime,
+  Refresh,
 } from "@mui/icons-material";
 import useBookingStore from "../../store/bookingStore";
 import useStationStore from "../../store/stationStore";
@@ -114,6 +118,85 @@ const formatTime = (minutes) => {
   }
   return `${hours} giờ ${remainingMinutes} phút`;
 };
+
+const stripHtml = (value) => {
+  if (!value) return "";
+  return String(value)
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+};
+
+const formatDistanceFromMeters = (meters) => {
+  if (meters == null || Number.isNaN(meters)) return "";
+  if (meters >= 1000) {
+    const km = meters / 1000;
+    return `${km >= 10 ? Math.round(km) : km.toFixed(1)} km`;
+  }
+  return `${Math.round(meters)} m`;
+};
+
+const formatDurationFromSeconds = (seconds) => {
+  if (seconds == null || Number.isNaN(seconds)) return "";
+  const totalMinutes = Math.max(1, Math.round(seconds / 60));
+  if (totalMinutes < 60) {
+    return `${totalMinutes} phút`;
+  }
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (minutes === 0) {
+    return `${hours} giờ`;
+  }
+  return `${hours} giờ ${minutes} phút`;
+};
+
+const extractStationCoordinates = (station) => {
+  if (!station || !station.location) return null;
+
+  const raw = station.location.coordinates;
+  let lat = null;
+  let lng = null;
+
+  const toNumber = (value) => {
+    if (value === null || value === undefined || value === "") return null;
+    const num = Number(value);
+    return Number.isFinite(num) ? num : null;
+  };
+
+  if (Array.isArray(raw) && raw.length >= 2) {
+    lng = toNumber(raw[0]);
+    lat = toNumber(raw[1]);
+  } else if (raw && typeof raw === "object") {
+    lat = toNumber(raw.lat ?? raw.latitude);
+    lng = toNumber(raw.lng ?? raw.longitude);
+  } else {
+    lat = toNumber(station.location.lat ?? station.lat ?? station.latitude);
+    lng = toNumber(station.location.lng ?? station.lng ?? station.longitude);
+  }
+
+  if (
+    (lat == null || lat < -90 || lat > 90) &&
+    lng != null &&
+    lng >= -90 &&
+    lng <= 90
+  ) {
+    const temp = lat;
+    lat = lng;
+    lng = temp;
+  }
+
+  if (
+    lat == null ||
+    lng == null ||
+    Number.isNaN(lat) ||
+    Number.isNaN(lng)
+  ) {
+    return null;
+  }
+
+  return { lat, lng };
+};
 import { getStationImage } from "../../utils/imageAssets";
 import { CONNECTOR_TYPES } from "../../utils/constants";
 import BookingModal from "../../components/customer/BookingModal";
@@ -149,6 +232,21 @@ const ChargingFlow = () => {
   };
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStation, setSelectedStation] = useState(null);
+  const [persistedStationId, setPersistedStationId] = useState(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      return sessionStorage.getItem("chargingSelectedStationId");
+    } catch (error) {
+      console.warn("Không thể đọc chargingSelectedStationId từ sessionStorage", error);
+      return null;
+    }
+  });
+  const [directionsData, setDirectionsData] = useState({
+    loading: false,
+    info: null,
+    error: null,
+  });
+  const [navigationRequestId, setNavigationRequestId] = useState(0);
   // viewMode removed - always use list/grid view in step 0, map only for navigation in step 1
   const [userLocation, setUserLocation] = useState({
     lat: 10.8231, // Default to Ho Chi Minh City (HCMC)
@@ -341,6 +439,45 @@ const ChargingFlow = () => {
     else sessionStorage.removeItem("chargingSessionData");
   };
 
+  useEffect(() => {
+    if (selectedStation) return;
+    if (!stationsWithStats || stationsWithStats.length === 0) return;
+
+    const sourceId =
+      currentBooking?.stationId ||
+      currentBookingData?.stationId ||
+      persistedStationId;
+
+    if (!sourceId) return;
+
+    const matchedStation = stationsWithStats.find(
+      (station) => station.id === sourceId
+    );
+
+    if (matchedStation) {
+      setSelectedStation(matchedStation);
+      if (matchedStation.id !== persistedStationId) {
+        setPersistedStationId(matchedStation.id);
+        if (typeof window !== "undefined") {
+          try {
+            sessionStorage.setItem(
+              "chargingSelectedStationId",
+              matchedStation.id
+            );
+          } catch (error) {
+            console.warn("Không thể lưu chargingSelectedStationId", error);
+          }
+        }
+      }
+    }
+  }, [
+    selectedStation,
+    stationsWithStats,
+    currentBooking,
+    currentBookingData,
+    persistedStationId,
+  ]);
+
   // Khôi phục state khi flowStep >= 2
   useEffect(() => {
     const saved = sessionStorage.getItem("chargingFlowStep");
@@ -492,6 +629,14 @@ const ChargingFlow = () => {
     }
   }, [searchQuery, filters.connectorTypes, stationsWithStats, userLocation]);
 
+  const selectedStationCoords = React.useMemo(
+    () => extractStationCoordinates(selectedStation),
+    [selectedStation]
+  );
+
+  const navigationSummary = directionsData.info;
+  const navigationWarnings = navigationSummary?.warnings || [];
+
   useEffect(() => {
     console.log("🚀 ChargingFlow mounted - initializing data");
     initializeData();
@@ -521,6 +666,20 @@ const ChargingFlow = () => {
       console.warn("⚠️ Geolocation not supported, using default location");
     }
   }, []);
+
+  useEffect(() => {
+    if (flowStep === 1 && selectedStation?.id) {
+      setDirectionsData((prev) => ({
+        loading: true,
+        error: null,
+        info:
+          prev.info && prev.info.stationId === selectedStation.id
+            ? prev.info
+            : null,
+      }));
+      setNavigationRequestId((prev) => prev + 1);
+    }
+  }, [flowStep, selectedStation?.id, userLocation?.lat, userLocation?.lng]);
 
   // Reset flow step to 0 if no active booking or charging session
   // Đã loại bỏ auto-reset flowStep về 0 khi mất currentBooking/changingSession để giữ đúng trạng thái flow khi quay lại
@@ -553,8 +712,138 @@ const ChargingFlow = () => {
 
   const handleStationSelect = (station) => {
     setSelectedStation(station);
+    setPersistedStationId(station?.id || null);
+    if (typeof window !== "undefined") {
+      try {
+        if (station?.id) {
+          sessionStorage.setItem("chargingSelectedStationId", station.id);
+        } else {
+          sessionStorage.removeItem("chargingSelectedStationId");
+        }
+      } catch (error) {
+        console.warn("Không thể lưu chargingSelectedStationId", error);
+      }
+    }
     setBookingModalOpen(true);
   };
+
+  const handleRetryDirections = React.useCallback(() => {
+    if (!selectedStation?.id) return;
+    setDirectionsData((prev) => ({
+      loading: true,
+      error: null,
+      info:
+        prev.info && prev.info.stationId === selectedStation.id
+          ? prev.info
+          : null,
+    }));
+    setNavigationRequestId((prev) => prev + 1);
+  }, [selectedStation?.id]);
+
+  const handleOpenGoogleMaps = React.useCallback(() => {
+    if (!selectedStationCoords) return;
+    const destinationParam = `${selectedStationCoords.lat},${selectedStationCoords.lng}`;
+    const hasOrigin =
+      userLocation &&
+      typeof userLocation.lat === "number" &&
+      typeof userLocation.lng === "number";
+    const originParam = hasOrigin
+      ? `${userLocation.lat},${userLocation.lng}`
+      : "";
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
+      destinationParam
+    )}${
+      originParam ? `&origin=${encodeURIComponent(originParam)}` : ""
+    }&travelmode=driving`;
+    if (typeof window !== "undefined") {
+      window.open(url, "_blank", "noopener,noreferrer");
+    }
+  }, [selectedStationCoords, userLocation]);
+
+  const handleDirectionsReady = React.useCallback(
+    (info) => {
+      if (!info) return;
+      if (
+        info.requestId != null &&
+        info.requestId !== navigationRequestId
+      ) {
+        return;
+      }
+
+      const normalizedSteps = Array.isArray(info.steps)
+        ? info.steps.map((step, index) => {
+            const instructionHtml =
+              step.instructionHtml ||
+              step.instruction ||
+              step.instructionText ||
+              "";
+            const instructionText =
+              step.instructionText ||
+              stripHtml(instructionHtml) ||
+              `Bước ${index + 1}`;
+            return {
+              ...step,
+              index: step.index ?? index,
+              instructionHtml,
+              instructionText,
+              distanceText:
+                step.distanceText ||
+                formatDistanceFromMeters(step.distanceMeters),
+              durationText:
+                step.durationText ||
+                formatDurationFromSeconds(step.durationSeconds),
+            };
+          })
+        : [];
+
+      const normalizedInfo = {
+        ...info,
+        stationId: selectedStation?.id || info.stationId || null,
+        distanceText:
+          info.distanceText ||
+          formatDistanceFromMeters(info.distanceMeters),
+        durationText:
+          info.durationText ||
+          formatDurationFromSeconds(info.durationSeconds),
+        steps: normalizedSteps,
+        warnings: Array.isArray(info.warnings) ? info.warnings : [],
+      };
+
+      setDirectionsData({
+        loading: false,
+        error: null,
+        info: normalizedInfo,
+      });
+    },
+    [navigationRequestId, selectedStation?.id]
+  );
+
+  const handleDirectionsError = React.useCallback(
+    (errorInfo) => {
+      const requestId =
+        typeof errorInfo === "object" && errorInfo !== null
+          ? errorInfo.requestId
+          : undefined;
+      if (requestId != null && requestId !== navigationRequestId) {
+        return;
+      }
+
+      const message =
+        typeof errorInfo === "string"
+          ? errorInfo
+          : errorInfo?.message || "Không thể tải chỉ đường.";
+
+      setDirectionsData((prev) => ({
+        loading: false,
+        info:
+          prev.info && prev.info.stationId === selectedStation?.id
+            ? prev.info
+            : null,
+        error: message,
+      }));
+    },
+    [navigationRequestId, selectedStation?.id]
+  );
 
   const handleBookingComplete = (booking) => {
     console.log("🎯 Booking completed:", booking);
@@ -1055,24 +1344,241 @@ const ChargingFlow = () => {
                 </Card>
 
                 {/* Map with directions */}
-                <Typography variant="h6" gutterBottom sx={{ fontWeight: "bold", mb: 2 }}>
+                <Typography
+                  variant="h6"
+                  gutterBottom
+                  sx={{ fontWeight: "bold", mb: 2 }}
+                >
                   🗺️ Chỉ đường đến trạm
                 </Typography>
-                <Box sx={{ 
-                  height: 500, 
-                  border: "1px solid", 
-                  borderColor: "divider", 
-                  borderRadius: 2,
-                  overflow: "hidden"
-                }}>
-                  <StationMapLeaflet
-                    stations={[selectedStation]}
-                    onStationSelect={() => {}}
-                    userLocation={userLocation}
-                    showRoute={true}
-                    centerOnStation={true}
-                  />
-                </Box>
+                <Grid container spacing={2} sx={{ mb: 1 }}>
+                  <Grid item xs={12} md={8}>
+                    <Box
+                      sx={{
+                        height: 500,
+                        border: "1px solid",
+                        borderColor: "divider",
+                        borderRadius: 2,
+                        overflow: "hidden",
+                      }}
+                    >
+                      <StationMapLeaflet
+                        stations={[selectedStation]}
+                        onStationSelect={() => {}}
+                        userLocation={userLocation}
+                        showRoute={true}
+                        centerOnStation={true}
+                        onDirectionsReady={handleDirectionsReady}
+                        onDirectionsError={handleDirectionsError}
+                        routeRequestId={navigationRequestId}
+                      />
+                    </Box>
+                  </Grid>
+                  <Grid item xs={12} md={4}>
+                    <Paper
+                      variant="outlined"
+                      sx={{
+                        height: "100%",
+                        p: 2.5,
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 2,
+                      }}
+                    >
+                      <Typography variant="subtitle1" fontWeight="bold">
+                        Lộ trình đề xuất
+                      </Typography>
+
+                      {directionsData.loading && (
+                        <Box
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 1,
+                          }}
+                        >
+                          <CircularProgress size={20} />
+                          <Typography
+                            variant="body2"
+                            color="text.secondary"
+                          >
+                            Đang tải chỉ đường...
+                          </Typography>
+                        </Box>
+                      )}
+
+                      {directionsData.error && (
+                        <Alert severity="warning">{directionsData.error}</Alert>
+                      )}
+
+                      {navigationSummary && (
+                        <>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              flexWrap: "wrap",
+                              gap: 1,
+                            }}
+                          >
+                            {navigationSummary.distanceText && (
+                              <Chip
+                                icon={<Directions fontSize="small" />}
+                                label={`Quãng đường: ${navigationSummary.distanceText}`}
+                                size="small"
+                                color="primary"
+                                variant="outlined"
+                              />
+                            )}
+                            {navigationSummary.durationText && (
+                              <Chip
+                                icon={<AccessTime fontSize="small" />}
+                                label={`Thời gian: ${navigationSummary.durationText}`}
+                                size="small"
+                                color="primary"
+                                variant="outlined"
+                              />
+                            )}
+                          </Box>
+
+                          {navigationWarnings.map((warning, index) => (
+                            <Alert
+                              key={`nav-warning-${index}`}
+                              severity={
+                                navigationSummary.provider === "fallback" ||
+                                navigationSummary.usedFallback
+                                  ? "warning"
+                                  : "info"
+                              }
+                              sx={{ mb: 1 }}
+                            >
+                              {warning}
+                            </Alert>
+                          ))}
+
+                          {navigationSummary.steps &&
+                          navigationSummary.steps.length > 0 ? (
+                            <List
+                              dense
+                              sx={{
+                                flex: 1,
+                                maxHeight: "400px",
+                                overflowY: "auto",
+                                pr: 1,
+                                // Custom scrollbar styling
+                                "&::-webkit-scrollbar": {
+                                  width: "8px",
+                                },
+                                "&::-webkit-scrollbar-track": {
+                                  backgroundColor: "rgba(0,0,0,0.05)",
+                                  borderRadius: "4px",
+                                },
+                                "&::-webkit-scrollbar-thumb": {
+                                  backgroundColor: "rgba(0,0,0,0.2)",
+                                  borderRadius: "4px",
+                                  "&:hover": {
+                                    backgroundColor: "rgba(0,0,0,0.3)",
+                                  },
+                                },
+                              }}
+                            >
+                              {navigationSummary.steps.map((step, idx) => (
+                                <ListItem
+                                  key={`direction-step-${
+                                    step.index ?? idx
+                                  }`}
+                                  alignItems="flex-start"
+                                  sx={{ py: 1 }}
+                                >
+                                  <ListItemIcon sx={{ minWidth: 36 }}>
+                                    <Avatar
+                                      sx={{
+                                        width: 28,
+                                        height: 28,
+                                        fontSize: "0.75rem",
+                                        backgroundColor: "primary.main",
+                                        color: "white",
+                                      }}
+                                    >
+                                      {(step.index ?? 0) + 1}
+                                    </Avatar>
+                                  </ListItemIcon>
+                                  <Box sx={{ flex: 1 }}>
+                                    <Typography
+                                      variant="body2"
+                                      fontWeight="medium"
+                                    >
+                                      {step.instructionText}
+                                    </Typography>
+                                    {(step.distanceText || step.durationText) && (
+                                      <Typography
+                                        variant="caption"
+                                        color="text.secondary"
+                                      >
+                                        {[
+                                          step.distanceText,
+                                          step.durationText,
+                                        ]
+                                          .filter(Boolean)
+                                          .join(" • ")}
+                                      </Typography>
+                                    )}
+                                  </Box>
+                                </ListItem>
+                              ))}
+                            </List>
+                          ) : (
+                            <Typography
+                              variant="body2"
+                              color="text.secondary"
+                            >
+                              Không có hướng dẫn chi tiết. Nhấn “Mở Google Maps”
+                              để xem đường đi trực tiếp.
+                            </Typography>
+                          )}
+                        </>
+                      )}
+
+                      {!directionsData.loading &&
+                        !navigationSummary &&
+                        !directionsData.error && (
+                          <Typography
+                            variant="body2"
+                            color="text.secondary"
+                          >
+                            Chúng tôi sẽ hiển thị chỉ đường ngay khi có dữ liệu.
+                          </Typography>
+                        )}
+
+                      <Box
+                        sx={{
+                          display: "flex",
+                          flexDirection: { xs: "column", sm: "row" },
+                          gap: 1,
+                          mt: "auto",
+                        }}
+                      >
+                        <Button
+                          variant="contained"
+                          startIcon={<Directions />}
+                          onClick={handleOpenGoogleMaps}
+                          disabled={!selectedStationCoords}
+                          fullWidth
+                        >
+                          Mở Google Maps
+                        </Button>
+                        <Button
+                          variant="outlined"
+                          startIcon={<Refresh />}
+                          onClick={handleRetryDirections}
+                          disabled={directionsData.loading || !selectedStation?.id}
+                          fullWidth
+                        >
+                          Làm mới
+                        </Button>
+                      </Box>
+                    </Paper>
+                  </Grid>
+                </Grid>
 
                 {/* Action Buttons */}
                 <Box sx={{ display: "flex", gap: 2, mt: 3, justifyContent: "center" }}>
@@ -1081,6 +1587,24 @@ const ChargingFlow = () => {
                     onClick={() => {
                       setFlowStep(0);
                       setSelectedStation(null);
+                      setPersistedStationId(null);
+                      setDirectionsData({
+                        loading: false,
+                        info: null,
+                        error: null,
+                      });
+                      if (typeof window !== "undefined") {
+                        try {
+                          sessionStorage.removeItem(
+                            "chargingSelectedStationId"
+                          );
+                        } catch (error) {
+                          console.warn(
+                            "Không thể xóa chargingSelectedStationId",
+                            error
+                          );
+                        }
+                      }
                     }}
                   >
                     Chọn trạm khác
@@ -2329,6 +2853,24 @@ const ChargingFlow = () => {
                     resetFlowState();
                     setFlowStep(0);
                     setSelectedStation(null);
+                    setPersistedStationId(null);
+                    setDirectionsData({
+                      loading: false,
+                      info: null,
+                      error: null,
+                    });
+                    if (typeof window !== "undefined") {
+                      try {
+                        sessionStorage.removeItem(
+                          "chargingSelectedStationId"
+                        );
+                      } catch (error) {
+                        console.warn(
+                          "Không thể xóa chargingSelectedStationId",
+                          error
+                        );
+                      }
+                    }
                     setScanResult("");
                     setCompletedSession(null);
                     setCurrentBookingData(null);
@@ -2408,6 +2950,22 @@ const ChargingFlow = () => {
           setTimeout(() => {
             setFlowStep(0);
             setSelectedStation(null);
+            setPersistedStationId(null);
+            setDirectionsData({
+              loading: false,
+              info: null,
+              error: null,
+            });
+            if (typeof window !== "undefined") {
+              try {
+                sessionStorage.removeItem("chargingSelectedStationId");
+              } catch (error) {
+                console.warn(
+                  "Không thể xóa chargingSelectedStationId",
+                  error
+                );
+              }
+            }
             setScanResult("");
             setCompletedSession(null);
           }, 1000);
