@@ -131,12 +131,48 @@ public class StationService : IStationService
         var stationsRaw = await query.ToListAsync();
 
         var pricingLookup = await BuildPricingLookupAsync(stationsRaw.Select(s => s.StationId));
+        
+        // Load charging posts and slots for all stations
+        var stationIds = stationsRaw.Select(s => s.StationId).ToList();
+        var chargingPosts = await _context.ChargingPosts
+            .Where(p => stationIds.Contains(p.StationId))
+            .Include(p => p.ChargingSlots)
+            .ToListAsync();
 
         var stations = stationsRaw.Select(s =>
         {
             var pricing = pricingLookup.TryGetValue(s.StationId, out var value)
                 ? value
                 : StationPricingInfo.CreateDefault();
+
+            // Get posts for this station or create defaults
+            var posts = chargingPosts.Where(p => p.StationId == s.StationId).ToList();
+            List<ChargingPostDto>? chargingPostsDtos = null;
+            
+            if (posts.Any())
+            {
+                // Use real data from DB
+                chargingPostsDtos = posts.Select(p => new ChargingPostDto
+                {
+                    PostId = p.PostId,
+                    PostName = $"Post {p.PostNumber}",
+                    PostType = p.PostType,
+                    Slots = p.ChargingSlots.Select(slot => new ChargingSlotSimpleDto
+                    {
+                        SlotId = slot.SlotId,
+                        SlotNumber = int.TryParse(slot.SlotNumber, out var num) ? num : 0,
+                        ConnectorType = slot.ConnectorType,
+                        MaxPower = slot.MaxPower,
+                        Status = slot.Status,
+                        CurrentBookingId = slot.CurrentBookingId
+                    }).ToList()
+                }).ToList();
+            }
+            else if (s.TotalPosts > 0)
+            {
+                // Create default structure based on TotalPosts/AvailablePosts
+                chargingPostsDtos = CreateDefaultChargingPosts(s.TotalPosts, s.AvailablePosts);
+            }
 
             return new StationDto
             {
@@ -157,11 +193,81 @@ public class StationService : IStationService
                 AcRate = pricing.AcRate,
                 DcRate = pricing.DcRate,
                 DcFastRate = pricing.DcFastRate,
-                ParkingFee = pricing.ParkingFee
+                ParkingFee = pricing.ParkingFee,
+                ChargingPosts = chargingPostsDtos
             };
         }).ToList();
 
         return stations;
+    }
+
+    private List<ChargingPostDto> CreateDefaultChargingPosts(int totalPosts, int availablePosts)
+    {
+        var posts = new List<ChargingPostDto>();
+        
+        // Distribute posts between AC and DC (60% AC, 40% DC)
+        int acPosts = (int)Math.Ceiling(totalPosts * 0.6);
+        int dcPosts = totalPosts - acPosts;
+        
+        int availableAC = (int)Math.Ceiling(availablePosts * 0.6);
+        int availableDC = availablePosts - availableAC;
+        
+        // Create AC posts
+        for (int i = 1; i <= acPosts; i++)
+        {
+            var slots = new List<ChargingSlotSimpleDto>();
+            // Each AC post has 2 slots (Type 2)
+            for (int j = 1; j <= 2; j++)
+            {
+                bool isAvailable = availableAC > 0;
+                slots.Add(new ChargingSlotSimpleDto
+                {
+                    SlotId = (i * 100) + j, // Virtual ID
+                    SlotNumber = j,
+                    ConnectorType = "Type 2",
+                    MaxPower = 22,
+                    Status = isAvailable ? "Available" : "In Use",
+                    CurrentBookingId = null
+                });
+                if (isAvailable) availableAC--;
+            }
+            
+            posts.Add(new ChargingPostDto
+            {
+                PostId = i,
+                PostName = $"AC Post {i}",
+                PostType = "AC",
+                Slots = slots
+            });
+        }
+        
+        // Create DC posts
+        for (int i = 1; i <= dcPosts; i++)
+        {
+            var slots = new List<ChargingSlotSimpleDto>();
+            // Each DC post has 1 CCS2 slot
+            bool isAvailable = availableDC > 0;
+            slots.Add(new ChargingSlotSimpleDto
+            {
+                SlotId = ((acPosts + i) * 100) + 1, // Virtual ID
+                SlotNumber = 1,
+                ConnectorType = "CCS2",
+                MaxPower = 50,
+                Status = isAvailable ? "Available" : "In Use",
+                CurrentBookingId = null
+            });
+            if (isAvailable) availableDC--;
+            
+            posts.Add(new ChargingPostDto
+            {
+                PostId = acPosts + i,
+                PostName = $"DC Post {i}",
+                PostType = "DC",
+                Slots = slots
+            });
+        }
+        
+        return posts;
     }
 
     public async Task<StationDto> CreateStationAsync(CreateStationDto dto)

@@ -57,6 +57,8 @@ import {
   MenuItem,
   CircularProgress,
   Checkbox,
+  Skeleton,
+  IconButton,
 } from "@mui/material";
 import {
   QrCodeScanner,
@@ -69,6 +71,7 @@ import {
   Directions,
   AccessTime,
   Refresh,
+  RefreshOutlined,
 } from "@mui/icons-material";
 import useBookingStore from "../../store/bookingStore";
 import useStationStore from "../../store/stationStore";
@@ -232,6 +235,9 @@ const ChargingFlow = () => {
     sessionStorage.setItem("chargingFlowStep", step);
   };
   const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState("distance"); // distance, price, availability
+  const [filterAvailable, setFilterAvailable] = useState(false);
+  const [filterMaxDistance, setFilterMaxDistance] = useState(50); // km
   const [selectedStation, setSelectedStation] = useState(null);
   const [persistedStationId, setPersistedStationId] = useState(() => {
     if (typeof window === "undefined") return null;
@@ -257,59 +263,14 @@ const ChargingFlow = () => {
   // State to store stations with real-time stats from API
   const [stationsWithStats, setStationsWithStats] = useState([]);
 
-  // Fetch real-time stats from API for each station
+  // Sync stations from store - they already have correct stats from transformStationData
   useEffect(() => {
-    const fetchStationsStats = async () => {
-      if (!stations || stations.length === 0) return;
-
-      try {
-        const stationsWithRealStats = await Promise.all(
-          stations.map(async (station) => {
-            try {
-              // Call API to get available posts and slots for this station
-              const response = await stationsAPI.getAvailablePosts(station.id);
-              const posts = response.data?.data || response.data || [];
-
-              // Calculate stats from real API data
-              let totalSlots = 0;
-              let availableSlots = 0;
-
-              posts.forEach((post) => {
-                totalSlots += post.totalSlots || 0;
-                availableSlots += post.availableSlots || 0;
-              });
-
-              const occupiedSlots = totalSlots - availableSlots;
-
-              return {
-                ...station,
-                stats: {
-                  total: totalSlots,
-                  available: availableSlots,
-                  occupied: occupiedSlots,
-                },
-              };
-            } catch (error) {
-              console.error(
-                `Error fetching stats for station ${station.id}:`,
-                error
-              );
-              // Return station with empty stats on error
-              return {
-                ...station,
-                stats: { total: 0, available: 0, occupied: 0 },
-              };
-            }
-          })
-        );
-
-        setStationsWithStats(stationsWithRealStats);
-      } catch (error) {
-        console.error("Error fetching stations stats:", error);
-      }
-    };
-
-    fetchStationsStats();
+    if (!stations || stations.length === 0) return;
+    
+    console.log("📊 Syncing stations from store (already have correct stats):", stations.length);
+    // Stations from store already have stats calculated in transformStationData
+    // No need to re-fetch - just use them directly
+    setStationsWithStats(stations);
   }, [stations]);
 
   // Khôi phục currentBooking, chargingSession, flowStep từ sessionStorage khi mount (KHÔNG reset flowStep về 0 tự động)
@@ -546,6 +507,7 @@ const ChargingFlow = () => {
         });
         console.log("🔤 After text search:", stationList.length, "stations");
       }
+
       // Apply connector type filter if selected (independent from text search)
       const connectorFilters = Array.isArray(filters.connectorTypes)
         ? filters.connectorTypes.filter(Boolean)
@@ -572,8 +534,6 @@ const ChargingFlow = () => {
             );
             return true;
           }
-          // Fallback: check if station has connector info in charging object
-          // Fallback: check if station has connector info in charging object
           return false;
         });
         console.log(
@@ -581,10 +541,6 @@ const ChargingFlow = () => {
           stationList.length,
           "stations"
         );
-      }
-      console.log("✅ FINAL RESULT:", stationList.length, "stations");
-      if (stationList.length > 0) {
-        console.log("   Stations:", stationList.map((s) => s.name).join(", "));
       }
 
       // Calculate distance from user location (stats already included from API)
@@ -605,21 +561,45 @@ const ChargingFlow = () => {
         return updatedStation;
       });
 
-      // Sort by distance (ascending order) - nearest stations first
+      // Apply availability filter
+      if (filterAvailable) {
+        stationList = stationList.filter((station) => {
+          const available = station.stats?.available || 0;
+          return available > 0;
+        });
+        console.log("🟢 After availability filter:", stationList.length, "stations");
+      }
+
+      // Apply distance filter
+      if (filterMaxDistance < 50) {
+        stationList = stationList.filter((station) => {
+          return station.distanceFromUser !== undefined && station.distanceFromUser <= filterMaxDistance;
+        });
+        console.log(`📏 After distance filter (${filterMaxDistance}km):`, stationList.length, "stations");
+      }
+
+      // Sort stations based on selected criteria
       stationList.sort((a, b) => {
-        if (
-          a.distanceFromUser !== undefined &&
-          b.distanceFromUser !== undefined
-        ) {
-          return a.distanceFromUser - b.distanceFromUser;
+        if (sortBy === 'distance') {
+          if (a.distanceFromUser !== undefined && b.distanceFromUser !== undefined) {
+            return a.distanceFromUser - b.distanceFromUser;
+          }
+        } else if (sortBy === 'price') {
+          const priceA = a.charging?.pricing?.acRate || a.pricing?.unitPrice || 0;
+          const priceB = b.charging?.pricing?.acRate || b.pricing?.unitPrice || 0;
+          return priceA - priceB;
+        } else if (sortBy === 'availability') {
+          const availA = a.stats?.available || 0;
+          const availB = b.stats?.available || 0;
+          return availB - availA; // Descending (most available first)
         }
         return 0;
       });
 
       console.log(
-        "📍 Stations sorted by distance:",
+        `� Stations sorted by ${sortBy}:`,
         stationList.map(
-          (s) => `${s.name} (${s.distanceFromUser?.toFixed(1)}km)`
+          (s) => `${s.name} (${s.distanceFromUser?.toFixed(1)}km, ${s.stats?.available || 0} available)`
         )
       );
 
@@ -628,7 +608,7 @@ const ChargingFlow = () => {
       console.error("❌ Error filtering stations:", error);
       return [];
     }
-  }, [searchQuery, filters.connectorTypes, stationsWithStats, userLocation]);
+  }, [searchQuery, filters.connectorTypes, stationsWithStats, userLocation, sortBy, filterAvailable, filterMaxDistance]);
 
   const selectedStationCoords = React.useMemo(
     () => extractStationCoordinates(selectedStation),
@@ -712,6 +692,41 @@ const ChargingFlow = () => {
   }, [currentBooking, chargingSession, flowStep]);
 
   const handleStationSelect = (station) => {
+    // CRITICAL: Validate station is available before allowing selection
+    if (!station) {
+      console.warn("⚠️ Cannot select null/undefined station");
+      return;
+    }
+    
+    const isActive = (station.status || "").toLowerCase() === "active";
+    const hasAvailableSlots = station.stats?.available > 0;
+    const isAvailable = isActive && hasAvailableSlots;
+    
+    if (!isAvailable) {
+      console.warn(`⚠️ Cannot select unavailable station: ${station.name}`, {
+        status: station.status,
+        isActive,
+        hasAvailableSlots,
+        availableSlots: station.stats?.available,
+        totalSlots: station.stats?.total
+      });
+      alert(`Không thể chọn trạm này.\n${!isActive ? 'Trạm đang bảo trì.' : 'Trạm đã hết chỗ.'}`);
+      return;
+    }
+    
+    console.log(`✅ Selected station: ${station.name} (${station.stats?.available}/${station.stats?.total} slots available)`);
+    console.log('🔍 Station object:', {
+      id: station.id,
+      name: station.name,
+      stats: station.stats,
+      charging: {
+        availablePorts: station.charging?.availablePorts,
+        totalPorts: station.charging?.totalPorts,
+        connectorTypes: station.charging?.connectorTypes,
+        poles: station.charging?.poles?.length || 0
+      }
+    });
+    
     setSelectedStation(station);
     setPersistedStationId(station?.id || null);
     if (typeof window !== "undefined") {
@@ -865,6 +880,17 @@ const ChargingFlow = () => {
       stationName: selectedStation?.name || "Trạm sạc FPT",
       maxPower: selectedStation?.charging?.fastCharging?.maxPower || 150,
     }));
+  };
+
+  const handleRefreshStations = async () => {
+    console.log("🔄 Refreshing stations from API...");
+    try {
+      // Simply re-initialize data from API - this will fetch fresh data with proper transform
+      await initializeData();
+      console.log("✅ Stations refreshed successfully");
+    } catch (error) {
+      console.error("❌ Error refreshing stations:", error);
+    }
   };
 
   const handleQRScan = async (result) => {
@@ -1111,6 +1137,75 @@ const ChargingFlow = () => {
                     },
                   }}
                 />
+
+                {/* Filters and Sorting Row */}
+                <Grid container spacing={2} sx={{ mt: 2 }}>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <FormControl fullWidth size="small">
+                      <InputLabel>Sắp xếp</InputLabel>
+                      <Select
+                        value={sortBy}
+                        label="Sắp xếp"
+                        onChange={(e) => setSortBy(e.target.value)}
+                      >
+                        <MenuItem value="distance">Khoảng cách</MenuItem>
+                        <MenuItem value="price">Giá thấp nhất</MenuItem>
+                        <MenuItem value="availability">Còn nhiều chỗ</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+
+                  <Grid item xs={12} sm={6} md={3}>
+                    <FormControl fullWidth size="small">
+                      <InputLabel>Khoảng cách tối đa</InputLabel>
+                      <Select
+                        value={filterMaxDistance}
+                        label="Khoảng cách tối đa"
+                        onChange={(e) => setFilterMaxDistance(e.target.value)}
+                      >
+                        <MenuItem value={5}>Trong 5km</MenuItem>
+                        <MenuItem value={10}>Trong 10km</MenuItem>
+                        <MenuItem value={20}>Trong 20km</MenuItem>
+                        <MenuItem value={50}>Tất cả</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        height: '100%',
+                        pl: 1,
+                      }}
+                    >
+                      <Checkbox
+                        checked={filterAvailable}
+                        onChange={(e) => setFilterAvailable(e.target.checked)}
+                      />
+                      <Typography variant="body2">
+                        Chỉ trạm còn chỗ
+                      </Typography>
+                    </Box>
+                  </Grid>
+
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Button
+                      fullWidth
+                      variant="outlined"
+                      onClick={() => {
+                        setSortBy('distance');
+                        setFilterMaxDistance(50);
+                        setFilterAvailable(false);
+                        setSearchQuery('');
+                      }}
+                      sx={{ height: '40px' }}
+                    >
+                      Xóa bộ lọc
+                    </Button>
+                  </Grid>
+                </Grid>
               </CardContent>
             </Card>
           </Grid>
@@ -1119,22 +1214,61 @@ const ChargingFlow = () => {
           <Grid item xs={12}>
             <Card>
               <CardContent>
-                <Typography
-                  variant="h6"
-                  gutterBottom
-                  sx={{
-                    fontWeight: "bold",
-                    color: "black",
-                    mb: 3,
-                  }}
-                >
-                  📍 Danh sách trạm sạc ({filteredStations.length} trạm)
-                </Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                  <Typography
+                    variant="h6"
+                    sx={{
+                      fontWeight: "bold",
+                      color: "black",
+                    }}
+                  >
+                    📍 Danh sách trạm sạc ({loading ? '...' : filteredStations.length} trạm)
+                  </Typography>
+                  <IconButton
+                    onClick={handleRefreshStations}
+                    disabled={loading}
+                    sx={{
+                      bgcolor: 'primary.main',
+                      color: 'white',
+                      '&:hover': { bgcolor: 'primary.dark' },
+                      '&:disabled': { bgcolor: 'grey.300' },
+                    }}
+                  >
+                    <RefreshOutlined />
+                  </IconButton>
+                </Box>
 
                 {loading ? (
-                  <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
-                    <Typography>Đang tải danh sách trạm...</Typography>
-                  </Box>
+                  <Grid container spacing={2}>
+                    {[1, 2, 3, 4, 5, 6].map((index) => (
+                      <Grid item xs={12} md={6} key={`skeleton-${index}`}>
+                        <Card
+                          sx={{
+                            borderRadius: 3,
+                            boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
+                          }}
+                        >
+                          <CardContent>
+                            <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                              <Skeleton variant="circular" width={60} height={60} />
+                              <Box sx={{ flex: 1 }}>
+                                <Skeleton variant="text" width="70%" height={28} />
+                                <Skeleton variant="text" width="40%" height={20} />
+                              </Box>
+                            </Box>
+                            <Skeleton variant="text" width="90%" />
+                            <Skeleton variant="text" width="60%" />
+                            <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
+                              <Skeleton variant="rectangular" width={80} height={32} sx={{ borderRadius: 1 }} />
+                              <Skeleton variant="rectangular" width={80} height={32} sx={{ borderRadius: 1 }} />
+                              <Skeleton variant="rectangular" width={80} height={32} sx={{ borderRadius: 1 }} />
+                            </Box>
+                            <Skeleton variant="rectangular" width="100%" height={40} sx={{ borderRadius: 2, mt: 2 }} />
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                    ))}
+                  </Grid>
                 ) : filteredStations.length === 0 ? (
                   <Box sx={{ textAlign: "center", py: 4 }}>
                     <Typography variant="body1" color="text.secondary">
@@ -1144,7 +1278,13 @@ const ChargingFlow = () => {
                 ) : (
                   <Grid container spacing={2}>
                     {filteredStations.map((station, index) => {
-                      const isAvailable = station.stats?.available > 0;
+                      // Station is available only if:
+                      // 1. Status is "active" (case-insensitive, to match DB values like "Active")
+                      // 2. Has available slots (stats.available > 0)
+                      const isActive = (station.status || "").toLowerCase() === "active";
+                      const hasAvailableSlots = station.stats?.available > 0;
+                      const isAvailable = isActive && hasAvailableSlots;
+                      
                       const distance = station.distanceFromUser?.toFixed(1) || "N/A";
                       const pricing = station.charging?.pricing?.acRate || 
                                      station.charging?.pricing?.dcRate || 0;
@@ -1154,17 +1294,18 @@ const ChargingFlow = () => {
                           <Card
                             sx={{
                               height: "100%",
-                              cursor: "pointer",
+                              cursor: isAvailable ? "pointer" : "not-allowed",
                               transition: "all 0.3s",
                               border: "2px solid",
-                              borderColor: "divider",
-                              "&:hover": {
+                              borderColor: isAvailable ? "divider" : "grey.300",
+                              opacity: isAvailable ? 1 : 0.6,
+                              "&:hover": isAvailable ? {
                                 borderColor: "primary.main",
                                 boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
                                 transform: "translateY(-4px)",
-                              },
+                              } : {},
                             }}
-                            onClick={() => handleStationSelect(station)}
+                            onClick={() => isAvailable && handleStationSelect(station)}
                           >
                             <CardContent>
                               {/* Station Header */}
@@ -1264,11 +1405,23 @@ const ChargingFlow = () => {
                                 variant="contained"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleStationSelect(station);
+                                  if (isAvailable) {
+                                    handleStationSelect(station);
+                                  }
                                 }}
                                 disabled={!isAvailable}
+                                sx={{
+                                  bgcolor: isAvailable ? 'primary.main' : 'grey.400',
+                                  '&:hover': {
+                                    bgcolor: isAvailable ? 'primary.dark' : 'grey.400',
+                                  },
+                                }}
                               >
-                                {isAvailable ? "Chọn trạm này" : "Hết chỗ"}
+                                {isAvailable 
+                                  ? "Chọn trạm này" 
+                                  : !isActive 
+                                    ? "Đang bảo trì" 
+                                    : "Hết chỗ"}
                               </Button>
                             </CardContent>
                           </Card>

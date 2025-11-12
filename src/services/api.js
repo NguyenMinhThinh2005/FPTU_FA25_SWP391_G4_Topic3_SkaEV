@@ -150,6 +150,11 @@ export const stationsAPI = {
     return axiosInstance.get(`/stations/${stationId}/slots`);
   },
 
+  // Alias for getAvailableSlots - used by stationStore
+  getStationSlots: (stationId) => {
+    return axiosInstance.get(`/stations/${stationId}/slots`);
+  },
+
   getAvailablePosts: (stationId) => {
     return axiosInstance.get(`/stations/${stationId}/posts`);
   },

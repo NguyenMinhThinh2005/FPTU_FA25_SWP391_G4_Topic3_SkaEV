@@ -47,6 +47,31 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
   const [bookingResult, setBookingResult] = useState(null);
   const [resultMessage, setResultMessage] = useState("");
 
+  // Debug: log station changes
+  React.useEffect(() => {
+    console.log('📋 BookingModal received station:', {
+      id: station?.id,
+      name: station?.name,
+      statsAvailable: station?.stats?.available,
+      chargingAvailablePorts: station?.charging?.availablePorts,
+      connectorTypes: station?.charging?.connectorTypes
+    });
+  }, [station]);
+
+  // Reset all state when modal opens or station changes
+  React.useEffect(() => {
+    if (open) {
+      setActiveStep(0);
+      setSelectedChargingType(null);
+      setSelectedPort(null);
+      setSelectedDateTime(null);
+      setAgreeTerms(false);
+      setLoading(false);
+      setBookingResult(null);
+      setResultMessage("");
+    }
+  }, [open, station?.id]);
+
   const steps = [
     "Chọn loại sạc",
     "Chọn cổng sạc",
@@ -81,48 +106,118 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
 
   // Get unique charging types from all poles
   const getChargingTypes = () => {
-    if (!station?.charging?.poles) return [];
-
     const pricing = station?.charging?.pricing || {};
 
-    const typesMap = new Map();
-    station.charging.poles.forEach((pole) => {
-      const key = `${pole.type}-${pole.power}`;
-      if (!typesMap.has(key)) {
-        typesMap.set(key, {
-          id: key,
-          type: pole.type,
-          power: pole.power,
-          voltage: pole.voltage,
-          name:
-            pole.type === "AC"
-              ? `Sạc chậm AC`
-              : pole.power >= 150
-              ? `Sạc siêu nhanh DC`
-              : `Sạc nhanh DC`,
-          rate:
-            pole.type === "AC"
-              ? pricing.acRate ?? pricing.dcRate ?? 0
-              : pole.power >= 150
-              ? pricing.dcFastRate ?? pricing.dcRate ?? pricing.acRate ?? 0
-              : pricing.dcRate ?? pricing.acRate ?? 0,
-          availableCount: 0,
-        });
-      }
-      // Count available ports on this pole
-      const availablePorts = (pole.ports || []).filter(
-        (p) => p.status === "available"
-      ).length;
-      const current = typesMap.get(key);
-      current.availableCount += availablePorts;
-    });
+    // If station has detailed poles data, use it
+    if (station?.charging?.poles && station.charging.poles.length > 0) {
+      const typesMap = new Map();
+      station.charging.poles.forEach((pole) => {
+        const key = `${pole.type}-${pole.power}`;
+        if (!typesMap.has(key)) {
+          typesMap.set(key, {
+            id: key,
+            type: pole.type,
+            power: pole.power,
+            voltage: pole.voltage,
+            name:
+              pole.type === "AC"
+                ? `Sạc chậm AC`
+                : pole.power >= 150
+                ? `Sạc siêu nhanh DC`
+                : `Sạc nhanh DC`,
+            rate:
+              pole.type === "AC"
+                ? pricing.acRate ?? pricing.dcRate ?? 0
+                : pole.power >= 150
+                ? pricing.dcFastRate ?? pricing.dcRate ?? pricing.acRate ?? 0
+                : pricing.dcRate ?? pricing.acRate ?? 0,
+            availableCount: 0,
+          });
+        }
+        // Count available ports on this pole
+        const availablePorts = (pole.ports || []).filter(
+          (p) => p.status === "available"
+        ).length;
+        const current = typesMap.get(key);
+        current.availableCount += availablePorts;
+      });
 
-    return Array.from(typesMap.values());
+      return Array.from(typesMap.values());
+    }
+
+    // Fallback: If no poles data, create types from connector types and stats
+    if (station?.charging?.connectorTypes && station.charging.connectorTypes.length > 0) {
+      const types = [];
+      const connectorTypes = station.charging.connectorTypes;
+      const availablePorts = station.stats?.available || station.charging?.availablePorts || 0;
+      
+      console.log('🔍 BookingModal - Creating fallback charging types:', {
+        stationId: station.id,
+        stationName: station.name,
+        connectorTypes,
+        statsAvailable: station.stats?.available,
+        chargingAvailablePorts: station.charging?.availablePorts,
+        finalAvailablePorts: availablePorts
+      });
+      
+      // Distribute available ports evenly across connector types
+      const portsPerType = Math.floor(availablePorts / connectorTypes.length);
+      const remainder = availablePorts % connectorTypes.length;
+      
+      connectorTypes.forEach((connector, index) => {
+        const isDC = connector.includes("CCS") || connector.includes("CHAdeMO");
+        const power = isDC ? 60 : 22; // Default DC: 60kW, AC: 22kW
+        const portCount = portsPerType + (index < remainder ? 1 : 0);
+        
+        console.log(`  - Connector ${index}: ${connector}, isDC=${isDC}, portCount=${portCount}`);
+        
+        types.push({
+          id: `${connector}-${power}`,
+          type: isDC ? "DC" : "AC",
+          power: power,
+          voltage: isDC ? 400 : 230,
+          connectorType: connector,
+          name: isDC ? `Sạc nhanh DC (${connector})` : `Sạc chậm AC (${connector})`,
+          rate: isDC ? (pricing.dcRate || 5000) : (pricing.acRate || 3500),
+          availableCount: portCount,
+        });
+      });
+      
+      return types;
+    }
+
+    return [];
   };
 
   // Get all ports matching selected charging type
   const getPortsForType = () => {
-    if (!selectedChargingType || !station?.charging?.poles) return [];
+    if (!selectedChargingType) return [];
+
+    // FALLBACK: If using fallback data (has connectorType), create virtual ports
+    if (selectedChargingType.connectorType) {
+      console.log('🔄 Creating virtual ports for fallback type:', selectedChargingType.name);
+      const virtualPorts = [];
+      const availableCount = selectedChargingType.availableCount || 0;
+      
+      for (let i = 1; i <= availableCount; i++) {
+        virtualPorts.push({
+          id: `virtual-${selectedChargingType.connectorType}-${i}`,
+          name: `Port ${i}`,
+          status: 'Available',
+          poleName: `Pole ${selectedChargingType.connectorType}`,
+          poleId: `virtual-pole-${selectedChargingType.connectorType}`,
+          power: selectedChargingType.power,
+          type: selectedChargingType.type,
+          connectorType: selectedChargingType.connectorType,
+        });
+      }
+      
+      console.log(`✅ Created ${virtualPorts.length} virtual ports`);
+      return virtualPorts;
+    }
+
+    // NORMAL: Use actual poles data
+    if (!station?.charging?.poles) return [];
 
     const ports = [];
     station.charging.poles.forEach((pole) => {

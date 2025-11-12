@@ -19,6 +19,27 @@ public class StationDto
     public decimal? DcRate { get; set; }
     public decimal? DcFastRate { get; set; }
     public decimal? ParkingFee { get; set; }
+    
+    // Detailed charging infrastructure
+    public List<ChargingPostDto>? ChargingPosts { get; set; }
+}
+
+public class ChargingPostDto
+{
+    public int PostId { get; set; }
+    public string PostName { get; set; } = string.Empty;
+    public string PostType { get; set; } = string.Empty; // AC or DC
+    public List<ChargingSlotSimpleDto> Slots { get; set; } = new();
+}
+
+public class ChargingSlotSimpleDto
+{
+    public int SlotId { get; set; }
+    public int SlotNumber { get; set; }
+    public string ConnectorType { get; set; } = string.Empty;
+    public decimal MaxPower { get; set; }
+    public string Status { get; set; } = string.Empty;
+    public int? CurrentBookingId { get; set; }
 }
 
 public class SearchStationsRequestDto
