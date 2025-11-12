@@ -22,6 +22,7 @@ import {
 } from '@mui/material';
 import { Add, Delete, Person, Email, Phone } from '@mui/icons-material';
 import stationStaffAPI from '../../services/stationStaffAPI';
+import useUserStore from '../../store/userStore';
 
 const StaffAssignment = ({ stationId, stationName }) => {
   const [availableStaff, setAvailableStaff] = useState([]);
@@ -41,6 +42,7 @@ const StaffAssignment = ({ stationId, stationName }) => {
         stationStaffAPI.getStationStaff(stationId)
       ]);
       
+      // Only keep available staff that exist in canonical user store as role === 'staff'
       setAvailableStaff(staffList);
       setAssignedStaff(assignments);
     } catch (err) {
@@ -57,6 +59,14 @@ const StaffAssignment = ({ stationId, stationName }) => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stationId]);
+
+  // Ensure canonical users are loaded so we can filter availableStaff
+  const { users, fetchUsers } = useUserStore();
+  React.useEffect(() => {
+    // fetchUsers is idempotent in the store
+    fetchUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleAssignStaff = async () => {
     if (!selectedStaffId) {
@@ -106,10 +116,14 @@ const StaffAssignment = ({ stationId, stationName }) => {
     }
   };
 
-  // Filter out already assigned staff
-  const unassignedStaff = availableStaff.filter(
-    staff => !assignedStaff.some(assigned => assigned.staffUserId === staff.userId)
-  );
+  // Filter out already assigned staff AND ensure the user exists and has role === 'staff'
+  const unassignedStaff = availableStaff.filter((staff) => {
+    const isAssigned = assignedStaff.some((assigned) => assigned.staffUserId === staff.userId);
+    if (isAssigned) return false;
+    const canonical = users.find((u) => u.userId === staff.userId);
+    // Only include if canonical user exists and role is 'staff'
+    return canonical && canonical.role === 'staff';
+  });
 
   return (
     <Box>

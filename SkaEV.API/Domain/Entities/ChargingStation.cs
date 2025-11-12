@@ -13,6 +13,8 @@ public class ChargingStation
     public Point? Location { get; set; } // Spatial type for geography
     public int TotalPosts { get; set; } = 0;
     public int AvailablePosts { get; set; } = 0;
+    // Derived / persisted metric: number of active sessions currently observed
+    public int ActiveSessions { get; set; } = 0;
     public string? OperatingHours { get; set; }
     public string? Amenities { get; set; } // JSON array
     public string? StationImageUrl { get; set; }

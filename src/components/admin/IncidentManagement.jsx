@@ -36,6 +36,7 @@ import {
 } from '@mui/icons-material';
 import incidentStore from '../../store/incidentStore';
 import stationStore from '../../store/stationStore';
+import axiosInstance from '../../services/axiosConfig';
 
 const IncidentManagement = () => {
   const {
@@ -73,13 +74,31 @@ const IncidentManagement = () => {
   const [updateData, setUpdateData] = useState({
     status: '',
     resolutionNotes: '',
-    assignedToStaffId: null
+    assignedToStaffId: null,
+    assignedToTeamId: null
   });
+
+  const [staffOptions, setStaffOptions] = useState([]);
+  const [teamOptions, setTeamOptions] = useState([]);
 
   useEffect(() => {
     fetchIncidents();
     fetchStats();
     fetchStations();
+    // fetch staff and maintenance teams for assignment dropdown
+    (async () => {
+      try {
+        const [staffRes, teamsRes] = await Promise.all([
+          axiosInstance.get('/maintenance/staff'),
+          axiosInstance.get('/maintenance/teams')
+        ]);
+        setStaffOptions(staffRes.data || []);
+        setTeamOptions(teamsRes.data || []);
+      } catch (err) {
+        // non-fatal: log and continue
+        console.error('Failed to fetch staff/teams for assignment', err);
+      }
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -109,7 +128,8 @@ const IncidentManagement = () => {
         setUpdateData({
           status: incident.status,
           resolutionNotes: '',
-          assignedToStaffId: incident.assignedToStaffId
+          assignedToStaffId: incident.assignedToStaffId,
+          assignedToTeamId: incident.assignedToTeamId || null
         });
       }
     }
@@ -184,14 +204,25 @@ const IncidentManagement = () => {
   };
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" fontWeight="bold">
-          Quản lý Sự cố
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Dữ liệu được đồng bộ tự động từ hệ thống
-        </Typography>
+    <Box sx={{ p: { xs: 2, md: 3 } }}>
+      {/* Header: responsive and balanced */}
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: { xs: 'column', md: 'row' },
+          justifyContent: 'space-between',
+          alignItems: { xs: 'flex-start', md: 'center' },
+          gap: 1,
+          mb: 3
+        }}
+      >
+        <Box>
+          <Typography variant="h4" fontWeight="bold">
+            Quản lý Sự cố
+          </Typography>
+          {/* optional subtitle removed per request */}
+        </Box>
+        {/* right-side helper text intentionally removed to keep header clean and balanced */}
       </Box>
 
       {error && (
@@ -200,72 +231,62 @@ const IncidentManagement = () => {
         </Alert>
       )}
 
-      {/* Statistics Cards */}
+      {/* Statistics Cards - spread evenly across the row for balanced layout */}
       {stats && (
-        <Grid container spacing={2} sx={{ mb: 3 }}>
-          <Grid item xs={12} sm={6} md={2.4}>
-            <Card>
-              <CardContent>
-                <Typography color="textSecondary" gutterBottom>
-                  Tổng số
-                </Typography>
-                <Typography variant="h4">{stats.totalIncidents}</Typography>
-              </CardContent>
-            </Card>
+          <Grid container spacing={2} sx={{ mb: 3 }} justifyContent="space-between">
+            <Grid item xs={12} sm={6} md={3}>
+              <Card>
+                <CardContent>
+                  <Typography color="textSecondary" gutterBottom>
+                    Tổng số
+                  </Typography>
+                  <Typography variant="h4">{stats.totalIncidents}</Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <Card sx={{ borderLeft: 4, borderColor: 'error.main' }}>
+                <CardContent>
+                  <Typography color="textSecondary" gutterBottom>
+                    Chưa xử lý
+                  </Typography>
+                  <Typography variant="h4" color="error">
+                    {stats.openIncidents}
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <Card sx={{ borderLeft: 4, borderColor: 'warning.main' }}>
+                <CardContent>
+                  <Typography color="textSecondary" gutterBottom>
+                    Đang xử lý
+                  </Typography>
+                  <Typography variant="h4" color="warning.main">
+                    {stats.inProgressIncidents}
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <Card sx={{ borderLeft: 4, borderColor: 'success.main' }}>
+                <CardContent>
+                  <Typography color="textSecondary" gutterBottom>
+                    Đã xử lý
+                  </Typography>
+                  <Typography variant="h4" color="success.main">
+                    {stats.resolvedIncidents}
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
           </Grid>
-          <Grid item xs={12} sm={6} md={2.4}>
-            <Card sx={{ borderLeft: 4, borderColor: 'error.main' }}>
-              <CardContent>
-                <Typography color="textSecondary" gutterBottom>
-                  Đang mở
-                </Typography>
-                <Typography variant="h4" color="error">
-                  {stats.openIncidents}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} sm={6} md={2.4}>
-            <Card sx={{ borderLeft: 4, borderColor: 'warning.main' }}>
-              <CardContent>
-                <Typography color="textSecondary" gutterBottom>
-                  Đang xử lý
-                </Typography>
-                <Typography variant="h4" color="warning.main">
-                  {stats.inProgressIncidents}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} sm={6} md={2.4}>
-            <Card sx={{ borderLeft: 4, borderColor: 'success.main' }}>
-              <CardContent>
-                <Typography color="textSecondary" gutterBottom>
-                  Đã giải quyết
-                </Typography>
-                <Typography variant="h4" color="success.main">
-                  {stats.resolvedIncidents}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} sm={6} md={2.4}>
-            <Card>
-              <CardContent>
-                <Typography color="textSecondary" gutterBottom>
-                  Đã đóng
-                </Typography>
-                <Typography variant="h4">{stats.closedIncidents}</Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
       )}
 
-      {/* Filters */}
+      {/* Filters - center and distribute controls for balanced layout */}
       <Paper sx={{ p: 2, mb: 2 }}>
-        <Grid container spacing={2} alignItems="center">
-          <Grid item xs={12} sm={3}>
+        <Grid container spacing={2} alignItems="center" justifyContent="space-between">
+          <Grid item xs={12} sm={6} md={4}>
             <FormControl fullWidth size="small">
               <InputLabel>Trạng thái</InputLabel>
               <Select
@@ -274,14 +295,13 @@ const IncidentManagement = () => {
                 onChange={(e) => setFilters({ status: e.target.value || null })}
               >
                 <MenuItem value="">Tất cả</MenuItem>
-                <MenuItem value="open">Đang mở</MenuItem>
+                <MenuItem value="open">Chưa xử lý</MenuItem>
                 <MenuItem value="in_progress">Đang xử lý</MenuItem>
-                <MenuItem value="resolved">Đã giải quyết</MenuItem>
-                <MenuItem value="closed">Đã đóng</MenuItem>
+                <MenuItem value="resolved">Đã xử lý</MenuItem>
               </Select>
             </FormControl>
           </Grid>
-          <Grid item xs={12} sm={4}>
+          <Grid item xs={12} sm={6} md={4}>
             <FormControl fullWidth size="small">
               <InputLabel>Mức độ nghiêm trọng</InputLabel>
               <Select
@@ -296,10 +316,12 @@ const IncidentManagement = () => {
               </Select>
             </FormControl>
           </Grid>
-          <Grid item xs={12} sm={2}>
-            <Button fullWidth variant="outlined" onClick={clearFilters}>
-              Xóa bộ lọc
-            </Button>
+          <Grid item xs={12} sm={12} md={3}>
+            <Box sx={{ display: 'flex', justifyContent: { xs: 'flex-start', md: 'flex-end' } }}>
+              <Button size="large" variant="outlined" onClick={clearFilters}>
+                Xóa bộ lọc
+              </Button>
+            </Box>
           </Grid>
         </Grid>
       </Paper>
@@ -364,7 +386,7 @@ const IncidentManagement = () => {
                       color={getStatusColor(incident.status)}
                     />
                   </TableCell>
-                  <TableCell>{incident.assignedToStaffName || 'Chưa gán'}</TableCell>
+                  <TableCell>{incident.assignedToStaffName || incident.assignedToTeamName || 'Chưa gán'}</TableCell>
                   <TableCell>{formatDate(incident.reportedAt)}</TableCell>
                   <TableCell align="center">
                     <Tooltip title="Xem chi tiết">
@@ -527,7 +549,7 @@ const IncidentManagement = () => {
                 </Typography>
                 <Typography variant="body1">{selectedIncident.description}</Typography>
               </Grid>
-              {selectedIncident.resolutionNotes && (
+                  {selectedIncident.resolutionNotes && (
                 <Grid item xs={12}>
                   <Typography variant="subtitle2" color="textSecondary">
                     Ghi chú giải quyết
@@ -548,7 +570,7 @@ const IncidentManagement = () => {
                   Người phụ trách
                 </Typography>
                 <Typography variant="body1">
-                  {selectedIncident.assignedToStaffName || 'Chưa gán'}
+                  {selectedIncident.assignedToStaffName || selectedIncident.assignedToTeamName || 'Chưa gán'}
                 </Typography>
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -602,6 +624,39 @@ const IncidentManagement = () => {
                   value={updateData.resolutionNotes}
                   onChange={(e) => setUpdateData({ ...updateData, resolutionNotes: e.target.value })}
                 />
+              </Grid>
+              <Grid item xs={12}>
+                <FormControl fullWidth>
+                  <InputLabel>Người phụ trách (Staff hoặc Team)</InputLabel>
+                  <Select
+                    value={updateData.assignedToTeamId ? `team:${updateData.assignedToTeamId}` : updateData.assignedToStaffId ? `staff:${updateData.assignedToStaffId}` : ''}
+                    label="Người phụ trách (Staff hoặc Team)"
+                    onChange={(e) => {
+                      const val = e.target.value || '';
+                      if (val.startsWith('staff:')) {
+                        const id = parseInt(val.split(':')[1], 10);
+                        setUpdateData({ ...updateData, assignedToStaffId: id, assignedToTeamId: null });
+                      } else if (val.startsWith('team:')) {
+                        const id = parseInt(val.split(':')[1], 10);
+                        setUpdateData({ ...updateData, assignedToTeamId: id, assignedToStaffId: null });
+                      } else {
+                        setUpdateData({ ...updateData, assignedToStaffId: null, assignedToTeamId: null });
+                      }
+                    }}
+                  >
+                    <MenuItem value="">Chưa gán</MenuItem>
+                    {staffOptions.map((s) => (
+                      <MenuItem key={`staff-${s.userId}`} value={`staff:${s.userId}`}>
+                        {s.fullName} (Staff)
+                      </MenuItem>
+                    ))}
+                    {teamOptions.map((t) => (
+                      <MenuItem key={`team-${t.maintenanceTeamId}`} value={`team:${t.maintenanceTeamId}`}>
+                        {t.name} (Team)
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
               </Grid>
             </Grid>
           )}

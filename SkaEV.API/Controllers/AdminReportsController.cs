@@ -15,11 +15,15 @@ public class AdminReportsController : ControllerBase
 {
     private readonly IReportService _reportService;
     private readonly ILogger<AdminReportsController> _logger;
+    private readonly IConfiguration _configuration;
+    private readonly IWebHostEnvironment _env;
 
-    public AdminReportsController(IReportService reportService, ILogger<AdminReportsController> logger)
+    public AdminReportsController(IReportService reportService, ILogger<AdminReportsController> logger, IConfiguration configuration, IWebHostEnvironment env)
     {
         _reportService = reportService;
         _logger = logger;
+        _configuration = configuration;
+        _env = env;
     }
 
     /// <summary>
@@ -273,6 +277,83 @@ public class AdminReportsController : ControllerBase
         {
             _logger.LogError(ex, "Error getting peak hours analysis");
             return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
+    }
+
+    /// <summary>
+    /// Get revenue aggregated by connector type (e.g. CCS2, Type2)
+    /// Returns DB-driven results only. No demo fallback in production or development.
+    /// </summary>
+    [HttpGet("revenue-by-connector")]
+    public async Task<IActionResult> GetRevenueByConnector(
+        [FromQuery] int? stationId = null,
+        [FromQuery] DateTime? startDate = null,
+        [FromQuery] DateTime? endDate = null)
+    {
+        try
+        {
+            var data = await _reportService.GetRevenueByConnectorAsync(stationId, startDate, endDate);
+            // Return empty array if no data found (caller can decide how to render)
+            return Ok(new { success = true, data = data ?? Enumerable.Empty<ConnectorRevenueDto>() });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting revenue by connector");
+            return StatusCode(500, new { success = false, message = "An error occurred while retrieving revenue by connector" });
+        }
+    }
+
+    /// <summary>
+    /// Development-only: Seed minimal demo data into the configured SQL Server.
+    /// This endpoint will only run when the application is running in Development environment.
+    /// It reads the script at SkaEV.API/Tools/seed_minimal.sql and executes batches separated by GO.
+    /// </summary>
+    [HttpPost("seed-demo")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> SeedDemoData()
+    {
+        if (!_env.IsDevelopment())
+        {
+            return BadRequest(new { success = false, message = "Seeding is allowed only in Development environment." });
+        }
+
+        try
+        {
+            var scriptPath = Path.Combine(_env.ContentRootPath, "SkaEV.API", "Tools", "seed_minimal.sql");
+            if (!System.IO.File.Exists(scriptPath))
+            {
+                return BadRequest(new { success = false, message = $"Seed script not found: {scriptPath}" });
+            }
+
+            var script = await System.IO.File.ReadAllTextAsync(scriptPath);
+
+            var connectionString = _configuration.GetConnectionString("DefaultConnection");
+            if (string.IsNullOrWhiteSpace(connectionString))
+                return BadRequest(new { success = false, message = "DefaultConnection is not configured." });
+
+            // Split on GO statements (common in SQL Server scripts)
+            var batches = System.Text.RegularExpressions.Regex.Split(script, "\r?\nGO\r?\n", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+            using var conn = new Microsoft.Data.SqlClient.SqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            foreach (var batch in batches)
+            {
+                var trimmed = batch.Trim();
+                if (string.IsNullOrWhiteSpace(trimmed)) continue;
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = trimmed;
+                cmd.CommandTimeout = 120;
+                await cmd.ExecuteNonQueryAsync();
+            }
+
+            return Ok(new { success = true, message = "Seed script executed." });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Seed demo failed");
+            return StatusCode(500, new { success = false, message = ex.Message });
         }
     }
 

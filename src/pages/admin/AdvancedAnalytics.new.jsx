@@ -54,6 +54,7 @@ import reportsAPI from "../../services/api/reportsAPI";
 const AdvancedAnalytics = () => {
   // States
   const [timeRange, setTimeRange] = useState("30d");
+  const [groupBy, setGroupBy] = useState("auto");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   
@@ -84,6 +85,7 @@ const AdvancedAnalytics = () => {
       } else if (timeRange === "12m") {
         params = { year: currentYear };
       }
+      if (groupBy && groupBy !== "auto") params.groupBy = groupBy;
 
       // Fetch data in parallel
       const [
@@ -98,7 +100,8 @@ const AdvancedAnalytics = () => {
         reportsAPI.getPeakHours({ 
           dateRange: timeRange === "7d" ? "last7days" : 
                      timeRange === "30d" ? "last30days" : 
-                     "last90days" 
+                     "last90days",
+          ...(groupBy && groupBy !== 'auto' ? { groupBy } : {}),
         }),
       ]);
 
@@ -113,7 +116,7 @@ const AdvancedAnalytics = () => {
     } finally {
       setLoading(false);
     }
-  }, [timeRange]);
+  }, [timeRange, groupBy]);
 
   useEffect(() => {
     fetchAnalyticsData();
@@ -256,7 +259,7 @@ const AdvancedAnalytics = () => {
       >
         <Box>
           <Typography variant="h4" fontWeight="bold" gutterBottom>
-            Phân tích nâng cao 📊
+            Phân tích tổng quan
           </Typography>
           <Typography variant="body1" color="text.secondary">
             Báo cáo chi tiết về doanh thu, sử dụng và hiệu suất hệ thống
@@ -264,20 +267,36 @@ const AdvancedAnalytics = () => {
         </Box>
 
         <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
-          {/* Time Range Selector */}
-          <FormControl size="small" sx={{ minWidth: 150 }}>
-            <InputLabel>Khoảng thời gian</InputLabel>
-            <Select
-              value={timeRange}
-              label="Khoảng thời gian"
-              onChange={(e) => setTimeRange(e.target.value)}
-            >
-              <MenuItem value="7d">7 ngày gần đây</MenuItem>
-              <MenuItem value="30d">30 ngày gần đây</MenuItem>
-              <MenuItem value="90d">3 tháng gần đây</MenuItem>
-              <MenuItem value="12m">12 tháng gần đây</MenuItem>
-            </Select>
-          </FormControl>
+              {/* Time Range Selector */}
+              <FormControl size="small" sx={{ minWidth: 150 }}>
+                <InputLabel>Khoảng thời gian</InputLabel>
+                <Select
+                  value={timeRange}
+                  label="Khoảng thời gian"
+                  onChange={(e) => setTimeRange(e.target.value)}
+                >
+                  <MenuItem value="7d">7 ngày gần đây</MenuItem>
+                  <MenuItem value="30d">30 ngày gần đây</MenuItem>
+                  <MenuItem value="90d">3 tháng gần đây</MenuItem>
+                  <MenuItem value="12m">12 tháng gần đây</MenuItem>
+                </Select>
+              </FormControl>
+
+              {/* Group By selector for aggregation granularity */}
+              <FormControl size="small" sx={{ minWidth: 140 }}>
+                <InputLabel>Nhóm theo</InputLabel>
+                <Select
+                  value={groupBy}
+                  label="Nhóm theo"
+                  onChange={(e) => setGroupBy(e.target.value)}
+                >
+                  <MenuItem value="auto">Tự động</MenuItem>
+                  <MenuItem value="hour">Giờ</MenuItem>
+                  <MenuItem value="day">Ngày</MenuItem>
+                  <MenuItem value="week">Tuần</MenuItem>
+                  <MenuItem value="month">Tháng</MenuItem>
+                </Select>
+              </FormControl>
 
           <Button
             variant="contained"
@@ -318,23 +337,6 @@ const AdvancedAnalytics = () => {
                   <Typography variant="body2" sx={{ opacity: 0.9 }}>
                     Tổng doanh thu
                   </Typography>
-                  <Box
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 0.5,
-                      mt: 0.5,
-                    }}
-                  >
-                    {kpis.revenueGrowth >= 0 ? (
-                      <TrendingUp sx={{ fontSize: 16 }} />
-                    ) : (
-                      <TrendingDown sx={{ fontSize: 16 }} />
-                    )}
-                    <Typography variant="caption">
-                      {Math.abs(kpis.revenueGrowth).toFixed(1)}% so với kỳ trước
-                    </Typography>
-                  </Box>
                 </Box>
               </Box>
             </CardContent>
@@ -359,9 +361,6 @@ const AdvancedAnalytics = () => {
                   </Typography>
                   <Typography variant="body2" sx={{ opacity: 0.9 }}>
                     Phiên sạc hoàn thành
-                  </Typography>
-                  <Typography variant="caption" sx={{ opacity: 0.8 }}>
-                    {kpis.totalBookings.toLocaleString()} lượt đặt chỗ
                   </Typography>
                 </Box>
               </Box>
@@ -388,9 +387,6 @@ const AdvancedAnalytics = () => {
                   <Typography variant="body2" sx={{ opacity: 0.9 }}>
                     kWh năng lượng cung cấp
                   </Typography>
-                  <Typography variant="caption" sx={{ opacity: 0.8 }}>
-                    ≈ {(kpis.totalEnergy * 0.5).toFixed(0)} kg CO₂ tiết kiệm
-                  </Typography>
                 </Box>
               </Box>
             </CardContent>
@@ -416,9 +412,6 @@ const AdvancedAnalytics = () => {
                   <Typography variant="body2" sx={{ opacity: 0.9 }}>
                     Tỷ lệ sử dụng trung bình
                   </Typography>
-                  <Typography variant="caption" sx={{ opacity: 0.8 }}>
-                    Trong {getTimeRangeLabel().toLowerCase()}
-                  </Typography>
                 </Box>
               </Box>
             </CardContent>
@@ -433,7 +426,7 @@ const AdvancedAnalytics = () => {
           <Card>
             <CardContent>
               <Typography variant="h6" fontWeight="bold" gutterBottom>
-                Xu hướng doanh thu & phiên sạc ({getTimeRangeLabel()})
+                Xu hướng doanh thu & phiên sạc 
               </Typography>
               <Box sx={{ height: 300 }}>
                 {getRevenueChartData().length > 0 ? (
@@ -525,7 +518,7 @@ const AdvancedAnalytics = () => {
           <Card>
             <CardContent>
               <Typography variant="h6" fontWeight="bold" gutterBottom>
-                Phân bố sử dụng theo giờ trong ngày
+                Phân bố sử dụng theo giờ 
               </Typography>
               <Box sx={{ height: 300 }}>
                 {peakHoursData.length > 0 ? (
@@ -563,7 +556,7 @@ const AdvancedAnalytics = () => {
           <Card>
             <CardContent>
               <Typography variant="h6" fontWeight="bold" gutterBottom>
-                Năng lượng & Tỷ lệ sử dụng ({getTimeRangeLabel()})
+                Năng lượng & Tỷ lệ sử dụng 
               </Typography>
               <Box sx={{ height: 300 }}>
                 {getSessionsChartData().length > 0 ? (

@@ -36,13 +36,18 @@ const transformStationData = (apiStation, slotsData = null) => {
         }
 
         const post = postMap.get(postId);
+        // Prefer connectorType coming from the database (truth from server).
+        // Only fall back to leaving connectorType undefined when the DB does not provide it.
+        // This avoids fabricating connector types based on heuristics (powerKw) when the
+        // database actually contains an authoritative value.
         post.ports.push({
           id: `${apiStation.stationId}-slot${slot.slotId}`,
           portId: `${apiStation.stationId}-slot${slot.slotId}`,
           slotId: slot.slotId,
           portNumber: slot.slotId,
-          connectorType:
-            slot.connectorType || (slot.powerKw >= 50 ? "CCS2" : "Type 2"),
+          // Use DB-provided connectorType when available; otherwise keep undefined so
+          // downstream UI and analytics can decide whether to treat it as unknown.
+          connectorType: slot.connectorType ?? undefined,
           maxPower: slot.powerKw,
           status: slot.status === "available" ? "available" : "occupied",
           currentRate: slot.powerKw >= 50 ? 5000 : 3000,
@@ -558,15 +563,39 @@ const useStationStore = create((set, get) => ({
   },
 
   remoteDisableStation: async (stationId) => {
-    await new Promise((r) => setTimeout(r, 300));
-    get().setStationStatus(stationId, "offline");
-    return { success: true };
-  },
+    try {
+      // Call backend admin control to disable whole station
+      const resp = await adminStationAPI.controlStation(stationId, 'disable_all', 'Disabled from Admin UI');
+      // Expect backend to return { success: true } or similar
+      if (resp && (resp.success === true || resp === true)) {
+        get().setStationStatus(stationId, 'offline');
+        return { success: true };
+      }
 
+      const msg = (resp && resp.message) || 'Unknown response from controlStation';
+      console.error('❌ Failed to disable station:', stationId, msg);
+      return { success: false, error: msg };
+    } catch (error) {
+      console.error('❌ remoteDisableStation error:', error);
+      return { success: false, error: error?.message || String(error) };
+    }
+  },
+  
   remoteEnableStation: async (stationId) => {
-    await new Promise((r) => setTimeout(r, 300));
-    get().setStationStatus(stationId, "active");
-    return { success: true };
+    try {
+      const resp = await adminStationAPI.controlStation(stationId, 'enable_all', 'Enabled from Admin UI');
+      if (resp && (resp.success === true || resp === true)) {
+        get().setStationStatus(stationId, 'active');
+        return { success: true };
+      }
+
+      const msg = (resp && resp.message) || 'Unknown response from controlStation';
+      console.error('❌ Failed to enable station:', stationId, msg);
+      return { success: false, error: msg };
+    } catch (error) {
+      console.error('❌ remoteEnableStation error:', error);
+      return { success: false, error: error?.message || String(error) };
+    }
   },
 
   // Add new station (Admin only)

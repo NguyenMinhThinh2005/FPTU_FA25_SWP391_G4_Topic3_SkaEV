@@ -31,6 +31,7 @@ public class SkaEVDbContext : DbContext
     public DbSet<Payment> Payments { get; set; }
     public DbSet<ServicePlan> ServicePlans { get; set; }
     public DbSet<Incident> Incidents { get; set; }
+    public DbSet<MaintenanceTeam> MaintenanceTeams { get; set; }
 
     // DbSets - Views (read-only)
     public DbSet<UserCostReport> UserCostReports { get; set; }
@@ -541,6 +542,7 @@ public class SkaEVDbContext : DbContext
             entity.Property(e => e.Description).HasColumnName("description");
             entity.Property(e => e.ResolutionNotes).HasColumnName("resolution_notes");
             entity.Property(e => e.AssignedToStaffId).HasColumnName("assigned_to_staff_id");
+            entity.Property(e => e.AssignedToTeamId).HasColumnName("assigned_to_team_id");
             entity.Property(e => e.ReportedAt).HasColumnName("reported_at").IsRequired();
             entity.Property(e => e.AcknowledgedAt).HasColumnName("acknowledged_at");
             entity.Property(e => e.ResolvedAt).HasColumnName("resolved_at");
@@ -573,6 +575,24 @@ public class SkaEVDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.AssignedToStaffId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(e => e.AssignedToTeam)
+                .WithMany()
+                .HasForeignKey(e => e.AssignedToTeamId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // MaintenanceTeam configuration
+        modelBuilder.Entity<MaintenanceTeam>(entity =>
+        {
+            entity.HasKey(e => e.MaintenanceTeamId);
+            entity.ToTable("maintenance_teams");
+            entity.Property(e => e.MaintenanceTeamId).HasColumnName("maintenance_team_id");
+            entity.Property(e => e.Name).HasColumnName("name").HasMaxLength(255).IsRequired();
+            entity.Property(e => e.ContactPerson).HasColumnName("contact_person").HasMaxLength(255);
+            entity.Property(e => e.ContactPhone).HasColumnName("contact_phone").HasMaxLength(50);
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at").IsRequired();
+            entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").IsRequired();
         });
 
         // Configure Views (read-only, no keys needed)

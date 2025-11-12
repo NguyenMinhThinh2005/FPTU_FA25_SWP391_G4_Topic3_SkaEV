@@ -103,16 +103,18 @@ const Monitoring = () => {
 
   const mapIssueStatus = (status = "") => {
     const normalized = status.toLowerCase();
+    // Map backend status values into a simplified 3-state model used in the UI
+    // UI keys: 'open' (Chưa xử lý), 'in_progress' (Đang xử lý), 'resolved' (Đã xử lý)
     switch (normalized) {
       case "resolved":
-        return { key: "completed", label: "Đã xử lý" };
+      case "closed":
+        return { key: "resolved", label: "Đã xử lý" };
       case "in_progress":
       case "in-progress":
+      case "processing":
         return { key: "in_progress", label: "Đang xử lý" };
-      case "closed":
-        return { key: "completed", label: "Đã đóng" };
       default:
-        return { key: "pending", label: "Chờ xử lý" };
+        return { key: "open", label: "Chưa xử lý" };
     }
   };
 
@@ -501,7 +503,7 @@ const Monitoring = () => {
                     <TableCell align="center">
                       <Chip 
                         label={incident.statusLabel} 
-                        color={incident.status === "completed" ? "success" : "warning"}
+                        color={incident.status === "resolved" ? "success" : "warning"}
                         size="small" 
                       />
                     </TableCell>
@@ -673,7 +675,7 @@ const Monitoring = () => {
                       <Typography variant="caption" color="text.secondary">Trạng thái:</Typography>
                       <Chip 
                         label={selectedIncident.statusLabel} 
-                        color={selectedIncident.status === "completed" ? "success" : "warning"}
+                        color={selectedIncident.status === "resolved" ? "success" : "warning"}
                         size="small" 
                       />
                     </Grid>

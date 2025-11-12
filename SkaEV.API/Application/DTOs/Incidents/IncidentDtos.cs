@@ -19,6 +19,8 @@ public class IncidentDto
     public string? ResolutionNotes { get; set; }
     public int? AssignedToStaffId { get; set; }
     public string? AssignedToStaffName { get; set; }
+    public int? AssignedToTeamId { get; set; }
+    public string? AssignedToTeamName { get; set; }
     public DateTime ReportedAt { get; set; }
     public DateTime? AcknowledgedAt { get; set; }
     public DateTime? ResolvedAt { get; set; }
@@ -44,6 +46,7 @@ public class UpdateIncidentDto
     public string? Status { get; set; }
     public string? ResolutionNotes { get; set; }
     public int? AssignedToStaffId { get; set; }
+    public int? AssignedToTeamId { get; set; }
 }
 
 public class IncidentListDto
@@ -56,6 +59,7 @@ public class IncidentListDto
     public string Status { get; set; } = string.Empty;
     public string Title { get; set; } = string.Empty;
     public string? AssignedToStaffName { get; set; }
+    public string? AssignedToTeamName { get; set; }
     public DateTime ReportedAt { get; set; }
 }
 

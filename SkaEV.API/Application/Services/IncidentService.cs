@@ -22,10 +22,21 @@ public class IncidentService
             .Include(i => i.ChargingSlot)
             .Include(i => i.ReportedByUser)
             .Include(i => i.AssignedToStaff)
+            .Include(i => i.AssignedToTeam)
             .AsQueryable();
 
         if (!string.IsNullOrEmpty(status))
-            query = query.Where(i => i.Status == status);
+        {
+            // Normalize status filter from UI: treat "resolved" as including both resolved and closed
+            if (string.Equals(status, "resolved", StringComparison.OrdinalIgnoreCase))
+            {
+                query = query.Where(i => i.Status == "resolved" || i.Status == "closed");
+            }
+            else
+            {
+                query = query.Where(i => i.Status == status);
+            }
+        }
 
         if (!string.IsNullOrEmpty(severity))
             query = query.Where(i => i.Severity == severity);
@@ -47,7 +58,8 @@ public class IncidentService
             Status = i.Status,
             Title = i.Title,
             ReportedAt = i.ReportedAt,
-            AssignedToStaffName = i.AssignedToStaff != null ? i.AssignedToStaff.FullName : null
+            AssignedToStaffName = i.AssignedToStaff != null ? i.AssignedToStaff.FullName : null,
+            AssignedToTeamName = i.AssignedToTeam != null ? i.AssignedToTeam.Name : null
         }).ToList();
     }
 
@@ -59,6 +71,7 @@ public class IncidentService
             .Include(i => i.ChargingSlot)
             .Include(i => i.ReportedByUser)
             .Include(i => i.AssignedToStaff)
+            .Include(i => i.AssignedToTeam)
             .FirstOrDefaultAsync(i => i.IncidentId == incidentId);
 
         if (incident == null)
@@ -83,6 +96,8 @@ public class IncidentService
             ResolutionNotes = incident.ResolutionNotes,
             AssignedToStaffId = incident.AssignedToStaffId,
             AssignedToStaffName = incident.AssignedToStaff?.FullName ?? null,
+            AssignedToTeamId = incident.AssignedToTeamId,
+            AssignedToTeamName = incident.AssignedToTeam?.Name ?? null,
             ReportedAt = incident.ReportedAt,
             AcknowledgedAt = incident.AcknowledgedAt,
             ResolvedAt = incident.ResolvedAt,
@@ -97,6 +112,7 @@ public class IncidentService
         var incidents = await _context.Incidents
             .Include(i => i.ChargingStation)
             .Include(i => i.AssignedToStaff)
+            .Include(i => i.AssignedToTeam)
             .Where(i => i.StationId == stationId)
             .OrderByDescending(i => i.ReportedAt)
             .ToListAsync();
@@ -112,6 +128,8 @@ public class IncidentService
             Title = i.Title,
             ReportedAt = i.ReportedAt,
             AssignedToStaffName = i.AssignedToStaff != null ? i.AssignedToStaff.FullName : null
+            ,
+            AssignedToTeamName = i.AssignedToTeam != null ? i.AssignedToTeam.Name : null
         }).ToList();
     }
 
@@ -161,8 +179,17 @@ public class IncidentService
         if (!string.IsNullOrEmpty(updateDto.ResolutionNotes))
             incident.ResolutionNotes = updateDto.ResolutionNotes;
 
-        if (updateDto.AssignedToStaffId.HasValue)
+        // Assignment rules: if AssignedToTeamId provided => assign to team and clear staff assignment
+        if (updateDto.AssignedToTeamId.HasValue)
+        {
+            incident.AssignedToTeamId = updateDto.AssignedToTeamId.Value;
+            incident.AssignedToStaffId = null;
+        }
+        else if (updateDto.AssignedToStaffId.HasValue)
+        {
             incident.AssignedToStaffId = updateDto.AssignedToStaffId.Value;
+            incident.AssignedToTeamId = null;
+        }
 
         await _context.SaveChangesAsync();
 
@@ -183,7 +210,9 @@ public class IncidentService
             TotalIncidents = incidents.Count,
             OpenIncidents = incidents.Count(i => i.Status == "open"),
             InProgressIncidents = incidents.Count(i => i.Status == "in_progress"),
-            ResolvedIncidents = incidents.Count(i => i.Status == "resolved"),
+            // Treat both "resolved" and legacy "closed" as resolved for admin summary
+            ResolvedIncidents = incidents.Count(i => i.Status == "resolved" || i.Status == "closed"),
+            // Keep closed count for backward compatibility but it's not used in UI anymore
             ClosedIncidents = incidents.Count(i => i.Status == "closed"),
             CriticalIncidents = incidents.Count(i => i.Severity == "critical"),
             HighSeverityIncidents = incidents.Count(i => i.Severity == "high"),

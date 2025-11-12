@@ -388,19 +388,18 @@ public partial class AdminUserService
         var now = DateTime.UtcNow;
         var windowStart = now.AddDays(-30);
 
-        var totalUsersTask = _context.Users.CountAsync();
-        var activeUsersTask = _context.Users.CountAsync(u => u.IsActive);
-        var totalStationsTask = _context.ChargingStations.CountAsync();
-        var activeStationsTask = _context.ChargingStations.CountAsync(s => s.Status == "active");
-        var bookings30Task = _context.Bookings.CountAsync(b => b.CreatedAt >= windowStart);
-        var revenue30Task = _context.Invoices
+        // Avoid running multiple EF Core operations in parallel on the same DbContext
+        // which causes InvalidOperationException: second operation started on this context.
+        var totalUsers = await _context.Users.CountAsync();
+        var activeUsers = await _context.Users.CountAsync(u => u.IsActive);
+        var totalStations = await _context.ChargingStations.CountAsync();
+        var activeStations = await _context.ChargingStations.CountAsync(s => s.Status == "active");
+        var bookings30 = await _context.Bookings.CountAsync(b => b.CreatedAt >= windowStart);
+        var revenue30 = await _context.Invoices
             .Where(i => i.PaymentStatus == "paid" && (i.PaidAt ?? i.CreatedAt) >= windowStart)
             .SumAsync(i => (decimal?)i.TotalAmount);
-        var newUsersTask = _context.Users.CountAsync(u => u.CreatedAt >= windowStart);
-        var openIncidentsTask = _context.Incidents.CountAsync(i => i.Status == "open" || i.Status == "in_progress");
-
-        await Task.WhenAll(totalUsersTask, activeUsersTask, totalStationsTask, activeStationsTask,
-            bookings30Task, revenue30Task, newUsersTask, openIncidentsTask);
+        var newUsers = await _context.Users.CountAsync(u => u.CreatedAt >= windowStart);
+        var openIncidents = await _context.Incidents.CountAsync(i => i.Status == "open" || i.Status == "in_progress");
 
         var topStations = await _context.Invoices
             .Where(i => i.PaymentStatus == "paid" && (i.PaidAt ?? i.CreatedAt) >= windowStart)
@@ -420,14 +419,14 @@ public partial class AdminUserService
         return new AdminOverviewDto
         {
             UserId = adminUserId,
-            TotalUsers = totalUsersTask.Result,
-            ActiveUsers = activeUsersTask.Result,
-            TotalStations = totalStationsTask.Result,
-            ActiveStations = activeStationsTask.Result,
-            TotalBookings30Days = bookings30Task.Result,
-            Revenue30Days = revenue30Task.Result ?? 0m,
-            NewUsers30Days = newUsersTask.Result,
-            OpenIncidents = openIncidentsTask.Result,
+            TotalUsers = totalUsers,
+            ActiveUsers = activeUsers,
+            TotalStations = totalStations,
+            ActiveStations = activeStations,
+            TotalBookings30Days = bookings30,
+            Revenue30Days = revenue30 ?? 0m,
+            NewUsers30Days = newUsers,
+            OpenIncidents = openIncidents,
             LastLoginAt = null,
             TopStations = topStations
         };

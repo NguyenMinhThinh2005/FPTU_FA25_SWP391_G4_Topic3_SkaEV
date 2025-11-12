@@ -25,11 +25,14 @@ const incidentStore = create((set, get) => ({
 
       const response = await axiosInstance.get(`/incident?${params.toString()}`);
       let data = response.data?.data || response.data || [];
-      // Normalize legacy severity values (map 'high' -> 'critical') so UI shows only the 3 levels
+      // Normalize legacy severity values (map 'high' -> 'critical') and normalize status
+      // so UI always works with the 3-state model: open, in_progress, resolved
       if (Array.isArray(data)) {
         data = data.map((it) => ({
           ...it,
-          severity: (it.severity === 'high') ? 'critical' : it.severity
+          severity: (it.severity === 'high') ? 'critical' : it.severity,
+          // map legacy/alternate status values into the simplified UI model
+          status: (it.status === 'closed') ? 'resolved' : it.status
         }));
       }
       set({ incidents: Array.isArray(data) ? data : [], isLoading: false });
@@ -45,7 +48,10 @@ const incidentStore = create((set, get) => ({
     try {
       const response = await axiosInstance.get(`/incident/${id}`);
       let data = response.data?.data || response.data;
-      if (data && data.severity === 'high') data.severity = 'critical';
+      if (data) {
+        if (data.severity === 'high') data.severity = 'critical';
+        if (data.status === 'closed') data.status = 'resolved';
+      }
       set({ selectedIncident: data, isLoading: false });
     } catch (error) {
       set({ error: error.message, isLoading: false });

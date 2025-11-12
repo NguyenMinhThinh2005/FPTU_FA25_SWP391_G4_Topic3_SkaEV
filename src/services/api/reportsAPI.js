@@ -119,6 +119,13 @@ const reportsAPI = {
     const response = await api.get(`/admin/AdminReports/stations/${stationId}/time-series`, { params });
     return response.data?.data || response.data;
   },
+
+  // Revenue grouped by connector / charging type (DB-backed)
+  getRevenueByConnector: async (params = {}) => {
+    // params: { startDate: ISO, endDate: ISO }
+    const response = await api.get('/admin/AdminReports/revenue-by-connector', { params });
+    return response.data;
+  },
 };
 
 export default reportsAPI;

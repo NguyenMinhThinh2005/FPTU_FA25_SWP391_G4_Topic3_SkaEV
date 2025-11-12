@@ -186,9 +186,9 @@ const AddStation = () => {
 
       await addStation(stationData);
       
-      // Show success message and navigate back
+      // Show success message and navigate back to Station Management
       alert("Trạm sạc đã được thêm thành công!");
-      navigate("/admin/dashboard");
+      navigate("/admin/stations");
       
     } catch (error) {
       console.error("Error adding station:", error);
@@ -492,7 +492,7 @@ const AddStation = () => {
     <Box>
       {/* Header */}
       <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-        <IconButton onClick={() => navigate("/admin/dashboard")} sx={{ mr: 2 }}>
+        <IconButton onClick={() => navigate("/admin/stations")} sx={{ mr: 2 }}>
           <ArrowBack />
         </IconButton>
         <Box>

@@ -86,6 +86,11 @@ public class StationDetailDto
     public decimal TodayRevenue { get; set; }
     public int TodaySessionCount { get; set; }
 
+    // Analytics broken down by common time windows
+    public PeriodMetrics DailyMetrics { get; set; } = new();
+    public PeriodMetrics MonthlyMetrics { get; set; } = new();
+    public PeriodMetrics YearlyMetrics { get; set; } = new();
+
     // Charging Points
     public List<ChargingPointDetailDto> ChargingPoints { get; set; } = new();
 
@@ -98,6 +103,17 @@ public class StationDetailDto
     public string? ManagerName { get; set; }
     public string? ManagerEmail { get; set; }
     public string? ManagerPhoneNumber { get; set; }
+}
+
+/// <summary>
+/// Simple aggregated metrics for a time window
+/// </summary>
+public class PeriodMetrics
+{
+    public int SessionCount { get; set; }
+    public decimal Revenue { get; set; }
+    public decimal EnergyKwh { get; set; }
+    public double AverageSessionDurationMinutes { get; set; }
 }
 
 /// <summary>

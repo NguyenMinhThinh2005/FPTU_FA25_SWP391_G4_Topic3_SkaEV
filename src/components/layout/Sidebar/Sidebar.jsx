@@ -37,13 +37,8 @@ const Sidebar = ({ open, onClose }) => {
     switch (user?.role) {
       case "admin":
         return [
-          // Admin dashboard intentionally hidden from the main nav to
-          // reduce clutter for admin workflows. Keep other admin routes.
-          {
-            text: getText("nav.advancedAnalytics"),
-            icon: <Analytics />,
-            path: "/admin/analytics",
-          },
+          // Reordered for admin: station management first, then users,
+          // analytics, and incidents as requested by the product owner.
           {
             text: getText("nav.stationManagement"),
             icon: <LocationOn />,
@@ -53,6 +48,11 @@ const Sidebar = ({ open, onClose }) => {
             text: getText("nav.userManagement"),
             icon: <People />,
             path: "/admin/users",
+          },
+          {
+            text: getText("nav.advancedAnalytics"),
+            icon: <Analytics />,
+            path: "/admin/analytics",
           },
           {
             text: "Quản lý báo cáo sự cố",

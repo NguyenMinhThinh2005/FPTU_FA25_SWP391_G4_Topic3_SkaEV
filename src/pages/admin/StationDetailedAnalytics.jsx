@@ -279,6 +279,7 @@ const StationDetailedAnalytics = () => {
                     label="Từ ngày"
                     value={startDate}
                     onChange={(newValue) => setStartDate(newValue)}
+                    maxDate={new Date()}
                     slotProps={{ textField: { fullWidth: true, size: "small" } }}
                   />
                 </Grid>
@@ -287,6 +288,7 @@ const StationDetailedAnalytics = () => {
                     label="Đến ngày"
                     value={endDate}
                     onChange={(newValue) => setEndDate(newValue)}
+                    maxDate={new Date()}
                     slotProps={{ textField: { fullWidth: true, size: "small" } }}
                   />
                 </Grid>
@@ -546,7 +548,7 @@ const HourlyAnalysisTab = ({ data, peakHour }) => {
         <Card>
           <CardContent>
             <Typography variant="h6" gutterBottom>
-              Phân bố sử dụng theo giờ trong ngày
+              Phân bố sử dụng theo giờ 
             </Typography>
             <Alert severity="info" sx={{ mb: 2 }}>
               Giờ cao điểm: {peakHour}:00 - {peakHour + 1}:00

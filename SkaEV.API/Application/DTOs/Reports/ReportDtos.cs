@@ -318,3 +318,14 @@ public class MonthlyAnalyticsSummaryDto
     public int CompletedSessions { get; set; }
     public decimal UtilizationRate { get; set; }
 }
+
+/// <summary>
+/// Revenue aggregated by connector type (charging port type)
+/// </summary>
+public class ConnectorRevenueDto
+{
+    public string ConnectorType { get; set; } = string.Empty;
+    public decimal TotalRevenue { get; set; }
+    public decimal TotalEnergyKwh { get; set; }
+    public int TotalTransactions { get; set; }
+}

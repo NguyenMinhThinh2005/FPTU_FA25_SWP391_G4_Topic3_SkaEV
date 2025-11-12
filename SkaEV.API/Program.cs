@@ -11,6 +11,11 @@ using Serilog.Events;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Read connection string early so we can adapt behavior (SQLite demo vs full SQL Server)
+var _defaultConnectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? string.Empty;
+var _isSqliteDemo = _defaultConnectionString.IndexOf(".db", StringComparison.OrdinalIgnoreCase) >= 0
+                    || _defaultConnectionString.StartsWith("Data Source=", StringComparison.OrdinalIgnoreCase);
+
 // Configure Serilog - Simple HTTP logging only
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Information()
@@ -35,18 +40,14 @@ builder.Services.AddControllers()
 // Configure Database
 builder.Services.AddDbContext<SkaEVDbContext>(options =>
 {
-    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+    var connectionString = _defaultConnectionString;
 
     if (string.IsNullOrWhiteSpace(connectionString))
     {
         throw new InvalidOperationException("DefaultConnection string is not configured.");
     }
 
-    var normalized = connectionString.Trim();
-    var isSqlite = normalized.Contains(".db", StringComparison.OrdinalIgnoreCase) ||
-                   normalized.StartsWith("Data Source=", StringComparison.OrdinalIgnoreCase);
-
-    if (isSqlite)
+    if (_isSqliteDemo)
     {
         options.UseSqlite(connectionString);
     }
@@ -141,8 +142,13 @@ builder.Services.AddScoped<IAdminStationManagementService, AdminStationManagemen
 // builder.Services.AddScoped<IAdvancedAnalyticsService, AdvancedAnalyticsService>(); // Advanced ML analytics
 
 // Background Simulation Services (for student project demo)
-builder.Services.AddHostedService<SkaEV.API.Services.ChargingSimulationService>();
-builder.Services.AddHostedService<SkaEV.API.Services.SystemEventsSimulationService>();
+// Disabled by default during developer-driven feature runs to avoid background exceptions
+// that interfere with API testing. Toggle back if you need simulations.
+if (!_isSqliteDemo && false)
+{
+    builder.Services.AddHostedService<SkaEV.API.Services.ChargingSimulationService>();
+    builder.Services.AddHostedService<SkaEV.API.Services.SystemEventsSimulationService>();
+}
 
 // Configure Swagger
 builder.Services.AddEndpointsApiExplorer();
@@ -254,16 +260,54 @@ try
     Log.Information("Starting SkaEV API...");
     Log.Information("Environment: {0}", app.Environment.EnvironmentName);
 
-    // Start the application asynchronously
-    _ = app.RunAsync();
+    // Optionally run development-only seeders if configuration requests it
+    var seedAdmin = builder.Configuration.GetValue<bool>("SeedAdminData", false);
+    if (seedAdmin)
+    {
+        using (var scope = app.Services.CreateScope())
+        {
+            var services = scope.ServiceProvider;
+            try
+            {
+                var context = services.GetRequiredService<SkaEVDbContext>();
+                var loggerFactory = services.GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>();
+                var logger = loggerFactory.CreateLogger("SeedSystemLogs");
 
-    Log.Information("Backend is now running. Press ENTER to stop...");
+                await SeedSystemLogs.SeedAsync(context, logger);
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "An error occurred while seeding the database.");
+            }
+        }
+    }
 
-    // Keep console alive
-    Console.ReadLine();
+    // Apply EF Core migrations automatically only for the SQLite demo so the DB file
+    // is created and the schema is available when running locally without SQL Server.
+    // Avoid auto-migrating against a fresh SQL Server container to prevent unexpected
+    // schema operations in environments where a production DB is expected.
+    if (_isSqliteDemo)
+    {
+        using (var scope = app.Services.CreateScope())
+        {
+            var services = scope.ServiceProvider;
+            try
+            {
+                var context = services.GetRequiredService<SkaEVDbContext>();
+                // Apply pending migrations (safe in local/dev environments)
+                context.Database.Migrate();
+                Log.Information("Database migrations applied (development/SQLite demo).");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Failed to apply database migrations.");
+            }
+        }
+    }
 
-    // Initiate shutdown
-    await app.StopAsync();
+    // Start the application (blocking). This keeps the host running normally in dev/test runs.
+    Log.Information("Backend is now running.");
+    app.Run();
 }
 catch (Exception ex)
 {

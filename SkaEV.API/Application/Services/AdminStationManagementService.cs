@@ -40,16 +40,7 @@ public interface IAdminStationManagementService
     Task<bool> UpdateStationManagerAsync(int stationId, int? managerUserId);
 }
 
-internal record StationCapacityMetrics(
-    int TotalPosts,
-    int AvailablePosts,
-    int MaintenancePosts,
-    int TotalSlots,
-    int AvailableSlots,
-    int OccupiedSlots,
-    decimal TotalPowerCapacityKw,
-    decimal CurrentPowerUsageKw,
-    decimal UtilizationRate);
+
 
 internal record StationCompletedSessionSummary(
     int StationId,
@@ -97,51 +88,8 @@ public class AdminStationManagementService : IAdminStationManagementService
 
     private static StationCapacityMetrics CalculateCapacityMetrics(ChargingStation station)
     {
-        var posts = station.ChargingPosts?.ToList() ?? new List<ChargingPost>();
-        var slots = posts.SelectMany(post => post.ChargingSlots ?? Enumerable.Empty<ChargingSlot>()).ToList();
-
-        var totalPosts = posts.Count;
-        var maintenancePosts = posts.Count(post => StatusComparer.Equals(post.Status, "maintenance"));
-        var availablePosts = posts.Count(post =>
-            StatusComparer.Equals(post.Status, "available") &&
-            post.ChargingSlots.Any(slot => IsSlotAvailable(slot.Status)));
-
-        var totalSlots = slots.Count;
-        var availableSlots = slots.Count(slot => IsSlotAvailable(slot.Status));
-        var maintenanceSlots = slots.Count(slot => IsSlotMaintenance(slot.Status));
-        var occupiedSlots = slots.Count(slot => IsSlotOccupied(slot.Status) || IsSlotReserved(slot.Status));
-
-        var accountedSlots = availableSlots + maintenanceSlots + occupiedSlots;
-        if (accountedSlots < totalSlots)
-        {
-            occupiedSlots += totalSlots - accountedSlots;
-        }
-
-        if (!StatusComparer.Equals(station.Status, "active"))
-        {
-            availablePosts = 0;
-            availableSlots = 0;
-        }
-
-        var totalPower = posts.Sum(post => post.PowerOutput);
-        var currentPower = posts
-            .Where(post => post.ChargingSlots.Any(slot => IsSlotOccupied(slot.Status)))
-            .Sum(post => post.PowerOutput);
-
-        var utilizationRate = totalSlots > 0
-            ? Math.Round(((decimal)(totalSlots - availableSlots) / totalSlots) * 100, 2)
-            : 0;
-
-        return new StationCapacityMetrics(
-            TotalPosts: totalPosts,
-            AvailablePosts: Math.Clamp(availablePosts, 0, totalPosts),
-            MaintenancePosts: maintenancePosts,
-            TotalSlots: totalSlots,
-            AvailableSlots: Math.Clamp(availableSlots, 0, totalSlots),
-            OccupiedSlots: Math.Clamp(occupiedSlots, 0, totalSlots),
-            TotalPowerCapacityKw: totalPower,
-            CurrentPowerUsageKw: currentPower,
-            UtilizationRate: utilizationRate);
+        // Delegate to the centralized CapacityCalculator to keep logic testable and reusable.
+        return CapacityCalculator.CalculateCapacityMetrics(station);
     }
 
     public async Task<(List<StationListDto> Stations, int TotalCount)> GetStationsAsync(StationFilterDto filter)
@@ -256,7 +204,8 @@ public class AdminStationManagementService : IAdminStationManagementService
                 TotalSlots = metrics.TotalSlots,
                 AvailableSlots = metrics.AvailableSlots,
                 OccupiedSlots = metrics.OccupiedSlots,
-                ActiveSessions = station.Bookings?.Count ?? 0,
+                // Canonical active sessions computed from slots occupancy (total slots - available slots)
+                ActiveSessions = metrics.TotalSlots - metrics.AvailableSlots,
                 CurrentPowerUsageKw = metrics.CurrentPowerUsageKw,
                 TotalPowerCapacityKw = metrics.TotalPowerCapacityKw,
                 UtilizationRate = metrics.UtilizationRate,
@@ -276,6 +225,31 @@ public class AdminStationManagementService : IAdminStationManagementService
                 TodayCompletedSessions = todaySessionCount
             };
         }).ToList();
+
+        // Persist computed ActiveSessions back to the ChargingStation entities so DB stays in sync.
+        try
+        {
+            var anyChange = false;
+            foreach (var stEntity in stationEntities)
+            {
+                var m = CalculateCapacityMetrics(stEntity);
+                var computed = Math.Max(0, m.TotalSlots - m.AvailableSlots);
+                if (stEntity.ActiveSessions != computed)
+                {
+                    stEntity.ActiveSessions = computed;
+                    anyChange = true;
+                }
+            }
+
+            if (anyChange)
+            {
+                await _context.SaveChangesAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not persist ActiveSessions for stations (non-fatal)");
+        }
 
         // Calculate error counts
         var stationIdList = stations.Select(s => s.StationId).ToList();
@@ -377,11 +351,31 @@ public class AdminStationManagementService : IAdminStationManagementService
         if (station == null)
             return null;
 
-        // Get today's statistics
-        var today = DateTime.UtcNow.Date;
+        // Get analytics for common time windows: daily, monthly, yearly
+        var now = DateTime.UtcNow;
+        var startOfDay = now.Date;
+        var startOfMonth = new DateTime(now.Year, now.Month, 1);
+        var startOfYear = new DateTime(now.Year, 1, 1);
+
         var todayBookings = await _context.Bookings
             .Where(b => b.StationId == stationId &&
-                       b.CreatedAt >= today &&
+                       b.CreatedAt >= startOfDay &&
+                       b.Status == "completed" &&
+                       b.DeletedAt == null)
+            .Include(b => b.Invoice)
+            .ToListAsync();
+
+        var monthBookings = await _context.Bookings
+            .Where(b => b.StationId == stationId &&
+                       b.CreatedAt >= startOfMonth &&
+                       b.Status == "completed" &&
+                       b.DeletedAt == null)
+            .Include(b => b.Invoice)
+            .ToListAsync();
+
+        var yearBookings = await _context.Bookings
+            .Where(b => b.StationId == stationId &&
+                       b.CreatedAt >= startOfYear &&
                        b.Status == "completed" &&
                        b.DeletedAt == null)
             .Include(b => b.Invoice)
@@ -400,7 +394,7 @@ public class AdminStationManagementService : IAdminStationManagementService
             .FirstOrDefaultAsync();
 
         var metrics = CalculateCapacityMetrics(station);
-        var activeSessionsCount = station.Bookings.Count(b => b.Status == "in_progress");
+        var activeSessionsCount = metrics.TotalSlots - metrics.AvailableSlots;
 
         var detail = new StationDetailDto
         {
@@ -427,6 +421,37 @@ public class AdminStationManagementService : IAdminStationManagementService
             TodayEnergyConsumedKwh = todayEnergyKwh,
             TodayRevenue = todayRevenue,
             TodaySessionCount = todayBookings.Count,
+            // Populate windowed metrics
+            DailyMetrics = new PeriodMetrics
+            {
+                SessionCount = todayBookings.Count,
+                Revenue = todayRevenue,
+                EnergyKwh = todayEnergyKwh,
+                AverageSessionDurationMinutes = todayBookings
+                    .Where(b => b.ActualStartTime.HasValue && b.ActualEndTime.HasValue)
+                    .Select(b => (b.ActualEndTime!.Value - b.ActualStartTime!.Value).TotalMinutes)
+                    .DefaultIfEmpty(0).Average()
+            },
+            MonthlyMetrics = new PeriodMetrics
+            {
+                SessionCount = monthBookings.Count,
+                Revenue = monthBookings.Sum(b => b.Invoice?.TotalAmount ?? 0),
+                EnergyKwh = monthBookings.Sum(b => b.Invoice?.TotalEnergyKwh ?? 0),
+                AverageSessionDurationMinutes = monthBookings
+                    .Where(b => b.ActualStartTime.HasValue && b.ActualEndTime.HasValue)
+                    .Select(b => (b.ActualEndTime!.Value - b.ActualStartTime!.Value).TotalMinutes)
+                    .DefaultIfEmpty(0).Average()
+            },
+            YearlyMetrics = new PeriodMetrics
+            {
+                SessionCount = yearBookings.Count,
+                Revenue = yearBookings.Sum(b => b.Invoice?.TotalAmount ?? 0),
+                EnergyKwh = yearBookings.Sum(b => b.Invoice?.TotalEnergyKwh ?? 0),
+                AverageSessionDurationMinutes = yearBookings
+                    .Where(b => b.ActualStartTime.HasValue && b.ActualEndTime.HasValue)
+                    .Select(b => (b.ActualEndTime!.Value - b.ActualStartTime!.Value).TotalMinutes)
+                    .DefaultIfEmpty(0).Average()
+            },
             ChargingPoints = station.ChargingPosts.Select(p => new ChargingPointDetailDto
             {
                 PostId = p.PostId,
@@ -478,6 +503,21 @@ public class AdminStationManagementService : IAdminStationManagementService
             ManagerEmail = managerAssignment?.StaffUser.Email,
             ManagerPhoneNumber = managerAssignment?.StaffUser.PhoneNumber
         };
+
+        // Persist the computed active sessions for this station (non-blocking, only when changed)
+        try
+        {
+            var computedDetail = Math.Max(0, activeSessionsCount);
+            if (station.ActiveSessions != computedDetail)
+            {
+                station.ActiveSessions = computedDetail;
+                await _context.SaveChangesAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not persist ActiveSessions for station {StationId} (non-fatal)", stationId);
+        }
 
         return detail;
     }

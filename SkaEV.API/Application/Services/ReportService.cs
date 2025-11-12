@@ -197,6 +197,55 @@ public class ReportService : IReportService
         }
     }
 
+    /// <summary>
+    /// Aggregate revenue by connector type (connector type comes from ChargingSlot.ConnectorType)
+    /// Filters by station and optional date range (invoice.CreatedAt)
+    /// </summary>
+    public async Task<IEnumerable<SkaEV.API.Application.DTOs.Reports.ConnectorRevenueDto>> GetRevenueByConnectorAsync(int? stationId = null, DateTime? startDate = null, DateTime? endDate = null)
+    {
+        try
+        {
+            // Default range: last 30 days
+            endDate ??= DateTime.UtcNow;
+            startDate ??= endDate.Value.AddDays(-30);
+
+            var query = from invoice in _context.Invoices
+                        join booking in _context.Bookings on invoice.BookingId equals booking.BookingId
+                        join slot in _context.ChargingSlots on booking.SlotId equals slot.SlotId
+                        where invoice.PaymentStatus == "paid"
+                        select new { invoice, booking, slot };
+
+            if (stationId.HasValue)
+                query = query.Where(x => x.booking.StationId == stationId.Value);
+
+            if (startDate.HasValue)
+                query = query.Where(x => x.invoice.CreatedAt >= startDate.Value);
+
+            if (endDate.HasValue)
+                query = query.Where(x => x.invoice.CreatedAt <= endDate.Value);
+
+            var data = await query.ToListAsync();
+
+            var grouped = data
+                .GroupBy(x => string.IsNullOrWhiteSpace(x.slot.ConnectorType) ? "unknown" : x.slot.ConnectorType)
+                .Select(g => new SkaEV.API.Application.DTOs.Reports.ConnectorRevenueDto
+                {
+                    ConnectorType = g.Key,
+                    TotalRevenue = g.Sum(x => x.invoice.TotalAmount),
+                    TotalEnergyKwh = g.Sum(x => x.invoice.TotalEnergyKwh),
+                    TotalTransactions = g.Count()
+                })
+                .OrderByDescending(r => r.TotalRevenue)
+                .ToList();
+
+            return grouped;
+        }
+        catch
+        {
+            return new List<SkaEV.API.Application.DTOs.Reports.ConnectorRevenueDto>();
+        }
+    }
+
     public async Task<IEnumerable<UsageReportDto>> GetUsageReportsAsync(int? stationId = null, int? year = null, int? month = null)
     {
         // Use brand new SQL connection - completely bypass EF Core

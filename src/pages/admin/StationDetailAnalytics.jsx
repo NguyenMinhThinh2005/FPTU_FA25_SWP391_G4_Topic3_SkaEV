@@ -27,7 +27,7 @@ import {
   CircularProgress,
   Tabs,
   Tab,
-  LinearProgress,
+  // LinearProgress previously used in removed Real-time tab
   Divider,
   Badge,
 } from '@mui/material';
@@ -50,16 +50,15 @@ import {
 } from '@mui/icons-material';
 // Charting removed from station detail per UX request
 import adminStationAPI from '../../services/adminStationAPI';
-import { formatCurrency } from '../../utils/helpers';
+// formatCurrency removed: not used in this view after Real-time removal
 import StaffAssignment from '../../components/admin/StaffAssignment';
 import AdvancedCharts from '../../components/admin/AdvancedCharts';
 
 const TAB_INDEX = {
-  REALTIME: 0,
-  CHARGING: 1,
-  ERRORS: 2,
-  ANALYTICS: 3,
-  STAFF: 4,
+  CHARGING: 0,
+  ERRORS: 1,
+  ANALYTICS: 2,
+  STAFF: 3,
 };
 
 const StationDetailAnalytics = () => {
@@ -69,7 +68,7 @@ const StationDetailAnalytics = () => {
   // State management
   const [loading, setLoading] = useState(true);
   const [stationDetail, setStationDetail] = useState(null);
-  const [realtimeData, setRealtimeData] = useState(null);
+  // realtimeData removed per UX: Real-time tab hidden
   const [errors, setErrors] = useState([]);
   const [currentTab, setCurrentTab] = useState(0);
 
@@ -86,14 +85,12 @@ const StationDetailAnalytics = () => {
 
   const fetchStationData = useCallback(async () => {
     try {
-      const [detailRes, realtimeRes, errorsRes] = await Promise.all([
+      const [detailRes, errorsRes] = await Promise.all([
         adminStationAPI.getStationDetail(stationId),
-        adminStationAPI.getStationRealTimeData(stationId),
         adminStationAPI.getStationErrors(stationId, false),
       ]);
 
       if (detailRes.success) setStationDetail(detailRes.data);
-      if (realtimeRes.success) setRealtimeData(realtimeRes.data);
       if (errorsRes.success) setErrors(errorsRes.data);
     } catch (error) {
       console.error('Error fetching station data:', error);
@@ -284,201 +281,18 @@ const StationDetailAnalytics = () => {
       {/* Tabs */}
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
         <Tabs value={currentTab} onChange={(e, v) => setCurrentTab(v)}>
-          <Tab label="Giám sát Real-time" />
           <Tab label="Charging Points" />
           <Tab
             label="Lỗi & Cảnh báo"
             icon={<Badge badgeContent={errors.length} color="error"><ErrorIcon /></Badge>}
             iconPosition="end"
           />
-          <Tab label="📊 Phân tích nâng cao" />
+          <Tab label="📊 Phân tích tổng quan" />
           <Tab label="👥 Quản lý Nhân viên" />
         </Tabs>
       </Box>
 
-      {/* Tab 0: Real-time Monitoring */}
-  {currentTab === TAB_INDEX.REALTIME && realtimeData && (
-        <Box>
-          {/* Summary cards removed per UX request */}
-
-          <Grid container spacing={3} sx={{ mb: 3 }}>
-            <Grid item xs={12} md={6}>
-              <Card>
-                <CardContent>
-                  <Typography variant="h6" fontWeight="bold" gutterBottom>
-                    Thông tin trạm
-                  </Typography>
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    <Box>
-                      <Typography variant="body2" color="text.secondary">
-                        Địa chỉ
-                      </Typography>
-                      <Typography variant="body1">{stationDetail.address}</Typography>
-                    </Box>
-                    <Box>
-                      <Typography variant="body2" color="text.secondary">
-                        Giờ hoạt động
-                      </Typography>
-                      <Typography variant="body1">
-                        {stationDetail.operatingHours || '24/7'}
-                      </Typography>
-                    </Box>
-                    <Box>
-                      <Typography variant="body2" color="text.secondary">
-                        Tiện ích
-                      </Typography>
-                      <Typography variant="body1">
-                        {stationDetail.amenities || 'Không có'}
-                      </Typography>
-                    </Box>
-                  </Box>
-                </CardContent>
-              </Card>
-            </Grid>
-
-            <Grid item xs={12} md={6}>
-              <Card>
-                <CardContent>
-                  <Typography variant="h6" fontWeight="bold" gutterBottom>
-                    Thống kê hôm nay
-                  </Typography>
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    <Box>
-                      <Typography variant="body2" color="text.secondary">
-                        Điện năng tiêu thụ
-                      </Typography>
-                      <Typography variant="h6" color="primary">
-                        {stationDetail.todayEnergyConsumedKwh.toFixed(2)} kWh
-                      </Typography>
-                    </Box>
-                    <Box>
-                      <Typography variant="body2" color="text.secondary">
-                        Doanh thu
-                      </Typography>
-                      <Typography variant="h6" color="success.main">
-                        {formatCurrency(stationDetail.todayRevenue)}
-                      </Typography>
-                    </Box>
-                    <Box>
-                      <Typography variant="body2" color="text.secondary">
-                        Số phiên sạc
-                      </Typography>
-                      <Typography variant="h6">{stationDetail.todaySessionCount}</Typography>
-                    </Box>
-                  </Box>
-                </CardContent>
-              </Card>
-            </Grid>
-          </Grid>
-
-          {/* Availability Status */}
-          <Card sx={{ mb: 3 }}>
-            <CardContent>
-              <Typography variant="h6" fontWeight="bold" gutterBottom>
-                Tình trạng cổng sạc
-              </Typography>
-              <Grid container spacing={2}>
-                <Grid item xs={4}>
-                  <Box sx={{ textAlign: 'center' }}>
-                    <Typography variant="h3" color="success.main" fontWeight="bold">
-                      {realtimeData.availableSlots}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Có sẵn
-                    </Typography>
-                  </Box>
-                </Grid>
-                <Grid item xs={4}>
-                  <Box sx={{ textAlign: 'center' }}>
-                    <Typography variant="h3" color="info.main" fontWeight="bold">
-                      {realtimeData.occupiedSlots}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Đang sạc
-                    </Typography>
-                  </Box>
-                </Grid>
-                <Grid item xs={4}>
-                  <Box sx={{ textAlign: 'center' }}>
-                    <Typography variant="h3" color="warning.main" fontWeight="bold">
-                      {realtimeData.maintenanceSlots}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Bảo trì
-                    </Typography>
-                  </Box>
-                </Grid>
-              </Grid>
-              <Box sx={{ mt: 2 }}>
-                <Typography variant="body2" color="text.secondary" gutterBottom>
-                  Tỷ lệ khả dụng: {realtimeData.availabilityRate.toFixed(1)}%
-                </Typography>
-                <LinearProgress
-                  variant="determinate"
-                  value={realtimeData.availabilityRate}
-                  color="success"
-                  sx={{ height: 8, borderRadius: 4 }}
-                />
-              </Box>
-            </CardContent>
-          </Card>
-
-          {/* Power chart intentionally removed from station detail view */}
-
-          {/* Active Sessions */}
-          {realtimeData.activeSessionsList && realtimeData.activeSessionsList.length > 0 && (
-            <Card>
-              <CardContent>
-                <Typography variant="h6" fontWeight="bold" gutterBottom>
-                  Phiên sạc đang hoạt động ({realtimeData.activeSessionsList.length})
-                </Typography>
-                <TableContainer>
-                  <Table>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Cổng sạc</TableCell>
-                        <TableCell>Người dùng</TableCell>
-                        <TableCell>Xe</TableCell>
-                        <TableCell>Bắt đầu</TableCell>
-                        <TableCell>Thời lượng</TableCell>
-                        <TableCell>Công suất</TableCell>
-                        <TableCell>Điện năng</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {realtimeData.activeSessionsList.map((session) => (
-                        <TableRow key={session.bookingId}>
-                          <TableCell>
-                            <Chip label={`${session.postNumber}-${session.slotNumber}`} size="small" />
-                          </TableCell>
-                          <TableCell>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <Person fontSize="small" />
-                              {session.userName}
-                            </Box>
-                          </TableCell>
-                          <TableCell>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <DirectionsCar fontSize="small" />
-                              {session.vehicleInfo}
-                            </Box>
-                          </TableCell>
-                          <TableCell>{formatDateTime(session.startTime)}</TableCell>
-                          <TableCell>
-                            <Chip label={`${session.durationMinutes} phút`} size="small" color="info" />
-                          </TableCell>
-                          <TableCell>{session.currentPowerKw.toFixed(1)} kW</TableCell>
-                          <TableCell>{session.energyConsumedKwh.toFixed(2)} kWh</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </CardContent>
-            </Card>
-          )}
-        </Box>
-      )}
+      {/* Real-time monitoring removed from station detail view per UX */}
 
       {/* Tab 1: Charging Points */}
   {currentTab === TAB_INDEX.CHARGING && (
@@ -631,7 +445,9 @@ const StationDetailAnalytics = () => {
 
       {/* Tab 3: Configuration */}
       {currentTab === TAB_INDEX.ANALYTICS && (
-        <AdvancedCharts stationId={stationId} />
+        <Box>
+          <AdvancedCharts stationId={stationId} />
+        </Box>
       )}
 
       {/* Control Dialog */}
