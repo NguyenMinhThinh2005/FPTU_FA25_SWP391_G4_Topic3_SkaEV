@@ -219,7 +219,6 @@ const Monitoring = () => {
           currentSoc: connector.currentSession?.vehicleSOC ?? connector.activeSession?.vehicleSOC ?? null,
           currentUser: connector.currentSession?.customerName ?? connector.activeSession?.customerName ?? null,
           bookingStart: connector.currentSession?.startTime ?? connector.activeSession?.startTime ?? null,
-          hasActiveIssue: hasStationActiveIssues, // Flag for station-level issues
         };
       });
 
@@ -511,21 +510,10 @@ const Monitoring = () => {
                     </TableCell>
                     <TableCell align="center">
                       <Chip
-                        icon={
-                          connector.hasActiveIssue ? (
-                            <Build fontSize="small" />
-                          ) : (
-                            getStatusIcon(connector.operationalStatus)
-                          )
-                        }
-                        label={
-                          connector.hasActiveIssue 
-                            ? "Đang bảo trì" 
-                            : connector.operationalStatus
-                        }
+                        icon={getStatusIcon(connector.operationalStatus)}
+                        label={connector.operationalStatus}
                         size="small"
                         variant="outlined"
-                        color={connector.hasActiveIssue ? "warning" : "default"}
                       />
                     </TableCell>
                     <TableCell align="right">
