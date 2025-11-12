@@ -201,6 +201,7 @@ import { getStationImage } from "../../utils/imageAssets";
 import { CONNECTOR_TYPES } from "../../utils/constants";
 import BookingModal from "../../components/customer/BookingModal";
 import RatingModal from "../../components/customer/RatingModal";
+import QRCodeScannerComponent from "../../components/ui/QRCodeScanner/QRCodeScanner";
 
 const ChargingFlow = () => {
   // Các bước của flow booking sạc xe
@@ -2916,22 +2917,20 @@ const ChargingFlow = () => {
       >
         <DialogTitle>Quét mã QR trên trụ sạc</DialogTitle>
         <DialogContent>
-          <Box sx={{ textAlign: "center", py: 4 }}>
-            <QrCodeScanner
-              sx={{ fontSize: 120, color: "primary.main", mb: 2 }}
+          {qrScanOpen && (
+            <QRCodeScannerComponent
+              onScanSuccess={(result) => {
+                handleQRScan(result);
+              }}
+              onClose={() => setQrScanOpen(false)}
             />
-            <Typography variant="body1" gutterBottom>
-              Hướng camera về phía mã QR trên trụ sạc
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Demo: Nhấn nút bên dưới để mô phỏng quét QR thành công
-            </Typography>
-          </Box>
+          )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setQrScanOpen(false)}>Hủy</Button>
+          <Button onClick={() => setQrScanOpen(false)}>Đóng</Button>
           <Button
-            variant="contained"
+            variant="outlined"
+            size="small"
             onClick={() => handleQRScan("SKAEV:STATION:ST001:A01")}
           >
             Demo: Quét thành công

@@ -1,6 +1,8 @@
 ﻿import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { Camera, X, AlertCircle, RefreshCw } from 'lucide-react';
 import { BrowserQRCodeReader } from '@zxing/browser';
+import { Box, Typography, Button, LinearProgress, IconButton } from '@mui/material';
+import { CameraAlt, Close, Refresh, Warning } from '@mui/icons-material';
 
 const QRCodeScanner = ({ onScanSuccess, onClose }) => {
   const [scanning, setScanning] = useState(false);
@@ -8,6 +10,7 @@ const QRCodeScanner = ({ onScanSuccess, onClose }) => {
   const [hasPermission, setHasPermission] = useState(null);
   const [selectedDeviceId, setSelectedDeviceId] = useState(null);
   const [cameraStarted, setCameraStarted] = useState(false);
+  const [scanProgress, setScanProgress] = useState(0);
   
   const videoRef = useRef(null);
   const codeReaderRef = useRef(null);
@@ -137,6 +140,12 @@ const QRCodeScanner = ({ onScanSuccess, onClose }) => {
     try {
       scanningRef.current = true;
       setScanning(true);
+      setScanProgress(0);
+
+      // Simulate progress while waiting for video
+      const progressInterval = setInterval(() => {
+        setScanProgress(prev => Math.min(prev + 10, 90));
+      }, 100);
 
       // Wait for video to be ready
       await new Promise((resolve, reject) => {
@@ -144,8 +153,11 @@ const QRCodeScanner = ({ onScanSuccess, onClose }) => {
         const checkVideo = () => {
           attempts++;
           if (videoRef.current?.readyState >= 2) {
+            clearInterval(progressInterval);
+            setScanProgress(100);
             resolve();
           } else if (attempts > 30) {
+            clearInterval(progressInterval);
             reject(new Error('Video không sẵn sàng'));
           } else {
             setTimeout(checkVideo, 100);
@@ -283,133 +295,363 @@ const QRCodeScanner = ({ onScanSuccess, onClose }) => {
   }, []);
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4 flex items-center justify-between">
-          <h3 className="text-white text-lg font-semibold flex items-center gap-2">
-            <Camera size={24} />
+    <Box
+      sx={{
+        position: 'relative',
+        width: '100%',
+        height: '100%',
+        minHeight: 500,
+        bgcolor: 'background.paper',
+        borderRadius: 2,
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      {/* Header */}
+      <Box
+        sx={{
+          bgcolor: 'primary.main',
+          color: 'white',
+          px: 3,
+          py: 2,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <CameraAlt />
+          <Typography variant="h6" fontWeight={600}>
             Quét mã QR trạm sạc
-          </h3>
-          <button 
-            onClick={onClose}
-            className="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-1 transition-colors"
+          </Typography>
+        </Box>
+        <IconButton 
+          onClick={onClose}
+          sx={{ 
+            color: 'white',
+            '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' }
+          }}
+        >
+          <Close />
+        </IconButton>
+      </Box>
+
+      {/* Video Container */}
+      <Box
+        sx={{
+          position: 'relative',
+          flex: 1,
+          bgcolor: '#000',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {/* Video preview */}
+        <video
+          ref={videoRef}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+          }}
+          playsInline
+          muted
+        />
+
+        {/* Scanning overlay - show when scanning */}
+        {cameraStarted && scanning && !error && (
+          <Box
+            sx={{
+              position: 'absolute',
+              inset: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              pointerEvents: 'none',
+            }}
           >
-            <X size={24} />
-          </button>
-        </div>
-
-        {/* Content */}
-        <div className="relative bg-black" style={{ aspectRatio: '3/4' }}>
-          {/* Video preview */}
-          <video
-            ref={videoRef}
-            className="w-full h-full object-cover"
-            playsInline
-            muted
-          />
-
-          {/* Scanner overlay - only show when scanning */}
-          {cameraStarted && scanning && !error && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="relative w-64 h-64">
-                {/* Scanning frame */}
-                <div className="absolute inset-0 border-4 border-white rounded-2xl opacity-80">
-                  <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-blue-500 rounded-tl-xl"></div>
-                  <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-blue-500 rounded-tr-xl"></div>
-                  <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-blue-500 rounded-bl-xl"></div>
-                  <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-blue-500 rounded-br-xl"></div>
-                </div>
-                
-                {/* Scanning line animation */}
-                <div className="absolute inset-0 overflow-hidden rounded-2xl">
-                  <div className="absolute w-full h-1 bg-gradient-to-r from-transparent via-blue-500 to-transparent animate-scan"></div>
-                </div>
-              </div>
+            {/* Scanning frame with animation */}
+            <Box
+              sx={{
+                position: 'relative',
+                width: { xs: 280, sm: 320 },
+                height: { xs: 280, sm: 320 },
+                animation: 'pulse 2s ease-in-out infinite',
+                '@keyframes pulse': {
+                  '0%, 100%': { opacity: 1, transform: 'scale(1)' },
+                  '50%': { opacity: 0.8, transform: 'scale(0.98)' },
+                },
+              }}
+            >
+              {/* Main border */}
+              <Box
+                sx={{
+                  position: 'absolute',
+                  inset: 0,
+                  border: '3px solid rgba(255,255,255,0.5)',
+                  borderRadius: 3,
+                }}
+              />
               
-              <p className="absolute bottom-8 left-0 right-0 text-center text-white text-sm bg-black bg-opacity-50 py-2 px-4 mx-4 rounded-lg">
-                Hướng camera vào mã QR trên trạm sạc
-              </p>
-            </div>
-          )}
-
-          {/* Permission required */}
-          {hasPermission === null && !cameraStarted && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900 bg-opacity-90 text-white p-6">
-              <Camera size={64} className="mb-4 opacity-50" />
-              <p className="text-center mb-4">Cần quyền truy cập camera</p>
-              <button
-                onClick={startCamera}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+              {/* Corner markers */}
+              <Box sx={{ position: 'absolute', top: -3, left: -3, width: 40, height: 40, borderTop: '6px solid', borderLeft: '6px solid', borderColor: 'primary.main', borderTopLeftRadius: 3 }} />
+              <Box sx={{ position: 'absolute', top: -3, right: -3, width: 40, height: 40, borderTop: '6px solid', borderRight: '6px solid', borderColor: 'primary.main', borderTopRightRadius: 3 }} />
+              <Box sx={{ position: 'absolute', bottom: -3, left: -3, width: 40, height: 40, borderBottom: '6px solid', borderLeft: '6px solid', borderColor: 'primary.main', borderBottomLeftRadius: 3 }} />
+              <Box sx={{ position: 'absolute', bottom: -3, right: -3, width: 40, height: 40, borderBottom: '6px solid', borderRight: '6px solid', borderColor: 'primary.main', borderBottomRightRadius: 3 }} />
+              
+              {/* Scanning line */}
+              <Box
+                sx={{
+                  position: 'absolute',
+                  inset: 0,
+                  overflow: 'hidden',
+                  borderRadius: 3,
+                }}
               >
-                Cho phép truy cập
-              </button>
-            </div>
-          )}
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    width: '100%',
+                    height: 3,
+                    background: 'linear-gradient(90deg, transparent, #1976d2, transparent)',
+                    boxShadow: '0 0 20px rgba(25,118,210,0.8)',
+                    animation: 'scan 2s linear infinite',
+                    '@keyframes scan': {
+                      '0%': { top: 0 },
+                      '50%': { top: '100%' },
+                      '100%': { top: 0 },
+                    },
+                  }}
+                />
+              </Box>
+            </Box>
 
-          {/* Permission denied */}
-          {hasPermission === false && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900 bg-opacity-90 text-white p-6">
-              <AlertCircle size={64} className="mb-4 text-red-500" />
-              <p className="text-center font-semibold mb-2">Không thể truy cập camera</p>
-              <p className="text-center text-sm text-gray-300 mb-6">
-                Vui lòng cho phép truy cập camera trong cài đặt trình duyệt
-              </p>
-              <button
-                onClick={handleRetry}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors flex items-center gap-2"
-              >
-                <RefreshCw size={20} />
-                Thử lại
-              </button>
-            </div>
-          )}
+            {/* Instruction text */}
+            <Typography
+              sx={{
+                position: 'absolute',
+                bottom: 60,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                bgcolor: 'rgba(0,0,0,0.75)',
+                color: 'white',
+                px: 3,
+                py: 1.5,
+                borderRadius: 2,
+                fontSize: { xs: '0.875rem', sm: '1rem' },
+                fontWeight: 500,
+                textAlign: 'center',
+                backdropFilter: 'blur(10px)',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              📱 Hướng camera vào mã QR trên trạm sạc
+            </Typography>
 
-          {/* Error message */}
-          {error && cameraStarted && (
-            <div className="absolute bottom-4 left-4 right-4 bg-red-500 text-white px-4 py-3 rounded-lg shadow-lg flex items-start gap-2">
-              <AlertCircle size={20} className="flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <p className="font-semibold">Lỗi</p>
-                <p className="text-sm">{error}</p>
-              </div>
-            </div>
-          )}
+            {/* Progress indicator */}
+            {scanProgress < 100 && (
+              <LinearProgress
+                variant="determinate"
+                value={scanProgress}
+                sx={{
+                  position: 'absolute',
+                  bottom: 40,
+                  left: 40,
+                  right: 40,
+                  borderRadius: 1,
+                  height: 6,
+                }}
+              />
+            )}
+          </Box>
+        )}
 
-          {/* Camera not started */}
-          {!cameraStarted && hasPermission && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900 bg-opacity-90 text-white p-6">
-              <Camera size={64} className="mb-4 animate-pulse" />
-              <p className="text-center mb-4">Đang khởi tạo camera...</p>
-              <button
-                onClick={startCamera}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
-              >
-                Mở camera
-              </button>
-            </div>
-          )}
-        </div>
+        {/* Permission required */}
+        {hasPermission === null && !cameraStarted && (
+          <Box
+            sx={{
+              position: 'absolute',
+              inset: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              bgcolor: 'rgba(0,0,0,0.85)',
+              color: 'white',
+              p: 4,
+              textAlign: 'center',
+            }}
+          >
+            <CameraAlt sx={{ fontSize: 80, mb: 3, opacity: 0.5 }} />
+            <Typography variant="h6" gutterBottom>
+              Cần quyền truy cập camera
+            </Typography>
+            <Typography variant="body2" sx={{ mb: 4, opacity: 0.8 }}>
+              Để quét mã QR, vui lòng cho phép ứng dụng sử dụng camera
+            </Typography>
+            <Button
+              variant="contained"
+              size="large"
+              startIcon={<CameraAlt />}
+              onClick={startCamera}
+              sx={{
+                px: 4,
+                py: 1.5,
+                borderRadius: 2,
+                textTransform: 'none',
+                fontSize: '1rem',
+              }}
+            >
+              Cho phép truy cập camera
+            </Button>
+          </Box>
+        )}
 
-        {/* Footer */}
-        <div className="bg-gray-50 px-6 py-4">
-          <p className="text-sm text-gray-600 text-center">
-            💡 Đảm bảo mã QR trong khung và có đủ ánh sáng
-          </p>
-        </div>
-      </div>
+        {/* Permission denied */}
+        {hasPermission === false && (
+          <Box
+            sx={{
+              position: 'absolute',
+              inset: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              bgcolor: 'rgba(0,0,0,0.85)',
+              color: 'white',
+              p: 4,
+              textAlign: 'center',
+            }}
+          >
+            <Warning sx={{ fontSize: 80, mb: 3, color: 'error.main' }} />
+            <Typography variant="h6" gutterBottom fontWeight={600}>
+              Không thể truy cập camera
+            </Typography>
+            <Typography variant="body2" sx={{ mb: 4, opacity: 0.8, maxWidth: 400 }}>
+              Vui lòng cho phép truy cập camera trong cài đặt trình duyệt, sau đó thử lại
+            </Typography>
+            <Button
+              variant="contained"
+              size="large"
+              startIcon={<Refresh />}
+              onClick={handleRetry}
+              sx={{
+                px: 4,
+                py: 1.5,
+                borderRadius: 2,
+                textTransform: 'none',
+                fontSize: '1rem',
+              }}
+            >
+              Thử lại
+            </Button>
+          </Box>
+        )}
 
-      <style>{`
-        @keyframes scan {
-          0% { top: 0; }
-          50% { top: 100%; }
-          100% { top: 0; }
-        }
-        .animate-scan {
-          animation: scan 2s linear infinite;
-        }
-      `}</style>
-    </div>
+        {/* Error message overlay */}
+        {error && cameraStarted && (
+          <Box
+            sx={{
+              position: 'absolute',
+              bottom: 20,
+              left: 20,
+              right: 20,
+              bgcolor: 'error.main',
+              color: 'white',
+              px: 3,
+              py: 2,
+              borderRadius: 2,
+              display: 'flex',
+              alignItems: 'start',
+              gap: 1.5,
+              boxShadow: 3,
+            }}
+          >
+            <Warning sx={{ mt: 0.2 }} />
+            <Box sx={{ flex: 1 }}>
+              <Typography variant="subtitle2" fontWeight={600}>
+                Lỗi
+              </Typography>
+              <Typography variant="body2">
+                {error}
+              </Typography>
+            </Box>
+          </Box>
+        )}
+
+        {/* Camera loading state */}
+        {!cameraStarted && hasPermission && (
+          <Box
+            sx={{
+              position: 'absolute',
+              inset: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              bgcolor: 'rgba(0,0,0,0.85)',
+              color: 'white',
+              p: 4,
+              textAlign: 'center',
+            }}
+          >
+            <CameraAlt
+              sx={{
+                fontSize: 80,
+                mb: 3,
+                animation: 'pulse 1.5s ease-in-out infinite',
+                '@keyframes pulse': {
+                  '0%, 100%': { opacity: 0.5, transform: 'scale(1)' },
+                  '50%': { opacity: 1, transform: 'scale(1.1)' },
+                },
+              }}
+            />
+            <Typography variant="h6" gutterBottom>
+              Đang khởi tạo camera...
+            </Typography>
+            <LinearProgress sx={{ width: 200, mt: 2 }} />
+            <Button
+              variant="outlined"
+              color="inherit"
+              size="large"
+              startIcon={<CameraAlt />}
+              onClick={startCamera}
+              sx={{
+                mt: 4,
+                px: 4,
+                py: 1.5,
+                borderRadius: 2,
+                textTransform: 'none',
+                borderColor: 'rgba(255,255,255,0.3)',
+                '&:hover': {
+                  borderColor: 'rgba(255,255,255,0.5)',
+                  bgcolor: 'rgba(255,255,255,0.05)',
+                },
+              }}
+            >
+              Mở camera thủ công
+            </Button>
+          </Box>
+        )}
+      </Box>
+
+      {/* Footer */}
+      <Box
+        sx={{
+          bgcolor: 'grey.100',
+          px: 3,
+          py: 2,
+          textAlign: 'center',
+        }}
+      >
+        <Typography variant="body2" color="text.secondary">
+          💡 Đảm bảo mã QR trong khung quét và có đủ ánh sáng
+        </Typography>
+      </Box>
+    </Box>
   );
 };
 
