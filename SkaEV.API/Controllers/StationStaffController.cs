@@ -24,8 +24,11 @@ public class StationStaffController : ControllerBase
     {
         try
         {
+            // Return only canonical staff users: active users with role 'staff' who have at least one
+            // StationStaff record (i.e., managed / created via admin workflows). This avoids showing
+            // legacy/test/team accounts in UI dropdowns that should list operational staff only.
             var staffUsers = await _context.Users
-                .Where(u => u.Role == "staff" && u.IsActive)
+                .Where(u => u.Role == "staff" && u.IsActive && _context.StationStaff.Any(ss => ss.StaffUserId == u.UserId))
                 .Select(u => new
                 {
                     u.UserId,
