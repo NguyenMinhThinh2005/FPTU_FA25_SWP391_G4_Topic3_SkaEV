@@ -122,7 +122,6 @@ builder.Services.AddScoped<IStationService, StationService>();
 builder.Services.AddScoped<IBookingService, BookingService>();
 builder.Services.AddScoped<IPaymentMethodService, PaymentMethodService>();
 builder.Services.AddScoped<IReportService, ReportService>();
-builder.Services.AddSingleton<IPaymentProcessor, SimulatedPaymentProcessor>();
 
 // New Services
 builder.Services.AddScoped<IInvoiceService, InvoiceService>();
@@ -135,11 +134,10 @@ builder.Services.AddScoped<ISlotService, SlotService>();
 builder.Services.AddScoped<IUserProfileService, UserProfileService>();
 builder.Services.AddScoped<IAdminUserService, AdminUserService>();
 builder.Services.AddScoped<IIssueService, IssueService>(); // Optional - requires 08_ADD_ISSUES_TABLE.sql
-builder.Services.AddHttpClient<IMapsService, MapsService>();
-// Temporarily commented out - services not implemented yet
-// builder.Services.AddScoped<IMonitoringService, MonitoringService>(); // Real-time monitoring
-// builder.Services.AddScoped<IDemandForecastingService, DemandForecastingService>(); // AI demand forecasting
-// builder.Services.AddScoped<IAdvancedAnalyticsService, AdvancedAnalyticsService>(); // Advanced ML analytics
+
+// Payment Services
+builder.Services.AddScoped<SkaEV.API.Application.Services.Payments.IPaymentProcessor, SkaEV.API.Application.Services.Payments.SimulatedPaymentProcessor>();
+builder.Services.AddScoped<SkaEV.API.Application.Services.Payments.IVNPayService, SkaEV.API.Application.Services.Payments.VNPayService>();
 
 // Configure Swagger
 builder.Services.AddEndpointsApiExplorer();
