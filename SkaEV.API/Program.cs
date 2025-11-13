@@ -135,6 +135,9 @@ builder.Services.AddScoped<IUserProfileService, UserProfileService>();
 builder.Services.AddScoped<IAdminUserService, AdminUserService>();
 builder.Services.AddScoped<IIssueService, IssueService>(); // Optional - requires 08_ADD_ISSUES_TABLE.sql
 
+// Maps Service with HttpClient
+builder.Services.AddHttpClient<IMapsService, MapsService>();
+
 // Payment Services
 builder.Services.AddScoped<SkaEV.API.Application.Services.Payments.IPaymentProcessor, SkaEV.API.Application.Services.Payments.SimulatedPaymentProcessor>();
 builder.Services.AddScoped<SkaEV.API.Application.Services.Payments.IVNPayService, SkaEV.API.Application.Services.Payments.VNPayService>();
