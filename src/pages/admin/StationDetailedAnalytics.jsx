@@ -476,25 +476,7 @@ const TimeSeriesTab = ({ data }) => {
         </Card>
       </Grid>
 
-      <Grid item xs={12} md={6}>
-        <Card>
-          <CardContent>
-            <Typography variant="h6" gutterBottom>
-              Năng lượng tiêu thụ
-            </Typography>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={data}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="label" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="energyKwh" fill="#ffc658" name="Năng lượng (kWh)" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </Grid>
+      {/* Energy consumption chart removed as requested. */}
 
       <Grid item xs={12} md={6}>
         <Card>
