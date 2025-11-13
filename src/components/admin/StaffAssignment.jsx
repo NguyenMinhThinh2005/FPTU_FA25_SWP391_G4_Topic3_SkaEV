@@ -116,14 +116,39 @@ const StaffAssignment = ({ stationId, stationName }) => {
     }
   };
 
-  // Filter out already assigned staff AND ensure the user exists and has role === 'staff'
-  const unassignedStaff = availableStaff.filter((staff) => {
-    const isAssigned = assignedStaff.some((assigned) => assigned.staffUserId === staff.userId);
-    if (isAssigned) return false;
-    const canonical = users.find((u) => u.userId === staff.userId);
-    // Only include if canonical user exists and role is 'staff'
-    return canonical && canonical.role === 'staff';
-  });
+  // Filter out already assigned staff, dedupe, and ensure the user exists and has role === 'staff'.
+  // Also exclude obvious group/team accounts to avoid cluttering the dropdown.
+  const seen = new Set();
+  const unassignedStaff = availableStaff
+    .filter((staff) => {
+      // Normalize id (backend may return userId or UserId depending on serializer)
+      const id = staff.userId ?? staff.UserId ?? null;
+      if (!id) return false;
+
+      if (seen.has(id)) return false;
+      seen.add(id);
+
+      const isAssigned = assignedStaff.some((assigned) => assigned.staffUserId === id);
+      if (isAssigned) return false;
+
+      const canonical = users.find((u) => u.userId === id);
+      if (!canonical) return false;
+      if (canonical.role !== 'staff') return false;
+      if (canonical.isActive === false) return false;
+
+      const name = (staff.fullName || staff.FullName || '').toString().toLowerCase();
+      // Exclude generic team/group accounts that should not be assigned as individuals
+      if (name.includes('team') || name.includes('(team)') || name.includes('on-call') || name.includes('team -')) return false;
+
+      return true;
+    })
+    .map((s) => ({
+      userId: s.userId ?? s.UserId,
+      fullName: s.fullName ?? s.FullName,
+      email: s.email ?? s.Email,
+      phoneNumber: s.phoneNumber ?? s.PhoneNumber,
+      assignedStations: s.assignedStations ?? s.AssignedStations ?? []
+    }));
 
   return (
     <Box>
