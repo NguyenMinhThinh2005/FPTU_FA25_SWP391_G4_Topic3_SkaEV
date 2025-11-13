@@ -35,7 +35,7 @@ import reportsAPI from '../../services/api/reportsAPI';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
 
-const AdvancedCharts = ({ stationId }) => {
+const AdvancedCharts = ({ stationId, showEnergy = true }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [analytics, setAnalytics] = useState(null);
@@ -246,15 +246,17 @@ const AdvancedCharts = ({ stationId }) => {
       {/* Charts Tabs */}
       <Card>
         <Tabs value={currentTab} onChange={(e, v) => setCurrentTab(v)}>
-          <Tab label="NĂNG LƯỢNG TIÊU THỤ" />
+          {showEnergy && <Tab label="NĂNG LƯỢNG TIÊU THỤ" />}
           <Tab label="SỬ DỤNG SLOT" />
           <Tab label="DOANH THU" />
           <Tab label="PHÂN BỐ THEO GIỜ" />
         </Tabs>
 
         <CardContent>
-          {/* Tab 0: Time Series Chart */}
-          {currentTab === 0 && (
+          {/* Tab contents (index order follows the rendered Tabs above) */}
+
+          {/* Energy tab (only when showEnergy is true) */}
+          {showEnergy && currentTab === 0 && (
             <Box>
               <Typography variant="h6" gutterBottom>
                 Năng lượng tiêu thụ 
@@ -289,7 +291,8 @@ const AdvancedCharts = ({ stationId }) => {
           )}
 
           {/* Slot Utilization Chart */}
-          {currentTab === 1 && (
+          {/* Note: When showEnergy is false this becomes tab index 0 */}
+          {((showEnergy && currentTab === 1) || (!showEnergy && currentTab === 0)) && (
             <Box>
               <Typography variant="h6" gutterBottom>
                 Tỷ lệ sử dụng theo Slot
@@ -316,7 +319,7 @@ const AdvancedCharts = ({ stationId }) => {
           )}
 
           {/* Revenue Breakdown Chart */}
-          {currentTab === 2 && (
+          {((showEnergy && currentTab === 2) || (!showEnergy && currentTab === 1)) && (
             <Box>
               <Typography variant="h6" gutterBottom>
                 Phân bổ doanh thu theo phương thức thanh toán
@@ -349,7 +352,7 @@ const AdvancedCharts = ({ stationId }) => {
           )}
 
           {/* Session Patterns Chart */}
-          {currentTab === 3 && (
+          {((showEnergy && currentTab === 3) || (!showEnergy && currentTab === 2)) && (
             <Box>
               <Typography variant="h6" gutterBottom>
                 Phân bố phiên sạc theo giờ

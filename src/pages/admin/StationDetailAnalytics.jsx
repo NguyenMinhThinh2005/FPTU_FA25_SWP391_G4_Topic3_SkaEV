@@ -446,7 +446,7 @@ const StationDetailAnalytics = () => {
       {/* Tab 3: Configuration */}
       {currentTab === TAB_INDEX.ANALYTICS && (
         <Box>
-          <AdvancedCharts stationId={stationId} />
+          <AdvancedCharts stationId={stationId} showEnergy={false} />
         </Box>
       )}
 
