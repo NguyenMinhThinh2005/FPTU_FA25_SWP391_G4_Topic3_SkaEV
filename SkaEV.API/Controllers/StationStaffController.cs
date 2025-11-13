@@ -28,7 +28,7 @@ public class StationStaffController : ControllerBase
             // StationStaff record (i.e., managed / created via admin workflows). This avoids showing
             // legacy/test/team accounts in UI dropdowns that should list operational staff only.
             var staffUsers = await _context.Users
-                .Where(u => u.Role == "staff" && u.IsActive && _context.StationStaff.Any(ss => ss.StaffUserId == u.UserId))
+                .Where(u => u.Role == "staff" && u.IsActive && _context.StationStaff.Any(ss => ss.StaffUserId == u.UserId && ss.IsActive))
                 .Select(u => new
                 {
                     u.UserId,
