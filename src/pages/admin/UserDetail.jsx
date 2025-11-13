@@ -583,7 +583,7 @@ const UserDetail = () => {
             {user.role === "admin" && [
               <Tab key="admin-activities" label="Hoạt động" icon={<AccessTime />} iconPosition="start" />,
               <Tab key="admin-perms" label="Quyền hạn" icon={<CheckCircle />} iconPosition="start" />,
-              <Tab key="admin-audit" label="Nhật ký" icon={<Receipt />} iconPosition="start" />,
+              // 'Nhật ký' tab intentionally removed per request
             ]}
           </Tabs>
         </Box>
