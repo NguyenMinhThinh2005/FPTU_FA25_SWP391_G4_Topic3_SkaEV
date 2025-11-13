@@ -784,13 +784,13 @@ const AdvancedAnalytics = () => {
         </Grid>
 
         {/* Revenue by Charging Type */}
-        <Grid item xs={12} md={4}>
+          <Grid item xs={12} md={4}>
           <Card>
             <CardContent>
               <Typography variant="h6" fontWeight="bold" gutterBottom>
                 Doanh thu theo loại sạc
               </Typography>
-              <Box sx={{ height: 300 }}>
+              <Box sx={{ height: 350 }}>
                 {revenueByTypeData.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={revenueByTypeData} layout="vertical" margin={{ top: 10, right: 30, left: 20, bottom: 5 }}>
