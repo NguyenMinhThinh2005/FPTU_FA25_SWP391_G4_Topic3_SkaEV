@@ -1,25 +1,25 @@
 ﻿/* eslint-disable */
 /**
  * ChargingFlow Component - Refactored Flow
- * 
+ *
  * CHANGES (Nov 2025):
- * 1. Step 0 - Select Station: 
+ * 1. Step 0 - Select Station:
  *    - REMOVED: Map view for station selection
  *    - ADDED: List/Grid view with station cards showing all details
  *    - Each card shows: name, address, distance, availability, slots, price, operating hours
- * 
+ *
  * 2. Step 1 - Navigation (NEW):
  *    - ADDED: Map with directions to booked station
  *    - Shows route from user location to selected station
  *    - Used for navigation only, not for station selection
- * 
+ *
  * 3. Date/Time Restrictions:
  *    - Only TODAY bookings allowed (Vietnam timezone UTC+7)
  *    - Future date selection removed in ChargingDateTimePicker component
  *    - Backend validation in BookingService.cs rejects non-today bookings
- * 
+ *
  * Flow Steps:
- * 0. Select Station (List/Grid) 
+ * 0. Select Station (List/Grid)
  * 1. Navigation Map (after booking)
  * 2. QR Scan
  * 3. Connect Vehicle
@@ -78,7 +78,13 @@ import useStationStore from "../../store/stationStore";
 import { formatCurrency, calculateDistance } from "../../utils/helpers";
 import StationMapLeaflet from "../../components/customer/StationMapLeaflet";
 import notificationService from "../../services/notificationService";
-import { qrCodesAPI, chargingAPI, stationsAPI } from "../../services/api";
+import {
+  qrCodesAPI,
+  chargingAPI,
+  stationsAPI,
+  invoicesAPI,
+  vnpayAPI,
+} from "../../services/api";
 
 // Helper function to normalize Vietnamese text for search
 const normalize = (text) => {
@@ -189,12 +195,7 @@ const extractStationCoordinates = (station) => {
     lng = temp;
   }
 
-  if (
-    lat == null ||
-    lng == null ||
-    Number.isNaN(lat) ||
-    Number.isNaN(lng)
-  ) {
+  if (lat == null || lng == null || Number.isNaN(lat) || Number.isNaN(lng)) {
     return null;
   }
 
@@ -244,7 +245,10 @@ const ChargingFlow = () => {
     try {
       return sessionStorage.getItem("chargingSelectedStationId");
     } catch (error) {
-      console.warn("Không thể đọc chargingSelectedStationId từ sessionStorage", error);
+      console.warn(
+        "Không thể đọc chargingSelectedStationId từ sessionStorage",
+        error
+      );
       return null;
     }
   });
@@ -266,8 +270,11 @@ const ChargingFlow = () => {
   // Sync stations from store - they already have correct stats from transformStationData
   useEffect(() => {
     if (!stations || stations.length === 0) return;
-    
-    console.log("📊 Syncing stations from store (already have correct stats):", stations.length);
+
+    console.log(
+      "📊 Syncing stations from store (already have correct stats):",
+      stations.length
+    );
     // Stations from store already have stats calculated in transformStationData
     // No need to re-fetch - just use them directly
     setStationsWithStats(stations);
@@ -356,7 +363,8 @@ const ChargingFlow = () => {
   const [chargingStartTime, setChargingStartTimeState] = useState(() =>
     getPersisted("chargingChargingStartTime", null)
   );
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [paymentError, setPaymentError] = useState(null);
   const [sessionData, setSessionDataState] = useState(() =>
     getPersisted("chargingSessionData", {
       energyDelivered: 0,
@@ -567,28 +575,44 @@ const ChargingFlow = () => {
           const available = station.stats?.available || 0;
           return available > 0;
         });
-        console.log("🟢 After availability filter:", stationList.length, "stations");
+        console.log(
+          "🟢 After availability filter:",
+          stationList.length,
+          "stations"
+        );
       }
 
       // Apply distance filter
       if (filterMaxDistance < 50) {
         stationList = stationList.filter((station) => {
-          return station.distanceFromUser !== undefined && station.distanceFromUser <= filterMaxDistance;
+          return (
+            station.distanceFromUser !== undefined &&
+            station.distanceFromUser <= filterMaxDistance
+          );
         });
-        console.log(`📏 After distance filter (${filterMaxDistance}km):`, stationList.length, "stations");
+        console.log(
+          `📏 After distance filter (${filterMaxDistance}km):`,
+          stationList.length,
+          "stations"
+        );
       }
 
       // Sort stations based on selected criteria
       stationList.sort((a, b) => {
-        if (sortBy === 'distance') {
-          if (a.distanceFromUser !== undefined && b.distanceFromUser !== undefined) {
+        if (sortBy === "distance") {
+          if (
+            a.distanceFromUser !== undefined &&
+            b.distanceFromUser !== undefined
+          ) {
             return a.distanceFromUser - b.distanceFromUser;
           }
-        } else if (sortBy === 'price') {
-          const priceA = a.charging?.pricing?.acRate || a.pricing?.unitPrice || 0;
-          const priceB = b.charging?.pricing?.acRate || b.pricing?.unitPrice || 0;
+        } else if (sortBy === "price") {
+          const priceA =
+            a.charging?.pricing?.acRate || a.pricing?.unitPrice || 0;
+          const priceB =
+            b.charging?.pricing?.acRate || b.pricing?.unitPrice || 0;
           return priceA - priceB;
-        } else if (sortBy === 'availability') {
+        } else if (sortBy === "availability") {
           const availA = a.stats?.available || 0;
           const availB = b.stats?.available || 0;
           return availB - availA; // Descending (most available first)
@@ -599,7 +623,10 @@ const ChargingFlow = () => {
       console.log(
         `� Stations sorted by ${sortBy}:`,
         stationList.map(
-          (s) => `${s.name} (${s.distanceFromUser?.toFixed(1)}km, ${s.stats?.available || 0} available)`
+          (s) =>
+            `${s.name} (${s.distanceFromUser?.toFixed(1)}km, ${
+              s.stats?.available || 0
+            } available)`
         )
       );
 
@@ -608,7 +635,15 @@ const ChargingFlow = () => {
       console.error("❌ Error filtering stations:", error);
       return [];
     }
-  }, [searchQuery, filters.connectorTypes, stationsWithStats, userLocation, sortBy, filterAvailable, filterMaxDistance]);
+  }, [
+    searchQuery,
+    filters.connectorTypes,
+    stationsWithStats,
+    userLocation,
+    sortBy,
+    filterAvailable,
+    filterMaxDistance,
+  ]);
 
   const selectedStationCoords = React.useMemo(
     () => extractStationCoordinates(selectedStation),
@@ -697,25 +732,31 @@ const ChargingFlow = () => {
       console.warn("⚠️ Cannot select null/undefined station");
       return;
     }
-    
+
     const isActive = (station.status || "").toLowerCase() === "active";
     const hasAvailableSlots = station.stats?.available > 0;
     const isAvailable = isActive && hasAvailableSlots;
-    
+
     if (!isAvailable) {
       console.warn(`⚠️ Cannot select unavailable station: ${station.name}`, {
         status: station.status,
         isActive,
         hasAvailableSlots,
         availableSlots: station.stats?.available,
-        totalSlots: station.stats?.total
+        totalSlots: station.stats?.total,
       });
-      alert(`Không thể chọn trạm này.\n${!isActive ? 'Trạm đang bảo trì.' : 'Trạm đã hết chỗ.'}`);
+      alert(
+        `Không thể chọn trạm này.\n${
+          !isActive ? "Trạm đang bảo trì." : "Trạm đã hết chỗ."
+        }`
+      );
       return;
     }
-    
-    console.log(`✅ Selected station: ${station.name} (${station.stats?.available}/${station.stats?.total} slots available)`);
-    console.log('🔍 Station object:', {
+
+    console.log(
+      `✅ Selected station: ${station.name} (${station.stats?.available}/${station.stats?.total} slots available)`
+    );
+    console.log("🔍 Station object:", {
       id: station.id,
       name: station.name,
       stats: station.stats,
@@ -723,10 +764,10 @@ const ChargingFlow = () => {
         availablePorts: station.charging?.availablePorts,
         totalPorts: station.charging?.totalPorts,
         connectorTypes: station.charging?.connectorTypes,
-        poles: station.charging?.poles?.length || 0
-      }
+        poles: station.charging?.poles?.length || 0,
+      },
     });
-    
+
     setSelectedStation(station);
     setPersistedStationId(station?.id || null);
     if (typeof window !== "undefined") {
@@ -779,10 +820,7 @@ const ChargingFlow = () => {
   const handleDirectionsReady = React.useCallback(
     (info) => {
       if (!info) return;
-      if (
-        info.requestId != null &&
-        info.requestId !== navigationRequestId
-      ) {
+      if (info.requestId != null && info.requestId !== navigationRequestId) {
         return;
       }
 
@@ -816,11 +854,9 @@ const ChargingFlow = () => {
         ...info,
         stationId: selectedStation?.id || info.stationId || null,
         distanceText:
-          info.distanceText ||
-          formatDistanceFromMeters(info.distanceMeters),
+          info.distanceText || formatDistanceFromMeters(info.distanceMeters),
         durationText:
-          info.durationText ||
-          formatDurationFromSeconds(info.durationSeconds),
+          info.durationText || formatDurationFromSeconds(info.durationSeconds),
         steps: normalizedSteps,
         warnings: Array.isArray(info.warnings) ? info.warnings : [],
       };
@@ -1174,9 +1210,9 @@ const ChargingFlow = () => {
                   <Grid item xs={12} sm={6} md={3}>
                     <Box
                       sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        height: '100%',
+                        display: "flex",
+                        alignItems: "center",
+                        height: "100%",
                         pl: 1,
                       }}
                     >
@@ -1184,9 +1220,7 @@ const ChargingFlow = () => {
                         checked={filterAvailable}
                         onChange={(e) => setFilterAvailable(e.target.checked)}
                       />
-                      <Typography variant="body2">
-                        Chỉ trạm còn chỗ
-                      </Typography>
+                      <Typography variant="body2">Chỉ trạm còn chỗ</Typography>
                     </Box>
                   </Grid>
 
@@ -1195,12 +1229,12 @@ const ChargingFlow = () => {
                       fullWidth
                       variant="outlined"
                       onClick={() => {
-                        setSortBy('distance');
+                        setSortBy("distance");
                         setFilterMaxDistance(50);
                         setFilterAvailable(false);
-                        setSearchQuery('');
+                        setSearchQuery("");
                       }}
-                      sx={{ height: '40px' }}
+                      sx={{ height: "40px" }}
                     >
                       Xóa bộ lọc
                     </Button>
@@ -1214,7 +1248,14 @@ const ChargingFlow = () => {
           <Grid item xs={12}>
             <Card>
               <CardContent>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    mb: 3,
+                  }}
+                >
                   <Typography
                     variant="h6"
                     sx={{
@@ -1222,16 +1263,17 @@ const ChargingFlow = () => {
                       color: "black",
                     }}
                   >
-                    📍 Danh sách trạm sạc ({loading ? '...' : filteredStations.length} trạm)
+                    📍 Danh sách trạm sạc (
+                    {loading ? "..." : filteredStations.length} trạm)
                   </Typography>
                   <IconButton
                     onClick={handleRefreshStations}
                     disabled={loading}
                     sx={{
-                      bgcolor: 'primary.main',
-                      color: 'white',
-                      '&:hover': { bgcolor: 'primary.dark' },
-                      '&:disabled': { bgcolor: 'grey.300' },
+                      bgcolor: "primary.main",
+                      color: "white",
+                      "&:hover": { bgcolor: "primary.dark" },
+                      "&:disabled": { bgcolor: "grey.300" },
                     }}
                   >
                     <RefreshOutlined />
@@ -1249,21 +1291,53 @@ const ChargingFlow = () => {
                           }}
                         >
                           <CardContent>
-                            <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-                              <Skeleton variant="circular" width={60} height={60} />
+                            <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
+                              <Skeleton
+                                variant="circular"
+                                width={60}
+                                height={60}
+                              />
                               <Box sx={{ flex: 1 }}>
-                                <Skeleton variant="text" width="70%" height={28} />
-                                <Skeleton variant="text" width="40%" height={20} />
+                                <Skeleton
+                                  variant="text"
+                                  width="70%"
+                                  height={28}
+                                />
+                                <Skeleton
+                                  variant="text"
+                                  width="40%"
+                                  height={20}
+                                />
                               </Box>
                             </Box>
                             <Skeleton variant="text" width="90%" />
                             <Skeleton variant="text" width="60%" />
-                            <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
-                              <Skeleton variant="rectangular" width={80} height={32} sx={{ borderRadius: 1 }} />
-                              <Skeleton variant="rectangular" width={80} height={32} sx={{ borderRadius: 1 }} />
-                              <Skeleton variant="rectangular" width={80} height={32} sx={{ borderRadius: 1 }} />
+                            <Box sx={{ display: "flex", gap: 1, mt: 2 }}>
+                              <Skeleton
+                                variant="rectangular"
+                                width={80}
+                                height={32}
+                                sx={{ borderRadius: 1 }}
+                              />
+                              <Skeleton
+                                variant="rectangular"
+                                width={80}
+                                height={32}
+                                sx={{ borderRadius: 1 }}
+                              />
+                              <Skeleton
+                                variant="rectangular"
+                                width={80}
+                                height={32}
+                                sx={{ borderRadius: 1 }}
+                              />
                             </Box>
-                            <Skeleton variant="rectangular" width="100%" height={40} sx={{ borderRadius: 2, mt: 2 }} />
+                            <Skeleton
+                              variant="rectangular"
+                              width="100%"
+                              height={40}
+                              sx={{ borderRadius: 2, mt: 2 }}
+                            />
                           </CardContent>
                         </Card>
                       </Grid>
@@ -1281,13 +1355,17 @@ const ChargingFlow = () => {
                       // Station is available only if:
                       // 1. Status is "active" (case-insensitive, to match DB values like "Active")
                       // 2. Has available slots (stats.available > 0)
-                      const isActive = (station.status || "").toLowerCase() === "active";
+                      const isActive =
+                        (station.status || "").toLowerCase() === "active";
                       const hasAvailableSlots = station.stats?.available > 0;
                       const isAvailable = isActive && hasAvailableSlots;
-                      
-                      const distance = station.distanceFromUser?.toFixed(1) || "N/A";
-                      const pricing = station.charging?.pricing?.acRate || 
-                                     station.charging?.pricing?.dcRate || 0;
+
+                      const distance =
+                        station.distanceFromUser?.toFixed(1) || "N/A";
+                      const pricing =
+                        station.charging?.pricing?.acRate ||
+                        station.charging?.pricing?.dcRate ||
+                        0;
 
                       return (
                         <Grid item xs={12} md={6} key={station.id}>
@@ -1299,17 +1377,27 @@ const ChargingFlow = () => {
                               border: "2px solid",
                               borderColor: isAvailable ? "divider" : "grey.300",
                               opacity: isAvailable ? 1 : 0.6,
-                              "&:hover": isAvailable ? {
-                                borderColor: "primary.main",
-                                boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-                                transform: "translateY(-4px)",
-                              } : {},
+                              "&:hover": isAvailable
+                                ? {
+                                    borderColor: "primary.main",
+                                    boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                                    transform: "translateY(-4px)",
+                                  }
+                                : {},
                             }}
-                            onClick={() => isAvailable && handleStationSelect(station)}
+                            onClick={() =>
+                              isAvailable && handleStationSelect(station)
+                            }
                           >
                             <CardContent>
                               {/* Station Header */}
-                              <Box sx={{ display: "flex", alignItems: "start", mb: 2 }}>
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  alignItems: "start",
+                                  mb: 2,
+                                }}
+                              >
                                 {/* Station Number Badge */}
                                 <Box
                                   sx={{
@@ -1345,10 +1433,21 @@ const ChargingFlow = () => {
 
                                 {/* Station Info */}
                                 <Box sx={{ flex: 1 }}>
-                                  <Typography variant="h6" fontWeight="bold" sx={{ mb: 0.5 }}>
+                                  <Typography
+                                    variant="h6"
+                                    fontWeight="bold"
+                                    sx={{ mb: 0.5 }}
+                                  >
                                     {station.name}
                                   </Typography>
-                                  <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mb: 1 }}>
+                                  <Box
+                                    sx={{
+                                      display: "flex",
+                                      gap: 1,
+                                      flexWrap: "wrap",
+                                      mb: 1,
+                                    }}
+                                  >
                                     <Chip
                                       label={`${distance} km`}
                                       size="small"
@@ -1366,34 +1465,81 @@ const ChargingFlow = () => {
 
                               {/* Station Details */}
                               <Box sx={{ mb: 2 }}>
-                                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mb: 1 }}>
-                                  <LocationOn sx={{ fontSize: 18, color: "text.secondary" }} />
-                                  <Typography variant="body2" color="text.secondary">
+                                <Box
+                                  sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 0.5,
+                                    mb: 1,
+                                  }}
+                                >
+                                  <LocationOn
+                                    sx={{
+                                      fontSize: 18,
+                                      color: "text.secondary",
+                                    }}
+                                  />
+                                  <Typography
+                                    variant="body2"
+                                    color="text.secondary"
+                                  >
                                     {station.location?.address}
                                   </Typography>
                                 </Box>
 
-                                <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
-                                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                                    <Speed sx={{ fontSize: 18, color: "primary.main" }} />
+                                <Box
+                                  sx={{
+                                    display: "flex",
+                                    gap: 2,
+                                    flexWrap: "wrap",
+                                  }}
+                                >
+                                  <Box
+                                    sx={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: 0.5,
+                                    }}
+                                  >
+                                    <Speed
+                                      sx={{
+                                        fontSize: 18,
+                                        color: "primary.main",
+                                      }}
+                                    />
                                     <Typography variant="body2">
                                       Tối đa {station.charging?.maxPower || 0}kW
                                     </Typography>
                                   </Box>
 
-                                  <Typography variant="body2" color="text.secondary">
-                                    ⚡ {station.stats?.available || 0}/{station.stats?.total || 0} cổng trống
+                                  <Typography
+                                    variant="body2"
+                                    color="text.secondary"
+                                  >
+                                    ⚡ {station.stats?.available || 0}/
+                                    {station.stats?.total || 0} cổng trống
                                   </Typography>
                                 </Box>
 
                                 {station.operatingHours && (
-                                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                                    🕐 {formatOperatingHours(station.operatingHours)}
+                                  <Typography
+                                    variant="body2"
+                                    color="text.secondary"
+                                    sx={{ mt: 0.5 }}
+                                  >
+                                    🕐{" "}
+                                    {formatOperatingHours(
+                                      station.operatingHours
+                                    )}
                                   </Typography>
                                 )}
 
                                 {pricing > 0 && (
-                                  <Typography variant="body2" color="success.main" sx={{ mt: 0.5, fontWeight: "bold" }}>
+                                  <Typography
+                                    variant="body2"
+                                    color="success.main"
+                                    sx={{ mt: 0.5, fontWeight: "bold" }}
+                                  >
                                     💰 Từ {formatCurrency(pricing)}/kWh
                                   </Typography>
                                 )}
@@ -1411,17 +1557,21 @@ const ChargingFlow = () => {
                                 }}
                                 disabled={!isAvailable}
                                 sx={{
-                                  bgcolor: isAvailable ? 'primary.main' : 'grey.400',
-                                  '&:hover': {
-                                    bgcolor: isAvailable ? 'primary.dark' : 'grey.400',
+                                  bgcolor: isAvailable
+                                    ? "primary.main"
+                                    : "grey.400",
+                                  "&:hover": {
+                                    bgcolor: isAvailable
+                                      ? "primary.dark"
+                                      : "grey.400",
                                   },
                                 }}
                               >
-                                {isAvailable 
-                                  ? "Chọn trạm này" 
-                                  : !isActive 
-                                    ? "Đang bảo trì" 
-                                    : "Hết chỗ"}
+                                {isAvailable
+                                  ? "Chọn trạm này"
+                                  : !isActive
+                                  ? "Đang bảo trì"
+                                  : "Hết chỗ"}
                               </Button>
                             </CardContent>
                           </Card>
@@ -1435,26 +1585,31 @@ const ChargingFlow = () => {
           </Grid>
         </Grid>
       )}
-
       {/* Step 1: Navigation/Direction Map - Show route to booked station */}
       {flowStep === 1 && selectedStation && (
         <Grid container spacing={3}>
           <Grid item xs={12}>
             <Card>
               <CardContent>
-                <Typography variant="h5" gutterBottom sx={{ fontWeight: "bold", mb: 2 }}>
+                <Typography
+                  variant="h5"
+                  gutterBottom
+                  sx={{ fontWeight: "bold", mb: 2 }}
+                >
                   ✅ Đặt lịch thành công!
                 </Typography>
                 <Alert severity="success" sx={{ mb: 3 }}>
-                  Bạn đã đặt trạm <strong>{selectedStation.name}</strong> thành công. 
-                  Hãy di chuyển đến trạm và quét QR để bắt đầu sạc.
+                  Bạn đã đặt trạm <strong>{selectedStation.name}</strong> thành
+                  công. Hãy di chuyển đến trạm và quét QR để bắt đầu sạc.
                 </Alert>
 
                 {/* Station Info Summary */}
                 <Card variant="outlined" sx={{ mb: 3, p: 2 }}>
                   <Grid container spacing={2}>
                     <Grid item xs={12} md={6}>
-                      <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", mb: 1 }}
+                      >
                         <Avatar
                           src={getStationImage(selectedStation)}
                           sx={{ width: 60, height: 60, mr: 2 }}
@@ -1475,7 +1630,10 @@ const ChargingFlow = () => {
                       <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
                         <Chip
                           icon={<LocationOn />}
-                          label={`${selectedStation.distanceFromUser?.toFixed(1) || "N/A"} km`}
+                          label={`${
+                            selectedStation.distanceFromUser?.toFixed(1) ||
+                            "N/A"
+                          } km`}
                           color="primary"
                           variant="outlined"
                         />
@@ -1487,7 +1645,9 @@ const ChargingFlow = () => {
                         />
                         {selectedStation.operatingHours && (
                           <Chip
-                            label={formatOperatingHours(selectedStation.operatingHours)}
+                            label={formatOperatingHours(
+                              selectedStation.operatingHours
+                            )}
                             color="default"
                             variant="outlined"
                           />
@@ -1552,10 +1712,7 @@ const ChargingFlow = () => {
                           }}
                         >
                           <CircularProgress size={20} />
-                          <Typography
-                            variant="body2"
-                            color="text.secondary"
-                          >
+                          <Typography variant="body2" color="text.secondary">
                             Đang tải chỉ đường...
                           </Typography>
                         </Box>
@@ -1637,9 +1794,7 @@ const ChargingFlow = () => {
                             >
                               {navigationSummary.steps.map((step, idx) => (
                                 <ListItem
-                                  key={`direction-step-${
-                                    step.index ?? idx
-                                  }`}
+                                  key={`direction-step-${step.index ?? idx}`}
                                   alignItems="flex-start"
                                   sx={{ py: 1 }}
                                 >
@@ -1663,15 +1818,13 @@ const ChargingFlow = () => {
                                     >
                                       {step.instructionText}
                                     </Typography>
-                                    {(step.distanceText || step.durationText) && (
+                                    {(step.distanceText ||
+                                      step.durationText) && (
                                       <Typography
                                         variant="caption"
                                         color="text.secondary"
                                       >
-                                        {[
-                                          step.distanceText,
-                                          step.durationText,
-                                        ]
+                                        {[step.distanceText, step.durationText]
                                           .filter(Boolean)
                                           .join(" • ")}
                                       </Typography>
@@ -1681,10 +1834,7 @@ const ChargingFlow = () => {
                               ))}
                             </List>
                           ) : (
-                            <Typography
-                              variant="body2"
-                              color="text.secondary"
-                            >
+                            <Typography variant="body2" color="text.secondary">
                               Không có hướng dẫn chi tiết. Nhấn “Mở Google Maps”
                               để xem đường đi trực tiếp.
                             </Typography>
@@ -1695,10 +1845,7 @@ const ChargingFlow = () => {
                       {!directionsData.loading &&
                         !navigationSummary &&
                         !directionsData.error && (
-                          <Typography
-                            variant="body2"
-                            color="text.secondary"
-                          >
+                          <Typography variant="body2" color="text.secondary">
                             Chúng tôi sẽ hiển thị chỉ đường ngay khi có dữ liệu.
                           </Typography>
                         )}
@@ -1724,7 +1871,9 @@ const ChargingFlow = () => {
                           variant="outlined"
                           startIcon={<Refresh />}
                           onClick={handleRetryDirections}
-                          disabled={directionsData.loading || !selectedStation?.id}
+                          disabled={
+                            directionsData.loading || !selectedStation?.id
+                          }
                           fullWidth
                         >
                           Làm mới
@@ -1735,7 +1884,14 @@ const ChargingFlow = () => {
                 </Grid>
 
                 {/* Action Buttons */}
-                <Box sx={{ display: "flex", gap: 2, mt: 3, justifyContent: "center" }}>
+                <Box
+                  sx={{
+                    display: "flex",
+                    gap: 2,
+                    mt: 3,
+                    justifyContent: "center",
+                  }}
+                >
                   <Button
                     variant="outlined"
                     onClick={() => {
@@ -1777,7 +1933,6 @@ const ChargingFlow = () => {
           </Grid>
         </Grid>
       )}
-
       {/* Step 2: QR Scan */}
       {flowStep === 2 && (
         <Grid item xs={12}>
@@ -1812,8 +1967,7 @@ const ChargingFlow = () => {
               Kết nối xe điện với trụ sạc
             </Typography>
             <Alert severity="success" sx={{ mb: 3 }}>
-              QR Code đã quét:{" "}
-              <strong>{scanResult || "SKAEV:STATION:ST001:A01"}</strong>
+              Quét thành công!
             </Alert>
             <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
               Cắm dây sạc vào cổng sạc của xe và đảm bảo kết nối chắc chắn
@@ -1861,9 +2015,6 @@ const ChargingFlow = () => {
               <Typography variant="h6" sx={{ fontWeight: 600 }}>
                 🔋 Đang sạc -{" "}
                 {selectedStation?.name || "Green Mall Charging Hub"}
-              </Typography>
-              <Typography variant="body2" sx={{ opacity: 0.8 }}>
-                Connector: {scanResult?.split(":").pop() || "A01"}
               </Typography>
             </Box>
 
@@ -2102,7 +2253,7 @@ const ChargingFlow = () => {
                             letterSpacing: 1,
                           }}
                         >
-                          Nhiệt độ
+                          Nhiệt độ pin
                         </Typography>
                       </Box>
                     </Grid>
@@ -2624,73 +2775,56 @@ const ChargingFlow = () => {
                     <Typography
                       variant="body2"
                       color="text.secondary"
-                      sx={{ mb: 2 }}
+                      sx={{ mb: 3 }}
                     >
-                      Chọn phương thức thanh toán của bạn
+                      Thanh toán an toàn qua cổng VNPay
                     </Typography>
 
-                    {/* Payment Methods */}
+                    {/* VNPay Payment Info */}
                     <Box
-                      sx={{ display: "flex", flexDirection: "column", gap: 2 }}
+                      sx={{
+                        border: 2,
+                        borderColor: "primary.main",
+                        borderRadius: 2,
+                        p: 3,
+                        mb: 3,
+                        background:
+                          "linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)",
+                      }}
                     >
-                      <Button
-                        variant={
-                          selectedPaymentMethod === "credit-card"
-                            ? "contained"
-                            : "outlined"
-                        }
-                        fullWidth
-                        onClick={() => setSelectedPaymentMethod("credit-card")}
-                        sx={{
-                          justifyContent: "flex-start",
-                          p: 2,
-                          borderWidth: 2,
-                          "&:hover": { borderWidth: 2 },
-                        }}
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", mb: 2 }}
                       >
-                        💳 Thẻ tín dụng **** 4567
-                      </Button>
-                      <Button
-                        variant={
-                          selectedPaymentMethod === "momo"
-                            ? "contained"
-                            : "outlined"
-                        }
-                        fullWidth
-                        onClick={() => setSelectedPaymentMethod("momo")}
-                        sx={{
-                          justifyContent: "flex-start",
-                          p: 2,
-                          borderWidth: 2,
-                          "&:hover": { borderWidth: 2 },
-                        }}
+                        <Typography
+                          variant="h6"
+                          fontWeight="bold"
+                          color="primary.main"
+                        >
+                          💳 VNPay
+                        </Typography>
+                      </Box>
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ mb: 2 }}
                       >
-                        📱 MoMo Wallet
-                      </Button>
-                      <Button
-                        variant={
-                          selectedPaymentMethod === "bank-transfer"
-                            ? "contained"
-                            : "outlined"
-                        }
-                        fullWidth
-                        onClick={() =>
-                          setSelectedPaymentMethod("bank-transfer")
-                        }
-                        sx={{
-                          justifyContent: "flex-start",
-                          p: 2,
-                          borderWidth: 2,
-                          "&:hover": { borderWidth: 2 },
-                        }}
+                        • Thanh toán qua thẻ ATM/Visa/MasterCard
+                      </Typography>
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ mb: 2 }}
                       >
-                        🏦 Chuyển khoản ngân hàng
-                      </Button>
+                        • Ví điện tử VNPay
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        • Bảo mật SSL 256-bit
+                      </Typography>
                     </Box>
 
-                    {!selectedPaymentMethod && (
-                      <Alert severity="info" sx={{ mt: 2 }}>
-                        Vui lòng chọn phương thức thanh toán
+                    {paymentError && (
+                      <Alert severity="error" sx={{ mb: 2 }}>
+                        {paymentError}
                       </Alert>
                     )}
 
@@ -2698,30 +2832,109 @@ const ChargingFlow = () => {
                       variant="contained"
                       fullWidth
                       size="large"
-                      disabled={!selectedPaymentMethod}
-                      sx={{
-                        mt: 3,
-                        opacity: !selectedPaymentMethod ? 0.5 : 1,
-                      }}
-                      onClick={() => {
-                        if (selectedPaymentMethod) {
-                          // Trigger payment success notification
+                      disabled={paymentLoading}
+                      sx={{ mt: 2 }}
+                      onClick={async () => {
+                        setPaymentLoading(true);
+                        setPaymentError(null);
+
+                        try {
                           const totalAmount = calculateTotalCost();
-                          const invoiceNumber = `INV-${Date.now()}`;
+                          const bookingId =
+                            currentBooking?.id || currentBookingData?.id;
 
-                          notificationService.notifyPaymentSuccess({
-                            amount: totalAmount,
-                            invoiceNumber: invoiceNumber,
-                          });
+                          if (!bookingId) {
+                            throw new Error("Không tìm thấy thông tin đặt chỗ");
+                          }
 
-                          setFlowStep(6);
+                          // 1. Get invoice for this booking
+                          console.log(
+                            "📋 Fetching invoice for booking:",
+                            bookingId
+                          );
+                          const invoiceResponse =
+                            await invoicesAPI.getByBooking(bookingId);
+
+                          if (!invoiceResponse || !invoiceResponse.invoiceId) {
+                            throw new Error(
+                              "Không tìm thấy hóa đơn cho phiên sạc này"
+                            );
+                          }
+
+                          const invoice = invoiceResponse;
+                          console.log("✅ Found invoice:", invoice);
+
+                          // 2. Create VNPay payment URL
+                          console.log("💳 Creating VNPay payment URL...");
+                          const vnpayResponse = await vnpayAPI.createPaymentUrl(
+                            {
+                              invoiceId: invoice.invoiceId,
+                              amount: invoice.totalAmount,
+                              orderDescription: `Thanh toan hoa don #${
+                                invoice.invoiceId
+                              } - Phien sac ${invoice.stationName || "SkaEV"}`,
+                              bankCode: null, // Let user choose at VNPay
+                            }
+                          );
+
+                          if (!vnpayResponse?.data?.paymentUrl) {
+                            throw new Error(
+                              "Không thể tạo liên kết thanh toán"
+                            );
+                          }
+
+                          console.log(
+                            "🔗 VNPay payment URL created:",
+                            vnpayResponse.data.paymentUrl
+                          );
+
+                          // 3. Save current state before redirecting
+                          sessionStorage.setItem(
+                            "pendingPaymentInvoiceId",
+                            invoice.invoiceId
+                          );
+                          sessionStorage.setItem(
+                            "pendingPaymentBookingId",
+                            bookingId
+                          );
+                          sessionStorage.setItem(
+                            "returnToChargingFlow",
+                            "true"
+                          );
+
+                          // 4. Redirect to VNPay
+                          window.location.href = vnpayResponse.data.paymentUrl;
+                        } catch (error) {
+                          console.error("❌ Payment error:", error);
+                          setPaymentError(
+                            error.message ||
+                              "Có lỗi xảy ra khi xử lý thanh toán. Vui lòng thử lại."
+                          );
+                          setPaymentLoading(false);
                         }
                       }}
                     >
-                      {selectedPaymentMethod
-                        ? `Thanh toán ${formatCurrency(calculateTotalCost())}`
-                        : "Chọn phương thức thanh toán"}
+                      {paymentLoading ? (
+                        <>
+                          <CircularProgress
+                            size={20}
+                            sx={{ mr: 1 }}
+                            color="inherit"
+                          />
+                          Đang xử lý...
+                        </>
+                      ) : (
+                        `Thanh toán ${formatCurrency(calculateTotalCost())}`
+                      )}
                     </Button>
+
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ display: "block", textAlign: "center", mt: 2 }}
+                    >
+                      🔒 Giao dịch được mã hóa và bảo mật
+                    </Typography>
                   </CardContent>
                 </Card>
               </Grid>
@@ -3015,9 +3228,7 @@ const ChargingFlow = () => {
                     });
                     if (typeof window !== "undefined") {
                       try {
-                        sessionStorage.removeItem(
-                          "chargingSelectedStationId"
-                        );
+                        sessionStorage.removeItem("chargingSelectedStationId");
                       } catch (error) {
                         console.warn(
                           "Không thể xóa chargingSelectedStationId",
@@ -3029,7 +3240,8 @@ const ChargingFlow = () => {
                     setCompletedSession(null);
                     setCurrentBookingData(null);
                     setChargingStartTime(null);
-                    setSelectedPaymentMethod(null);
+                    setPaymentLoading(false);
+                    setPaymentError(null);
                     // Reset session data to initial state
                     setSessionData({
                       energyDelivered: 0,
@@ -3086,7 +3298,7 @@ const ChargingFlow = () => {
             size="small"
             onClick={() => handleQRScan("SKAEV:STATION:ST001:A01")}
           >
-            Demo: Quét thành công
+            Demo sạc xe
           </Button>
         </DialogActions>
       </Dialog>
@@ -3112,10 +3324,7 @@ const ChargingFlow = () => {
               try {
                 sessionStorage.removeItem("chargingSelectedStationId");
               } catch (error) {
-                console.warn(
-                  "Không thể xóa chargingSelectedStationId",
-                  error
-                );
+                console.warn("Không thể xóa chargingSelectedStationId", error);
               }
             }
             setScanResult("");

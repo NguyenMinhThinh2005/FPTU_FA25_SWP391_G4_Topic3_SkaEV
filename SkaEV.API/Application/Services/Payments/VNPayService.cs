@@ -43,7 +43,15 @@ public class VNPayService : IVNPayService
             throw new InvalidOperationException($"Invoice {request.InvoiceId} is already paid");
 
         var txnRef = $"INV{request.InvoiceId}_{DateTime.Now:yyyyMMddHHmmss}";
-        var vnpayAmount = ((long)(request.Amount * 100)).ToString();
+        
+        // Ensure minimum amount for VNPay Sandbox (5,000 VND)
+        // Note: This is ONLY for VNPay gateway requirement. Invoice amount remains unchanged in database.
+        var actualAmount = request.Amount;
+        var vnpayMinAmount = actualAmount < 5000 ? 5000 : actualAmount;
+        var vnpayAmount = ((long)(vnpayMinAmount * 100)).ToString();
+        
+        _logger.LogInformation("Invoice {InvoiceId}: Actual amount = {ActualAmount} VND, VNPay amount = {VNPayAmount} VND", 
+            request.InvoiceId, actualAmount, vnpayMinAmount);
 
         var vnpayData = new SortedDictionary<string, string>
         {
@@ -169,19 +177,19 @@ public class VNPayService : IVNPayService
     {
         return responseCode switch
         {
-            "00" => "Giao d?ch thành công",
-            "07" => "Tr? ti?n thành công. Giao d?ch b? nghi ng?",
-            "09" => "Th? ch?a ??ng ký InternetBanking",
-            "10" => "Xác th?c không ?úng quá 3 l?n",
-            "11" => "?ã h?t h?n ch? thanh toán",
-            "12" => "Th? b? khóa",
+            "00" => "Giao d?ch thï¿½nh cï¿½ng",
+            "07" => "Tr? ti?n thï¿½nh cï¿½ng. Giao d?ch b? nghi ng?",
+            "09" => "Th? ch?a ??ng kï¿½ InternetBanking",
+            "10" => "Xï¿½c th?c khï¿½ng ?ï¿½ng quï¿½ 3 l?n",
+            "11" => "?ï¿½ h?t h?n ch? thanh toï¿½n",
+            "12" => "Th? b? khï¿½a",
             "13" => "Sai m?t kh?u OTP",
-            "24" => "Khách hàng h?y giao d?ch",
-            "51" => "Tài kho?n không ?? s? d?",
-            "65" => "V??t quá h?n m?c giao d?ch",
-            "75" => "Ngân hàng ?ang b?o trì",
-            "79" => "Sai m?t kh?u thanh toán quá s? l?n quy ??nh",
-            _ => $"L?i không xác ??nh: {responseCode}"
+            "24" => "Khï¿½ch hï¿½ng h?y giao d?ch",
+            "51" => "Tï¿½i kho?n khï¿½ng ?? s? d?",
+            "65" => "V??t quï¿½ h?n m?c giao d?ch",
+            "75" => "Ngï¿½n hï¿½ng ?ang b?o trï¿½",
+            "79" => "Sai m?t kh?u thanh toï¿½n quï¿½ s? l?n quy ??nh",
+            _ => $"L?i khï¿½ng xï¿½c ??nh: {responseCode}"
         };
     }
 }

@@ -39,12 +39,10 @@ import {
   CheckCircle,
   Schedule,
   ElectricBolt,
-  CreditCard,
   AccountBalanceWallet,
-  LocalAtm,
 } from "@mui/icons-material";
 import { formatCurrency } from "../../utils/helpers";
-import { invoicesAPI, paymentsAPI } from "../../services/api";
+import { invoicesAPI } from "../../services/api";
 
 const PaymentHistory = () => {
   const [selectedPayment, setSelectedPayment] = useState(null);
@@ -64,7 +62,7 @@ const PaymentHistory = () => {
     setError(null);
     try {
       const response = await invoicesAPI.getMyInvoices();
-      const data = response?.data || response || [];
+      const data = response?.data?.data || response?.data || response || [];
       setInvoices(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Error fetching invoices:", err);
@@ -76,51 +74,30 @@ const PaymentHistory = () => {
 
   // Transform invoice data to payment history format
   const paymentHistory = invoices.map((invoice) => {
-    const paymentMethods = [
-      {
-        name: "SkaEV Wallet",
-        icon: <AccountBalanceWallet />,
-        color: "primary",
-      },
-      { name: "Visa ****1234", icon: <CreditCard />, color: "info" },
-      {
-        name: "MoMo Wallet",
-        icon: <AccountBalanceWallet />,
-        color: "success",
-      },
-      { name: "Banking Transfer", icon: <LocalAtm />, color: "warning" },
-    ];
-    
-    // Get payment method from invoice or use random for demo
-    const methodIndex = invoice.paymentMethodId 
-      ? invoice.paymentMethodId % paymentMethods.length 
-      : Math.floor(Math.random() * paymentMethods.length);
-    const method = paymentMethods[methodIndex];
-
     return {
       id: `PAY-${invoice.invoiceId || invoice.id}`,
       invoiceId: invoice.invoiceId || invoice.id,
-      date: invoice.invoiceDate || invoice.createdAt || new Date().toISOString().split("T")[0],
+      date: invoice.createdAt || invoice.invoiceDate || new Date().toISOString(),
       amount: invoice.totalAmount || invoice.total || 0,
-      method: method.name,
-      methodIcon: method.icon,
-      methodColor: method.color,
-      status: invoice.paymentStatus || invoice.status || "completed",
-      description: invoice.description || `Sạc tại trạm`,
+      method: invoice.paymentMethodName || "VNPay",
+      methodIcon: <AccountBalanceWallet />,
+      methodColor: "primary",
+      status: invoice.paymentStatus === "paid" ? "completed" : invoice.paymentStatus || "pending",
+      description: invoice.stationName ? `Sạc tại ${invoice.stationName}` : `Sạc xe điện`,
       session: {
         stationName: invoice.stationName || "Trạm sạc",
-        energy: `${invoice.energyDelivered || invoice.energy || 0} kWh`,
-        duration: `${invoice.chargingDuration || invoice.duration || 0} phút`,
-        connector: invoice.connectorType || "CCS2",
-        startTime: invoice.startTime || "10:00",
-        endTime: invoice.endTime || "11:00",
-        energyCost: invoice.energyCost || invoice.subtotal || 0,
-        parkingFee: invoice.parkingFee || 0,
+        energy: `${invoice.energyDelivered || 0} kWh`,
+        duration: `${invoice.chargingDuration || 0} phút`,
+        connector: "VNPay",
+        startTime: invoice.startTime ? new Date(invoice.startTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : "--:--",
+        endTime: invoice.endTime ? new Date(invoice.endTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : "--:--",
+        energyCost: invoice.totalAmount || 0,
+        parkingFee: 0,
       },
-      invoiceNumber: invoice.invoiceNumber || `INV-${invoice.invoiceId}`,
+      invoiceNumber: `INV-${invoice.invoiceId}`,
       taxInfo: {
-        subtotal: invoice.subtotal || Math.round((invoice.totalAmount || 0) / 1.1),
-        tax: invoice.taxAmount || Math.round((invoice.totalAmount || 0) * 0.1),
+        subtotal: invoice.taxAmount ? invoice.totalAmount - invoice.taxAmount : Math.round((invoice.totalAmount || 0) / 1.1),
+        tax: invoice.taxAmount || Math.round((invoice.totalAmount || 0) * 0.1 / 1.1),
         total: invoice.totalAmount || invoice.total || 0,
       },
     };

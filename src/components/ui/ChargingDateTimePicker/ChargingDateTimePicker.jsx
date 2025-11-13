@@ -176,12 +176,9 @@ const ChargingDateTimePicker = ({
       return;
     }
 
-    // Mock available slots (in real app, this would come from API)
-    const mockOccupiedSlots = ["09:00", "14:00", "18:30"]; // Some slots are taken
-    const available = commonTimeSlots.filter(
-      (slot) => !mockOccupiedSlots.includes(slot)
-    );
-    setAvailableSlots(available);
+    // 🔥 XÓA HARD-CODE - Tất cả slots đều available
+    // TODO: Integrate with real API to get occupied slots from database
+    setAvailableSlots(commonTimeSlots); // All slots available
   };
 
   const handleSchedulingTypeChange = (type) => {

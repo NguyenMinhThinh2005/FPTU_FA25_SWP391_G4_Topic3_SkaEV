@@ -1026,38 +1026,62 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
                     <Typography variant="body2" paragraph>
                       2. Phương thức Thanh toán
                       <br />
-                      Chúng tôi chấp nhận thanh toán qua các phương thức sau:
+                      SkaEV sử dụng cổng thanh toán VNPay để xử lý các giao dịch thanh toán.
                       <br />
-                      Thẻ tín dụng/ghi nợ quốc tế (Visa, Mastercard).
+                      Bạn có thể thanh toán qua các phương thức được hỗ trợ bởi VNPay:
                       <br />
-                      Thẻ ATM nội địa.
+                      • Thẻ ATM nội địa (có đăng ký Internet Banking)
                       <br />
-                      Ví điện tử (Momo, ZaloPay, VNPay,...).
+                      • Thẻ tín dụng/ghi nợ quốc tế (Visa, Mastercard, JCB)
                       <br />
-                      Bạn cần liên kết một phương thức thanh toán hợp lệ vào tài
-                      khoản trên ứng dụng để có thể bắt đầu phiên sạc.
+                      • Ví điện tử VNPay
+                      <br />
+                      • QR Code ngân hàng (VietQR)
+                      <br />
+                      <strong>Lưu ý:</strong> Bạn không cần liên kết phương thức thanh toán trước.
+                      Thanh toán sẽ được thực hiện sau khi hoàn thành phiên sạc.
                     </Typography>
                     <Typography variant="body2" paragraph>
                       3. Quy trình Thanh toán
                       <br />
-                      Khi phiên sạc kết thúc, tổng chi phí sẽ được tính toán tự
-                      động.
+                      <strong>Bước 1:</strong> Sau khi phiên sạc kết thúc, hệ thống sẽ tự động tính toán
+                      tổng chi phí dựa trên lượng điện tiêu thụ thực tế (kWh) và đơn giá.
                       <br />
-                      Hệ thống sẽ tự động trừ tiền từ phương thức thanh toán mà
-                      bạn đã chọn được đăng ký trên tài khoản.
+                      <strong>Bước 2:</strong> Hệ thống tạo hóa đơn điện tử và hiển thị thông tin thanh toán.
                       <br />
-                      Hóa đơn chi tiết cho phiên sạc sẽ được gửi đến email của
-                      bạn và lưu lại trong lịch sử giao dịch trên ứng dụng.
+                      <strong>Bước 3:</strong> Bạn nhấn nút "Thanh toán" để được chuyển đến cổng thanh toán VNPay.
+                      <br />
+                      <strong>Bước 4:</strong> Tại cổng VNPay, chọn phương thức thanh toán phù hợp (thẻ ngân hàng,
+                      ví điện tử, QR Code) và hoàn tất giao dịch.
+                      <br />
+                      <strong>Bước 5:</strong> Sau khi thanh toán thành công, bạn sẽ được chuyển về trang xác nhận.
+                      Hóa đơn chi tiết sẽ được gửi đến email và lưu trong lịch sử giao dịch.
+                      <br />
+                      <br />
+                      <strong>Bảo mật:</strong> Mọi giao dịch được mã hóa và xử lý an toàn qua
+                      cổng thanh toán VNPay. SkaEV không lưu trữ thông tin thẻ ngân hàng của bạn.
                     </Typography>
                     <Typography variant="body2" paragraph>
                       4. Hoàn tiền
                       <br />
-                      Việc hoàn tiền chỉ được xem xét trong trường hợp phiên sạc
-                      không thành công hoặc bị gián đoạn do lỗi từ hệ thống hoặc
-                      thiết bị của chúng tôi.
+                      Việc hoàn tiền chỉ được xem xét trong các trường hợp sau:
                       <br />
-                      Vui lòng liên hệ bộ phận chăm sóc khách hàng qua hotline
-                      0917123123 để được hướng dẫn và xử lý yêu cầu hoàn tiền.
+                      • Phiên sạc không thành công hoặc bị gián đoạn do lỗi từ hệ thống/thiết bị của chúng tôi
+                      <br />
+                      • Thanh toán bị trừ tiền nhưng không nhận được dịch vụ
+                      <br />
+                      • Lỗi kỹ thuật trong quá trình thanh toán qua VNPay
+                      <br />
+                      <br />
+                      <strong>Quy trình hoàn tiền:</strong>
+                      <br />
+                      1. Liên hệ bộ phận chăm sóc khách hàng qua hotline 0917123123
+                      <br />
+                      2. Cung cấp mã giao dịch và thông tin liên quan
+                      <br />
+                      3. Yêu cầu hoàn tiền sẽ được xử lý trong vòng 7-14 ngày làm việc
+                      <br />
+                      4. Tiền sẽ được hoàn về tài khoản/thẻ ngân hàng bạn đã sử dụng để thanh toán
                     </Typography>
                     <Typography variant="body2" paragraph>
                       5. Thay đổi Chính sách

@@ -56,4 +56,42 @@ public class VNPayController : ControllerBase
             return Redirect("http://localhost:5173/payment/failed?message=Error");
         }
     }
+
+    /// <summary>
+    /// Verify VNPay payment return (for frontend verification)
+    /// Returns JSON result instead of redirect
+    /// </summary>
+    [HttpGet("verify-return")]
+    [AllowAnonymous]
+    public async Task<IActionResult> VerifyReturn()
+    {
+        try
+        {
+            var vnpayData = Request.Query.ToDictionary(q => q.Key, q => q.Value.ToString());
+            
+            _logger.LogInformation("Verifying VNPay return with {Count} parameters", vnpayData.Count);
+            
+            var result = await _vnpayService.ProcessReturnUrlCallbackAsync(vnpayData);
+
+            return Ok(new
+            {
+                success = result.Success,
+                transactionRef = result.TransactionRef,
+                transactionNo = result.TransactionNo,
+                amount = result.Amount,
+                bankCode = result.BankCode,
+                responseCode = result.ResponseCode,
+                message = result.ResponseMessage
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error verifying VNPay return");
+            return Ok(new
+            {
+                success = false,
+                message = ex.Message
+            });
+        }
+    }
 }

@@ -488,6 +488,15 @@ export const chargingAPI = {
   },
 };
 
+// VNPay Payment Gateway API
+export const vnpayAPI = {
+  // Create VNPay payment URL
+  createPaymentUrl: (paymentData) => {
+    // paymentData: { invoiceId, amount, orderDescription, bankCode? }
+    return axiosInstance.post("/vnpay/create-payment-url", paymentData);
+  },
+};
+
 // Health check
 export const healthAPI = {
   check: () => {

@@ -1,8 +1,20 @@
-﻿import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { Camera, X, AlertCircle, RefreshCw } from 'lucide-react';
-import { BrowserQRCodeReader } from '@zxing/browser';
-import { Box, Typography, Button, LinearProgress, IconButton } from '@mui/material';
-import { CameraAlt, Close, Refresh, Warning } from '@mui/icons-material';
+﻿import React, {
+  useState,
+  useRef,
+  useEffect,
+  useMemo,
+  useCallback,
+} from "react";
+import { Camera, X, AlertCircle, RefreshCw } from "lucide-react";
+import { BrowserQRCodeReader } from "@zxing/browser";
+import {
+  Box,
+  Typography,
+  Button,
+  LinearProgress,
+  IconButton,
+} from "@mui/material";
+import { CameraAlt, Close, Refresh, Warning } from "@mui/icons-material";
 
 const QRCodeScanner = ({ onScanSuccess, onClose }) => {
   const [scanning, setScanning] = useState(false);
@@ -11,7 +23,7 @@ const QRCodeScanner = ({ onScanSuccess, onClose }) => {
   const [selectedDeviceId, setSelectedDeviceId] = useState(null);
   const [cameraStarted, setCameraStarted] = useState(false);
   const [scanProgress, setScanProgress] = useState(0);
-  
+
   const videoRef = useRef(null);
   const codeReaderRef = useRef(null);
   const controlsRef = useRef(null);
@@ -26,22 +38,22 @@ const QRCodeScanner = ({ onScanSuccess, onClose }) => {
   const checkCameraPermission = async () => {
     try {
       if (!navigator.mediaDevices?.getUserMedia) {
-        throw new Error('Trình duyệt không hỗ trợ camera');
+        throw new Error("Trình duyệt không hỗ trợ camera");
       }
 
       // Check if we already have permission
       if (navigator.permissions) {
-        const result = await navigator.permissions.query({ name: 'camera' });
-        if (result.state === 'granted') {
+        const result = await navigator.permissions.query({ name: "camera" });
+        if (result.state === "granted") {
           setHasPermission(true);
           await getCameraDevices();
-        } else if (result.state === 'denied') {
+        } else if (result.state === "denied") {
           setHasPermission(false);
-          setError('Quyền truy cập camera bị từ chối');
+          setError("Quyền truy cập camera bị từ chối");
         }
       }
     } catch (err) {
-      console.warn('Permission check failed:', err);
+      console.warn("Permission check failed:", err);
       // If permission API not available, we'll check when starting camera
       setHasPermission(null);
     }
@@ -50,17 +62,17 @@ const QRCodeScanner = ({ onScanSuccess, onClose }) => {
   const getCameraDevices = async () => {
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
-      const videoDevices = devices.filter(d => d.kind === 'videoinput');
-      
+      const videoDevices = devices.filter((d) => d.kind === "videoinput");
+
       if (videoDevices.length > 0) {
         // Prefer back/rear camera
-        const backCamera = videoDevices.find(d => 
+        const backCamera = videoDevices.find((d) =>
           /back|rear|environment/i.test(d.label)
         );
         setSelectedDeviceId(backCamera?.deviceId || videoDevices[0].deviceId);
       }
     } catch (err) {
-      console.error('Get devices error:', err);
+      console.error("Get devices error:", err);
     }
   };
 
@@ -70,26 +82,26 @@ const QRCodeScanner = ({ onScanSuccess, onClose }) => {
       setCameraStarted(false);
 
       const constraints = {
-        video: selectedDeviceId 
-          ? { 
+        video: selectedDeviceId
+          ? {
               deviceId: { exact: selectedDeviceId },
               width: { ideal: 1280 },
               height: { ideal: 720 },
-              facingMode: { ideal: 'environment' }
+              facingMode: { ideal: "environment" },
             }
-          : { 
-              facingMode: { ideal: 'environment' },
+          : {
+              facingMode: { ideal: "environment" },
               width: { ideal: 1280 },
-              height: { ideal: 720 }
+              height: { ideal: 720 },
             },
-        audio: false
+        audio: false,
       };
 
-      console.log('[Camera] Starting with constraints:', constraints);
-      
+      console.log("[Camera] Starting with constraints:", constraints);
+
       // Stop any existing stream
       if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current.getTracks().forEach((track) => track.stop());
       }
 
       // Get camera stream
@@ -102,7 +114,7 @@ const QRCodeScanner = ({ onScanSuccess, onClose }) => {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
         setCameraStarted(true);
-        console.log('[Camera] Started successfully');
+        console.log("[Camera] Started successfully");
 
         // Get actual device ID from stream
         const videoTrack = stream.getVideoTracks()[0];
@@ -117,26 +129,26 @@ const QRCodeScanner = ({ onScanSuccess, onClose }) => {
         startQRScanning();
       }
     } catch (err) {
-      console.error('[Camera] Start error:', err);
+      console.error("[Camera] Start error:", err);
       setHasPermission(false);
       setCameraStarted(false);
-      
-      let errorMessage = 'Không thể mở camera';
-      if (err.name === 'NotAllowedError') {
-        errorMessage = 'Bạn đã từ chối quyền truy cập camera';
-      } else if (err.name === 'NotFoundError') {
-        errorMessage = 'Không tìm thấy camera';
-      } else if (err.name === 'NotReadableError') {
-        errorMessage = 'Camera đang được sử dụng bởi ứng dụng khác';
+
+      let errorMessage = "Không thể mở camera";
+      if (err.name === "NotAllowedError") {
+        errorMessage = "Bạn đã từ chối quyền truy cập camera";
+      } else if (err.name === "NotFoundError") {
+        errorMessage = "Không tìm thấy camera";
+      } else if (err.name === "NotReadableError") {
+        errorMessage = "Camera đang được sử dụng bởi ứng dụng khác";
       }
-      
+
       setError(errorMessage);
     }
   };
 
   const startQRScanning = async () => {
     if (scanningRef.current) return;
-    
+
     try {
       scanningRef.current = true;
       setScanning(true);
@@ -144,7 +156,7 @@ const QRCodeScanner = ({ onScanSuccess, onClose }) => {
 
       // Simulate progress while waiting for video
       const progressInterval = setInterval(() => {
-        setScanProgress(prev => Math.min(prev + 10, 90));
+        setScanProgress((prev) => Math.min(prev + 10, 90));
       }, 100);
 
       // Wait for video to be ready
@@ -158,7 +170,7 @@ const QRCodeScanner = ({ onScanSuccess, onClose }) => {
             resolve();
           } else if (attempts > 30) {
             clearInterval(progressInterval);
-            reject(new Error('Video không sẵn sàng'));
+            reject(new Error("Video không sẵn sàng"));
           } else {
             setTimeout(checkVideo, 100);
           }
@@ -181,21 +193,21 @@ const QRCodeScanner = ({ onScanSuccess, onClose }) => {
           if (result) {
             const text = result.getText();
             if (text) {
-              console.log('[QR] Scanned:', text);
+              console.log("[QR] Scanned:", text);
               handleQRScanned(text);
             }
           }
-          
-          if (err && err.name !== 'NotFoundException') {
-            console.warn('[QR] Decode error:', err);
+
+          if (err && err.name !== "NotFoundException") {
+            console.warn("[QR] Decode error:", err);
           }
         }
       );
 
-      console.log('[QR] Scanning started');
+      console.log("[QR] Scanning started");
     } catch (err) {
-      console.error('[QR] Start scanning error:', err);
-      setError('Không thể khởi tạo trình quét QR');
+      console.error("[QR] Start scanning error:", err);
+      setError("Không thể khởi tạo trình quét QR");
       scanningRef.current = false;
       setScanning(false);
     }
@@ -205,9 +217,9 @@ const QRCodeScanner = ({ onScanSuccess, onClose }) => {
     try {
       // Stop scanning immediately
       stopScanning();
-      
-      console.log('[QR] Processing:', qrData);
-      
+
+      console.log("[QR] Processing:", qrData);
+
       // Parse QR code data
       let stationId, portId;
       try {
@@ -215,7 +227,7 @@ const QRCodeScanner = ({ onScanSuccess, onClose }) => {
         stationId = parsed.stationId;
         portId = parsed.portId;
       } catch {
-        const parts = qrData.split(':');
+        const parts = qrData.split(":");
         if (parts.length >= 4) {
           stationId = parts[1];
           portId = parts[3];
@@ -223,7 +235,7 @@ const QRCodeScanner = ({ onScanSuccess, onClose }) => {
       }
 
       if (!stationId || !portId) {
-        throw new Error('Mã QR không hợp lệ');
+        throw new Error("Mã QR không hợp lệ");
       }
 
       const payload = {
@@ -234,8 +246,8 @@ const QRCodeScanner = ({ onScanSuccess, onClose }) => {
 
       await onScanSuccess?.(payload);
     } catch (err) {
-      console.error('[QR] Process error:', err);
-      setError(err.message || 'Không thể xử lý mã QR');
+      console.error("[QR] Process error:", err);
+      setError(err.message || "Không thể xử lý mã QR");
       setTimeout(() => {
         setError(null);
         startQRScanning();
@@ -246,37 +258,37 @@ const QRCodeScanner = ({ onScanSuccess, onClose }) => {
   const stopScanning = () => {
     scanningRef.current = false;
     setScanning(false);
-    
+
     if (controlsRef.current) {
       try {
         controlsRef.current.stop();
       } catch (e) {
-        console.warn('[QR] Stop controls error:', e);
+        console.warn("[QR] Stop controls error:", e);
       }
       controlsRef.current = null;
     }
-    
+
     if (codeReaderRef.current) {
       try {
         codeReaderRef.current.reset();
       } catch (e) {
-        console.warn('[QR] Reset reader error:', e);
+        console.warn("[QR] Reset reader error:", e);
       }
     }
   };
 
   const stopCamera = () => {
     stopScanning();
-    
+
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
     }
-    
+
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
-    
+
     setCameraStarted(false);
   };
 
@@ -297,40 +309,40 @@ const QRCodeScanner = ({ onScanSuccess, onClose }) => {
   return (
     <Box
       sx={{
-        position: 'relative',
-        width: '100%',
-        height: '100%',
+        position: "relative",
+        width: "100%",
+        height: "100%",
         minHeight: 500,
-        bgcolor: 'background.paper',
+        bgcolor: "background.paper",
         borderRadius: 2,
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
       }}
     >
       {/* Header */}
       <Box
         sx={{
-          bgcolor: 'primary.main',
-          color: 'white',
+          bgcolor: "primary.main",
+          color: "white",
           px: 3,
           py: 2,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
           <CameraAlt />
           <Typography variant="h6" fontWeight={600}>
             Quét mã QR trạm sạc
           </Typography>
         </Box>
-        <IconButton 
+        <IconButton
           onClick={onClose}
-          sx={{ 
-            color: 'white',
-            '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' }
+          sx={{
+            color: "white",
+            "&:hover": { bgcolor: "rgba(255,255,255,0.1)" },
           }}
         >
           <Close />
@@ -340,21 +352,21 @@ const QRCodeScanner = ({ onScanSuccess, onClose }) => {
       {/* Video Container */}
       <Box
         sx={{
-          position: 'relative',
+          position: "relative",
           flex: 1,
-          bgcolor: '#000',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
+          bgcolor: "#000",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
         }}
       >
         {/* Video preview */}
         <video
           ref={videoRef}
           style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover',
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
           }}
           playsInline
           muted
@@ -364,65 +376,114 @@ const QRCodeScanner = ({ onScanSuccess, onClose }) => {
         {cameraStarted && scanning && !error && (
           <Box
             sx={{
-              position: 'absolute',
+              position: "absolute",
               inset: 0,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              pointerEvents: 'none',
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              pointerEvents: "none",
             }}
           >
             {/* Scanning frame with animation */}
             <Box
               sx={{
-                position: 'relative',
+                position: "relative",
                 width: { xs: 280, sm: 320 },
                 height: { xs: 280, sm: 320 },
-                animation: 'pulse 2s ease-in-out infinite',
-                '@keyframes pulse': {
-                  '0%, 100%': { opacity: 1, transform: 'scale(1)' },
-                  '50%': { opacity: 0.8, transform: 'scale(0.98)' },
+                animation: "pulse 2s ease-in-out infinite",
+                "@keyframes pulse": {
+                  "0%, 100%": { opacity: 1, transform: "scale(1)" },
+                  "50%": { opacity: 0.8, transform: "scale(0.98)" },
                 },
               }}
             >
               {/* Main border */}
               <Box
                 sx={{
-                  position: 'absolute',
+                  position: "absolute",
                   inset: 0,
-                  border: '3px solid rgba(255,255,255,0.5)',
+                  border: "3px solid rgba(255,255,255,0.5)",
                   borderRadius: 3,
                 }}
               />
-              
+
               {/* Corner markers */}
-              <Box sx={{ position: 'absolute', top: -3, left: -3, width: 40, height: 40, borderTop: '6px solid', borderLeft: '6px solid', borderColor: 'primary.main', borderTopLeftRadius: 3 }} />
-              <Box sx={{ position: 'absolute', top: -3, right: -3, width: 40, height: 40, borderTop: '6px solid', borderRight: '6px solid', borderColor: 'primary.main', borderTopRightRadius: 3 }} />
-              <Box sx={{ position: 'absolute', bottom: -3, left: -3, width: 40, height: 40, borderBottom: '6px solid', borderLeft: '6px solid', borderColor: 'primary.main', borderBottomLeftRadius: 3 }} />
-              <Box sx={{ position: 'absolute', bottom: -3, right: -3, width: 40, height: 40, borderBottom: '6px solid', borderRight: '6px solid', borderColor: 'primary.main', borderBottomRightRadius: 3 }} />
-              
+              <Box
+                sx={{
+                  position: "absolute",
+                  top: -3,
+                  left: -3,
+                  width: 40,
+                  height: 40,
+                  borderTop: "6px solid",
+                  borderLeft: "6px solid",
+                  borderColor: "primary.main",
+                  borderTopLeftRadius: 3,
+                }}
+              />
+              <Box
+                sx={{
+                  position: "absolute",
+                  top: -3,
+                  right: -3,
+                  width: 40,
+                  height: 40,
+                  borderTop: "6px solid",
+                  borderRight: "6px solid",
+                  borderColor: "primary.main",
+                  borderTopRightRadius: 3,
+                }}
+              />
+              <Box
+                sx={{
+                  position: "absolute",
+                  bottom: -3,
+                  left: -3,
+                  width: 40,
+                  height: 40,
+                  borderBottom: "6px solid",
+                  borderLeft: "6px solid",
+                  borderColor: "primary.main",
+                  borderBottomLeftRadius: 3,
+                }}
+              />
+              <Box
+                sx={{
+                  position: "absolute",
+                  bottom: -3,
+                  right: -3,
+                  width: 40,
+                  height: 40,
+                  borderBottom: "6px solid",
+                  borderRight: "6px solid",
+                  borderColor: "primary.main",
+                  borderBottomRightRadius: 3,
+                }}
+              />
+
               {/* Scanning line */}
               <Box
                 sx={{
-                  position: 'absolute',
+                  position: "absolute",
                   inset: 0,
-                  overflow: 'hidden',
+                  overflow: "hidden",
                   borderRadius: 3,
                 }}
               >
                 <Box
                   sx={{
-                    position: 'absolute',
-                    width: '100%',
+                    position: "absolute",
+                    width: "100%",
                     height: 3,
-                    background: 'linear-gradient(90deg, transparent, #1976d2, transparent)',
-                    boxShadow: '0 0 20px rgba(25,118,210,0.8)',
-                    animation: 'scan 2s linear infinite',
-                    '@keyframes scan': {
-                      '0%': { top: 0 },
-                      '50%': { top: '100%' },
-                      '100%': { top: 0 },
+                    background:
+                      "linear-gradient(90deg, transparent, #1976d2, transparent)",
+                    boxShadow: "0 0 20px rgba(25,118,210,0.8)",
+                    animation: "scan 2s linear infinite",
+                    "@keyframes scan": {
+                      "0%": { top: 0 },
+                      "50%": { top: "100%" },
+                      "100%": { top: 0 },
                     },
                   }}
                 />
@@ -432,20 +493,20 @@ const QRCodeScanner = ({ onScanSuccess, onClose }) => {
             {/* Instruction text */}
             <Typography
               sx={{
-                position: 'absolute',
+                position: "absolute",
                 bottom: 60,
-                left: '50%',
-                transform: 'translateX(-50%)',
-                bgcolor: 'rgba(0,0,0,0.75)',
-                color: 'white',
+                left: "50%",
+                transform: "translateX(-50%)",
+                bgcolor: "rgba(0,0,0,0.75)",
+                color: "white",
                 px: 3,
                 py: 1.5,
                 borderRadius: 2,
-                fontSize: { xs: '0.875rem', sm: '1rem' },
+                fontSize: { xs: "0.875rem", sm: "1rem" },
                 fontWeight: 500,
-                textAlign: 'center',
-                backdropFilter: 'blur(10px)',
-                whiteSpace: 'nowrap',
+                textAlign: "center",
+                backdropFilter: "blur(10px)",
+                whiteSpace: "nowrap",
               }}
             >
               📱 Hướng camera vào mã QR trên trạm sạc
@@ -457,7 +518,7 @@ const QRCodeScanner = ({ onScanSuccess, onClose }) => {
                 variant="determinate"
                 value={scanProgress}
                 sx={{
-                  position: 'absolute',
+                  position: "absolute",
                   bottom: 40,
                   left: 40,
                   right: 40,
@@ -473,16 +534,16 @@ const QRCodeScanner = ({ onScanSuccess, onClose }) => {
         {hasPermission === null && !cameraStarted && (
           <Box
             sx={{
-              position: 'absolute',
+              position: "absolute",
               inset: 0,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              bgcolor: 'rgba(0,0,0,0.85)',
-              color: 'white',
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              bgcolor: "rgba(0,0,0,0.85)",
+              color: "white",
               p: 4,
-              textAlign: 'center',
+              textAlign: "center",
             }}
           >
             <CameraAlt sx={{ fontSize: 80, mb: 3, opacity: 0.5 }} />
@@ -501,8 +562,8 @@ const QRCodeScanner = ({ onScanSuccess, onClose }) => {
                 px: 4,
                 py: 1.5,
                 borderRadius: 2,
-                textTransform: 'none',
-                fontSize: '1rem',
+                textTransform: "none",
+                fontSize: "1rem",
               }}
             >
               Cho phép truy cập camera
@@ -514,24 +575,28 @@ const QRCodeScanner = ({ onScanSuccess, onClose }) => {
         {hasPermission === false && (
           <Box
             sx={{
-              position: 'absolute',
+              position: "absolute",
               inset: 0,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              bgcolor: 'rgba(0,0,0,0.85)',
-              color: 'white',
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              bgcolor: "rgba(0,0,0,0.85)",
+              color: "white",
               p: 4,
-              textAlign: 'center',
+              textAlign: "center",
             }}
           >
-            <Warning sx={{ fontSize: 80, mb: 3, color: 'error.main' }} />
+            <Warning sx={{ fontSize: 80, mb: 3, color: "error.main" }} />
             <Typography variant="h6" gutterBottom fontWeight={600}>
               Không thể truy cập camera
             </Typography>
-            <Typography variant="body2" sx={{ mb: 4, opacity: 0.8, maxWidth: 400 }}>
-              Vui lòng cho phép truy cập camera trong cài đặt trình duyệt, sau đó thử lại
+            <Typography
+              variant="body2"
+              sx={{ mb: 4, opacity: 0.8, maxWidth: 400 }}
+            >
+              Vui lòng cho phép truy cập camera trong cài đặt trình duyệt, sau
+              đó thử lại
             </Typography>
             <Button
               variant="contained"
@@ -542,8 +607,8 @@ const QRCodeScanner = ({ onScanSuccess, onClose }) => {
                 px: 4,
                 py: 1.5,
                 borderRadius: 2,
-                textTransform: 'none',
-                fontSize: '1rem',
+                textTransform: "none",
+                fontSize: "1rem",
               }}
             >
               Thử lại
@@ -555,17 +620,17 @@ const QRCodeScanner = ({ onScanSuccess, onClose }) => {
         {error && cameraStarted && (
           <Box
             sx={{
-              position: 'absolute',
+              position: "absolute",
               bottom: 20,
               left: 20,
               right: 20,
-              bgcolor: 'error.main',
-              color: 'white',
+              bgcolor: "error.main",
+              color: "white",
               px: 3,
               py: 2,
               borderRadius: 2,
-              display: 'flex',
-              alignItems: 'start',
+              display: "flex",
+              alignItems: "start",
               gap: 1.5,
               boxShadow: 3,
             }}
@@ -575,9 +640,7 @@ const QRCodeScanner = ({ onScanSuccess, onClose }) => {
               <Typography variant="subtitle2" fontWeight={600}>
                 Lỗi
               </Typography>
-              <Typography variant="body2">
-                {error}
-              </Typography>
+              <Typography variant="body2">{error}</Typography>
             </Box>
           </Box>
         )}
@@ -586,26 +649,26 @@ const QRCodeScanner = ({ onScanSuccess, onClose }) => {
         {!cameraStarted && hasPermission && (
           <Box
             sx={{
-              position: 'absolute',
+              position: "absolute",
               inset: 0,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              bgcolor: 'rgba(0,0,0,0.85)',
-              color: 'white',
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              bgcolor: "rgba(0,0,0,0.85)",
+              color: "white",
               p: 4,
-              textAlign: 'center',
+              textAlign: "center",
             }}
           >
             <CameraAlt
               sx={{
                 fontSize: 80,
                 mb: 3,
-                animation: 'pulse 1.5s ease-in-out infinite',
-                '@keyframes pulse': {
-                  '0%, 100%': { opacity: 0.5, transform: 'scale(1)' },
-                  '50%': { opacity: 1, transform: 'scale(1.1)' },
+                animation: "pulse 1.5s ease-in-out infinite",
+                "@keyframes pulse": {
+                  "0%, 100%": { opacity: 0.5, transform: "scale(1)" },
+                  "50%": { opacity: 1, transform: "scale(1.1)" },
                 },
               }}
             />
@@ -624,11 +687,11 @@ const QRCodeScanner = ({ onScanSuccess, onClose }) => {
                 px: 4,
                 py: 1.5,
                 borderRadius: 2,
-                textTransform: 'none',
-                borderColor: 'rgba(255,255,255,0.3)',
-                '&:hover': {
-                  borderColor: 'rgba(255,255,255,0.5)',
-                  bgcolor: 'rgba(255,255,255,0.05)',
+                textTransform: "none",
+                borderColor: "rgba(255,255,255,0.3)",
+                "&:hover": {
+                  borderColor: "rgba(255,255,255,0.5)",
+                  bgcolor: "rgba(255,255,255,0.05)",
                 },
               }}
             >
@@ -641,10 +704,10 @@ const QRCodeScanner = ({ onScanSuccess, onClose }) => {
       {/* Footer */}
       <Box
         sx={{
-          bgcolor: 'grey.100',
+          bgcolor: "grey.100",
           px: 3,
           py: 2,
-          textAlign: 'center',
+          textAlign: "center",
         }}
       >
         <Typography variant="body2" color="text.secondary">

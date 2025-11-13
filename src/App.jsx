@@ -25,7 +25,7 @@ import HomePage from "./pages/public/Home";
 // Test and Demo Pages
 import TestPage from "./pages/TestPage";
 import DateTimePickerDemo from "./pages/DateTimePickerDemo";
-import CUSTOMER_ROUTES from "./routes/customerRoutes";
+import CUSTOMER_ROUTES, { PAYMENT_ROUTES } from "./routes/customerRoutes";
 
 // Staff Pages
 import StaffDashboard from "./pages/staff/Dashboard";
@@ -142,6 +142,15 @@ function App() {
                   </PublicRoute>
                 }
               />
+
+              {/* VNPay Return Routes - Public (no auth required) */}
+              {PAYMENT_ROUTES.map(({ path, component }) => (
+                <Route
+                  key={path}
+                  path={path}
+                  element={React.createElement(component)}
+                />
+              ))}
 
               {/* Customer Routes */}
               <Route

@@ -153,6 +153,14 @@ const useReviewStore = create((set, get) => ({
   },
 
   submitReview: async ({ stationId, rating, comment }) => {
+    // ✅ Check authentication before API call
+    const token =
+      sessionStorage.getItem("token") || localStorage.getItem("token");
+    if (!token) {
+      console.error("❌ No auth token - user not logged in");
+      throw new Error("Vui lòng đăng nhập để đánh giá");
+    }
+
     if (!stationId) {
       throw new Error("Thiếu thông tin trạm sạc");
     }
@@ -169,6 +177,9 @@ const useReviewStore = create((set, get) => ({
         rating,
         comment,
       };
+
+      console.log("📤 Submitting review:", payload);
+      console.log("🔐 Auth token present:", token.substring(0, 20) + "...");
 
       const response = await reviewsAPI.create(payload);
       // Backend trả về response.data chứa review object

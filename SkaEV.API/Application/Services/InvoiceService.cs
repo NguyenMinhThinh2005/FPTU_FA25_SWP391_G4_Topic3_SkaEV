@@ -23,13 +23,15 @@ public class InvoiceService : IInvoiceService
 
     public async Task<IEnumerable<InvoiceDto>> GetUserInvoicesAsync(int userId)
     {
-        return await _context.Invoices
+        var invoices = await _context.Invoices
             .Include(i => i.User)
             .Include(i => i.Booking)
+                .ThenInclude(b => b.ChargingStation)
             .Where(i => i.UserId == userId)
             .OrderByDescending(i => i.CreatedAt)
-            .Select(i => MapToDto(i))
             .ToListAsync();
+        
+        return invoices.Select(i => MapToDto(i)).ToList();
     }
 
     public async Task<InvoiceDto?> GetInvoiceByIdAsync(int invoiceId)
@@ -295,7 +297,16 @@ public class InvoiceService : IInvoiceService
             PaidAt = invoice.PaidAt,
             CreatedAt = invoice.CreatedAt,
             DueDate = invoice.CreatedAt.AddDays(7), // 7 days from creation
-            Notes = null
+            Notes = null,
+            
+            // Booking details for payment history
+            StationName = invoice.Booking?.ChargingStation?.StationName,
+            EnergyDelivered = invoice.TotalEnergyKwh,
+            ChargingDuration = invoice.Booking?.ActualEndTime != null && invoice.Booking?.ActualStartTime != null 
+                ? (int?)(invoice.Booking.ActualEndTime.Value - invoice.Booking.ActualStartTime.Value).TotalMinutes 
+                : null,
+            StartTime = invoice.Booking?.ActualStartTime,
+            EndTime = invoice.Booking?.ActualEndTime
         };
     }
 
