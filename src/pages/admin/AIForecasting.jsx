@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from "react";
 import {
   Box,
   Card,
@@ -18,40 +18,39 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Paper
-} from '@mui/material';
+  Paper,
+} from "@mui/material";
 import {
   TrendingUp as TrendingUpIcon,
   TrendingDown as TrendingDownIcon,
   TrendingFlat as TrendingFlatIcon,
-  Timeline as TimelineIcon
-} from '@mui/icons-material';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
-import demandForecastingAPI from '../../services/api/demandForecastingAPI';
-import stationsAPI from '../../services/api/stationsAPI';
+  Timeline as TimelineIcon,
+} from "@mui/icons-material";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  LineChart,
+  Line,
+} from "recharts";
+import demandForecastingAPI from "../../services/api/demandForecastingAPI";
+import stationsAPI from "../../services/api/stationsAPI";
 
 const AIForecasting = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [stations, setStations] = useState([]);
-  const [selectedStation, setSelectedStation] = useState('');
+  const [selectedStation, setSelectedStation] = useState("");
   const [forecast, setForecast] = useState(null);
   const [peakHours, setPeakHours] = useState([]);
   const [demandScores, setDemandScores] = useState([]);
 
-  useEffect(() => {
-    fetchStations();
-    fetchDemandScores();
-  }, []);
-
-  useEffect(() => {
-    if (selectedStation) {
-      fetchForecast();
-      fetchPeakHours();
-    }
-  }, [selectedStation]);
-
-  const fetchStations = async () => {
+  const fetchStations = useCallback(async () => {
     try {
       const data = await stationsAPI.getAllStations();
       setStations(data);
@@ -59,53 +58,67 @@ const AIForecasting = () => {
         setSelectedStation(data[0].stationID);
       }
     } catch (err) {
-      console.error('Error fetching stations:', err);
-      setError('Failed to load stations');
+      console.error("Error fetching stations:", err);
+      setError("Failed to load stations");
     }
-  };
+  }, []);
 
-  const fetchForecast = async () => {
+  const fetchForecast = useCallback(async () => {
     if (!selectedStation) return;
-    
+
     try {
       setLoading(true);
-      const data = await demandForecastingAPI.getStationForecast(selectedStation);
+      const data = await demandForecastingAPI.getStationForecast(
+        selectedStation
+      );
       setForecast(data);
     } catch (err) {
-      console.error('Error fetching forecast:', err);
-      setError('Failed to load forecast data');
+      console.error("Error fetching forecast:", err);
+      setError("Failed to load forecast data");
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedStation]);
 
-  const fetchPeakHours = async () => {
+  const fetchPeakHours = useCallback(async () => {
     if (!selectedStation) return;
-    
+
     try {
       const data = await demandForecastingAPI.getPeakHours(selectedStation);
       setPeakHours(data);
     } catch (err) {
-      console.error('Error fetching peak hours:', err);
+      console.error("Error fetching peak hours:", err);
     }
-  };
+  }, [selectedStation]);
 
-  const fetchDemandScores = async () => {
+  const fetchDemandScores = useCallback(async () => {
     try {
       const data = await demandForecastingAPI.getDemandScores();
       setDemandScores(data);
     } catch (err) {
-      console.error('Error fetching demand scores:', err);
+      console.error("Error fetching demand scores:", err);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchStations();
+    fetchDemandScores();
+  }, [fetchDemandScores, fetchStations]);
+
+  useEffect(() => {
+    if (selectedStation) {
+      fetchForecast();
+      fetchPeakHours();
+    }
+  }, [fetchForecast, fetchPeakHours, selectedStation]);
 
   const getTrendIcon = (trend) => {
     switch (trend?.toLowerCase()) {
-      case 'increasing':
+      case "increasing":
         return <TrendingUpIcon color="success" />;
-      case 'decreasing':
+      case "decreasing":
         return <TrendingDownIcon color="error" />;
-      case 'stable':
+      case "stable":
         return <TrendingFlatIcon color="action" />;
       default:
         return <TimelineIcon color="action" />;
@@ -114,20 +127,25 @@ const AIForecasting = () => {
 
   const getDemandColor = (category) => {
     switch (category?.toLowerCase()) {
-      case 'high':
-        return 'error';
-      case 'medium':
-        return 'warning';
-      case 'low':
-        return 'success';
+      case "high":
+        return "error";
+      case "medium":
+        return "warning";
+      case "low":
+        return "success";
       default:
-        return 'default';
+        return "default";
     }
   };
 
   if (loading && !forecast) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+      <Box
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+        minHeight="400px"
+      >
         <CircularProgress />
       </Box>
     );
@@ -170,7 +188,9 @@ const AIForecasting = () => {
                 <Typography color="text.secondary" gutterBottom>
                   Predicted Daily Bookings
                 </Typography>
-                <Typography variant="h4">{forecast.predictedDailyBookings}</Typography>
+                <Typography variant="h4">
+                  {forecast.predictedDailyBookings}
+                </Typography>
                 <Typography variant="caption" color="text.secondary">
                   Historical avg: {forecast.historicalAverage}
                 </Typography>
@@ -183,7 +203,9 @@ const AIForecasting = () => {
                 <Typography color="text.secondary" gutterBottom>
                   Predicted Energy Demand
                 </Typography>
-                <Typography variant="h4">{forecast.predictedEnergyDemand.toFixed(2)}</Typography>
+                <Typography variant="h4">
+                  {forecast.predictedEnergyDemand.toFixed(2)}
+                </Typography>
                 <Typography variant="caption" color="text.secondary">
                   kWh per day
                 </Typography>
@@ -198,7 +220,8 @@ const AIForecasting = () => {
                   {getTrendIcon(forecast.trend)}
                 </Box>
                 <Typography variant="h4">
-                  {forecast.trendPercentage > 0 ? '+' : ''}{forecast.trendPercentage}%
+                  {forecast.trendPercentage > 0 ? "+" : ""}
+                  {forecast.trendPercentage}%
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
                   vs last period
@@ -212,7 +235,9 @@ const AIForecasting = () => {
                 <Typography color="text.secondary" gutterBottom>
                   Confidence Score
                 </Typography>
-                <Typography variant="h4">{forecast.confidenceScore}%</Typography>
+                <Typography variant="h4">
+                  {forecast.confidenceScore}%
+                </Typography>
                 <Typography variant="caption" color="text.secondary">
                   Forecast reliability
                 </Typography>
@@ -232,11 +257,28 @@ const AIForecasting = () => {
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={peakHours}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="hour" label={{ value: 'Hour of Day', position: 'insideBottom', offset: -5 }} />
-                <YAxis label={{ value: 'Predicted Bookings', angle: -90, position: 'insideLeft' }} />
+                <XAxis
+                  dataKey="hour"
+                  label={{
+                    value: "Hour of Day",
+                    position: "insideBottom",
+                    offset: -5,
+                  }}
+                />
+                <YAxis
+                  label={{
+                    value: "Predicted Bookings",
+                    angle: -90,
+                    position: "insideLeft",
+                  }}
+                />
                 <Tooltip />
                 <Legend />
-                <Bar dataKey="predictedBookings" fill="#8884d8" name="Predicted Bookings" />
+                <Bar
+                  dataKey="predictedBookings"
+                  fill="#8884d8"
+                  name="Predicted Bookings"
+                />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -266,7 +308,9 @@ const AIForecasting = () => {
                     <TableCell align="right">
                       <strong>{score.demandScore}</strong>
                     </TableCell>
-                    <TableCell align="right">{score.avgDailyBookings}</TableCell>
+                    <TableCell align="right">
+                      {score.avgDailyBookings}
+                    </TableCell>
                     <TableCell>
                       <Chip
                         label={score.category.toUpperCase()}

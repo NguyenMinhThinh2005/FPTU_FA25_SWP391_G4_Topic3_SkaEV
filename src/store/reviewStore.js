@@ -250,7 +250,9 @@ const useReviewStore = create((set, get) => ({
       return null;
     }
 
-    return stationData.data.find((review) => isSameUser(review, userId)) || null;
+    return (
+      stationData.data.find((review) => isSameUser(review, userId)) || null
+    );
   },
 
   clearError: () => set({ error: null }),

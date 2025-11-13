@@ -36,28 +36,43 @@ const HomePage = () => {
       try {
         const response = await statisticsAPI.getHomeStats();
         if (response.success && response.data) {
-          const { activeStations, registeredUsers, successfulSessions, systemReliability } = response.data;
-          
+          const {
+            activeStations,
+            registeredUsers,
+            successfulSessions,
+            systemReliability,
+          } = response.data;
+
           setStats([
-            { 
-              label: "Trạm sạc đang hoạt động", 
-              value: activeStations.toString(), 
-              color: "primary" 
+            {
+              label: "Trạm sạc đang hoạt động",
+              value: activeStations.toString(),
+              color: "primary",
             },
-            { 
-              label: "Khách hàng đăng ký", 
-              value: registeredUsers >= 1000 ? `${Math.floor(registeredUsers / 1000)},${registeredUsers % 1000}+` : registeredUsers.toString(), 
-              color: "success" 
+            {
+              label: "Khách hàng đăng ký",
+              value:
+                registeredUsers >= 1000
+                  ? `${Math.floor(registeredUsers / 1000)},${
+                      registeredUsers % 1000
+                    }+`
+                  : registeredUsers.toString(),
+              color: "success",
             },
-            { 
-              label: "Lượt sạc thành công", 
-              value: successfulSessions >= 1000 ? `${Math.floor(successfulSessions / 1000)},${String(successfulSessions % 1000).padStart(3, '0')}+` : successfulSessions.toString(), 
-              color: "warning" 
+            {
+              label: "Lượt sạc thành công",
+              value:
+                successfulSessions >= 1000
+                  ? `${Math.floor(successfulSessions / 1000)},${String(
+                      successfulSessions % 1000
+                    ).padStart(3, "0")}+`
+                  : successfulSessions.toString(),
+              color: "warning",
             },
-            { 
-              label: "Độ tin cậy hệ thống", 
-              value: `${systemReliability}%`, 
-              color: "secondary" 
+            {
+              label: "Độ tin cậy hệ thống",
+              value: `${systemReliability}%`,
+              color: "secondary",
             },
           ]);
         }
@@ -225,7 +240,7 @@ const HomePage = () => {
                 gutterBottom
                 sx={{ fontSize: { xs: "2.5rem", md: "3.5rem" } }}
               >
-                Hệ thống quản lý trạm sạc xe điện thông minh
+                Hệ thống đặt sạc xe điện thông minh
               </Typography>
               <Typography variant="h6" sx={{ mb: 4, opacity: 0.9 }}>
                 Giải pháp toàn diện cho việc tìm kiếm, đặt chỗ và thanh toán tại

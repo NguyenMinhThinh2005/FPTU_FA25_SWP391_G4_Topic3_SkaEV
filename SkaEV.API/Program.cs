@@ -4,7 +4,9 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Text;
 using SkaEV.API.Infrastructure.Data;
+using SkaEV.API.Application.Options;
 using SkaEV.API.Application.Services;
+using SkaEV.API.Application.Services.Payments;
 // using SkaEV.API.Hubs; // Temporarily commented out
 using Serilog;
 using Serilog.Events;
@@ -31,6 +33,8 @@ builder.Services.AddControllers()
         options.SerializerSettings.ReferenceLoopHandling = Newtonsoft.Json.ReferenceLoopHandling.Ignore;
         options.SerializerSettings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
     });
+
+builder.Services.Configure<GoogleMapsOptions>(builder.Configuration.GetSection(GoogleMapsOptions.SectionName));
 
 // Configure Database
 builder.Services.AddDbContext<SkaEVDbContext>(options =>
@@ -130,10 +134,10 @@ builder.Services.AddScoped<ISlotService, SlotService>();
 builder.Services.AddScoped<IUserProfileService, UserProfileService>();
 builder.Services.AddScoped<IAdminUserService, AdminUserService>();
 builder.Services.AddScoped<IIssueService, IssueService>(); // Optional - requires 08_ADD_ISSUES_TABLE.sql
-// Temporarily commented out - services not implemented yet
-// builder.Services.AddScoped<IMonitoringService, MonitoringService>(); // Real-time monitoring
-// builder.Services.AddScoped<IDemandForecastingService, DemandForecastingService>(); // AI demand forecasting
-// builder.Services.AddScoped<IAdvancedAnalyticsService, AdvancedAnalyticsService>(); // Advanced ML analytics
+
+// Payment Services
+builder.Services.AddScoped<SkaEV.API.Application.Services.Payments.IPaymentProcessor, SkaEV.API.Application.Services.Payments.SimulatedPaymentProcessor>();
+builder.Services.AddScoped<SkaEV.API.Application.Services.Payments.IVNPayService, SkaEV.API.Application.Services.Payments.VNPayService>();
 
 // Configure Swagger
 builder.Services.AddEndpointsApiExplorer();
@@ -242,8 +246,7 @@ app.MapHealthChecks("/health");
 
 try
 {
-    Log.Information("Starting SkaEV API...");
-    Log.Information("Environment: {0}", app.Environment.EnvironmentName);
+    Log.Information("Starting SkaEV API in {Environment} mode...", app.Environment.EnvironmentName);
 
     // Start the application asynchronously
     _ = app.RunAsync();

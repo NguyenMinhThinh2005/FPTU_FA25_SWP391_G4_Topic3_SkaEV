@@ -24,19 +24,8 @@ import ForgotPassword from "./pages/auth/ForgotPassword";
 import HomePage from "./pages/public/Home";
 // Test and Demo Pages
 import TestPage from "./pages/TestPage";
-import ChargingFlow from "./pages/customer/ChargingFlow";
 import DateTimePickerDemo from "./pages/DateTimePickerDemo";
-
-// Customer Pages
-import CustomerDashboard from "./pages/customer/Dashboard";
-import FindStations from "./pages/customer/FindStations";
-import BookingHistory from "./pages/customer/BookingHistory";
-import PaymentMethods from "./pages/customer/PaymentMethods";
-import PaymentHistory from "./pages/customer/PaymentHistory";
-import CustomerProfile from "./pages/customer/CustomerProfileIntegrated";
-import PaymentPage from "./pages/customer/PaymentPage";
-import MonthlyCostReports from "./pages/customer/MonthlyCostReports";
-import ChargingHabitsAnalysis from "./pages/customer/ChargingHabitsAnalysis";
+import CUSTOMER_ROUTES from "./routes/customerRoutes";
 
 // Staff Pages
 import StaffDashboard from "./pages/staff/Dashboard";
@@ -166,18 +155,13 @@ function App() {
                 }
               >
                 <Route index element={<Navigate to="profile" replace />} />
-                <Route path="profile" element={<CustomerProfile />} />
-                <Route path="charging" element={<ChargingFlow />} />
-                <Route path="payment" element={<PaymentPage />} />
-                <Route path="payment-history" element={<PaymentHistory />} />
-                <Route
-                  path="monthly-reports"
-                  element={<MonthlyCostReports />}
-                />
-                <Route
-                  path="charging-habits"
-                  element={<ChargingHabitsAnalysis />}
-                />
+                {CUSTOMER_ROUTES.map(({ path, component }) => (
+                  <Route
+                    key={path}
+                    path={path}
+                    element={React.createElement(component)}
+                  />
+                ))}
               </Route>
 
               {/* Staff Routes */}

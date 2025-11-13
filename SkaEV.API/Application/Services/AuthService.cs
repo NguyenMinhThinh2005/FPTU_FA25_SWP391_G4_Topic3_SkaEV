@@ -6,7 +6,6 @@ using System.Text;
 using SkaEV.API.Infrastructure.Data;
 using SkaEV.API.Domain.Entities;
 using SkaEV.API.Application.DTOs.Auth;
-using BCrypt.Net;
 
 namespace SkaEV.API.Application.Services;
 
@@ -33,7 +32,7 @@ public class AuthService : IAuthService
         var user = await _context.Users
             .FirstOrDefaultAsync(u => u.Email == request.Email && u.IsActive);
 
-        if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+        if (user == null || user.PasswordHash != request.Password)
         {
             return null;
         }
@@ -57,7 +56,10 @@ public class AuthService : IAuthService
         // === VALIDATION (FIX LỖI 500) ===
 
         // 1. Kiểm tra trường FullName (NOT NULL)
-
+        if (string.IsNullOrWhiteSpace(request.FullName))
+        {
+            throw new InvalidOperationException("Full name is required");
+        }
 
         // 2. Kiểm tra trường Role (NOT NULL)
         if (string.IsNullOrWhiteSpace(request.Role))
@@ -82,7 +84,7 @@ public class AuthService : IAuthService
         var user = new User
         {
             Email = request.Email,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password), // Hash password với BCrypt
+            PasswordHash = request.Password, // (Giữ nguyên theo yêu cầu)
             FullName = request.FullName,
             PhoneNumber = request.PhoneNumber,
             Role = request.Role,
@@ -150,3 +152,4 @@ public class AuthService : IAuthService
         return tokenHandler.WriteToken(token);
     }
 }
+                                                                                                                                                           

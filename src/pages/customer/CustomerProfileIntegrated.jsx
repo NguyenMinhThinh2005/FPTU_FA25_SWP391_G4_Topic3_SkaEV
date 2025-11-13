@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from "react";
+﻿import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Box,
   Typography,
@@ -36,8 +36,10 @@ import {
   Speed,
   CalendarToday,
 } from "@mui/icons-material";
+import { useNavigate } from "react-router-dom";
 import useAuthStore from "../../store/authStore";
 import { useMasterDataSync } from "../../hooks/useMasterDataSync";
+import useVehicleStore from "../../store/vehicleStore";
 import { formatCurrency } from "../../utils/helpers";
 import { authAPI } from "../../services/api";
 
@@ -59,10 +61,18 @@ function TabPanel({ children, value, index, ...other }) {
 const CustomerProfile = () => {
   const { user, updateProfile } = useAuthStore();
   const { bookingHistory, stats: bookingStats } = useMasterDataSync();
+  const navigate = useNavigate();
+  const {
+    vehicles,
+    fetchVehicles,
+    isLoading: vehiclesLoading,
+    error: vehiclesError,
+    hasLoaded: vehiclesLoaded,
+  } = useVehicleStore();
   const [tabValue, setTabValue] = useState(0);
   const [editMode, setEditMode] = useState(false);
 
-  const buildInitialProfile = () => {
+  const buildInitialProfile = useCallback(() => {
     const profile = user?.profile;
     const composedName = profile
       ? `${profile.firstName || ""} ${profile.lastName || ""}`.trim()
@@ -79,7 +89,7 @@ const CustomerProfile = () => {
         "Chưa cập nhật",
       address: profile?.address || "Chưa cập nhật địa chỉ",
     };
-  };
+  }, [user]);
 
   const [profileData, setProfileData] = useState(buildInitialProfile);
   const [originalProfileData, setOriginalProfileData] =
@@ -93,7 +103,7 @@ const CustomerProfile = () => {
     const initial = buildInitialProfile();
     setProfileData(initial);
     setOriginalProfileData(initial);
-  }, [user]);
+  }, [buildInitialProfile]);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -135,35 +145,27 @@ const CustomerProfile = () => {
     };
 
     fetchProfile();
-  }, [user]);
+  }, [buildInitialProfile, user]);
 
-  // Mock vehicle data
-  const [vehicles] = useState([
-    {
-      id: "VF001",
-      make: "VinFast",
-      model: "VF8",
-      year: 2024,
-      licensePlate: "51A-123.45",
-      batteryCapacity: 87.7, // kWh
-      range: 420, // km
-      efficiency: 4.8, // km/kWh
-      isDefault: true,
-    },
-    {
-      id: "VF002",
-      make: "Tesla",
-      model: "Model Y",
-      year: 2023,
-      licensePlate: "51B-678.90",
-      batteryCapacity: 75.0, // kWh
-      range: 380, // km
-      efficiency: 5.1, // km/kWh
-      isDefault: false,
-    },
-  ]);
+  useEffect(() => {
+    if (user && !vehiclesLoaded && !vehiclesLoading) {
+      fetchVehicles();
+    }
+  }, [user, vehiclesLoaded, vehiclesLoading, fetchVehicles]);
 
-  // Data is now managed by master data sync hook
+  const sortedVehicles = useMemo(() => {
+    if (!vehicles?.length) {
+      return [];
+    }
+
+    return [...vehicles].sort((a, b) => {
+      if (a.isDefault === b.isDefault) {
+        return 0;
+      }
+      return a.isDefault ? -1 : 1;
+    });
+  }, [vehicles]);
+
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);
   };
@@ -401,8 +403,60 @@ const CustomerProfile = () => {
       {/* Tab 2: Vehicle Management */}
       <TabPanel value={tabValue} index={1}>
         <Grid container spacing={3}>
-          {vehicles.map((vehicle) => (
-            <Grid item xs={12} md={6} key={vehicle.id}>
+          {vehiclesError && (
+            <Grid item xs={12}>
+              <Alert severity="error">{vehiclesError}</Alert>
+            </Grid>
+          )}
+
+          {vehiclesLoading && (
+            <Grid item xs={12}>
+              <LinearProgress sx={{ mb: 2 }} />
+            </Grid>
+          )}
+
+          {!vehiclesLoading && sortedVehicles.length === 0 && (
+            <Grid item xs={12}>
+              <Card>
+                <CardContent sx={{ textAlign: "center", py: 6 }}>
+                  <Avatar
+                    sx={{
+                      bgcolor: "grey.100",
+                      width: 80,
+                      height: 80,
+                      mx: "auto",
+                      mb: 2,
+                    }}
+                  >
+                    <ElectricCar sx={{ fontSize: 40, color: "grey.400" }} />
+                  </Avatar>
+                  <Typography variant="h6" gutterBottom>
+                    Chưa có xe nào được lưu
+                  </Typography>
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ mb: 3 }}
+                  >
+                    Thêm thông tin xe điện để theo dõi lịch sử sạc và nhận gợi ý
+                    phù hợp
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    startIcon={<ElectricCar />}
+                    onClick={() =>
+                      navigate("/customer/vehicle-management?add=true")
+                    }
+                  >
+                    Thêm xe ngay
+                  </Button>
+                </CardContent>
+              </Card>
+            </Grid>
+          )}
+
+          {sortedVehicles.map((vehicle) => (
+            <Grid item xs={12} md={6} key={vehicle.id || vehicle.vehicleId}>
               <Card sx={{ position: "relative" }}>
                 <CardContent>
                   {vehicle.isDefault && (
@@ -420,10 +474,17 @@ const CustomerProfile = () => {
                     </Avatar>
                     <Box>
                       <Typography variant="h6" fontWeight="bold">
-                        {vehicle.make} {vehicle.model}
+                        {vehicle.nickname ||
+                          vehicle.displayName ||
+                          `${vehicle.make} ${vehicle.model}`}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        {vehicle.year} • {vehicle.licensePlate}
+                        {[vehicle.make, vehicle.model]
+                          .filter(Boolean)
+                          .join(" ") || "Chưa cập nhật"}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {vehicle.year || "--"} • {vehicle.licensePlate || "--"}
                       </Typography>
                     </Box>
                   </Box>
@@ -433,7 +494,9 @@ const CustomerProfile = () => {
                       <Box sx={{ textAlign: "center", p: 1 }}>
                         <BatteryFull color="success" />
                         <Typography variant="body2" fontWeight="medium">
-                          {vehicle.batteryCapacity} kWh
+                          {vehicle.batteryCapacity
+                            ? `${vehicle.batteryCapacity} kWh`
+                            : "--"}
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
                           Dung lượng pin
@@ -444,7 +507,9 @@ const CustomerProfile = () => {
                       <Box sx={{ textAlign: "center", p: 1 }}>
                         <Speed color="info" />
                         <Typography variant="body2" fontWeight="medium">
-                          {vehicle.range} km
+                          {vehicle.estimatedRange
+                            ? `${vehicle.estimatedRange} km`
+                            : "--"}
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
                           Quãng đường
@@ -455,16 +520,41 @@ const CustomerProfile = () => {
                       <Box sx={{ textAlign: "center", p: 1 }}>
                         <TrendingUp color="primary" />
                         <Typography variant="body2" fontWeight="medium">
-                          {vehicle.efficiency} km/kWh
+                          {vehicle.estimatedEfficiency
+                            ? `${vehicle.estimatedEfficiency} km/kWh`
+                            : "--"}
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
                           Hiệu suất năng lượng
                         </Typography>
                       </Box>
                     </Grid>
+                    <Grid item xs={12}>
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        textAlign="center"
+                      >
+                        Cổng sạc hỗ trợ:{" "}
+                        {vehicle.connectorTypes?.length
+                          ? vehicle.connectorTypes.join(", ")
+                          : "--"}
+                      </Typography>
+                    </Grid>
                   </Grid>
 
-                  <Button variant="outlined" fullWidth sx={{ mt: 2 }}>
+                  <Button
+                    variant="outlined"
+                    fullWidth
+                    sx={{ mt: 2 }}
+                    onClick={() =>
+                      navigate(
+                        `/customer/vehicle-management?edit=${
+                          vehicle.id || vehicle.vehicleId
+                        }`
+                      )
+                    }
+                  >
                     Chỉnh sửa thông tin
                   </Button>
                 </CardContent>
@@ -472,44 +562,52 @@ const CustomerProfile = () => {
             </Grid>
           ))}
 
-          <Grid item xs={12} md={6}>
-            <Card
-              sx={{
-                height: "100%",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                minHeight: 280,
-              }}
-            >
-              <CardContent sx={{ textAlign: "center" }}>
-                <Avatar
-                  sx={{
-                    bgcolor: "grey.100",
-                    width: 80,
-                    height: 80,
-                    mx: "auto",
-                    mb: 2,
-                  }}
-                >
-                  <ElectricCar sx={{ fontSize: 40, color: "grey.400" }} />
-                </Avatar>
-                <Typography variant="h6" gutterBottom>
-                  Thêm xe mới
-                </Typography>
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{ mb: 3 }}
-                >
-                  Đăng ký thêm xe điện để quản lý tốt hơn
-                </Typography>
-                <Button variant="contained" startIcon={<ElectricCar />}>
-                  Thêm xe
-                </Button>
-              </CardContent>
-            </Card>
-          </Grid>
+          {sortedVehicles.length > 0 && (
+            <Grid item xs={12} md={6}>
+              <Card
+                sx={{
+                  height: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  minHeight: 280,
+                }}
+              >
+                <CardContent sx={{ textAlign: "center" }}>
+                  <Avatar
+                    sx={{
+                      bgcolor: "grey.100",
+                      width: 80,
+                      height: 80,
+                      mx: "auto",
+                      mb: 2,
+                    }}
+                  >
+                    <ElectricCar sx={{ fontSize: 40, color: "grey.400" }} />
+                  </Avatar>
+                  <Typography variant="h6" gutterBottom>
+                    Thêm xe mới
+                  </Typography>
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ mb: 3 }}
+                  >
+                    Đăng ký thêm xe điện để quản lý tốt hơn
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    startIcon={<ElectricCar />}
+                    onClick={() =>
+                      navigate("/customer/vehicle-management?add=true")
+                    }
+                  >
+                    Thêm xe
+                  </Button>
+                </CardContent>
+              </Card>
+            </Grid>
+          )}
         </Grid>
       </TabPanel>
 
