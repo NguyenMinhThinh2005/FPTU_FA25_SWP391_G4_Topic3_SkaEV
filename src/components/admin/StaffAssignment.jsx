@@ -36,14 +36,29 @@ const StaffAssignment = ({ stationId, stationName }) => {
     try {
       setLoading(true);
       setError(null);
-      
+
+      // Ensure canonical admin users are loaded first so we can restrict the available staff to
+      // the same set shown in user management (avoids showing legacy/test/group accounts).
+      await fetchUsers();
+
       const [staffList, assignments] = await Promise.all([
         stationStaffAPI.getAvailableStaff(),
         stationStaffAPI.getStationStaff(stationId)
       ]);
-      
-      // Only keep available staff that exist in canonical user store as role === 'staff'
-      setAvailableStaff(staffList);
+
+      // Build a set of canonical staff userIds from the user store (admin user management)
+      const canonicalStaffIds = new Set(
+        (users || [])
+          .filter((u) => u.role === 'staff' && u.isActive !== false)
+          .map((u) => u.userId)
+      );
+
+      // If canonical list is empty (rare), fall back to server-provided staffList
+      const filteredStaff = canonicalStaffIds.size > 0
+        ? (staffList || []).filter(s => canonicalStaffIds.has(s.userId))
+        : (staffList || []);
+
+      setAvailableStaff(filteredStaff);
       setAssignedStaff(assignments);
     } catch (err) {
       setError('Không thể tải danh sách nhân viên: ' + err.message);
