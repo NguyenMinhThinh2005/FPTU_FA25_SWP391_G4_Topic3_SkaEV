@@ -452,48 +452,59 @@ public class AdminStationManagementService : IAdminStationManagementService
                     .Select(b => (b.ActualEndTime!.Value - b.ActualStartTime!.Value).TotalMinutes)
                     .DefaultIfEmpty(0).Average()
             },
-            ChargingPoints = station.ChargingPosts.Select(p => new ChargingPointDetailDto
-            {
-                PostId = p.PostId,
-                StationId = p.StationId,
-                PostNumber = p.PostNumber,
-                PostType = p.PostType,
-                PowerOutput = p.PowerOutput,
-                ConnectorTypes = p.ConnectorTypes,
-                Status = p.Status,
-                IsOnline = p.Status != "offline",
-                TotalSlots = p.TotalSlots,
-                AvailableSlots = p.AvailableSlots,
-                OccupiedSlots = p.TotalSlots - p.AvailableSlots,
-                CurrentPowerUsageKw = p.Status == "occupied" ? p.PowerOutput : 0,
-                ActiveSessionsCount = p.ChargingSlots.Count(s => s.Status == "occupied"),
-                Slots = p.ChargingSlots.Select(s => new ChargingSlotDetailDto
+            ChargingPoints = station.ChargingPosts.Select(p => {
+                // Compute per-post metrics from actual slots (DB truth) rather than relying on cached columns
+                var totalSlotsForPost = p.ChargingSlots?.Count ?? 0;
+                var availableSlotsForPost = p.ChargingSlots?.Count(s => IsSlotAvailable(s.Status)) ?? 0;
+                var occupiedSlotsForPost = p.ChargingSlots?.Count(s => IsSlotOccupied(s.Status)) ?? 0;
+
+                return new ChargingPointDetailDto
                 {
-                    SlotId = s.SlotId,
-                    PostId = s.PostId,
-                    SlotNumber = s.SlotNumber,
-                    ConnectorType = s.ConnectorType,
-                    MaxPower = s.MaxPower,
-                    Status = s.Status,
-                    IsAvailable = s.Status == "available",
-                    CurrentBookingId = s.CurrentBookingId,
-                    CurrentUserName = s.Bookings
-                        .Where(b => b.Status == "in_progress" && b.DeletedAt == null)
-                        .Select(b => b.User.FullName)
-                        .FirstOrDefault(),
-                    CurrentVehicle = s.Bookings
-                        .Where(b => b.Status == "in_progress" && b.DeletedAt == null)
-                        .Select(b => b.Vehicle.Brand + " " + b.Vehicle.Model)
-                        .FirstOrDefault(),
-                    SessionStartTime = s.Bookings
-                        .Where(b => b.Status == "in_progress" && b.DeletedAt == null)
-                        .Select(b => b.ActualStartTime)
-                        .FirstOrDefault(),
-                    CreatedAt = s.CreatedAt,
-                    UpdatedAt = s.UpdatedAt
-                }).ToList(),
-                CreatedAt = p.CreatedAt,
-                UpdatedAt = p.UpdatedAt
+                    PostId = p.PostId,
+                    StationId = p.StationId,
+                    PostNumber = p.PostNumber,
+                    PostType = p.PostType,
+                    PowerOutput = p.PowerOutput,
+                    ConnectorTypes = p.ConnectorTypes,
+                    Status = p.Status,
+                    IsOnline = p.Status != "offline",
+                    // Use live counts derived from slots
+                    TotalSlots = totalSlotsForPost,
+                    AvailableSlots = availableSlotsForPost,
+                    OccupiedSlots = occupiedSlotsForPost,
+                    // Estimate current power usage as number of occupied slots * post power output
+                    CurrentPowerUsageKw = occupiedSlotsForPost * (p.PowerOutput <= 0 ? 0 : p.PowerOutput),
+                    ActiveSessionsCount = occupiedSlotsForPost,
+                    Slots = p.ChargingSlots != null
+                        ? p.ChargingSlots.Select(s => new ChargingSlotDetailDto
+                    {
+                        SlotId = s.SlotId,
+                        PostId = s.PostId,
+                        SlotNumber = s.SlotNumber,
+                        ConnectorType = s.ConnectorType,
+                        MaxPower = s.MaxPower,
+                        Status = s.Status,
+                        IsAvailable = IsSlotAvailable(s.Status),
+                        CurrentBookingId = s.CurrentBookingId,
+                        CurrentUserName = s.Bookings
+                            .Where(b => b.Status == "in_progress" && b.DeletedAt == null)
+                            .Select(b => b.User.FullName)
+                            .FirstOrDefault(),
+                        CurrentVehicle = s.Bookings
+                            .Where(b => b.Status == "in_progress" && b.DeletedAt == null)
+                            .Select(b => b.Vehicle.Brand + " " + b.Vehicle.Model)
+                            .FirstOrDefault(),
+                        SessionStartTime = s.Bookings
+                            .Where(b => b.Status == "in_progress" && b.DeletedAt == null)
+                            .Select(b => b.ActualStartTime)
+                            .FirstOrDefault(),
+                        CreatedAt = s.CreatedAt,
+                        UpdatedAt = s.UpdatedAt
+                    }).ToList()
+                        : new List<ChargingSlotDetailDto>(),
+                    CreatedAt = p.CreatedAt,
+                    UpdatedAt = p.UpdatedAt
+                };
             }).ToList(),
             RecentErrors = recentErrors.Take(10).ToList(),
             CreatedAt = station.CreatedAt,

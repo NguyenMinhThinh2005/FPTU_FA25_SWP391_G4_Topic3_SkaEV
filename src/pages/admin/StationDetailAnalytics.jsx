@@ -319,7 +319,13 @@ const StationDetailAnalytics = () => {
                         Connector: {post.connectorTypes}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        Slots: {post.availableSlots}/{post.totalSlots} có sẵn
+                        {(() => {
+                          // Prefer live per-slot data from the API when available.
+                          const total = (post.slots && post.slots.length) || post.totalSlots || 0;
+                          const availableFromSlots = post.slots ? post.slots.filter(s => s.isAvailable).length : null;
+                          const available = Number.isInteger(availableFromSlots) ? availableFromSlots : (post.availableSlots ?? 0);
+                          return `Slots: ${available}/${total} có sẵn`;
+                        })()}
                       </Typography>
                     </Box>
 
