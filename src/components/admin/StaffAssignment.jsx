@@ -23,6 +23,7 @@ import {
 import { Add, Delete, Person, Email, Phone } from '@mui/icons-material';
 import stationStaffAPI from '../../services/stationStaffAPI';
 import useUserStore from '../../store/userStore';
+import { usersAPI } from '../../services/api';
 
 const StaffAssignment = ({ stationId, stationName }) => {
   const [availableStaff, setAvailableStaff] = useState([]);
@@ -37,23 +38,24 @@ const StaffAssignment = ({ stationId, stationName }) => {
       setLoading(true);
       setError(null);
 
-      // Ensure canonical admin users are loaded first so we can restrict the available staff to
-      // the same set shown in user management (avoids showing legacy/test/group accounts).
-      await fetchUsers();
-
       const [staffList, assignments] = await Promise.all([
         stationStaffAPI.getAvailableStaff(),
         stationStaffAPI.getStationStaff(stationId)
       ]);
 
-      // Build a set of canonical staff userIds from the user store (admin user management)
-      const canonicalStaffIds = new Set(
-        (users || [])
-          .filter((u) => u.role === 'staff' && u.isActive !== false)
-          .map((u) => u.userId)
-      );
+      // Fetch canonical staff via admin users API to ensure we match the user management listing.
+      // Request a large pageSize to include all staff in dev/demo environments.
+      let canonicalStaff = [];
+      try {
+        const usersResp = await usersAPI.getAll({ role: 'staff', page: 1, pageSize: 1000 });
+        canonicalStaff = usersResp?.data || [];
+      } catch (uErr) {
+        // If admin users API fails (auth etc), fall back to local userStore users if available
+        console.warn('Could not load canonical staff from admin API, falling back to user store', uErr);
+        canonicalStaff = users || [];
+      }
 
-      // If canonical list is empty (rare), fall back to server-provided staffList
+      const canonicalStaffIds = new Set((canonicalStaff || []).map(u => u.userId));
       const filteredStaff = canonicalStaffIds.size > 0
         ? (staffList || []).filter(s => canonicalStaffIds.has(s.userId))
         : (staffList || []);
