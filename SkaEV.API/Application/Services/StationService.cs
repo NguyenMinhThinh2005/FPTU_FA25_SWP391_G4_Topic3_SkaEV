@@ -148,7 +148,8 @@ public class StationService : IStationService
     private static StationDto ComposeStationDto(
         ChargingStation station,
         StationAggregates aggregates,
-        StationStaff? assignment)
+        StationStaff? assignment,
+        decimal? basePricePerKwh)
     {
         return new StationDto
         {
@@ -174,8 +175,249 @@ public class StationService : IStationService
             ManagerUserId = assignment?.StaffUserId,
             ManagerName = assignment?.StaffUser.FullName,
             ManagerEmail = assignment?.StaffUser.Email,
-            ManagerPhoneNumber = assignment?.StaffUser.PhoneNumber
+            ManagerPhoneNumber = assignment?.StaffUser.PhoneNumber,
+            BasePricePerKwh = basePricePerKwh
         };
+    }
+
+    private async Task<Dictionary<int, decimal?>> GetBasePricingForStationsAsync(IEnumerable<int> stationIds)
+    {
+        var idList = stationIds?.Distinct().ToList() ?? new List<int>();
+        if (idList.Count == 0)
+        {
+            return new Dictionary<int, decimal?>();
+        }
+
+        return await _context.PricingRules
+            .Where(rule => rule.StationId != null && idList.Contains(rule.StationId.Value) && rule.IsActive)
+            .GroupBy(rule => rule.StationId!.Value)
+            .Select(group => new
+            {
+                StationId = group.Key,
+                BasePrice = group
+                    .OrderByDescending(rule => rule.UpdatedAt)
+                    .ThenByDescending(rule => rule.RuleId)
+                    .Select(rule => (decimal?)rule.BasePrice)
+                    .FirstOrDefault()
+            })
+            .ToDictionaryAsync(x => x.StationId, x => x.BasePrice);
+    }
+
+    private async Task EnsureBasePricingAsync(int stationId, decimal pricePerKwh)
+    {
+        if (pricePerKwh <= 0)
+        {
+            return;
+        }
+
+        var existingRule = await _context.PricingRules
+            .Where(rule => rule.StationId == stationId && rule.VehicleType == null)
+            .OrderByDescending(rule => rule.UpdatedAt)
+            .ThenByDescending(rule => rule.RuleId)
+            .FirstOrDefaultAsync();
+
+        var utcNow = DateTime.UtcNow;
+
+        if (existingRule == null)
+        {
+            var pricingRule = new PricingRule
+            {
+                StationId = stationId,
+                BasePrice = pricePerKwh,
+                VehicleType = null,
+                TimeRangeStart = null,
+                TimeRangeEnd = null,
+                IsActive = true,
+                CreatedAt = utcNow,
+                UpdatedAt = utcNow
+            };
+
+            _context.PricingRules.Add(pricingRule);
+        }
+        else
+        {
+            existingRule.BasePrice = pricePerKwh;
+            existingRule.IsActive = true;
+            existingRule.UpdatedAt = utcNow;
+        }
+
+        await _context.SaveChangesAsync();
+    }
+
+    private async Task RecreateChargingInfrastructureAsync(
+        ChargingStation station,
+        int totalPorts,
+        int fastPorts,
+        int standardPorts,
+        decimal? fastPowerKw,
+        decimal? standardPowerKw)
+    {
+        var existingPosts = await _context.ChargingPosts
+            .Where(post => post.StationId == station.StationId)
+            .Include(post => post.ChargingSlots)
+            .ToListAsync();
+
+        if (existingPosts.Count > 0)
+        {
+            var existingSlots = existingPosts.SelectMany(post => post.ChargingSlots).ToList();
+            if (existingSlots.Count > 0)
+            {
+                _context.ChargingSlots.RemoveRange(existingSlots);
+            }
+
+            _context.ChargingPosts.RemoveRange(existingPosts);
+            station.ChargingPosts.Clear();
+            await _context.SaveChangesAsync();
+        }
+
+        await CreateChargingInfrastructureAsync(
+            station,
+            totalPorts,
+            fastPorts,
+            standardPorts,
+            fastPowerKw,
+            standardPowerKw);
+    }
+
+    private async Task CreateChargingInfrastructureAsync(
+        ChargingStation station,
+        int totalPorts,
+        int fastPorts,
+        int standardPorts,
+        decimal? fastPowerKw,
+        decimal? standardPowerKw)
+    {
+        var normalizedFastPorts = Math.Max(0, fastPorts);
+        var normalizedStandardPorts = Math.Max(0, standardPorts);
+        var normalizedTotalPorts = Math.Max(totalPorts, normalizedFastPorts + normalizedStandardPorts);
+
+        var postsToAdd = new List<ChargingPost>();
+        var utcNow = DateTime.UtcNow;
+        var statusIsActive = string.Equals(station.Status, "active", StringComparison.OrdinalIgnoreCase);
+        var postIndex = 1;
+
+        void AddPost(string postType, int slotCount, decimal slotPowerKw, string connector)
+        {
+            if (slotCount <= 0)
+            {
+                return;
+            }
+
+            var postNumber = $"{postType}-{postIndex:00}";
+            postIndex++;
+
+            var post = new ChargingPost
+            {
+                StationId = station.StationId,
+                PostNumber = postNumber,
+                PostType = postType,
+                PowerOutput = slotPowerKw * Math.Max(1, slotCount),
+                ConnectorTypes = JsonConvert.SerializeObject(new[] { connector }),
+                TotalSlots = slotCount,
+                AvailableSlots = slotCount,
+                Status = "available",
+                CreatedAt = utcNow,
+                UpdatedAt = utcNow
+            };
+
+            for (var slotIndex = 1; slotIndex <= slotCount; slotIndex++)
+            {
+                var slot = new ChargingSlot
+                {
+                    SlotNumber = $"{postType}-{slotIndex:00}",
+                    ConnectorType = connector,
+                    MaxPower = slotPowerKw,
+                    Status = "available",
+                    CreatedAt = utcNow,
+                    UpdatedAt = utcNow
+                };
+
+                post.ChargingSlots.Add(slot);
+            }
+
+            postsToAdd.Add(post);
+            station.ChargingPosts.Add(post);
+        }
+
+        if (normalizedFastPorts > 0)
+        {
+            var fastPower = fastPowerKw.HasValue && fastPowerKw.Value > 0 ? fastPowerKw.Value : 120m;
+            AddPost("DC", normalizedFastPorts, fastPower, "CCS");
+        }
+
+        var standardCount = normalizedStandardPorts;
+        var leftover = normalizedTotalPorts - (normalizedFastPorts + normalizedStandardPorts);
+        if (leftover > 0)
+        {
+            standardCount += leftover;
+        }
+
+        if (standardCount > 0)
+        {
+            var standardPower = standardPowerKw.HasValue && standardPowerKw.Value > 0 ? standardPowerKw.Value : 22m;
+            AddPost("AC", standardCount, standardPower, "Type2");
+        }
+
+        if (postsToAdd.Count == 0)
+        {
+            station.TotalPosts = 0;
+            station.AvailablePosts = 0;
+            station.UpdatedAt = utcNow;
+            await _context.SaveChangesAsync();
+            return;
+        }
+
+        await _context.ChargingPosts.AddRangeAsync(postsToAdd);
+        station.TotalPosts = postsToAdd.Count;
+        station.AvailablePosts = statusIsActive ? postsToAdd.Count : 0;
+        station.UpdatedAt = utcNow;
+
+        await _context.SaveChangesAsync();
+    }
+
+    private async Task AssignManagerAsync(int stationId, int managerUserId)
+    {
+        if (managerUserId <= 0)
+        {
+            return;
+        }
+
+        var manager = await _context.Users
+            .FirstOrDefaultAsync(user => user.UserId == managerUserId);
+
+        if (manager == null)
+        {
+            return;
+        }
+
+        var activeAssignments = await _context.StationStaff
+            .Where(ss => ss.StationId == stationId && ss.IsActive)
+            .ToListAsync();
+
+        var alreadyAssigned = activeAssignments.Any(ss => ss.StaffUserId == managerUserId);
+
+        foreach (var assignment in activeAssignments)
+        {
+            assignment.IsActive = assignment.StaffUserId == managerUserId;
+        }
+
+        if (!alreadyAssigned)
+        {
+            var newAssignment = new StationStaff
+            {
+                StationId = stationId,
+                StaffUserId = managerUserId,
+                AssignedAt = DateTime.UtcNow,
+                IsActive = true
+            };
+
+            _context.StationStaff.Add(newAssignment);
+        }
+
+        if (activeAssignments.Count > 0 || !alreadyAssigned)
+        {
+            await _context.SaveChangesAsync();
+        }
     }
 
     public async Task<List<StationDto>> SearchStationsByLocationAsync(SearchStationsRequestDto request)
@@ -216,6 +458,7 @@ public class StationService : IStationService
             .ToDictionaryAsync(x => x.Key, x => x.Count);
 
         var managerAssignments = await GetActiveManagerAssignmentsAsync(stationIds);
+        var pricingLookup = await GetBasePricingForStationsAsync(stationIds);
 
         var stations = stationsRaw.Select(station =>
         {
@@ -226,7 +469,8 @@ public class StationService : IStationService
                 : 0;
 
             var aggregates = CalculateAggregates(stationPosts, activeSessions, station.Status);
-            return ComposeStationDto(station, aggregates, assignment);
+            pricingLookup.TryGetValue(station.StationId, out var basePrice);
+            return ComposeStationDto(station, aggregates, assignment, basePrice);
         }).ToList();
 
         return stations;
@@ -259,7 +503,14 @@ public class StationService : IStationService
             .CountAsync();
 
         var aggregates = CalculateAggregates(stationEntity.ChargingPosts, activeSessions, stationEntity.Status);
-        return ComposeStationDto(stationEntity, aggregates, assignment);
+        var basePrice = await _context.PricingRules
+            .Where(rule => rule.StationId == stationId && rule.IsActive)
+            .OrderByDescending(rule => rule.UpdatedAt)
+            .ThenByDescending(rule => rule.RuleId)
+            .Select(rule => (decimal?)rule.BasePrice)
+            .FirstOrDefaultAsync();
+
+        return ComposeStationDto(stationEntity, aggregates, assignment, basePrice);
     }
 
     public async Task<List<StationDto>> GetAllStationsAsync(string? city = null, string? status = null)
@@ -313,13 +564,15 @@ public class StationService : IStationService
 
         var activeBookingsDict = activeBookingCounts.ToDictionary(x => x.StationId, x => x.Count);
         var managerAssignments = await GetActiveManagerAssignmentsAsync(stationIds);
+        var pricingLookup = await GetBasePricingForStationsAsync(stationIds);
 
         var stations = stationsRaw.Select(station =>
         {
             managerAssignments.TryGetValue(station.StationId, out var assignment);
             activeBookingsDict.TryGetValue(station.StationId, out var activeSessions);
             var aggregates = CalculateAggregates(station.ChargingPosts, activeSessions, station.Status);
-            return ComposeStationDto(station, aggregates, assignment);
+            pricingLookup.TryGetValue(station.StationId, out var basePrice);
+            return ComposeStationDto(station, aggregates, assignment, basePrice);
         }).ToList();
 
         return stations;
@@ -344,6 +597,9 @@ public class StationService : IStationService
 
     public async Task<StationDto> CreateStationAsync(CreateStationDto dto)
     {
+        var utcNow = DateTime.UtcNow;
+        var normalizedStatus = string.IsNullOrWhiteSpace(dto.Status) ? "active" : dto.Status;
+
         var station = new Domain.Entities.ChargingStation
         {
             StationName = dto.StationName,
@@ -354,23 +610,53 @@ public class StationService : IStationService
             OperatingHours = dto.OperatingHours,
             Amenities = dto.Amenities != null ? JsonConvert.SerializeObject(dto.Amenities) : null,
             StationImageUrl = dto.StationImageUrl,
-            Status = "active",
+            Status = normalizedStatus,
             TotalPosts = 0,
             AvailablePosts = 0,
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
+            CreatedAt = utcNow,
+            UpdatedAt = utcNow
         };
 
         _context.ChargingStations.Add(station);
         await _context.SaveChangesAsync();
 
-        var aggregates = CalculateAggregates(Enumerable.Empty<ChargingPost>(), 0, station.Status);
-        return ComposeStationDto(station, aggregates, null);
+        if (dto.TotalPorts > 0 || dto.FastChargePorts > 0 || dto.StandardPorts > 0)
+        {
+            await CreateChargingInfrastructureAsync(
+                station,
+                dto.TotalPorts,
+                dto.FastChargePorts,
+                dto.StandardPorts,
+                dto.FastChargePowerKw,
+                dto.StandardChargePowerKw);
+        }
+
+        if (dto.PricePerKwh.HasValue && dto.PricePerKwh.Value > 0)
+        {
+            await EnsureBasePricingAsync(station.StationId, dto.PricePerKwh.Value);
+        }
+
+        if (dto.ManagerUserId.HasValue)
+        {
+            await AssignManagerAsync(station.StationId, dto.ManagerUserId.Value);
+        }
+
+        var refreshed = await GetStationByIdAsync(station.StationId);
+        if (refreshed != null)
+        {
+            return refreshed;
+        }
+
+        var aggregates = CalculateAggregates(station.ChargingPosts, station.ActiveSessions, station.Status);
+        return ComposeStationDto(station, aggregates, null, dto.PricePerKwh);
     }
 
     public async Task<bool> UpdateStationAsync(int stationId, UpdateStationDto dto)
     {
-        var station = await _context.ChargingStations.FindAsync(stationId);
+        var station = await _context.ChargingStations
+            .Include(s => s.ChargingPosts)
+                .ThenInclude(post => post.ChargingSlots)
+            .FirstOrDefaultAsync(s => s.StationId == stationId);
         if (station == null) return false;
 
         if (!string.IsNullOrEmpty(dto.StationName))
@@ -391,9 +677,50 @@ public class StationService : IStationService
         if (!string.IsNullOrEmpty(dto.Status))
             station.Status = dto.Status;
 
+        var requiresInfrastructureUpdate =
+            dto.TotalPorts.HasValue ||
+            dto.FastChargePorts.HasValue ||
+            dto.StandardPorts.HasValue ||
+            dto.FastChargePowerKw.HasValue ||
+            dto.StandardChargePowerKw.HasValue;
+
+        if (requiresInfrastructureUpdate)
+        {
+            var currentFastPorts = station.ChargingPosts
+                .Where(post => post.PostType.Equals("DC", StringComparison.OrdinalIgnoreCase))
+                .Sum(post => post.TotalSlots);
+
+            var currentStandardPorts = station.ChargingPosts
+                .Where(post => !post.PostType.Equals("DC", StringComparison.OrdinalIgnoreCase))
+                .Sum(post => post.TotalSlots);
+
+            var targetTotalPorts = dto.TotalPorts ?? (currentFastPorts + currentStandardPorts);
+            var targetFastPorts = dto.FastChargePorts ?? currentFastPorts;
+            var targetStandardPorts = dto.StandardPorts ?? currentStandardPorts;
+
+            await RecreateChargingInfrastructureAsync(
+                station,
+                targetTotalPorts,
+                targetFastPorts,
+                targetStandardPorts,
+                dto.FastChargePowerKw,
+                dto.StandardChargePowerKw);
+        }
+
         station.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
+
+        if (dto.PricePerKwh.HasValue && dto.PricePerKwh.Value > 0)
+        {
+            await EnsureBasePricingAsync(station.StationId, dto.PricePerKwh.Value);
+        }
+
+        if (dto.ManagerUserId.HasValue)
+        {
+            await AssignManagerAsync(station.StationId, dto.ManagerUserId.Value);
+        }
+
         return true;
     }
 

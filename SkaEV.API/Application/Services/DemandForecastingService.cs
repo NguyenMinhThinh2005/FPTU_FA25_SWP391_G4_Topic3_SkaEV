@@ -31,7 +31,7 @@ namespace SkaEV.API.Application.Services
                            b.ActualStartTime >= startDate.AddDays(-30) &&
                            b.ActualStartTime <= startDate &&
                            b.DeletedAt == null)
-                .GroupBy(b => b.ActualStartTime.Value.Date)
+                .GroupBy(b => b.ActualStartTime!.Value.Date)
                 .Select(g => new
                 {
                     Date = g.Key,
@@ -97,11 +97,11 @@ namespace SkaEV.API.Application.Services
             var historicalData = await _context.Bookings
                 .Where(b => b.StationId == stationId &&
                            b.ActualStartTime != null &&
-                           b.ActualStartTime.Value.DayOfWeek == dayOfWeek &&
+                           b.ActualStartTime!.Value.DayOfWeek == dayOfWeek &&
                            b.ActualStartTime >= date.AddDays(-60) &&
                            b.ActualStartTime < date &&
                            b.DeletedAt == null)
-                .Select(b => new { Hour = b.ActualStartTime.Value.Hour, b.BookingId })
+                .Select(b => new { Hour = b.ActualStartTime!.Value.Hour, b.BookingId })
                 .ToListAsync();
 
             var hourlyDistribution = historicalData

@@ -148,7 +148,12 @@ public class SkaEVDbContext : DbContext
             }
             else
             {
-                entity.Property(e => e.Location).HasColumnName("location").HasColumnType("geography");
+                // The `location` column in the database is computed (geography point from lat/lon).
+                // Mark it as value-generated so EF Core does not attempt to set/modify it during inserts/updates.
+                entity.Property(e => e.Location)
+                    .HasColumnName("location")
+                    .HasColumnType("geography")
+                    .ValueGeneratedOnAddOrUpdate();
             }
             entity.Property(e => e.TotalPosts).HasColumnName("total_posts");
             entity.Property(e => e.AvailablePosts).HasColumnName("available_posts");

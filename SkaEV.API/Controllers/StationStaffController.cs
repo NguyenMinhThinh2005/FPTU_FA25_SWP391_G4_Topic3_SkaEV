@@ -27,6 +27,8 @@ public class StationStaffController : ControllerBase
             // Return only canonical staff users: active users with role 'staff' who have at least one
             // StationStaff record (i.e., managed / created via admin workflows). This avoids showing
             // legacy/test/team accounts in UI dropdowns that should list operational staff only.
+            // Build per-user assigned stations and only include users who actually have
+            // at least one assigned station record with a resolvable station name.
             var staffUsers = await _context.Users
                 .Where(u => u.Role == "staff" && u.IsActive && _context.StationStaff.Any(ss => ss.StaffUserId == u.UserId && ss.IsActive))
                 .Select(u => new
@@ -37,13 +39,19 @@ public class StationStaffController : ControllerBase
                     u.PhoneNumber,
                     AssignedStations = _context.StationStaff
                         .Where(ss => ss.StaffUserId == u.UserId && ss.IsActive)
-                        .Select(ss => new
-                        {
-                            ss.StationId,
-                            StationName = ss.ChargingStation.StationName
-                        })
+                        // Join to ChargingStations to ensure the station exists and has a name
+                        .Join(_context.ChargingStations,
+                              ss => ss.StationId,
+                              cs => cs.StationId,
+                              (ss, cs) => new
+                              {
+                                  ss.StationId,
+                                  StationName = cs.StationName
+                              })
                         .ToList()
                 })
+                // Only keep users who have at least one assigned station (non-empty list)
+                .Where(u => u.AssignedStations.Count > 0)
                 .OrderBy(u => u.FullName)
                 .ToListAsync();
 

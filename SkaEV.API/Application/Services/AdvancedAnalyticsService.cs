@@ -49,12 +49,12 @@ namespace SkaEV.API.Application.Services
             var avgEnergy = totalEnergy / userBookings.Count;
             var avgSessionDuration = userBookings
                 .Where(b => b.ActualStartTime != null && b.ActualEndTime != null)
-                .Average(b => (b.ActualEndTime.Value - b.ActualStartTime.Value).TotalMinutes);
+                .Average(b => (b.ActualEndTime!.Value - b.ActualStartTime!.Value).TotalMinutes);
 
             // Preferred time of day
             var hourDistribution = userBookings
                 .Where(b => b.ActualStartTime != null)
-                .GroupBy(b => b.ActualStartTime.Value.Hour)
+                .GroupBy(b => b.ActualStartTime!.Value.Hour)
                 .Select(g => new { Hour = g.Key, Count = g.Count() })
                 .OrderByDescending(x => x.Count)
                 .FirstOrDefault();
@@ -76,7 +76,7 @@ namespace SkaEV.API.Application.Services
 
             // Frequency analysis
             var firstBooking = userBookings.Where(b => b.ActualStartTime != null).Min(b => b.ActualStartTime);
-            var daysSinceFirst = firstBooking != null ? (DateTime.UtcNow - firstBooking.Value).TotalDays : 0;
+            var daysSinceFirst = firstBooking != null ? (DateTime.UtcNow - firstBooking!.Value).TotalDays : 0;
             var avgDaysBetweenBookings = daysSinceFirst / Math.Max(1, userBookings.Count - 1);
 
             // User category
@@ -124,12 +124,12 @@ namespace SkaEV.API.Application.Services
             // Hourly distribution
             var hourlyPattern = bookings
                 .Where(b => b.ActualStartTime != null && b.ActualEndTime != null)
-                .GroupBy(b => b.ActualStartTime.Value.Hour)
+                .GroupBy(b => b.ActualStartTime!.Value.Hour)
                 .Select(g => new HourlyPattern
                 {
                     Hour = g.Key,
                     Count = g.Count(),
-                    AvgDuration = Math.Round(g.Average(b => (b.ActualEndTime.Value - b.ActualStartTime.Value).TotalMinutes), 2),
+                    AvgDuration = Math.Round(g.Average(b => (b.ActualEndTime!.Value - b.ActualStartTime!.Value).TotalMinutes), 2),
                     AvgEnergy = Math.Round((double)g.Average(b => b.Invoice?.TotalEnergyKwh ?? 0), 2)
                 })
                 .OrderBy(x => x.Hour)
@@ -138,7 +138,7 @@ namespace SkaEV.API.Application.Services
             // Day of week pattern
             var weekdayPattern = bookings
                 .Where(b => b.ActualStartTime != null)
-                .GroupBy(b => b.ActualStartTime.Value.DayOfWeek)
+                .GroupBy(b => b.ActualStartTime!.Value.DayOfWeek)
                 .Select(g => new DayPattern
                 {
                     DayOfWeek = g.Key.ToString(),
@@ -166,7 +166,7 @@ namespace SkaEV.API.Application.Services
             {
                 AnalysisPeriod = "Last 30 days",
                 TotalSessions = bookings.Count,
-                AvgSessionDuration = completedBookings.Any() ? Math.Round(completedBookings.Average(b => (b.ActualEndTime.Value - b.ActualStartTime.Value).TotalMinutes), 2) : 0,
+                AvgSessionDuration = completedBookings.Any() ? Math.Round(completedBookings.Average(b => (b.ActualEndTime!.Value - b.ActualStartTime!.Value).TotalMinutes), 2) : 0,
                 AvgEnergyPerSession = Math.Round((double)bookings.Average(b => b.Invoice?.TotalEnergyKwh ?? 0), 2),
                 HourlyPatterns = hourlyPattern,
                 WeekdayPatterns = weekdayPattern,
@@ -199,7 +199,7 @@ namespace SkaEV.API.Application.Services
             var totalSlots = station.ChargingPosts.SelectMany(p => p.ChargingSlots).Count();
             var totalHoursInPeriod = 30 * 24 * totalSlots; // Total possible slot-hours
             var completedBookings = bookings.Where(b => b.ActualStartTime != null && b.ActualEndTime != null).ToList();
-            var usedHours = completedBookings.Sum(b => (b.ActualEndTime.Value - b.ActualStartTime.Value).TotalHours);
+            var usedHours = completedBookings.Sum(b => (b.ActualEndTime!.Value - b.ActualStartTime!.Value).TotalHours);
             var utilizationRate = totalHoursInPeriod > 0 ? (usedHours / totalHoursInPeriod) * 100 : 0;
 
             // Revenue analysis
@@ -213,7 +213,7 @@ namespace SkaEV.API.Application.Services
             // Peak efficiency hours
             var peakHours = bookings
                 .Where(b => b.ActualStartTime != null)
-                .GroupBy(b => b.ActualStartTime.Value.Hour)
+                .GroupBy(b => b.ActualStartTime!.Value.Hour)
                 .Select(g => new { Hour = g.Key, Count = g.Count() })
                 .OrderByDescending(x => x.Count)
                 .Take(3)
@@ -265,7 +265,7 @@ namespace SkaEV.API.Application.Services
             var avgEnergy = userBookings.Average(b => b.Invoice?.TotalEnergyKwh ?? 0);
             var preferredHour = userBookings
                 .Where(b => b.ActualStartTime != null)
-                .GroupBy(b => b.ActualStartTime.Value.Hour)
+                .GroupBy(b => b.ActualStartTime!.Value.Hour)
                 .OrderByDescending(g => g.Count())
                 .FirstOrDefault()?.Key ?? 12;
 

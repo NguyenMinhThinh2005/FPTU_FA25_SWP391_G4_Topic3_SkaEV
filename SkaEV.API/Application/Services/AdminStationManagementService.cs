@@ -452,7 +452,8 @@ public class AdminStationManagementService : IAdminStationManagementService
                     .Select(b => (b.ActualEndTime!.Value - b.ActualStartTime!.Value).TotalMinutes)
                     .DefaultIfEmpty(0).Average()
             },
-            ChargingPoints = station.ChargingPosts.Select(p => {
+            ChargingPoints = station.ChargingPosts.Select(p =>
+            {
                 // Compute per-post metrics from actual slots (DB truth) rather than relying on cached columns
                 var totalSlotsForPost = p.ChargingSlots?.Count ?? 0;
                 var availableSlotsForPost = p.ChargingSlots?.Count(s => IsSlotAvailable(s.Status)) ?? 0;
@@ -477,30 +478,30 @@ public class AdminStationManagementService : IAdminStationManagementService
                     ActiveSessionsCount = occupiedSlotsForPost,
                     Slots = p.ChargingSlots != null
                         ? p.ChargingSlots.Select(s => new ChargingSlotDetailDto
-                    {
-                        SlotId = s.SlotId,
-                        PostId = s.PostId,
-                        SlotNumber = s.SlotNumber,
-                        ConnectorType = s.ConnectorType,
-                        MaxPower = s.MaxPower,
-                        Status = s.Status,
-                        IsAvailable = IsSlotAvailable(s.Status),
-                        CurrentBookingId = s.CurrentBookingId,
-                        CurrentUserName = s.Bookings
+                        {
+                            SlotId = s.SlotId,
+                            PostId = s.PostId,
+                            SlotNumber = s.SlotNumber,
+                            ConnectorType = s.ConnectorType,
+                            MaxPower = s.MaxPower,
+                            Status = s.Status,
+                            IsAvailable = IsSlotAvailable(s.Status),
+                            CurrentBookingId = s.CurrentBookingId,
+                            CurrentUserName = s.Bookings
                             .Where(b => b.Status == "in_progress" && b.DeletedAt == null)
                             .Select(b => b.User.FullName)
                             .FirstOrDefault(),
-                        CurrentVehicle = s.Bookings
+                            CurrentVehicle = s.Bookings
                             .Where(b => b.Status == "in_progress" && b.DeletedAt == null)
                             .Select(b => b.Vehicle.Brand + " " + b.Vehicle.Model)
                             .FirstOrDefault(),
-                        SessionStartTime = s.Bookings
+                            SessionStartTime = s.Bookings
                             .Where(b => b.Status == "in_progress" && b.DeletedAt == null)
                             .Select(b => b.ActualStartTime)
                             .FirstOrDefault(),
-                        CreatedAt = s.CreatedAt,
-                        UpdatedAt = s.UpdatedAt
-                    }).ToList()
+                            CreatedAt = s.CreatedAt,
+                            UpdatedAt = s.UpdatedAt
+                        }).ToList()
                         : new List<ChargingSlotDetailDto>(),
                     CreatedAt = p.CreatedAt,
                     UpdatedAt = p.UpdatedAt

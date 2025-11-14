@@ -19,16 +19,20 @@ const transformStationData = (apiStation, slotsData = null) => {
 
       slotsData.forEach((slot) => {
         const postId = slot.chargingPostId || slot.postId;
+        const slotPower = Number(slot.maxPower ?? slot.powerKw ?? 0);
+        const connectorFromDb = slot.connectorType ?? undefined;
+        const slotConnector = connectorFromDb ?? (slotPower >= 50 ? "DC" : "AC");
+        const isDc = (slotConnector || "").toUpperCase().includes("DC") || slotPower >= 50;
         if (!postMap.has(postId)) {
           postMap.set(postId, {
             id: `${apiStation.stationId}-post${postId}`,
             poleId: `${apiStation.stationId}-post${postId}`,
-            name: `Trụ sạc ${postId}`,
-            poleNumber: postId,
-            type: slot.powerKw >= 50 ? "DC" : "AC",
-            power: slot.powerKw,
-            voltage: slot.powerKw >= 50 ? 400 : 220,
-            status: slot.status || "active",
+            name: slot.postNumber ? `Trụ ${slot.postNumber}` : `Trụ sạc ${postId}`,
+            poleNumber: slot.postNumber ?? postId,
+            type: isDc ? "DC" : "AC",
+            power: slotPower,
+            voltage: isDc ? 400 : 220,
+            status: slot.status || "available",
             ports: [],
             totalPorts: 0,
             availablePorts: 0,
@@ -36,32 +40,25 @@ const transformStationData = (apiStation, slotsData = null) => {
         }
 
         const post = postMap.get(postId);
-        // Prefer connectorType coming from the database (truth from server).
-        // Only fall back to leaving connectorType undefined when the DB does not provide it.
-        // This avoids fabricating connector types based on heuristics (powerKw) when the
-        // database actually contains an authoritative value.
         post.ports.push({
           id: `${apiStation.stationId}-slot${slot.slotId}`,
           portId: `${apiStation.stationId}-slot${slot.slotId}`,
           slotId: slot.slotId,
-          portNumber: slot.slotId,
-          // Use DB-provided connectorType when available; otherwise keep undefined so
-          // downstream UI and analytics can decide whether to treat it as unknown.
-          connectorType: slot.connectorType ?? undefined,
-          maxPower: slot.powerKw,
-          status: slot.status === "available" ? "available" : "occupied",
-          currentRate: slot.powerKw >= 50 ? 5000 : 3000,
+          portNumber: slot.slotNumber ?? slot.slotId,
+          connectorType: slotConnector,
+          maxPower: slotPower,
+          status: (slot.status || "available").toLowerCase() === "available" ? "available" : "occupied",
+          currentRate: null,
         });
+        post.power = Math.max(post.power, slotPower);
+        post.status = slot.status || post.status;
         post.totalPorts += 1;
-        if (slot.status === "available") {
+        if ((slot.status || "").toLowerCase() === "available") {
           post.availablePorts += 1;
         }
       });
 
       poles = Array.from(postMap.values());
-      console.log(
-        `✅ Loaded ${poles.length} poles from real database slots for station ${apiStation.stationId}`
-      );
     }
 
     let totalPorts = poles.reduce((sum, pole) => sum + pole.totalPorts, 0);
@@ -165,6 +162,13 @@ const transformStationData = (apiStation, slotsData = null) => {
     const todayCompletedSessions =
       apiStation.todayCompletedSessions ?? apiStation.todaySessionCount ?? 0;
 
+    const basePrice = Number(
+      apiStation.basePricePerKwh ??
+      apiStation.pricePerKwh ??
+      apiStation.basePrice ??
+      0
+    );
+
     const managerUserId =
       apiStation.managerUserId ??
       apiStation.manager?.userId ??
@@ -223,10 +227,12 @@ const transformStationData = (apiStation, slotsData = null) => {
         maxPower,
         connectorTypes,
         pricing: {
-          acRate: 3500,
-          dcRate: 5000,
-          dcFastRate: 7000,
+          baseRate: basePrice > 0 ? basePrice : 0,
+          acRate: basePrice > 0 ? basePrice : 0,
+          dcRate: basePrice > 0 ? basePrice : 0,
+          dcFastRate: basePrice > 0 ? basePrice : 0,
         },
+        pricePerKwh: basePrice > 0 ? basePrice : null,
       },
       stats: {
         total: totalPorts,
@@ -257,6 +263,7 @@ const transformStationData = (apiStation, slotsData = null) => {
       amenities: apiStation.amenities || [],
       operatingHours: apiStation.operatingHours || "00:00-24:00",
       imageUrl: apiStation.stationImageUrl,
+      basePricePerKwh: basePrice > 0 ? basePrice : null,
       ratings: {
         overall: 4.5,
         totalReviews: 0,
@@ -603,20 +610,42 @@ const useStationStore = create((set, get) => ({
     set({ loading: true, error: null });
     try {
       const response = await stationsAPI.create(stationData);
+      const creationSucceeded = response?.success !== false;
+      const createdPayload = response?.data ?? response?.station ?? response;
 
-      if (response.success && response.data) {
-        const newStation = response.data;
-
-        set((state) => ({
-          stations: [...state.stations, newStation],
-          loading: false,
-        }));
-
-        console.log("✅ New station added:", newStation.name);
-        return { success: true, station: newStation };
-      } else {
-        throw new Error(response.message || "Không thể thêm trạm mới");
+      if (!creationSucceeded || !createdPayload) {
+        throw new Error(response?.message || "Không thể thêm trạm mới");
       }
+
+      const stationId = createdPayload.stationId ?? createdPayload.id;
+      if (!stationId) {
+        throw new Error("Phản hồi tạo trạm không hợp lệ");
+      }
+
+      let normalizedStation = null;
+      try {
+        const [stationDetail, slotsResponse] = await Promise.all([
+          stationsAPI.getById(stationId),
+          stationsAPI.getStationSlots(stationId).catch(() => null),
+        ]);
+
+        const stationDto = stationDetail?.data ?? stationDetail;
+        const slotsData = slotsResponse?.data ?? slotsResponse?.slots ?? [];
+        normalizedStation = transformStationData(stationDto, slotsData);
+      } catch (refreshError) {
+        console.error("⚠️ Không thể tải lại dữ liệu trạm vừa tạo:", refreshError);
+        normalizedStation = transformStationData(createdPayload, null);
+      }
+
+      set((state) => ({
+        stations: [
+          ...state.stations.filter((station) => station.stationId !== normalizedStation.stationId),
+          normalizedStation,
+        ],
+        loading: false,
+      }));
+
+      return { success: true, station: normalizedStation };
     } catch (error) {
       const errorMessage = error.message || "Đã xảy ra lỗi khi thêm trạm";
       set({ error: errorMessage, loading: false });
@@ -629,26 +658,29 @@ const useStationStore = create((set, get) => ({
     set({ loading: true, error: null });
     try {
       const response = await stationsAPI.update(stationId, stationData);
+      const updateSucceeded = response?.success !== false;
 
-      if (response.success) {
-        set((state) => ({
-          stations: state.stations.map((station) =>
-            station.id === stationId
-              ? {
-                  ...station,
-                  ...stationData,
-                  lastUpdated: new Date().toISOString(),
-                }
-              : station
-          ),
-          loading: false,
-        }));
-
-        console.log("✅ Station updated successfully:", stationId);
-        return { success: true };
-      } else {
-        throw new Error(response.message || "Không thể cập nhật trạm");
+      if (!updateSucceeded) {
+        throw new Error(response?.message || "Không thể cập nhật trạm");
       }
+
+      const [stationDetail, slotsResponse] = await Promise.all([
+        stationsAPI.getById(stationId),
+        stationsAPI.getStationSlots(stationId).catch(() => null),
+      ]);
+
+      const stationDto = stationDetail?.data ?? stationDetail;
+      const slotsData = slotsResponse?.data ?? slotsResponse?.slots ?? [];
+      const normalizedStation = transformStationData(stationDto, slotsData);
+
+      set((state) => ({
+        stations: state.stations.map((station) =>
+          station.stationId === stationId ? normalizedStation : station
+        ),
+        loading: false,
+      }));
+
+      return { success: true };
     } catch (error) {
       const errorMessage = error.message || "Đã xảy ra lỗi khi cập nhật trạm";
       set({ error: errorMessage, loading: false });

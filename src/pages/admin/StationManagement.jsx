@@ -117,67 +117,71 @@ const StationManagement = () => {
 
   // Station analytics data (with deterministic fallbacks so UI never shows 0)
   const stationAnalytics = stations.map((station) => {
-    const ports = station.charging?.totalPorts || 4;
-    const pricePerKwh = station.charging?.pricePerKwh || 3500;
-
-    // Raw values from API (may be 0/null)
-    const rawMonthlyRevenue = Number(
-      station.monthlyRevenue ?? station.revenue ?? station.todayRevenue ?? 0
+    const ports = station.charging?.totalPorts ?? 0;
+    const pricePerKwh = Number(
+      station.charging?.pricePerKwh ??
+      station.charging?.pricing?.acRate ??
+      station.basePricePerKwh ??
+      0
     );
-    const rawMonthlyBookings =
+
+    const monthlyRevenue = Number(
+      station.monthlyRevenue ?? station.revenue ?? 0
+    );
+
+    const monthlyBookings =
       station.monthlyBookings ??
       station.monthlyCompletedSessions ??
-      station.todayCompletedSessions ??
       0;
-    const rawUtil = Number.isFinite(station.utilizationRate)
+
+    const utilization = Number.isFinite(station.utilizationRate)
       ? station.utilizationRate
-      : station.utilization ?? 0;
-    const rawAvgSession = Number(
+      : Number(station.utilization ?? 0);
+
+    const avgSessionTime = Number(
       station.avgSessionTime ?? station.averageSessionDurationMinutes ?? 0
     );
 
-    // Deterministic fallbacks based on station configuration to avoid zeros
-    const utilization = rawUtil > 0 ? rawUtil : Math.min(60, Math.max(20, Math.round((ports / 6) * 30)));
-
-    const fallbackMonthlyBookings = rawMonthlyBookings > 0
-      ? rawMonthlyBookings
-      : Math.max(5, Math.round((ports * utilization / 100) * 30)); // rough monthly sessions
-
-    // Assume avg energy per session ~12 kWh for deterministic revenue fallback
-    const energyPerSession = 12;
-    const revenuePerSession = energyPerSession * pricePerKwh;
-
-    const monthlyRevenue = rawMonthlyRevenue > 0
-      ? rawMonthlyRevenue
-      : Math.max(100000, Math.round(fallbackMonthlyBookings * revenuePerSession));
-
-    const avgSessionTime = rawAvgSession > 0 ? rawAvgSession : 50; // minutes
-
-    const todayRevenue = Number(station.todayRevenue ?? Math.round(monthlyRevenue / 30));
-    const todayCompletedSessions = station.todayCompletedSessions ?? Math.max(1, Math.round(fallbackMonthlyBookings / 30));
+    const todayRevenue = Number(station.todayRevenue ?? 0);
+    const todayCompletedSessions = station.todayCompletedSessions ?? 0;
 
     return {
       ...station,
       monthlyRevenue,
-      monthlyBookings: fallbackMonthlyBookings,
+      monthlyBookings,
       utilization,
       avgSessionTime,
       todayRevenue,
       todayCompletedSessions,
+      charging: {
+        ...station.charging,
+        pricePerKwh,
+        pricing: {
+          ...(station.charging?.pricing || {}),
+          baseRate: station.charging?.pricing?.baseRate ?? pricePerKwh,
+          acRate: station.charging?.pricing?.acRate ?? pricePerKwh,
+          dcRate: station.charging?.pricing?.dcRate ?? pricePerKwh,
+          dcFastRate: station.charging?.pricing?.dcFastRate ?? pricePerKwh,
+        },
+        totalPorts: ports,
+      },
     };
   });
 
   const handleStationClick = (station) => {
+    const location = station.location ?? {};
+    const charging = station.charging ?? {};
+
     setSelectedStation(station);
     setStationForm({
       name: station.name,
-      address: station.location.address,
-      totalPorts: station.charging.totalPorts,
-      fastChargePorts: station.charging.fastChargePorts || 0,
-      standardPorts: station.charging.standardPorts || station.charging.totalPorts,
-      pricePerKwh: station.charging.pricePerKwh,
+      address: location.address ?? "",
+      totalPorts: charging.totalPorts ?? 0,
+      fastChargePorts: charging.fastChargePorts ?? 0,
+      standardPorts: charging.standardPorts ?? charging.totalPorts ?? 0,
+      pricePerKwh: charging.pricePerKwh ?? 0,
       status: station.status,
-      availableSlots: station.charging.availablePorts || station.charging.totalPorts,
+      availableSlots: charging.availablePorts ?? charging.totalPorts ?? 0,
       managerUserId: station.managerUserId || null,
     });
     setDialogOpen(true);
@@ -245,20 +249,16 @@ const StationManagement = () => {
     if (!validateForm()) return;
 
     const stationData = {
-      name: stationForm.name,
-      location: {
-        address: stationForm.address
-      },
-      charging: {
-        totalPorts: parseInt(stationForm.totalPorts),
-        availablePorts: parseInt(stationForm.availableSlots),
-        fastChargePorts: parseInt(stationForm.fastChargePorts),
-        standardPorts: parseInt(stationForm.standardPorts),
-        pricePerKwh: parseFloat(stationForm.pricePerKwh)
-      },
+      stationName: stationForm.name,
+      address: stationForm.address,
       status: stationForm.status,
+      totalPorts: Number(stationForm.totalPorts) || 0,
+      fastChargePorts: Number(stationForm.fastChargePorts) || 0,
+      standardPorts: Number(stationForm.standardPorts) || 0,
+      pricePerKwh: Number(stationForm.pricePerKwh) || 0,
+      fastChargePowerKw: stationForm.fastChargePorts > 0 ? 120 : null,
+      standardChargePowerKw: stationForm.standardPorts > 0 ? 22 : null,
       managerUserId: stationForm.managerUserId || null,
-      lastUpdated: new Date().toISOString(),
     };
 
     try {
@@ -308,7 +308,7 @@ const StationManagement = () => {
       >
         <Box>
           <Typography variant="h4" fontWeight="bold" gutterBottom>
-            Quản lý trạm sạc ⚡
+            Quản lý trạm sạc 
           </Typography>
           <Typography variant="body1" color="text.secondary">
             Giám sát và quản lý mạng lưới trạm sạc xe điện của bạn
@@ -422,7 +422,11 @@ const StationManagement = () => {
                 </Avatar>
                 <Box>
                   <Typography variant="h5" fontWeight="700">
-                    {filteredStations.reduce((sum, s) => sum + (s.charging.availablePorts ?? s.charging.totalPorts ?? 0), 0)}
+                    {filteredStations.reduce((sum, s) => {
+                      const charging = s.charging ?? {};
+                      const availablePorts = charging.availablePorts ?? charging.totalPorts ?? 0;
+                      return sum + (Number.isFinite(availablePorts) ? availablePorts : 0);
+                    }, 0)}
                   </Typography>
                   <Typography variant="body2" sx={{ opacity: 0.9 }}>
                     Tổng số cổng khả dụng hiện tại
@@ -487,6 +491,9 @@ const StationManagement = () => {
               </TableHead>
               <TableBody>
                   {filteredStations.map((station) => {
+                    const location = station.location ?? {};
+                    const charging = station.charging ?? {};
+
                     // Prefer explicit manager info from API DTO; fall back to user store lookup when missing
                     const managerFromUsers = users.find(
                       (u) => u.userId === (station.managerUserId ?? station.manager?.userId)
@@ -521,7 +528,7 @@ const StationManagement = () => {
                             {station.name}
                           </Typography>
                           <Typography variant="caption" color="text.secondary">
-                            {station.location.address}
+                            {location.address || "Địa chỉ chưa cập nhật"}
                           </Typography>
                         </Box>
                       </Box>
@@ -535,8 +542,8 @@ const StationManagement = () => {
                     </TableCell>
                     <TableCell align="center">
                       <Typography variant="body2">
-                        {station.charging.availablePorts}/
-                        {station.charging.totalPorts}
+                        {(Number.isFinite(charging.availablePorts) ? charging.availablePorts : 0)}/
+                        {(Number.isFinite(charging.totalPorts) ? charging.totalPorts : Math.max(charging.availablePorts ?? 0, 0))}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
                         có sẵn
