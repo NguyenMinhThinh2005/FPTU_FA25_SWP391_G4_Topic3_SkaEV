@@ -103,6 +103,44 @@ public class AdminReportsController : ControllerBase
     }
 
     /// <summary>
+    /// Debug endpoint to test view access
+    /// </summary>
+    [HttpGet("test-view")]
+    public async Task<IActionResult> TestViewAccess()
+    {
+        try
+        {
+            _logger.LogInformation("Testing direct SQL access to view...");
+            using var connection = new Microsoft.Data.SqlClient.SqlConnection("Server=ADMIN-PC\\MSSQLSERVER01;Database=SkaEV_DB;TrustServerCertificate=True;Integrated Security=True;");
+            await connection.OpenAsync();
+            using var command = connection.CreateCommand();
+            command.CommandText = "SELECT COUNT(*) FROM v_admin_usage_reports WHERE year IS NOT NULL";
+            var scalarResult = await command.ExecuteScalarAsync();
+            var count = scalarResult == null || scalarResult == System.DBNull.Value
+                ? 0
+                : System.Convert.ToInt32(scalarResult);
+            _logger.LogInformation($"Direct SQL returned {count} records");
+
+            // Now test through service
+            _logger.LogInformation("Testing through ReportService...");
+            var serviceResult = await _reportService.GetUsageReportsAsync();
+            _logger.LogInformation($"Service returned {serviceResult.Count()} records");
+
+            return Ok(new
+            {
+                directSqlCount = count,
+                serviceCount = serviceResult.Count(),
+                message = "Both methods executed"
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Test endpoint failed");
+            return Ok(new { message = "Test failed", error = ex.Message, stack = ex.StackTrace });
+        }
+    }
+
+    /// <summary>
     /// Get real-time station performance metrics
     /// </summary>
     /// <param name="stationId">Optional station ID filter</param>
@@ -270,6 +308,182 @@ public class AdminReportsController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting user growth");
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
+    }
+
+    /// <summary>
+    /// Get detailed analytics for a specific station with time-series data
+    /// </summary>
+    /// <param name="stationId">Station ID</param>
+    /// <param name="startDate">Start date (optional, defaults to 30 days ago)</param>
+    /// <param name="endDate">End date (optional, defaults to now)</param>
+    [HttpGet("stations/{stationId}/detailed-analytics")]
+    [ProducesResponseType(typeof(StationDetailedAnalyticsDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetStationDetailedAnalytics(
+        int stationId,
+        [FromQuery] DateTime? startDate = null,
+        [FromQuery] DateTime? endDate = null)
+    {
+        try
+        {
+            var analytics = await _reportService.GetStationDetailedAnalyticsAsync(stationId, startDate, endDate);
+            return Ok(new { success = true, data = analytics });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            _logger.LogWarning(ex, "Station not found: {StationId}", stationId);
+            return NotFound(new { success = false, message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting detailed analytics for station {StationId}", stationId);
+            return StatusCode(500, new { success = false, message = "An error occurred while retrieving station analytics" });
+        }
+    }
+
+    /// <summary>
+    /// Get daily analytics for a specific station
+    /// </summary>
+    /// <param name="stationId">Station ID</param>
+    /// <param name="startDate">Start date (optional, defaults to 30 days ago)</param>
+    /// <param name="endDate">End date (optional, defaults to now)</param>
+    [HttpGet("stations/{stationId}/daily")]
+    [ProducesResponseType(typeof(List<DailyAnalyticsDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetStationDailyAnalytics(
+        int stationId,
+        [FromQuery] DateTime? startDate = null,
+        [FromQuery] DateTime? endDate = null)
+    {
+        try
+        {
+            var analytics = await _reportService.GetStationDailyAnalyticsAsync(stationId, startDate, endDate);
+            return Ok(new { success = true, data = analytics, count = analytics.Count });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            _logger.LogWarning(ex, "Station not found: {StationId}", stationId);
+            return NotFound(new { success = false, message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting daily analytics for station {StationId}", stationId);
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
+    }
+
+    /// <summary>
+    /// Get monthly analytics for a specific station
+    /// </summary>
+    /// <param name="stationId">Station ID</param>
+    /// <param name="year">Year</param>
+    /// <param name="month">Month (1-12)</param>
+    [HttpGet("stations/{stationId}/monthly")]
+    [ProducesResponseType(typeof(MonthlyAnalyticsDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GetStationMonthlyAnalytics(
+        int stationId,
+        [FromQuery] int? year = null,
+        [FromQuery] int? month = null)
+    {
+        try
+        {
+            var currentYear = year ?? DateTime.Now.Year;
+            var currentMonth = month ?? DateTime.Now.Month;
+
+            if (currentMonth < 1 || currentMonth > 12)
+            {
+                return BadRequest(new { success = false, message = "Month must be between 1 and 12" });
+            }
+
+            var analytics = await _reportService.GetStationMonthlyAnalyticsAsync(stationId, currentYear, currentMonth);
+            return Ok(new { success = true, data = analytics });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            _logger.LogWarning(ex, "Station not found: {StationId}", stationId);
+            return NotFound(new { success = false, message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting monthly analytics for station {StationId}", stationId);
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
+    }
+
+    /// <summary>
+    /// Get yearly analytics for a specific station
+    /// </summary>
+    /// <param name="stationId">Station ID</param>
+    /// <param name="year">Year (optional, defaults to current year)</param>
+    [HttpGet("stations/{stationId}/yearly")]
+    [ProducesResponseType(typeof(YearlyAnalyticsDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetStationYearlyAnalytics(
+        int stationId,
+        [FromQuery] int? year = null)
+    {
+        try
+        {
+            var currentYear = year ?? DateTime.Now.Year;
+            var analytics = await _reportService.GetStationYearlyAnalyticsAsync(stationId, currentYear);
+            return Ok(new { success = true, data = analytics });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            _logger.LogWarning(ex, "Station not found: {StationId}", stationId);
+            return NotFound(new { success = false, message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting yearly analytics for station {StationId}", stationId);
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
+    }
+
+    /// <summary>
+    /// Get time-series data for a specific station
+    /// </summary>
+    /// <param name="stationId">Station ID</param>
+    /// <param name="granularity">Granularity: daily, monthly, or yearly</param>
+    /// <param name="startDate">Start date (optional)</param>
+    /// <param name="endDate">End date (optional)</param>
+    [HttpGet("stations/{stationId}/time-series")]
+    [ProducesResponseType(typeof(List<TimeSeriesDataPointDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GetStationTimeSeries(
+        int stationId,
+        [FromQuery] string granularity = "daily",
+        [FromQuery] DateTime? startDate = null,
+        [FromQuery] DateTime? endDate = null)
+    {
+        try
+        {
+            var validGranularities = new[] { "daily", "monthly", "yearly" };
+            if (!validGranularities.Contains(granularity.ToLower()))
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = "Granularity must be one of: daily, monthly, yearly"
+                });
+            }
+
+            var timeSeries = await _reportService.GetStationTimeSeriesAsync(stationId, granularity, startDate, endDate);
+            return Ok(new { success = true, data = timeSeries, granularity, count = timeSeries.Count });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            _logger.LogWarning(ex, "Station not found: {StationId}", stationId);
+            return NotFound(new { success = false, message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting time-series for station {StationId}", stationId);
             return StatusCode(500, new { success = false, message = "An error occurred" });
         }
     }

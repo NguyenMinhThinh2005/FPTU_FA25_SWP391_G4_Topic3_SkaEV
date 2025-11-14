@@ -12,71 +12,21 @@ const transformStationData = (apiStation, slotsData = null) => {
 
     let poles = [];
 
-    // PRIORITY 1: Use chargingPosts from API if available (new structure)
-    if (apiStation.chargingPosts && Array.isArray(apiStation.chargingPosts) && apiStation.chargingPosts.length > 0) {
-      console.log(`🔍 Processing ${apiStation.chargingPosts.length} charging posts from API for station ${apiStation.stationId}`);
-      
-      apiStation.chargingPosts.forEach((post) => {
-        const postSlots = post.slots || [];
-        const poleData = {
-          id: `${apiStation.stationId}-post${post.postId}`,
-          poleId: `${apiStation.stationId}-post${post.postId}`,
-          name: post.postName || `Post ${post.postId}`,
-          poleNumber: post.postId,
-          type: post.postType || "AC",
-          power: postSlots.length > 0 ? Math.max(...postSlots.map(s => s.maxPower || 0)) : 0,
-          voltage: post.postType === "DC" ? 400 : 220,
-          status: "active",
-          ports: [],
-          totalPorts: 0,
-          availablePorts: 0,
-        };
-
-        postSlots.forEach((slot) => {
-          poleData.ports.push({
-            id: `${apiStation.stationId}-slot${slot.slotId}`,
-            portId: `${apiStation.stationId}-slot${slot.slotId}`,
-            slotId: slot.slotId,
-            portNumber: slot.slotNumber || slot.slotId,
-            connectorType: slot.connectorType || (slot.maxPower >= 50 ? "CCS2" : "Type 2"),
-            maxPower: slot.maxPower || 0,
-            status: (slot.status || "").toLowerCase() === "available" ? "available" : "occupied",
-            currentRate: slot.maxPower >= 50 ? 5000 : 3000,
-          });
-          poleData.totalPorts += 1;
-          if ((slot.status || "").toLowerCase() === "available") {
-            poleData.availablePorts += 1;
-          }
-        });
-
-        poles.push(poleData);
-      });
-
-      console.log(`✅ Loaded ${poles.length} poles from API chargingPosts for station ${apiStation.stationId}`);
-      console.log(`   Total ports: ${poles.reduce((sum, pole) => sum + pole.totalPorts, 0)}, Available: ${poles.reduce((sum, pole) => sum + pole.availablePorts, 0)}`);
-    }
-    // PRIORITY 2: Use legacy slotsData parameter if provided (old structure)
-    else if (slotsData && Array.isArray(slotsData) && slotsData.length > 0) {
-      console.log(`🔍 Processing ${slotsData.length} slots (legacy) for station ${apiStation.stationId}:`, slotsData);
+    // Use real slots data if provided, otherwise leave empty to avoid mock fabrication
+    if (slotsData && Array.isArray(slotsData) && slotsData.length > 0) {
       const postMap = new Map();
 
       slotsData.forEach((slot) => {
-        // Backend returns maxPower instead of powerKw
-        const powerKw = slot.powerKw || slot.maxPower || 0;
         const postId = slot.chargingPostId || slot.postId;
-        const postNumber = slot.postNumber || `POST-${postId}`;
-        
-        console.log(`  Slot ${slot.slotId}: postId=${postId}, power=${powerKw}, status=${slot.status}`);
-        
         if (!postMap.has(postId)) {
           postMap.set(postId, {
             id: `${apiStation.stationId}-post${postId}`,
             poleId: `${apiStation.stationId}-post${postId}`,
-            name: postNumber,
+            name: `Trụ sạc ${postId}`,
             poleNumber: postId,
-            type: powerKw >= 50 ? "DC" : "AC",
-            power: powerKw,
-            voltage: powerKw >= 50 ? 400 : 220,
+            type: slot.powerKw >= 50 ? "DC" : "AC",
+            power: slot.powerKw,
+            voltage: slot.powerKw >= 50 ? 400 : 220,
             status: slot.status || "active",
             ports: [],
             totalPorts: 0,
@@ -89,12 +39,12 @@ const transformStationData = (apiStation, slotsData = null) => {
           id: `${apiStation.stationId}-slot${slot.slotId}`,
           portId: `${apiStation.stationId}-slot${slot.slotId}`,
           slotId: slot.slotId,
-          portNumber: slot.slotNumber || slot.slotId,
+          portNumber: slot.slotId,
           connectorType:
-            slot.connectorType || (powerKw >= 50 ? "CCS2" : "Type 2"),
-          maxPower: powerKw,
+            slot.connectorType || (slot.powerKw >= 50 ? "CCS2" : "Type 2"),
+          maxPower: slot.powerKw,
           status: slot.status === "available" ? "available" : "occupied",
-          currentRate: powerKw >= 50 ? 5000 : 3000,
+          currentRate: slot.powerKw >= 50 ? 5000 : 3000,
         });
         post.totalPorts += 1;
         if (slot.status === "available") {
@@ -104,49 +54,29 @@ const transformStationData = (apiStation, slotsData = null) => {
 
       poles = Array.from(postMap.values());
       console.log(
-        `✅ Loaded ${poles.length} poles from legacy slots data for station ${apiStation.stationId}`
+        `✅ Loaded ${poles.length} poles from real database slots for station ${apiStation.stationId}`
       );
-      console.log(`   Total ports: ${poles.reduce((sum, pole) => sum + pole.totalPorts, 0)}, Available: ${poles.reduce((sum, pole) => sum + pole.availablePorts, 0)}`);
-    } else {
-      console.log(`⚠️ No chargingPosts or slots data for station ${apiStation.stationId} - will use fallback or API totals`);
     }
 
     let totalPorts = poles.reduce((sum, pole) => sum + pole.totalPorts, 0);
     let availablePorts = poles.reduce((sum, pole) => sum + pole.availablePorts, 0);
 
     if (poles.length === 0) {
-      // No real slots data - use API totals directly if available
-      // API provides totalPosts/availablePosts from database
-      const apiTotalPorts = apiStation.totalPorts ?? apiStation.totalPosts ?? 0;
-      const apiAvailablePorts = apiStation.availablePosts ?? apiStation.availablePosts ?? 0;
+      const aggregatedTotalPorts =
+        apiStation.totalPorts ??
+        apiStation.totalSlots ??
+        totalPoles ??
+        (apiStation.ports ? apiStation.ports.length : 0) ??
+        0;
+      const aggregatedAvailablePorts =
+        apiStation.availablePorts ??
+        apiStation.availableSlots ??
+        apiStation.availablePoles ??
+        availablePoles ??
+        0;
 
-      console.log(`🔍 Station ${apiStation.stationId} - Checking API totals:`, {
-        apiTotalPorts,
-        apiAvailablePorts,
-        rawTotalPorts: apiStation.totalPorts,
-        rawTotalPosts: apiStation.totalPosts,
-        rawAvailablePorts: apiStation.availablePorts,
-        rawAvailablePosts: apiStation.availablePosts
-      });
-
-      if (apiTotalPorts > 0) {
-        // Trust API totals - don't fabricate fake poles
-        totalPorts = apiTotalPorts;
-        availablePorts = Math.min(apiAvailablePorts, apiTotalPorts); // Ensure available <= total
-        console.log(`📊 Station ${apiStation.stationId} using API totals: ${totalPorts} total, ${availablePorts} available (no detailed slots data)`);
-      } else {
-        // No API totals either - use reasonable defaults for active stations
-        const isActiveStation = (apiStation.status || "").toLowerCase() === "active";
-        totalPorts = isActiveStation ? 6 : 0; // Default: 6 ports for active stations
-        availablePorts = isActiveStation ? 4 : 0; // Default: ~67% availability
-        console.log(`⚙️ Station ${apiStation.stationId} using defaults: ${totalPorts} total, ${availablePorts} available (no API data)`);
-      }
-
-      // DON'T create fallback poles when we have API totals
-      // Frontend will show aggregate stats without detailed pole/port breakdown
-      poles = [];
-      
-      console.log(`⚠️ No slots data for station ${apiStation.stationId} - will use API totals or defaults`);
+      totalPorts = aggregatedTotalPorts;
+      availablePorts = aggregatedAvailablePorts;
     }
 
     if (poles.length > 0) {
@@ -197,17 +127,6 @@ const transformStationData = (apiStation, slotsData = null) => {
     } else if (Array.isArray(apiConnectorTypes)) {
       apiConnectorTypes.filter(Boolean).forEach((c) => connectorTypesSet.add(c));
     }
-    
-    // If no connector types found from slots or API, add common defaults for Vietnamese EV stations
-    if (connectorTypesSet.size === 0) {
-      // Default connector types for active stations
-      const isActiveStation = statusNormalized === "active";
-      if (isActiveStation) {
-        connectorTypesSet.add("Type 2"); // Standard AC charging (common in Vietnam)
-        connectorTypesSet.add("CCS2");   // DC fast charging (VinFast standard)
-        console.log(`⚙️ Station ${apiStation.stationId} using default connector types (no data from API)`);
-      }
-    }
 
     const connectorTypes = Array.from(connectorTypesSet);
 
@@ -242,25 +161,11 @@ const transformStationData = (apiStation, slotsData = null) => {
           }
         : null;
     
-    // Debug log to check final values
-    console.log(`🔍 Station ${apiStation.stationId} - Final values:`, {
-      totalPoles: totalPolesCount,
-      availablePoles,
-      totalPorts,
-      availablePorts: availablePorts,
-      polesCount: poles.length,
-      hasSlotsData: slotsData && Array.isArray(slotsData) && slotsData.length > 0,
-      status: apiStation.status
-    });
-    
-    // DON'T override status - always trust the database/API status
-    // Status should only be changed by admin/staff in the database
-    
     return {
       id: apiStation.stationId,
       stationId: apiStation.stationId,
       name: apiStation.stationName || apiStation.name,
-      status: apiStation.status || "active", // Keep original case from database
+      status: apiStation.status || "active",
       location: {
         address: apiStation.address,
         city: apiStation.city,
@@ -373,10 +278,22 @@ const useStationStore = create((set, get) => ({
         console.log("📊 Raw stations from API:", rawStations.length);
 
         // Transform API data to frontend format
-        // API now includes chargingPosts in the response, no need to fetch separately
-        const stations = rawStations.map((station) => {
-          return transformStationData(station, null);
-        });
+        // First pass: transform without slots data
+        const stations = await Promise.all(
+          rawStations.map(async (station) => {
+            try {
+              // Try to fetch slots for each station
+              console.log(`🔌 Fetching slots for station ${station.stationId}...`);
+              const slotsResponse = await stationsAPI.getStationSlots(station.stationId);
+              const slotsData = slotsResponse.data || slotsResponse.slots || [];
+              console.log(`✅ Loaded ${slotsData.length} slots for station ${station.stationId}`);
+              return transformStationData(station, slotsData);
+            } catch (slotError) {
+              console.warn(`⚠️ Could not fetch slots for station ${station.stationId}, using fallback:`, slotError.message);
+              return transformStationData(station, null);
+            }
+          })
+        );
 
         console.log("✅ Stations loaded from API:", stations.length);
         console.log("🔍 First station sample:", stations[0]);
@@ -396,9 +313,7 @@ const useStationStore = create((set, get) => ({
       const errorMessage = error.message || "Đã xảy ra lỗi khi tải trạm sạc";
       console.error("❌ Fetch stations error:", errorMessage);
       console.error("❌ Full error:", error);
-      
-      // IMPORTANT: Do NOT clear existing stations on error - preserve current data
-      set({ error: errorMessage, loading: false });
+      set({ error: errorMessage, loading: false, stations: [] });
       return { success: false, error: errorMessage };
     }
   },
@@ -470,9 +385,8 @@ const useStationStore = create((set, get) => ({
       );
       console.log(`   - Station status: ${station.status}`);
 
-      // Filter by station status - only active stations (case-insensitive)
-      const statusLower = (station.status || "").toLowerCase();
-      if (statusLower !== "active") {
+      // Filter by station status - only active stations
+      if (station.status !== "active") {
         console.log(`   ❌ Station not active: ${station.status}`);
         return false;
       }
@@ -534,7 +448,7 @@ const useStationStore = create((set, get) => ({
     const { stations } = get();
     return stations.filter(
       (station) =>
-        (station.status || "").toLowerCase() === "active" && station.charging.availablePorts > 0
+        station.status === "active" && station.charging.availablePorts > 0
     );
   },
 

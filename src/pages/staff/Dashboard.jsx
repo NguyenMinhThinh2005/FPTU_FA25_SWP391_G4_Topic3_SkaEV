@@ -28,7 +28,6 @@ import {
   AccessTime,
   MonetizationOn,
 } from "@mui/icons-material";
-import staffAPI from "../../services/api/staffAPI";
 
 const StaffDashboard = () => {
   const navigate = useNavigate();
@@ -39,7 +38,6 @@ const StaffDashboard = () => {
     revenue: 0,
     completedSessions: 0,
     energyConsumed: 0,
-    activeSessions: 0,
   });
   const [alerts, setAlerts] = useState([]);
   const [error, setError] = useState(null);
@@ -53,7 +51,6 @@ const StaffDashboard = () => {
     setError(null);
     try {
       const response = await staffAPI.getDashboardOverview();
-      console.log("📊 Dashboard API Response:", response);
 
       if (!response || typeof response !== "object") {
         throw new Error("Không nhận được dữ liệu dashboard");
@@ -67,9 +64,6 @@ const StaffDashboard = () => {
         dailyStats: dailyStatsPayload,
         alerts: alertPayload = [],
       } = response;
-
-      console.log("📈 Daily Stats from API:", dailyStatsPayload);
-      console.log("🔌 Connectors from API:", connectorPayload);
 
       if (hasAssignment && station) {
         setStationInfo({
@@ -89,65 +83,15 @@ const StaffDashboard = () => {
         : [];
       setConnectors(normalizedConnectors);
 
-      // Calculate comprehensive stats
-      let calculatedStats = {
-        revenue: 0,
-        completedSessions: 0,
-        energyConsumed: 0,
-        activeSessions: 0,
-      };
-
-      // Start with API stats if provided
       if (dailyStatsPayload) {
-        calculatedStats.revenue = Number(dailyStatsPayload.revenue || 0);
-        calculatedStats.completedSessions = Number(dailyStatsPayload.completedSessions || 0);
-        calculatedStats.energyConsumed = Number(dailyStatsPayload.energyDeliveredKwh || 0);
-        calculatedStats.activeSessions = Number(dailyStatsPayload.activeSessions || 0);
+        setDailyStats({
+          revenue: Number(dailyStatsPayload.revenue || 0),
+          completedSessions: Number(dailyStatsPayload.completedSessions || 0),
+          energyConsumed: Number(dailyStatsPayload.energyDeliveredKwh || 0),
+        });
+      } else {
+        setDailyStats({ revenue: 0, completedSessions: 0, energyConsumed: 0 });
       }
-
-      // Calculate current active sessions from connectors
-      let currentActiveSessions = 0;
-      let currentActiveEnergy = 0;
-      let currentActiveRevenue = 0;
-
-      normalizedConnectors.forEach((connector) => {
-        console.log("🔍 Checking connector:", connector.code, "hasActiveSession:", !!connector.activeSession);
-        if (connector.activeSession) {
-          currentActiveSessions += 1;
-          const session = connector.activeSession;
-          console.log("  ✅ Active session found:", session);
-          
-          // Calculate energy consumed from SOC change or direct value
-          const energyKwh = Number(session.energyConsumedKwh || 0);
-          currentActiveEnergy += energyKwh;
-          
-          // Calculate revenue based on energy and rate
-          const rate = Number(session.unitPrice || 5000); // Default rate VND/kWh
-          currentActiveRevenue += energyKwh * rate;
-        }
-      });
-
-      console.log("📊 Calculated from connectors:", {
-        activeSessions: currentActiveSessions,
-        energy: currentActiveEnergy,
-        revenue: currentActiveRevenue
-      });
-
-      // Update stats with current active data
-      calculatedStats.activeSessions = currentActiveSessions;
-      
-      // Add active session energy to total (if not already counted in dailyStats)
-      if (!dailyStatsPayload || dailyStatsPayload.energyDeliveredKwh === 0) {
-        calculatedStats.energyConsumed += currentActiveEnergy;
-      }
-
-      // If no revenue from API, use calculated from active sessions
-      if (calculatedStats.revenue === 0 && currentActiveRevenue > 0) {
-        calculatedStats.revenue = currentActiveRevenue;
-      }
-
-      console.log("✅ Final calculated stats:", calculatedStats);
-      setDailyStats(calculatedStats);
 
       const normalizedAlerts = Array.isArray(alertPayload)
         ? alertPayload.map((alert) => ({
@@ -302,27 +246,22 @@ const StaffDashboard = () => {
         </Alert>
       )}
 
-      {/* Statistics Cards - 4 chỉ số chính */}
+      {/* Statistics Cards - THAY THẾ VÀ SẮP XẾP LẠI CÁC CHỈ SỐ */}
       <Grid container spacing={3} mb={3}>
         {/* Doanh thu hôm nay */}
         <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ 
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            color: 'white',
-            height: '100%',
-            minHeight: 140
-          }}>
-            <CardContent sx={{ height: '100%', display: 'flex', alignItems: 'center' }}>
-              <Box display="flex" alignItems="center" justifyContent="space-between" width="100%">
-                <Box flex={1}>
-                  <Typography variant="body2" sx={{ opacity: 0.9, mb: 1, fontSize: '0.875rem' }}>
+          <Card>
+            <CardContent>
+              <Box display="flex" alignItems="center" gap={2}>
+                <MonetizationOn color="success" sx={{ fontSize: 40 }} />
+                <Box>
+                  <Typography variant="h4" fontWeight="bold" color="success.main">
+                    {Number(dailyStats.revenue || 0).toLocaleString()}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
                     Doanh thu hôm nay (VNĐ)
                   </Typography>
-                  <Typography variant="h4" fontWeight="bold" sx={{ fontSize: { xs: '1.75rem', md: '2.125rem' } }}>
-                    {Number(dailyStats.revenue || 0).toLocaleString('vi-VN')}
-                  </Typography>
                 </Box>
-                <MonetizationOn sx={{ fontSize: { xs: 40, md: 48 }, opacity: 0.8, ml: 1 }} />
               </Box>
             </CardContent>
           </Card>
@@ -330,23 +269,18 @@ const StaffDashboard = () => {
 
         {/* Phiên hoàn thành */}
         <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ 
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            color: 'white',
-            height: '100%',
-            minHeight: 140
-          }}>
-            <CardContent sx={{ height: '100%', display: 'flex', alignItems: 'center' }}>
-              <Box display="flex" alignItems="center" justifyContent="space-between" width="100%">
-                <Box flex={1}>
-                  <Typography variant="body2" sx={{ opacity: 0.9, mb: 1, fontSize: '0.875rem' }}>
+          <Card>
+            <CardContent>
+              <Box display="flex" alignItems="center" gap={2}>
+                <CheckCircle color="primary" sx={{ fontSize: 40 }} />
+                <Box>
+                  <Typography variant="h4" fontWeight="bold" color="primary.main">
+                    {dailyStats.completedSessions}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
                     Phiên hoàn thành
                   </Typography>
-                  <Typography variant="h4" fontWeight="bold" sx={{ fontSize: { xs: '1.75rem', md: '2.125rem' } }}>
-                    {Number(dailyStats.completedSessions || 0).toLocaleString('vi-VN')}
-                  </Typography>
                 </Box>
-                <CheckCircle sx={{ fontSize: { xs: 40, md: 48 }, opacity: 0.8, ml: 1 }} />
               </Box>
             </CardContent>
           </Card>
@@ -354,47 +288,37 @@ const StaffDashboard = () => {
 
         {/* Năng lượng tiêu thụ */}
         <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ 
-            background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-            color: 'white',
-            height: '100%',
-            minHeight: 140
-          }}>
-            <CardContent sx={{ height: '100%', display: 'flex', alignItems: 'center' }}>
-              <Box display="flex" alignItems="center" justifyContent="space-between" width="100%">
-                <Box flex={1}>
-                  <Typography variant="body2" sx={{ opacity: 0.9, mb: 1, fontSize: '0.875rem' }}>
-                    Năng lượng tiêu thụ (kWh)
-                  </Typography>
-                  <Typography variant="h4" fontWeight="bold" sx={{ fontSize: { xs: '1.75rem', md: '2.125rem' } }}>
+          <Card>
+            <CardContent>
+              <Box display="flex" alignItems="center" gap={2}>
+                <Bolt color="warning" sx={{ fontSize: 40 }} />
+                <Box>
+                  <Typography variant="h4" fontWeight="bold" color="warning.main">
                     {Number(dailyStats.energyConsumed || 0).toFixed(1)}
                   </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Năng lượng tiêu thụ (kWh)
+                  </Typography>
                 </Box>
-                <Bolt sx={{ fontSize: { xs: 40, md: 48 }, opacity: 0.8, ml: 1 }} />
               </Box>
             </CardContent>
           </Card>
         </Grid>
 
-        {/* Số lượng Xe đang sạc */}
+        {/* Số lượng Xe đang sạc - Thay thế "Tích hợp bình chỗ sạc" */}
         <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ 
-            background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-            color: 'white',
-            height: '100%',
-            minHeight: 140
-          }}>
-            <CardContent sx={{ height: '100%', display: 'flex', alignItems: 'center' }}>
-              <Box display="flex" alignItems="center" justifyContent="space-between" width="100%">
-                <Box flex={1}>
-                  <Typography variant="body2" sx={{ opacity: 0.9, mb: 1, fontSize: '0.875rem' }}>
+          <Card>
+            <CardContent>
+              <Box display="flex" alignItems="center" gap={2}>
+                <BatteryChargingFull color="info" sx={{ fontSize: 40 }} />
+                <Box>
+                  <Typography variant="h4" fontWeight="bold" color="info.main">
+                    {chargingConnectors}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
                     Số lượng Xe đang sạc
                   </Typography>
-                  <Typography variant="h4" fontWeight="bold" sx={{ fontSize: { xs: '1.75rem', md: '2.125rem' } }}>
-                    {Number(dailyStats.activeSessions || chargingConnectors || 0).toLocaleString('vi-VN')}
-                  </Typography>
                 </Box>
-                <BatteryChargingFull sx={{ fontSize: { xs: 40, md: 48 }, opacity: 0.8, ml: 1 }} />
               </Box>
             </CardContent>
           </Card>

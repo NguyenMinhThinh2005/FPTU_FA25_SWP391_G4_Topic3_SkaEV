@@ -8,7 +8,10 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "vitest"
+        "test": "vitest",
+        "test:run": "vitest run",
+        "test:cov": "vitest run --coverage",
+        "smoke:admin": "powershell.exe -File tools/run-smoke-tests.ps1 -ApiBaseUrl http://localhost:5000 -AdminEmail admin@skaev.com -AdminPassword Admin@123"
   },
   "dependencies": {
     "@emotion/react": "^11.13.5",
@@ -29,7 +32,8 @@
     "@zxing/browser": "^0.1.5",
     "axios": "^1.12.2",
     "date-fns": "^4.1.0",
-    "jsqr": "^1.4.0",
+    "jspdf": "^3.0.3",
+    "jspdf-autotable": "^5.0.2",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.553.0",
     "react": "^19.1.1",
@@ -41,24 +45,26 @@
     "react-toastify": "^11.0.5",
     "react-webcam": "^7.2.0",
     "recharts": "^2.15.4",
+    "xlsx": "^0.18.5",
     "zod": "^3.24.1",
     "zustand": "^5.0.2"
   },
   "devDependencies": {
     "@eslint/js": "^9.33.0",
-    "@testing-library/dom": "^10.4.1",
-    "@testing-library/jest-dom": "^6.6.3",
-    "@testing-library/react": "^16.1.0",
-    "@testing-library/user-event": "^14.6.1",
+    "@testing-library/jest-dom": "^6.1.5",
+    "@testing-library/react": "^15.0.0",
+    "@testing-library/user-event": "^14.5.1",
     "@types/react": "^19.1.10",
     "@types/react-dom": "^19.1.7",
     "@vitejs/plugin-react": "^5.0.0",
+    "@vitest/coverage-v8": "^1.0.4",
     "eslint": "^9.33.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "0.4.20",
     "globals": "^16.3.0",
-    "jsdom": "^27.1.0",
+    "jsdom": "^23.0.1",
+    "msw": "^2.0.11",
     "vite": "^7.1.9",
-    "vitest": "^2.1.6"
+    "vitest": "^1.0.4"
   }
 }

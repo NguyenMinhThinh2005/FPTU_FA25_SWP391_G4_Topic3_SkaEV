@@ -62,6 +62,7 @@ import { useNavigate } from "react-router-dom";
 import useAuthStore from "../../store/authStore";
 import useStationStore from "../../store/stationStore";
 import { formatCurrency } from "../../utils/helpers";
+import useAdminDashboard from '../../hooks/useAdminDashboard';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -87,6 +88,7 @@ const AdminDashboard = () => {
   // Real-time stats from API
   const [stationPerformance, setStationPerformance] = useState([]);
   const [_loading, setLoading] = useState(true);
+  const { recentActivities, isLoading: dashboardLoading, error: dashboardError } = useAdminDashboard();
 
   // Fetch stations on component mount
   useEffect(() => {
@@ -110,31 +112,35 @@ const AdminDashboard = () => {
   useEffect(() => {
     if (stations.length > 0) {
       const performance = stations.map((station) => {
-        // Tính tỷ lệ sử dụng từ các trụ/cổng
-        let totalPorts = 0;
-        let occupiedPorts = 0;
+        // Lấy dữ liệu THỰC từ backend (không tính toán lại)
+        const totalPosts = station.totalPosts || station.charging?.totalPosts || 0;
+        
+        // Logic: Mỗi trụ có 2 cổng
+        const totalSlots = totalPosts * 2;
+        
+        // Active sessions từ backend
+        const activeSessions = station.activeSessions || station.charging?.activeSessions || 0;
+        
+        // Số cổng khả dụng = Tổng cổng - Số phiên đang hoạt động
+        const availableSlots = Math.max(0, totalSlots - activeSessions);
+        
+        // Tỷ lệ sử dụng từ backend (nếu có) hoặc tính từ activeSessions
+        const utilization = station.utilizationRate !== undefined 
+          ? station.utilizationRate 
+          : (totalSlots > 0 ? (activeSessions / totalSlots) * 100 : 0);
 
-        if (station.charging?.poles) {
-          station.charging.poles.forEach((pole) => {
-            const ports = pole.totalPorts || (pole.ports || []).length;
-            totalPorts += ports;
-            const available = typeof pole.availablePorts === 'number' 
-              ? pole.availablePorts 
-              : (pole.ports || []).filter(p => p.status === 'available').length;
-            occupiedPorts += Math.max(0, ports - available);
-          });
-        }
-
-        const utilization = totalPorts > 0 ? (occupiedPorts / totalPorts) * 100 : 0;
+        // Doanh thu từ backend
+        const revenue = station.todayRevenue || station.revenue || 0;
 
         return {
           ...station,
-          bookingsCount: 0, // Sẽ được cập nhật từ API nếu cần
-          revenue: 0, // Sẽ được cập nhật từ API nếu cần
-          utilization,
-          totalSlots: totalPorts,
-          occupiedSlots: occupiedPorts,
-          chargingPostsCount: station.charging?.poles?.length || 0,
+          bookingsCount: activeSessions,  // Số phiên đang hoạt động
+          revenue: revenue,
+          utilization: utilization,
+          totalSlots: totalSlots,          // Tổng cổng = trụ * 2
+          availableSlots: availableSlots,  // Khả dụng = total - active
+          occupiedSlots: activeSessions,   // Đang sử dụng = active sessions
+          chargingPostsCount: totalPosts,  // Số trụ từ backend
         };
       });
       
@@ -181,56 +187,8 @@ const AdminDashboard = () => {
     setActionDialog({ open: false, type: "", station: null });
   };
 
-  const getDistanceToStation = () => {
-    // Tính toán khoảng cách giả lập cho chế độ xem admin
-    return (Math.random() * 10 + 1).toFixed(1);
-  };
-
-  // Hoạt động gần đây
-  const _recentActivities = [
-    {
-      id: 1,
-      type: "booking",
-      message: "Đặt chỗ mới tại Tech Park SuperCharger - Trụ A",
-      time: "5 phút trước",
-      severity: "info",
-    },
-    {
-      id: 2,
-      type: "station",
-      message: 'Trụ B tại "Green Mall Hub" đã ngắt kết nối',
-      time: "15 phút trước",
-      severity: "warning",
-    },
-    {
-      id: 3,
-      type: "user",
-      message: "Người dùng mới đăng ký: Nguyễn Văn A",
-      time: "30 phút trước",
-      severity: "success",
-    },
-    {
-      id: 4,
-      type: "payment",
-      message: "Sạc nhanh DC hoàn thành: ₫125,000",
-      time: "1 giờ trước",
-      severity: "success",
-    },
-    {
-      id: 5,
-      type: "maintenance",
-      message: "Bảo trì đã lên lịch cho Trạm EcoPark - Tất cả các trụ",
-      time: "2 giờ trước",
-      severity: "info",
-    },
-    {
-      id: 6,
-      type: "port",
-      message: "Cổng A01 tại Tech Park SuperCharger - Trụ C hiện đã sẵn sàng",
-      time: "3 giờ trước",
-      severity: "success",
-    },
-  ];
+  // Use recent activities computed from live data
+  const _recentActivities = recentActivities || [];
 
   const getStatusChip = (status) => {
     // Ánh xạ trạng thái không phân biệt chữ hoa chữ thường
@@ -315,7 +273,10 @@ const AdminDashboard = () => {
         </Grid>
       </Box>
 
-      <Grid container spacing={3}>
+  {/* Show a thin loading bar while dashboard data loads */}
+  {dashboardLoading && <LinearProgress color="primary" sx={{ mb: 2 }} />}
+
+  <Grid container spacing={3}>
         {/* Station List */}
         <Grid item xs={12} lg={9}>
           <Card elevation={2}>
@@ -358,7 +319,20 @@ const AdminDashboard = () => {
                           boxShadow: 3,
                         },
                       }}
-                      onClick={() => setSelectedStationForDetail(station)}
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Mở phân tích trạm ${station.name}`}
+                      onClick={() => {
+                        // Navigate to the station analytics/detail page (same target as in StationManagement)
+                        navigate(`/admin/stations/${station.id}/analytics`);
+                      }}
+                      onKeyDown={(e) => {
+                        // Allow Enter or Space to activate navigation for keyboard users
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          navigate(`/admin/stations/${station.id}/analytics`);
+                        }
+                      }}
                     >
                       <Box
                         sx={{
@@ -405,8 +379,7 @@ const AdminDashboard = () => {
                               sx={{ fontSize: 16, color: "text.secondary" }}
                             />
                             <Typography variant="body2" color="text.secondary">
-                              {station.location.address} •{" "}
-                              {getDistanceToStation(station)}km từ trạm trung tâm
+                              {station.location.address}
                             </Typography>
                           </Box>
 
@@ -479,13 +452,20 @@ const AdminDashboard = () => {
                               size="small"
                               variant="outlined"
                             />
-                            <Chip
-                              label={`${
-                                station.totalSlots - station.occupiedSlots
-                              } khả dụng`}
-                              color="success"
-                              size="small"
-                            />
+                            {/* Only show available slots if station is active */}
+                            {(station.status || '').toLowerCase() === 'active' ? (
+                              <Chip
+                                label={`${station.availableSlots} cổng khả dụng`}
+                                color="success"
+                                size="small"
+                              />
+                            ) : (
+                              <Chip
+                                label="Không khả dụng"
+                                color="error"
+                                size="small"
+                              />
+                            )}
                           </Box>
                         </Box>
 
@@ -539,11 +519,6 @@ const AdminDashboard = () => {
                   {selectedStationForDetail.location.address}
                 </Box>
 
-                <Typography variant="body2" color="text.secondary" gutterBottom>
-                  Khoảng cách: {getDistanceToStation(selectedStationForDetail)}km
-                  từ trạm trung tâm
-                </Typography>
-
                 <Divider sx={{ my: 2 }} />
 
                 <Typography variant="subtitle2" fontWeight="bold" gutterBottom sx={{ mb: 1.5 }}>
@@ -564,9 +539,15 @@ const AdminDashboard = () => {
                   </Box>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                     <Typography variant="body2" color="text.secondary">Cổng khả dụng:</Typography>
-                    <Typography variant="body2" fontWeight="bold" color="success.main">
-                      {selectedStationForDetail.totalSlots - selectedStationForDetail.occupiedSlots}
-                    </Typography>
+                    {(selectedStationForDetail.status || '').toLowerCase() === 'active' ? (
+                      <Typography variant="body2" fontWeight="bold" color="success.main">
+                        {selectedStationForDetail.availableSlots}
+                      </Typography>
+                    ) : (
+                      <Typography variant="body2" fontWeight="bold" color="error.main">
+                        0 (Trạm không hoạt động)
+                      </Typography>
+                    )}
                   </Box>
                 </Stack>
 

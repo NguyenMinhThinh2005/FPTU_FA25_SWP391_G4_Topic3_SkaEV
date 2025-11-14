@@ -30,6 +30,7 @@ public class SkaEVDbContext : DbContext
     public DbSet<PaymentMethod> PaymentMethods { get; set; }
     public DbSet<Payment> Payments { get; set; }
     public DbSet<ServicePlan> ServicePlans { get; set; }
+    public DbSet<Incident> Incidents { get; set; }
 
     // DbSets - Views (read-only)
     public DbSet<UserCostReport> UserCostReports { get; set; }
@@ -69,6 +70,7 @@ public class SkaEVDbContext : DbContext
         modelBuilder.Entity<PricingRule>().ToTable("pricing_rules");
         modelBuilder.Entity<StationStaff>().ToTable("station_staff");
         modelBuilder.Entity<ServicePlan>().ToTable("service_plans");
+        modelBuilder.Entity<Incident>().ToTable("incidents");
 
         // User configuration
         modelBuilder.Entity<User>(entity =>
@@ -543,6 +545,56 @@ public class SkaEVDbContext : DbContext
             entity.HasQueryFilter(e => e.DeletedAt == null); // Global query filter for soft delete
         });
 
+        // Incident configuration
+        modelBuilder.Entity<Incident>(entity =>
+        {
+            entity.HasKey(e => e.IncidentId);
+            entity.Property(e => e.IncidentId).HasColumnName("incident_id");
+            entity.Property(e => e.StationId).HasColumnName("station_id").IsRequired();
+            entity.Property(e => e.PostId).HasColumnName("post_id");
+            entity.Property(e => e.SlotId).HasColumnName("slot_id");
+            entity.Property(e => e.ReportedByUserId).HasColumnName("reported_by_user_id");
+            entity.Property(e => e.IncidentType).HasColumnName("incident_type").HasMaxLength(50).IsRequired();
+            entity.Property(e => e.Severity).HasColumnName("severity").HasMaxLength(20).IsRequired();
+            entity.Property(e => e.Status).HasColumnName("status").HasMaxLength(20).IsRequired();
+            entity.Property(e => e.Title).HasColumnName("title").HasMaxLength(500).IsRequired();
+            entity.Property(e => e.Description).HasColumnName("description");
+            entity.Property(e => e.ResolutionNotes).HasColumnName("resolution_notes");
+            entity.Property(e => e.AssignedToStaffId).HasColumnName("assigned_to_staff_id");
+            entity.Property(e => e.ReportedAt).HasColumnName("reported_at").IsRequired();
+            entity.Property(e => e.AcknowledgedAt).HasColumnName("acknowledged_at");
+            entity.Property(e => e.ResolvedAt).HasColumnName("resolved_at");
+            entity.Property(e => e.ClosedAt).HasColumnName("closed_at");
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at").IsRequired();
+            entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").IsRequired();
+
+            // Foreign keys
+            entity.HasOne(e => e.ChargingStation)
+                .WithMany()
+                .HasForeignKey(e => e.StationId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(e => e.ChargingPost)
+                .WithMany()
+                .HasForeignKey(e => e.PostId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(e => e.ChargingSlot)
+                .WithMany()
+                .HasForeignKey(e => e.SlotId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(e => e.ReportedByUser)
+                .WithMany()
+                .HasForeignKey(e => e.ReportedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(e => e.AssignedToStaff)
+                .WithMany()
+                .HasForeignKey(e => e.AssignedToStaffId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
         // Configure Views (read-only, no keys needed)
         modelBuilder.Entity<UserCostReport>(entity =>
         {
@@ -566,6 +618,18 @@ public class SkaEVDbContext : DbContext
         {
             entity.ToView("v_admin_usage_reports");
             entity.HasNoKey();
+            entity.Property(e => e.StationId).HasColumnName("station_id");
+            entity.Property(e => e.StationName).HasColumnName("station_name");
+            entity.Property(e => e.Year).HasColumnName("year");
+            entity.Property(e => e.Month).HasColumnName("month");
+            entity.Property(e => e.TotalBookings).HasColumnName("total_bookings");
+            entity.Property(e => e.CompletedSessions).HasColumnName("completed_sessions");
+            entity.Property(e => e.CancelledSessions).HasColumnName("cancelled_sessions");
+            entity.Property(e => e.NoShowSessions).HasColumnName("no_show_sessions");
+            entity.Property(e => e.TotalUsageMinutes).HasColumnName("total_usage_minutes");
+            entity.Property(e => e.AvgSessionDurationMinutes).HasColumnName("avg_session_duration_minutes");
+            entity.Property(e => e.PeakUsageHour).HasColumnName("peak_usage_hour");
+            entity.Property(e => e.UtilizationRatePercent).HasColumnName("utilization_rate_percent");
         });
 
         modelBuilder.Entity<StationPerformance>(entity =>

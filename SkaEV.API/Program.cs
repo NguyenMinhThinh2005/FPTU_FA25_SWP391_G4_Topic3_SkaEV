@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authentication.JwtBearer;
+﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -122,6 +122,7 @@ builder.Services.AddScoped<IStationService, StationService>();
 builder.Services.AddScoped<IBookingService, BookingService>();
 builder.Services.AddScoped<IPaymentMethodService, PaymentMethodService>();
 builder.Services.AddScoped<IReportService, ReportService>();
+builder.Services.AddScoped<IStaffDashboardService, StaffDashboardService>();
 
 // New Services
 builder.Services.AddScoped<IInvoiceService, InvoiceService>();
@@ -135,12 +136,21 @@ builder.Services.AddScoped<IUserProfileService, UserProfileService>();
 builder.Services.AddScoped<IAdminUserService, AdminUserService>();
 builder.Services.AddScoped<IIssueService, IssueService>(); // Optional - requires 08_ADD_ISSUES_TABLE.sql
 
+// Additional admin and analytics services
+builder.Services.AddScoped<IncidentService>(); // Incident management service
+builder.Services.AddScoped<StationAnalyticsService>(); // Station analytics service
+builder.Services.AddScoped<IAdminStationManagementService, AdminStationManagementService>();
+
 // Maps Service with HttpClient
 builder.Services.AddHttpClient<IMapsService, MapsService>();
 
 // Payment Services
 builder.Services.AddScoped<SkaEV.API.Application.Services.Payments.IPaymentProcessor, SkaEV.API.Application.Services.Payments.SimulatedPaymentProcessor>();
 builder.Services.AddScoped<SkaEV.API.Application.Services.Payments.IVNPayService, SkaEV.API.Application.Services.Payments.VNPayService>();
+
+// Background Simulation Services (for student project demo)
+builder.Services.AddHostedService<SkaEV.API.Services.ChargingSimulationService>();
+builder.Services.AddHostedService<SkaEV.API.Services.SystemEventsSimulationService>();
 
 // Configure Swagger
 builder.Services.AddEndpointsApiExplorer();

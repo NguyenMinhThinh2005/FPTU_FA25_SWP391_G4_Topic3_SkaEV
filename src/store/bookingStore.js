@@ -2,99 +2,99 @@
 import { persist } from "zustand/middleware";
 import { bookingsAPI } from "../services/api";
 
-const ACTIVE_STATUSES = new Set([
-  "pending",
-  "scheduled",
-  "confirmed",
-  "in_progress",
-  "charging",
-]);
-
-const parseNumber = (value, fallback = null) => {
-  if (value === null || value === undefined || value === "") {
-    return fallback;
-  }
-  const numeric = Number(value);
-  return Number.isNaN(numeric) ? fallback : numeric;
+const normalizeTimestamp = (value) => {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
 };
 
-const normalizeBookingFromApi = (raw) => {
-  if (!raw) {
-    return null;
-  }
+const calculateDurationMinutes = (startIso, endIso) => {
+  if (!startIso || !endIso) return null;
+  const start = new Date(startIso).getTime();
+  const end = new Date(endIso).getTime();
+  if (Number.isNaN(start) || Number.isNaN(end) || end < start) return null;
+  return Math.round((end - start) / 60000);
+};
 
-  const status = (raw.status || "").toLowerCase();
-  const createdAt = raw.createdAt || new Date().toISOString();
-  const scheduledStartTime =
-    raw.scheduledStartTime || raw.scheduledDateTime || null;
-  const actualStartTime = raw.actualStartTime || null;
-  const actualEndTime = raw.actualEndTime || null;
-  const completedAt = raw.completedAt || actualEndTime || null;
+const addMinutes = (isoString, minutes) => {
+  if (!isoString || minutes == null) return null;
+  const base = new Date(isoString);
+  if (Number.isNaN(base.getTime())) return null;
+  const end = new Date(base.getTime() + minutes * 60000);
+  return end.toISOString();
+};
 
-  const chargingDurationFromApi = parseNumber(raw.chargingDurationMinutes);
-  let chargingDuration = chargingDurationFromApi;
-  if (chargingDuration === null && actualStartTime && actualEndTime) {
-    const start = new Date(actualStartTime).getTime();
-    const end = new Date(actualEndTime).getTime();
-    const diffMinutes = Math.round((end - start) / 60000);
-    chargingDuration = diffMinutes > 0 ? diffMinutes : 0;
-  }
-  if (chargingDuration === null && raw.estimatedDuration !== undefined) {
-    chargingDuration = parseNumber(raw.estimatedDuration, null);
-  }
-
-  const energyDelivered = parseNumber(
-    raw.totalEnergyKwh !== undefined ? raw.totalEnergyKwh : raw.energyDelivered,
-    0
+const mapApiBookingToStore = (apiBooking) => {
+  const createdAt = normalizeTimestamp(apiBooking.createdAt);
+  const scheduledStart = normalizeTimestamp(apiBooking.scheduledStartTime);
+  const estimatedArrival = normalizeTimestamp(apiBooking.estimatedArrival);
+  const actualStart = normalizeTimestamp(apiBooking.actualStartTime);
+  const actualEnd = normalizeTimestamp(apiBooking.actualEndTime);
+  const chargingDuration = calculateDurationMinutes(actualStart, actualEnd);
+  const estimatedDuration = apiBooking.estimatedDuration ?? null;
+  const durationMinutes = chargingDuration ?? estimatedDuration ?? null;
+  const effectiveStart = actualStart || scheduledStart || estimatedArrival || createdAt;
+  const projectedEnd =
+    effectiveStart && (estimatedDuration ?? durationMinutes) != null
+      ? addMinutes(effectiveStart, estimatedDuration ?? durationMinutes)
+      : null;
+  const estimatedEndTime = actualEnd || projectedEnd;
+  const baseCost = Number(
+    apiBooking.totalAmount ?? apiBooking.totalCost ?? apiBooking.finalAmount ?? 0
   );
-  const totalAmount = parseNumber(raw.totalAmount, 0);
+  const deliveredEnergy = Number(
+    apiBooking.energyDelivered ?? apiBooking.energyKwh ?? apiBooking.totalEnergy ?? 0
+  );
 
   return {
-    id: raw.bookingId,
-    bookingId: raw.bookingId,
-    apiId: raw.bookingId,
-    bookingCode: `BK-${String(raw.bookingId).padStart(6, "0")}`,
-    userId: raw.userId,
-    vehicleId: raw.vehicleId,
-    vehicleType: raw.vehicleType,
-    licensePlate: raw.licensePlate,
-    stationId: raw.stationId,
-    stationName: raw.stationName,
-    stationAddress: raw.stationAddress,
-    slotId: raw.slotId,
-    slotNumber: raw.slotNumber,
-    status,
-    statusLabel: raw.status,
-    schedulingType: raw.schedulingType,
-    bookingDate: createdAt ? createdAt.split("T")[0] : null,
+    id: apiBooking.bookingId,
+    bookingId: apiBooking.bookingId,
+    apiId: apiBooking.bookingId,
+    userId: apiBooking.userId,
+    customerName: apiBooking.customerName,
+    stationId: apiBooking.stationId,
+    stationName: apiBooking.stationName,
+    stationAddress: apiBooking.stationAddress,
+    slotId: apiBooking.slotId,
+    slotNumber: apiBooking.slotNumber,
+    schedulingType: (apiBooking.schedulingType || "immediate").toLowerCase(),
+    status: (apiBooking.status || "pending").toLowerCase(),
+    statusRaw: apiBooking.status,
+    bookingCode: `BK-${apiBooking.bookingId}`,
+    bookingTime: createdAt,
     createdAt,
-    estimatedArrival: raw.estimatedArrival || null,
-    scheduledDateTime: scheduledStartTime,
-    actualStartTime,
-    actualEndTime,
-    completedAt,
-    targetSOC: parseNumber(raw.targetSoc),
-    currentSOC: parseNumber(raw.currentSoc),
-    finalSOC: parseNumber(raw.finalSoc ?? raw.currentSoc),
-    estimatedDuration: parseNumber(raw.estimatedDuration),
+    bookingDate: createdAt,
+    scheduledDateTime: scheduledStart,
+    scheduledTime: scheduledStart,
+    scheduledDate: scheduledStart ? scheduledStart.split("T")[0] : null,
+    estimatedArrival,
+    estimatedDuration,
+    duration: durationMinutes,
+    durationMinutes,
+    sessionDurationMinutes: durationMinutes,
+    actualStartTime: actualStart,
+    actualEndTime: actualEnd,
+    startTime: effectiveStart,
+    endTime: actualEnd || estimatedEndTime,
+    estimatedEndTime,
+    chargingStarted: Boolean(actualStart),
+    chargingEndedAt: actualEnd,
     chargingDuration,
-    energyDelivered,
-    totalEnergyKwh: energyDelivered,
-    totalAmount,
-    subtotal: parseNumber(raw.subtotal),
-    taxAmount: parseNumber(raw.taxAmount),
-    unitPrice: parseNumber(raw.unitPrice),
-    connector: raw.slotNumber
-      ? {
-          id: raw.slotId,
-          name: `Slot ${raw.slotNumber}`,
-          location: raw.stationName,
-          compatible: true,
-        }
-      : null,
-    chargerType: null,
-    qrScanned: status !== "scheduled" && status !== "pending",
-    chargingStarted: status === "in_progress" || status === "charging",
+    vehicleId: apiBooking.vehicleId,
+    vehicleType: apiBooking.vehicleType,
+    licensePlate: apiBooking.licensePlate,
+  portNumber: apiBooking.slotNumber,
+    slotName: apiBooking.slotNumber,
+    targetSOC: apiBooking.targetSoc ?? null,
+    currentSOC: apiBooking.currentSoc ?? null,
+  cost: baseCost,
+  totalAmount: baseCost,
+    chargingRate: null,
+  energyDelivered: deliveredEnergy,
+    powerDelivered: null,
+    qrScanned: false,
+    chargingStartedAt: actualStart,
+    notes: null,
   };
 };
 
@@ -111,6 +111,35 @@ const useBookingStore = create(
       error: null,
 
       // Actions
+      fetchBookings: async (params = {}) => {
+        set({ loading: true, error: null });
+        try {
+          const response = await bookingsAPI.getAll({ limit: 200, offset: 0, ...params });
+          const apiBookings = Array.isArray(response?.data) ? response.data : [];
+          const transformed = apiBookings.map(mapApiBookingToStore);
+
+          // Sort by creation date desc
+          transformed.sort((a, b) => {
+            const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+            const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+            return bTime - aTime;
+          });
+
+          set({
+            bookings: transformed,
+            bookingHistory: transformed,
+            loading: false,
+          });
+
+          return { success: true, data: transformed };
+        } catch (error) {
+          const errorMessage = error.message || "Error fetching bookings";
+          console.error("Fetch bookings error:", errorMessage, error);
+          set({ error: errorMessage, loading: false });
+          return { success: false, error: errorMessage };
+        }
+      },
+
       createBooking: async (bookingData) => {
         // API is enabled - database has sp_create_booking stored procedure
         const ENABLE_API = true; // Database is ready with stored procedure
@@ -151,29 +180,15 @@ const useBookingStore = create(
           scannedAt: bookingData.scannedAt,
           autoStart: bookingData.autoStart,
           bookingDate: new Date().toISOString().split("T")[0],
-          schedulingType:
-            bookingData.schedulingType === "immediate"
-              ? "qr_immediate"
-              : bookingData.schedulingType || "qr_immediate",
+          schedulingType: bookingData.schedulingType || "immediate",
           scheduledDateTime: bookingData.scheduledDateTime,
           scheduledDate: bookingData.scheduledDate,
           scheduledTime: bookingData.scheduledTime,
-          estimatedDuration: bookingData.estimatedDuration
-            ? parseInt(bookingData.estimatedDuration)
-            : null,
-          targetSOC: bookingData.targetSOC
-            ? parseInt(bookingData.targetSOC)
-            : null,
         };
-
-        // Generate a booking ID that fits in Int32 (max: 2,147,483,647)
-        // Use last 9 digits of timestamp to keep it unique but within range
-        const timestamp = Date.now();
-        const shortId = parseInt(timestamp.toString().slice(-9));
 
         let booking = {
           ...cleanData,
-          id: `BOOK${shortId}`,
+          id: `BOOK${Date.now()}`,
           status:
             cleanData.schedulingType === "scheduled" ? "scheduled" : "pending",
           createdAt: new Date().toISOString(),
@@ -183,84 +198,77 @@ const useBookingStore = create(
               : new Date(Date.now() + 15 * 60 * 1000).toISOString(),
           qrScanned: false,
           chargingStarted: false,
-          energyDelivered: 0,
-          totalEnergyKwh: 0,
-          totalAmount: 0,
-          chargingDuration: cleanData.estimatedDuration || 0,
         };
 
-        // 🔥 CHẠY THIỆT - CHỈ GỌI API, KHÔNG FALLBACK
-        set({ loading: true, error: null });
+        // Try API if enabled
+        if (ENABLE_API) {
+          try {
+            set({ loading: true, error: null });
 
-        try {
-          // Use real slot ID from database if available, otherwise fallback
-          let slotId = bookingData.port?.slotId || 3; // Use real slotId or default to 3
-
-          if (bookingData.port?.slotId) {
-            console.log("✅ Using real slot ID from database:", slotId);
-          } else {
-            console.warn("⚠️ No real slot ID, using fallback slot:", slotId);
-            // Fallback: Extract from port ID format "stationId-slotX"
-            if (bookingData.port?.id) {
-              const portStr = bookingData.port.id.toString();
-              const slotMatch = portStr.match(/slot(\d+)/);
-              if (slotMatch) {
-                slotId = parseInt(slotMatch[1]);
-                console.log("🎯 Extracted slot ID from port string:", slotId);
+            // Use real slot ID from database if available, otherwise fallback
+            let slotId = bookingData.port?.slotId || 3; // Use real slotId or default to 3
+            
+            if (bookingData.port?.slotId) {
+              console.log('✅ Using real slot ID from database:', slotId);
+            } else {
+              console.warn('⚠️ No real slot ID, using fallback slot:', slotId);
+              // Fallback: Extract from port ID format "stationId-slotX"
+              if (bookingData.port?.id) {
+                const portStr = bookingData.port.id.toString();
+                const slotMatch = portStr.match(/slot(\d+)/);
+                if (slotMatch) {
+                  slotId = parseInt(slotMatch[1]);
+                  console.log('🎯 Extracted slot ID from port string:', slotId);
+                }
               }
             }
+
+            const apiPayload = {
+              stationId: parseInt(bookingData.stationId) || 1,
+              slotId: slotId, // Use mapped slot ID
+              vehicleId: 5, // Use actual vehicle ID from database (user has vehicle_id=5,6)
+              scheduledStartTime:
+                bookingData.scheduledDateTime || new Date().toISOString(),
+              estimatedArrival:
+                bookingData.scheduledDateTime ||
+                new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+              estimatedDuration: parseInt(bookingData.estimatedDuration) || 60,
+              schedulingType:
+                bookingData.schedulingType === "scheduled"
+                  ? "scheduled"
+                  : "immediate",
+              targetSoc: bookingData.targetSOC || 80,
+            };
+
+            console.log("📤 API Payload:", apiPayload);
+            const response = await bookingsAPI.create(apiPayload);
+            console.log("✅ API Response:", response);
+
+            // Merge API response
+            booking = {
+              ...booking,
+              id: response.bookingId || response.id, // Use numeric ID from API
+              bookingCode: booking.id, // Keep BOOK... string as code for display
+              apiId: response.bookingId || response.id, // Keep for backward compatibility
+              status: response.status || booking.status,
+              createdAt: response.createdAt || booking.createdAt,
+            };
+
+            set({ loading: false });
+          } catch (error) {
+            console.error(
+              "❌ API Error:",
+              error.response?.data || error.message
+            );
+            set({ loading: false, error: error.message });
+            console.warn("⚠️ Using local booking as fallback");
           }
-
-          const apiPayload = {
-            stationId: parseInt(bookingData.stationId) || 1,
-            slotId: slotId,
-            vehicleId: 5, // Use actual vehicle ID from database
-            scheduledStartTime:
-              bookingData.scheduledDateTime || new Date().toISOString(),
-            estimatedArrival:
-              bookingData.scheduledDateTime ||
-              new Date(Date.now() + 15 * 60 * 1000).toISOString(),
-            estimatedDuration: parseInt(bookingData.estimatedDuration) || 60,
-            schedulingType:
-              bookingData.schedulingType === "scheduled"
-                ? "scheduled"
-                : "qr_immediate",
-            targetSoc: bookingData.targetSOC || 80,
-          };
-
-          console.log("📤 API Payload (REAL CALL - NO FALLBACK):", apiPayload);
-          const response = await bookingsAPI.create(apiPayload);
-          console.log("✅ API Response:", response);
-
-          // Use API response data ONLY
-          booking = {
-            ...booking,
-            id: response.bookingId || response.id, // Use API ID
-            bookingCode: `BOOK${response.bookingId || response.id}`,
-            apiId: response.bookingId || response.id,
-            status: response.status || booking.status,
-            createdAt: response.createdAt || booking.createdAt,
-          };
-
-          set({ loading: false });
-        } catch (error) {
-          console.error(
-            "❌ API Error (NO FALLBACK - THROW ERROR):",
-            error.response?.data || error.message
-          );
-          set({ loading: false, error: error.message });
-          // 🔥 THROW ERROR - KHÔNG TẠO BOOKING GIẢ
-          throw new Error(
-            `Failed to create booking: ${
-              error.response?.data?.message || error.message
-            }`
-          );
         }
 
         // Save to store
         set((state) => ({
-          bookings: [...state.bookings, booking],
-          bookingHistory: [...state.bookingHistory, booking],
+          bookings: [booking, ...state.bookings],
+          bookingHistory: [booking, ...state.bookingHistory],
           currentBooking: booking,
           socTracking: {
             ...state.socTracking,
@@ -277,57 +285,6 @@ const useBookingStore = create(
 
         console.log("✅ Booking created:", booking.id);
         return booking;
-      },
-
-      fetchBookings: async () => {
-        set({ loading: true, error: null });
-
-        try {
-          const response = await bookingsAPI.getUserBookings();
-          const rawBookings = Array.isArray(response)
-            ? response
-            : Array.isArray(response?.data)
-            ? response.data
-            : [];
-
-          const normalizedBookings = rawBookings
-            .map(normalizeBookingFromApi)
-            .filter((booking) => booking !== null);
-
-          const sortedHistory = [...normalizedBookings].sort((a, b) => {
-            const createdA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-            const createdB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-            return createdB - createdA;
-          });
-
-          const activeBookings = normalizedBookings.filter((booking) =>
-            ACTIVE_STATUSES.has(booking.status)
-          );
-
-          const currentActiveBooking = sortedHistory.find((booking) =>
-            ["charging", "in_progress"].includes(booking.status)
-          );
-
-          set({
-            bookings: activeBookings,
-            bookingHistory: sortedHistory,
-            currentBooking: currentActiveBooking || null,
-            loading: false,
-          });
-
-          return sortedHistory;
-        } catch (error) {
-          console.error("❌ Error fetching bookings:", error);
-          set({
-            loading: false,
-            error: error?.message || "Failed to fetch bookings",
-          });
-          throw error;
-        }
-      },
-
-      loadUserBookings: async () => {
-        return get().fetchBookings();
       },
 
       updateBookingStatus: (bookingId, status, data = {}) => {
@@ -388,17 +345,50 @@ const useBookingStore = create(
       },
 
       completeBooking: async (bookingId, sessionData) => {
-        // 🔥 NO API CALL - ChargingFlow already called the API
-        // This method ONLY updates local state
-        console.log(
-          "📝 Updating local booking state (no API call):",
-          bookingId
-        );
+        try {
+          const booking = get().bookings.find((b) => b.id === bookingId);
 
-        get().updateBookingStatus(bookingId, "completed", {
-          ...sessionData,
-          completedAt: new Date().toISOString(),
-        });
+          // API call should be done by caller (ChargingFlow), not here
+          // This method only updates local state
+          const ENABLE_COMPLETE_API = false; // Disabled - caller handles API
+
+          if (booking && booking.apiId && ENABLE_COMPLETE_API) {
+            console.log(
+              "📤 Completing booking via API:",
+              booking.apiId,
+              sessionData
+            );
+
+            // Prepare payload matching backend CompleteChargingDto
+            const completePayload = {
+              finalSoc: sessionData.finalSOC || sessionData.currentSOC || 80,
+              totalEnergyKwh: sessionData.energyDelivered || 0,
+              unitPrice: sessionData.chargingRate || 8500,
+            };
+
+            console.log("📤 Complete API Payload:", completePayload);
+
+            // Call API to complete charging
+            await bookingsAPI.complete(booking.apiId, completePayload);
+            console.log("✅ Booking completed via API");
+          } else if (booking && booking.apiId) {
+            console.log("⚠️ Complete API skipped - requires staff/admin role");
+          }
+
+          // Update local state with session data
+          get().updateBookingStatus(bookingId, "completed", {
+            ...sessionData,
+            completedAt: new Date().toISOString(),
+          });
+        } catch (error) {
+          console.error("❌ Error completing booking via API:", error);
+          console.error("❌ Error details:", error.response?.data);
+          // Still update local state even if API fails
+          get().updateBookingStatus(bookingId, "completed", {
+            ...sessionData,
+            completedAt: new Date().toISOString(),
+          });
+        }
       },
 
       // New method for QR code scanning
@@ -655,89 +645,57 @@ const useBookingStore = create(
       // Statistics - MASTER DATA SOURCE
       getBookingStats: () => {
         const { bookingHistory } = get();
-
-        if (!bookingHistory || bookingHistory.length === 0) {
-          return {
-            total: 0,
-            completed: 0,
-            cancelled: 0,
-            completionRate: 0,
-            totalEnergyCharged: 0,
-            totalAmount: 0,
-            totalDuration: 0,
-            averageEnergy: 0,
-            averageAmount: 0,
-            averageDuration: 0,
-            averageSession: 0,
-          };
-        }
-
-        const statusOf = (booking) =>
-          (booking?.status || booking?.statusLabel || "").toLowerCase();
-
+        const total = bookingHistory.length;
         const completedBookings = bookingHistory.filter(
-          (booking) => statusOf(booking) === "completed"
+          (b) => b.status === "completed"
         );
+        const completed = completedBookings.length;
         const cancelled = bookingHistory.filter(
-          (booking) => statusOf(booking) === "cancelled"
+          (b) => b.status === "cancelled"
         ).length;
 
-        const completed = completedBookings.length;
-        const total = bookingHistory.length;
+        // Calculate totals from actual booking data
+        const totalEnergyCharged = completedBookings.reduce(
+          (sum, b) => sum + (b.energyDelivered || 0),
+          0
+        );
+        const totalAmount = completedBookings.reduce(
+          (sum, b) => sum + (b.totalAmount || 0),
+          0
+        );
+        const totalDuration = completedBookings.reduce(
+          (sum, b) => sum + (b.chargingDuration || 0),
+          0
+        );
 
-        const totalEnergyCharged = completedBookings.reduce((sum, booking) => {
-          const energy = parseNumber(
-            booking?.energyDelivered !== undefined
-              ? booking.energyDelivered
-              : booking?.totalEnergyKwh,
-            0
-          );
-          return sum + (energy || 0);
-        }, 0);
-
-        const totalAmount = completedBookings.reduce((sum, booking) => {
-          const amount = parseNumber(
-            booking?.totalAmount !== undefined
-              ? booking.totalAmount
-              : booking?.amount,
-            0
-          );
-          return sum + (amount || 0);
-        }, 0);
-
-        const totalDuration = completedBookings.reduce((sum, booking) => {
-          const duration = parseNumber(
-            booking?.chargingDuration !== undefined
-              ? booking.chargingDuration
-              : booking?.chargingDurationMinutes !== undefined
-              ? booking.chargingDurationMinutes
-              : booking?.estimatedDuration,
-            0
-          );
-          return sum + (duration || 0);
-        }, 0);
+        // Debug log
+        console.log("📊 bookingStore.getBookingStats() - Calculation:", {
+          completedBookings: completed,
+          totalEnergyCharged,
+          totalAmount,
+          totalDuration,
+        });
 
         return {
           total,
           completed,
           cancelled,
           completionRate:
-            total > 0 ? Number(((completed / total) * 100).toFixed(1)) : 0,
-          totalEnergyCharged: Number(totalEnergyCharged.toFixed(2)),
-          totalAmount: Math.round(totalAmount),
-          totalDuration,
+            total > 0 ? ((completed / total) * 100).toFixed(1) : 0,
+          // Return exact values, no minimum manipulation
+          totalEnergyCharged: totalEnergyCharged.toFixed(2), // "245.00"
+          totalAmount: totalAmount.toFixed(0), // "1679966"
+          totalDuration: totalDuration, // 642
+          // Averages
           averageEnergy:
-            completed > 0
-              ? Number((totalEnergyCharged / completed).toFixed(2))
-              : 0,
+            completed > 0 ? (totalEnergyCharged / completed).toFixed(2) : "0", // "20.42"
           averageAmount:
-            completed > 0 ? Math.round(totalAmount / completed) : 0,
+            completed > 0 ? Math.round(totalAmount / completed) : 0, // 139997
           averageDuration:
-            completed > 0 ? Math.round(totalDuration / completed) : 0,
+            completed > 0 ? Math.round(totalDuration / completed) : 0, // 54
+          // Keep for backward compatibility
           averageSession:
-            completed > 0
-              ? Number((totalEnergyCharged / completed).toFixed(2))
-              : 0,
+            completed > 0 ? (totalEnergyCharged / completed).toFixed(2) : "0",
         };
       },
     }),
