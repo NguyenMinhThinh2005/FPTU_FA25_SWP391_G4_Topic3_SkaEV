@@ -20,7 +20,6 @@ dist-ssr
 *.suo
 *.ntvs*
 *.njsproj
-*.sln
 *.sw?
 # Build outputs
 SkaEV.API/bin/
@@ -48,21 +47,14 @@ SkaEV.API/appsettings.*.json
 !SkaEV.API/appsettings.*.example
 !SkaEV.API/*.example.json
 
-# PowerShell scripts - may contain machine-specific paths
-*.ps1
-!*.example.ps1
-!start-all.ps1
-!run-backend.ps1
-!run-frontend.ps1
+# PowerShell scripts - keep normal project scripts tracked.
+# Only ignore sensitive scripts explicitly listed below.
+!*.ps1
 
 # Sensitive PowerShell scripts with passwords/credentials
 reset-user-password.ps1
 test-user-creation.ps1
 quick-setup-after-pull.ps1
-
-# Batch files - may contain machine-specific paths
-*.bat
-!*.example.bat
 
 # Database scripts that are machine-specific
 database/delete_users_*.sql
