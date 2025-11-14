@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using SkaEV.API.Application.Constants;
 using SkaEV.API.Application.DTOs.Invoices;
+using SkaEV.API.Application.Services.Payments;
 using SkaEV.API.Domain.Entities;
 using SkaEV.API.Infrastructure.Data;
 using System.Text;
@@ -10,22 +12,26 @@ public class InvoiceService : IInvoiceService
 {
     private readonly SkaEVDbContext _context;
     private readonly ILogger<InvoiceService> _logger;
+    private readonly IPaymentProcessor _paymentProcessor;
 
-    public InvoiceService(SkaEVDbContext context, ILogger<InvoiceService> logger)
+    public InvoiceService(SkaEVDbContext context, ILogger<InvoiceService> logger, IPaymentProcessor paymentProcessor)
     {
         _context = context;
         _logger = logger;
+        _paymentProcessor = paymentProcessor;
     }
 
     public async Task<IEnumerable<InvoiceDto>> GetUserInvoicesAsync(int userId)
     {
-        return await _context.Invoices
+        var invoices = await _context.Invoices
             .Include(i => i.User)
             .Include(i => i.Booking)
+                .ThenInclude(b => b.ChargingStation)
             .Where(i => i.UserId == userId)
             .OrderByDescending(i => i.CreatedAt)
-            .Select(i => MapToDto(i))
             .ToListAsync();
+        
+        return invoices.Select(i => MapToDto(i)).ToList();
     }
 
     public async Task<InvoiceDto?> GetInvoiceByIdAsync(int invoiceId)
@@ -56,51 +62,99 @@ public class InvoiceService : IInvoiceService
             .FirstOrDefaultAsync(i => i.InvoiceId == invoiceId);
 
         if (invoice == null)
-            throw new ArgumentException("Invoice not found");
+            throw new KeyNotFoundException("Invoice not found");
 
         if (invoice.PaymentStatus == "paid")
-            throw new ArgumentException("Invoice is already paid");
-
-        // Get payment method name if available
-        var paymentMethodName = "Cash";
-        if (_context.PaymentMethods != null)
         {
-            var paymentMethod = await _context.PaymentMethods
-                .FirstOrDefaultAsync(pm => pm.PaymentMethodId == processDto.PaymentMethodId);
-            
-            if (paymentMethod != null)
-            {
-                paymentMethodName = paymentMethod.Type ?? "Unknown";
-            }
+            _logger.LogInformation(
+                "Payment skipped for already settled invoice {InvoiceId} by staff {StaffId}",
+                invoiceId,
+                processedByUserId);
+
+            return MapToDto(invoice);
         }
 
-        // Create payment record if Payment entity exists
-        if (_context.Payments != null)
-        {
-            var payment = new Payment
-            {
-                InvoiceId = invoiceId,
-                PaymentMethodId = processDto.PaymentMethodId,
-                Amount = processDto.Amount,
-                PaymentType = paymentMethodName,
-                Status = "completed",
-                ProcessedByStaffId = processedByUserId,
-                ProcessedAt = DateTime.UtcNow,
-                CreatedAt = DateTime.UtcNow
-            };
+        if (processDto.Amount <= 0)
+            throw new InvalidOperationException("Payment amount must be greater than zero");
 
-            _context.Payments.Add(payment);
+        if (Math.Abs(invoice.TotalAmount - processDto.Amount) > 0.01m)
+            throw new InvalidOperationException("Payment amount does not match invoice total");
+
+        var paymentMethod = await _context.PaymentMethods
+            .FirstOrDefaultAsync(pm => pm.PaymentMethodId == processDto.PaymentMethodId);
+
+        if (paymentMethod == null)
+            throw new KeyNotFoundException("Payment method not found");
+
+        if (paymentMethod.UserId != invoice.UserId)
+            throw new InvalidOperationException("Payment method does not belong to the invoice owner");
+
+        if (!paymentMethod.IsActive)
+            throw new InvalidOperationException("Payment method is inactive");
+
+        var now = DateTime.UtcNow;
+        var paymentMethodName = GetPaymentMethodLabel(paymentMethod);
+
+        var payment = new Payment
+        {
+            InvoiceId = invoice.InvoiceId,
+            PaymentMethodId = paymentMethod.PaymentMethodId,
+            Amount = processDto.Amount,
+            PaymentType = paymentMethodName,
+            Status = PaymentStatuses.Pending,
+            CreatedAt = now,
+            ProcessedByStaffId = processedByUserId,
+            ProcessedAt = now
+        };
+
+        _context.Payments.Add(payment);
+
+        var attemptResult = await _paymentProcessor.ProcessAsync(invoice, paymentMethod, processDto.Amount);
+
+        payment.Status = attemptResult.Status;
+        payment.TransactionId = attemptResult.TransactionId;
+        payment.Notes = attemptResult.FailureReason;
+
+        if (attemptResult.Status == PaymentStatuses.Completed)
+        {
+            invoice.PaymentMethod = paymentMethodName;
+            invoice.PaymentStatus = "paid";
+            invoice.PaidAt = now;
+            invoice.UpdatedAt = now;
+
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation(
+                "Payment succeeded for invoice {InvoiceId} amount {Amount} via method {PaymentMethodId} transaction {TransactionId}",
+                invoice.InvoiceId,
+                processDto.Amount,
+                paymentMethod.PaymentMethodId,
+                payment.TransactionId);
+
+            return MapToDto(invoice);
         }
 
-        // Update invoice
-        invoice.PaymentMethod = paymentMethodName;
-        invoice.PaymentStatus = "paid";
-        invoice.PaidAt = DateTime.UtcNow;
-        invoice.UpdatedAt = DateTime.UtcNow;
+        invoice.UpdatedAt = now;
 
         await _context.SaveChangesAsync();
 
-        _logger.LogInformation("Processed payment for invoice {InvoiceId} by user {UserId}", invoiceId, processedByUserId);
+        if (attemptResult.Status == PaymentStatuses.Pending)
+        {
+            _logger.LogInformation(
+                "Payment pending confirmation for invoice {InvoiceId} transaction {TransactionId}: {Reason}",
+                invoice.InvoiceId,
+                payment.TransactionId,
+                attemptResult.FailureReason ?? "Awaiting confirmation");
+        }
+        else
+        {
+            _logger.LogWarning(
+                "Payment failed for invoice {InvoiceId} transaction {TransactionId}: {Reason}",
+                invoice.InvoiceId,
+                payment.TransactionId,
+                attemptResult.FailureReason ?? "Unknown reason");
+        }
+
         return MapToDto(invoice);
     }
 
@@ -118,16 +172,26 @@ public class InvoiceService : IInvoiceService
         if (!validStatuses.Contains(statusDto.Status))
             throw new ArgumentException("Invalid payment status");
 
+        var previousStatus = invoice.PaymentStatus;
+
         invoice.PaymentStatus = statusDto.Status;
-        
+
         if (statusDto.Status == "paid" && invoice.PaidAt == null)
             invoice.PaidAt = DateTime.UtcNow;
-        
+
+        if (statusDto.Status != "paid")
+            invoice.PaidAt = null;
+
         invoice.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
 
-        _logger.LogInformation("Updated invoice {InvoiceId} payment status to {Status}", invoiceId, statusDto.Status);
+        _logger.LogInformation(
+            "Invoice {InvoiceId} payment status changed from {PreviousStatus} to {CurrentStatus} with note {Note}",
+            invoiceId,
+            previousStatus,
+            invoice.PaymentStatus,
+            statusDto.Notes ?? "none");
         return MapToDto(invoice);
     }
 
@@ -233,7 +297,24 @@ public class InvoiceService : IInvoiceService
             PaidAt = invoice.PaidAt,
             CreatedAt = invoice.CreatedAt,
             DueDate = invoice.CreatedAt.AddDays(7), // 7 days from creation
-            Notes = null
+            Notes = null,
+            
+            // Booking details for payment history
+            StationName = invoice.Booking?.ChargingStation?.StationName,
+            EnergyDelivered = invoice.TotalEnergyKwh,
+            ChargingDuration = invoice.Booking?.ActualEndTime != null && invoice.Booking?.ActualStartTime != null 
+                ? (int?)(invoice.Booking.ActualEndTime.Value - invoice.Booking.ActualStartTime.Value).TotalMinutes 
+                : null,
+            StartTime = invoice.Booking?.ActualStartTime,
+            EndTime = invoice.Booking?.ActualEndTime
         };
+    }
+
+    private static string GetPaymentMethodLabel(PaymentMethod paymentMethod)
+    {
+        if (!string.IsNullOrWhiteSpace(paymentMethod.Provider))
+            return paymentMethod.Provider;
+
+        return paymentMethod.Type;
     }
 }

@@ -169,17 +169,51 @@ public class BookingsController : ControllerBase
     /// </summary>
     [HttpPut("{id}/start")]
     [Authorize]
-    public async Task<IActionResult> StartCharging(int id)
+    public async Task<IActionResult> StartCharging(string id)
     {
         try
         {
+            _logger.LogInformation("StartCharging called with ID: {Id} (length: {Length})", id, id.Length);
+            
+            // Parse booking ID - handle both "BOOK123" format and numeric "123" format
+            // Use long to support timestamp-based IDs (13 digits)
+            long bookingIdLong;
+            if (id.StartsWith("BOOK", StringComparison.OrdinalIgnoreCase))
+            {
+                string numericPart = id.Substring(4);
+                _logger.LogInformation("Extracting numeric part: {NumericPart}", numericPart);
+                
+                // Extract numeric part from "BOOK123" format
+                if (!long.TryParse(numericPart, out bookingIdLong))
+                {
+                    _logger.LogWarning("Failed to parse numeric part: {NumericPart}", numericPart);
+                    return BadRequest(new { message = "Invalid booking ID format" });
+                }
+                
+                _logger.LogInformation("Successfully parsed booking ID: {BookingId}", bookingIdLong);
+            }
+            else if (!long.TryParse(id, out bookingIdLong))
+            {
+                _logger.LogWarning("Failed to parse ID as long: {Id}", id);
+                return BadRequest(new { message = "Invalid booking ID format" });
+            }
+            
+            // Convert to int for service layer (database uses INT)
+            if (bookingIdLong > int.MaxValue || bookingIdLong < int.MinValue)
+            {
+                _logger.LogWarning("Booking ID out of INT range: {BookingId}", bookingIdLong);
+                return BadRequest(new { message = "Booking ID out of valid range" });
+            }
+            
+            int bookingId = (int)bookingIdLong;
+
             var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
             var userRole = User.FindFirst(ClaimTypes.Role)!.Value;
             
             // Check if user owns this booking (unless they are staff/admin)
             if (userRole != "admin" && userRole != "staff")
             {
-                var booking = await _bookingService.GetBookingByIdAsync(id);
+                var booking = await _bookingService.GetBookingByIdAsync(bookingId);
                 if (booking == null)
                 {
                     return NotFound(new { message = "Booking not found" });
@@ -191,7 +225,7 @@ public class BookingsController : ControllerBase
                 }
             }
             
-            var success = await _bookingService.StartChargingAsync(id);
+            var success = await _bookingService.StartChargingAsync(bookingId);
             if (!success)
             {
                 return BadRequest(new { message = "Failed to start charging" });
@@ -211,17 +245,51 @@ public class BookingsController : ControllerBase
     /// </summary>
     [HttpPut("{id}/complete")]
     [Authorize]
-    public async Task<IActionResult> CompleteCharging(int id, [FromBody] CompleteChargingDto dto)
+    public async Task<IActionResult> CompleteCharging(string id, [FromBody] CompleteChargingDto dto)
     {
         try
         {
+            _logger.LogInformation("CompleteCharging called with ID: {Id} (length: {Length})", id, id.Length);
+            
+            // Parse booking ID - handle both "BOOK123" format and numeric "123" format
+            // Use long to support timestamp-based IDs (13 digits)
+            long bookingIdLong;
+            if (id.StartsWith("BOOK", StringComparison.OrdinalIgnoreCase))
+            {
+                string numericPart = id.Substring(4);
+                _logger.LogInformation("Extracting numeric part: {NumericPart}", numericPart);
+                
+                // Extract numeric part from "BOOK123" format
+                if (!long.TryParse(numericPart, out bookingIdLong))
+                {
+                    _logger.LogWarning("Failed to parse numeric part: {NumericPart}", numericPart);
+                    return BadRequest(new { message = "Invalid booking ID format" });
+                }
+                
+                _logger.LogInformation("Successfully parsed booking ID: {BookingId}", bookingIdLong);
+            }
+            else if (!long.TryParse(id, out bookingIdLong))
+            {
+                _logger.LogWarning("Failed to parse ID as long: {Id}", id);
+                return BadRequest(new { message = "Invalid booking ID format" });
+            }
+            
+            // Convert to int for service layer (database uses INT)
+            if (bookingIdLong > int.MaxValue || bookingIdLong < int.MinValue)
+            {
+                _logger.LogWarning("Booking ID out of INT range: {BookingId}", bookingIdLong);
+                return BadRequest(new { message = "Booking ID out of valid range" });
+            }
+            
+            int bookingId = (int)bookingIdLong;
+
             var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
             var userRole = User.FindFirst(ClaimTypes.Role)!.Value;
             
             // Check if user owns this booking (unless they are staff/admin)
             if (userRole != "admin" && userRole != "staff")
             {
-                var booking = await _bookingService.GetBookingByIdAsync(id);
+                var booking = await _bookingService.GetBookingByIdAsync(bookingId);
                 if (booking == null)
                 {
                     return NotFound(new { message = "Booking not found" });
@@ -233,7 +301,7 @@ public class BookingsController : ControllerBase
                 }
             }
             
-            var success = await _bookingService.CompleteChargingAsync(id, dto.FinalSoc, dto.TotalEnergyKwh, dto.UnitPrice);
+            var success = await _bookingService.CompleteChargingAsync(bookingId, dto.FinalSoc, dto.TotalEnergyKwh, dto.UnitPrice);
             if (!success)
             {
                 return BadRequest(new { message = "Failed to complete charging" });

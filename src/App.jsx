@@ -3,6 +3,8 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "@mui/material/styles";
 import { CssBaseline } from "@mui/material";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 import skaevTheme from "./theme/index";
 import useAuthStore from "./store/authStore";
@@ -22,21 +24,8 @@ import ForgotPassword from "./pages/auth/ForgotPassword";
 import HomePage from "./pages/public/Home";
 // Test and Demo Pages
 import TestPage from "./pages/TestPage";
-import ChargingFlow from "./pages/customer/ChargingFlow";
 import DateTimePickerDemo from "./pages/DateTimePickerDemo";
-
-// Customer Pages
-import CustomerDashboard from "./pages/customer/Dashboard";
-import FindStations from "./pages/customer/FindStations";
-import BookingHistory from "./pages/customer/BookingHistory";
-import PaymentMethods from "./pages/customer/PaymentMethods";
-import PaymentHistory from "./pages/customer/PaymentHistory";
-import CustomerProfile from "./pages/customer/CustomerProfile";
-import PaymentPage from "./pages/customer/PaymentPage";
-import AnalyticsPage from "./pages/customer/AnalyticsPage";
-import CustomerAnalytics from "./pages/customer/Analytics";
-import MonthlyCostReports from "./pages/customer/MonthlyCostReports";
-import ChargingHabitsAnalysis from "./pages/customer/ChargingHabitsAnalysis";
+import CUSTOMER_ROUTES, { PAYMENT_ROUTES } from "./routes/customerRoutes";
 
 // Staff Pages
 import StaffDashboard from "./pages/staff/Dashboard";
@@ -107,6 +96,18 @@ function App() {
       <QueryClientProvider client={queryClient}>
         <ThemeProvider theme={skaevTheme}>
           <CssBaseline />
+          <ToastContainer
+            position="top-right"
+            autoClose={3000}
+            hideProgressBar={false}
+            newestOnTop={false}
+            closeOnClick
+            rtl={false}
+            pauseOnFocusLoss
+            draggable
+            pauseOnHover
+            theme="light"
+          />
           <BrowserRouter>
             <Routes>
               {/* Public Routes */}
@@ -146,6 +147,15 @@ function App() {
                 }
               />
 
+              {/* VNPay Return Routes - Public (no auth required) */}
+              {PAYMENT_ROUTES.map(({ path, component }) => (
+                <Route
+                  key={path}
+                  path={path}
+                  element={React.createElement(component)}
+                />
+              ))}
+
               {/* Customer Routes */}
               <Route
                 path="/customer"
@@ -158,19 +168,13 @@ function App() {
                 }
               >
                 <Route index element={<Navigate to="profile" replace />} />
-                <Route path="profile" element={<CustomerProfile />} />
-                <Route path="charging" element={<ChargingFlow />} />
-                <Route path="payment" element={<PaymentPage />} />
-                <Route path="analytics" element={<AnalyticsPage />} />
-                <Route path="payment-history" element={<PaymentHistory />} />
-                <Route
-                  path="monthly-reports"
-                  element={<MonthlyCostReports />}
-                />
-                <Route
-                  path="charging-habits"
-                  element={<ChargingHabitsAnalysis />}
-                />
+                {CUSTOMER_ROUTES.map(({ path, component }) => (
+                  <Route
+                    key={path}
+                    path={path}
+                    element={React.createElement(component)}
+                  />
+                ))}
               </Route>
 
               {/* Staff Routes */}
@@ -183,7 +187,10 @@ function App() {
                 }
               >
                 <Route path="dashboard" element={<StaffDashboard />} />
-                <Route path="charging-sessions" element={<ChargingSessions />} />
+                <Route
+                  path="charging-sessions"
+                  element={<ChargingSessions />}
+                />
                 <Route path="monitoring" element={<Monitoring />} />
                 <Route path="profile" element={<StaffProfile />} />
                 <Route index element={<Navigate to="dashboard" replace />} />

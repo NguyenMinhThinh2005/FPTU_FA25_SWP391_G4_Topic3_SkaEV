@@ -17,6 +17,13 @@ public class InvoiceDto
     public DateTime CreatedAt { get; set; }
     public DateTime? DueDate { get; set; }
     public string? Notes { get; set; }
+    
+    // Booking details for payment history
+    public string? StationName { get; set; }
+    public decimal? EnergyDelivered { get; set; }
+    public int? ChargingDuration { get; set; }
+    public DateTime? StartTime { get; set; }
+    public DateTime? EndTime { get; set; }
 }
 
 public class ProcessPaymentDto

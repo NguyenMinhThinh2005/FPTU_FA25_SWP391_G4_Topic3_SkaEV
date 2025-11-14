@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Auth Token Checker - SkaEV</title>
+    <style>
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        max-width: 900px;
+        margin: 50px auto;
+        padding: 20px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: #fff;
+      }
+      .container {
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 12px;
+        padding: 30px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        color: #333;
+      }
+      h1 {
+        color: #667eea;
+        margin-bottom: 10px;
+      }
+      .subtitle {
+        color: #666;
+        margin-bottom: 30px;
+        font-size: 14px;
+      }
+      .status-box {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+        border-left: 4px solid #667eea;
+      }
+      .status-box.error {
+        border-left-color: #dc3545;
+        background: #fff5f5;
+      }
+      .status-box.success {
+        border-left-color: #28a745;
+        background: #f0fff4;
+      }
+      .token-display {
+        background: #1e1e1e;
+        color: #00ff00;
+        padding: 15px;
+        border-radius: 6px;
+        font-family: "Courier New", monospace;
+        font-size: 12px;
+        word-break: break-all;
+        margin: 10px 0;
+        max-height: 150px;
+        overflow-y: auto;
+      }
+      button {
+        background: #667eea;
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 16px;
+        margin-right: 10px;
+        transition: background 0.3s;
+      }
+      button:hover {
+        background: #5568d3;
+      }
+      button.danger {
+        background: #dc3545;
+      }
+      button.danger:hover {
+        background: #c82333;
+      }
+      .info-grid {
+        display: grid;
+        grid-template-columns: 200px 1fr;
+        gap: 10px;
+        margin: 15px 0;
+      }
+      .info-label {
+        font-weight: bold;
+        color: #667eea;
+      }
+      .info-value {
+        color: #333;
+      }
+      .action-section {
+        margin-top: 30px;
+        padding-top: 20px;
+        border-top: 2px solid #e0e0e0;
+      }
+      .test-result {
+        margin-top: 20px;
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 6px;
+        border-left: 4px solid #17a2b8;
+      }
+      pre {
+        background: #1e1e1e;
+        color: #00ff00;
+        padding: 10px;
+        border-radius: 4px;
+        overflow-x: auto;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>🔐 Authentication Token Checker</h1>
+      <p class="subtitle">SkaEV API Authentication Diagnostic Tool</p>
+
+      <!-- Token Status Section -->
+      <div id="token-status"></div>
+
+      <!-- Token Details Section -->
+      <div id="token-details"></div>
+
+      <!-- Actions Section -->
+      <div class="action-section">
+        <h3>🛠️ Actions</h3>
+        <button onclick="refreshCheck()">🔄 Refresh Check</button>
+        <button onclick="copyToken()">📋 Copy Token</button>
+        <button onclick="testAPI()">🧪 Test API Call</button>
+        <button onclick="clearTokens()" class="danger">
+          🗑️ Clear All Tokens
+        </button>
+      </div>
+
+      <!-- Test Results Section -->
+      <div id="test-results"></div>
+    </div>
+
+    <script>
+      // API Base URL
+      const API_BASE_URL = "http://localhost:5000/api";
+
+      // Parse JWT token
+      function parseJWT(token) {
+        try {
+          const base64Url = token.split(".")[1];
+          const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+          const jsonPayload = decodeURIComponent(
+            atob(base64)
+              .split("")
+              .map(function (c) {
+                return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
+              })
+              .join("")
+          );
+          return JSON.parse(jsonPayload);
+        } catch (e) {
+          return null;
+        }
+      }
+
+      // Check token status
+      function checkTokenStatus() {
+        const sessionToken = sessionStorage.getItem("token");
+        const localToken = localStorage.getItem("token");
+        const sessionRefresh = sessionStorage.getItem("refreshToken");
+        const localRefresh = localStorage.getItem("refreshToken");
+
+        const token = sessionToken || localToken;
+
+        const statusDiv = document.getElementById("token-status");
+        const detailsDiv = document.getElementById("token-details");
+
+        if (!token) {
+          statusDiv.innerHTML = `
+                    <div class="status-box error">
+                        <h3>❌ No Authentication Token Found</h3>
+                        <p><strong>Issue:</strong> User is not logged in or token has been cleared.</p>
+                        <p><strong>Solution:</strong> Please log in at <a href="/login" style="color: #667eea;">/login</a></p>
+                        <p><strong>Storage Status:</strong></p>
+                        <ul>
+                            <li>sessionStorage.token: <code>null</code></li>
+                            <li>localStorage.token: <code>null</code></li>
+                        </ul>
+                    </div>
+                `;
+          detailsDiv.innerHTML = "";
+          return;
+        }
+
+        // Parse token
+        const payload = parseJWT(token);
+
+        if (!payload) {
+          statusDiv.innerHTML = `
+                    <div class="status-box error">
+                        <h3>⚠️ Invalid Token Format</h3>
+                        <p>Token exists but cannot be parsed as JWT.</p>
+                    </div>
+                `;
+          detailsDiv.innerHTML = `
+                    <div class="status-box">
+                        <h3>Raw Token:</h3>
+                        <div class="token-display">${token}</div>
+                    </div>
+                `;
+          return;
+        }
+
+        // Check expiration
+        const now = Math.floor(Date.now() / 1000);
+        const isExpired = payload.exp && payload.exp < now;
+        const expiresIn = payload.exp ? payload.exp - now : null;
+
+        const statusClass = isExpired ? "error" : "success";
+        const statusIcon = isExpired ? "❌" : "✅";
+        const statusText = isExpired ? "Token Expired" : "Token Valid";
+
+        statusDiv.innerHTML = `
+                <div class="status-box ${statusClass}">
+                    <h3>${statusIcon} ${statusText}</h3>
+                    ${
+                      isExpired
+                        ? "<p><strong>Action Required:</strong> Please log in again to get a new token.</p>"
+                        : ""
+                    }
+                </div>
+            `;
+
+        // Display token details
+        const expiryDate = payload.exp
+          ? new Date(payload.exp * 1000).toLocaleString()
+          : "N/A";
+        const issuedDate = payload.iat
+          ? new Date(payload.iat * 1000).toLocaleString()
+          : "N/A";
+
+        detailsDiv.innerHTML = `
+                <div class="status-box">
+                    <h3>📋 Token Details</h3>
+                    <div class="info-grid">
+                        <div class="info-label">Storage Location:</div>
+                        <div class="info-value">${
+                          sessionToken ? "sessionStorage" : "localStorage"
+                        }</div>
+                        
+                        <div class="info-label">User ID:</div>
+                        <div class="info-value">${
+                          payload.nameid || payload.sub || "N/A"
+                        }</div>
+                        
+                        <div class="info-label">Email:</div>
+                        <div class="info-value">${payload.email || "N/A"}</div>
+                        
+                        <div class="info-label">Role:</div>
+                        <div class="info-value">${payload.role || "N/A"}</div>
+                        
+                        <div class="info-label">Issued At:</div>
+                        <div class="info-value">${issuedDate}</div>
+                        
+                        <div class="info-label">Expires At:</div>
+                        <div class="info-value">${expiryDate}</div>
+                        
+                        <div class="info-label">Time Until Expiry:</div>
+                        <div class="info-value">
+                            ${
+                              expiresIn !== null
+                                ? expiresIn > 0
+                                  ? Math.floor(expiresIn / 60) + " minutes"
+                                  : "EXPIRED"
+                                : "N/A"
+                            }
+                        </div>
+                        
+                        <div class="info-label">Refresh Token:</div>
+                        <div class="info-value">${
+                          sessionRefresh || localRefresh
+                            ? "✅ Available"
+                            : "❌ Not found"
+                        }</div>
+                    </div>
+                    
+                    <h4 style="margin-top: 20px;">Token Preview (First 100 chars):</h4>
+                    <div class="token-display">${token.substring(
+                      0,
+                      100
+                    )}...</div>
+                    
+                    <h4 style="margin-top: 20px;">Decoded Payload:</h4>
+                    <pre>${JSON.stringify(payload, null, 2)}</pre>
+                </div>
+            `;
+      }
+
+      // Refresh check
+      function refreshCheck() {
+        checkTokenStatus();
+        showMessage("✅ Status refreshed");
+      }
+
+      // Copy token to clipboard
+      function copyToken() {
+        const token =
+          sessionStorage.getItem("token") || localStorage.getItem("token");
+        if (!token) {
+          alert("❌ No token to copy");
+          return;
+        }
+        navigator.clipboard.writeText(token).then(() => {
+          showMessage("✅ Token copied to clipboard");
+        });
+      }
+
+      // Test API call
+      async function testAPI() {
+        const resultsDiv = document.getElementById("test-results");
+        resultsDiv.innerHTML =
+          '<div class="test-result"><h3>🧪 Testing API...</h3></div>';
+
+        const token =
+          sessionStorage.getItem("token") || localStorage.getItem("token");
+
+        if (!token) {
+          resultsDiv.innerHTML = `
+                    <div class="test-result">
+                        <h3>❌ Cannot Test API</h3>
+                        <p>No token available. Please log in first.</p>
+                    </div>
+                `;
+          return;
+        }
+
+        try {
+          // Test with a simple GET endpoint that requires auth
+          const response = await fetch(`${API_BASE_URL}/vehicles`, {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          });
+
+          const data = await response.json().catch(() => response.text());
+
+          const statusClass = response.ok ? "success" : "error";
+          const statusIcon = response.ok ? "✅" : "❌";
+
+          resultsDiv.innerHTML = `
+                    <div class="test-result">
+                        <h3>${statusIcon} API Test Result</h3>
+                        <div class="info-grid">
+                            <div class="info-label">Endpoint:</div>
+                            <div class="info-value">GET ${API_BASE_URL}/vehicles</div>
+                            
+                            <div class="info-label">Status:</div>
+                            <div class="info-value">${response.status} ${
+            response.statusText
+          }</div>
+                            
+                            <div class="info-label">Authorization Header:</div>
+                            <div class="info-value">Bearer ${token.substring(
+                              0,
+                              20
+                            )}...</div>
+                        </div>
+                        
+                        <h4>Response:</h4>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                        
+                        ${
+                          response.ok
+                            ? '<p style="color: #28a745;"><strong>✅ Authentication is working correctly!</strong></p>'
+                            : '<p style="color: #dc3545;"><strong>❌ Authentication failed. Token may be invalid or expired.</strong></p>'
+                        }
+                    </div>
+                `;
+        } catch (error) {
+          resultsDiv.innerHTML = `
+                    <div class="test-result">
+                        <h3>❌ API Test Failed</h3>
+                        <p><strong>Error:</strong> ${error.message}</p>
+                        <pre>${error.stack}</pre>
+                    </div>
+                `;
+        }
+      }
+
+      // Clear all tokens
+      function clearTokens() {
+        if (
+          !confirm(
+            "⚠️ Are you sure you want to clear all tokens? You will need to log in again."
+          )
+        ) {
+          return;
+        }
+
+        sessionStorage.removeItem("token");
+        sessionStorage.removeItem("refreshToken");
+        localStorage.removeItem("token");
+        localStorage.removeItem("refreshToken");
+
+        showMessage("🗑️ All tokens cleared");
+        checkTokenStatus();
+      }
+
+      // Show temporary message
+      function showMessage(msg) {
+        const msgDiv = document.createElement("div");
+        msgDiv.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: #28a745;
+                color: white;
+                padding: 15px 25px;
+                border-radius: 6px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                z-index: 9999;
+                animation: slideIn 0.3s ease-out;
+            `;
+        msgDiv.textContent = msg;
+        document.body.appendChild(msgDiv);
+
+        setTimeout(() => {
+          msgDiv.style.animation = "slideOut 0.3s ease-out";
+          setTimeout(() => msgDiv.remove(), 300);
+        }, 2000);
+      }
+
+      // Run check on load
+      checkTokenStatus();
+    </script>
+  </body>
+</html>

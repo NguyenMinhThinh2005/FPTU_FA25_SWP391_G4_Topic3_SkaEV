@@ -114,6 +114,26 @@ const useUserStore = create(
         }
       },
 
+      changeUserRole: async (userId, newRole) => {
+        set({ loading: true, error: null });
+        try {
+          const response = await usersAPI.updateRole(userId, { role: newRole });
+          // Backend returns updated user
+          if (response) {
+            const updatedUser = response;
+            set((s) => ({ users: s.users.map((u) => u.userId === userId ? updatedUser : u), loading: false }));
+            return { success: true, data: updatedUser };
+          } else {
+            throw new Error("Cannot change user role");
+          }
+        } catch (error) {
+          const errorMessage = error.message || "Error changing user role";
+          console.error("Change role error:", errorMessage);
+          set({ error: errorMessage, loading: false });
+          return { success: false, error: errorMessage };
+        }
+      },
+
       getUserById: (userId) => get().users.find((u) => u.userId === userId),
       getUsersByRole: (role) => get().users.filter((u) => u.role === role),
       searchUsers: (query = "") => {

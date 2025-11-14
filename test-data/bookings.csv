@@ -1,0 +1,6 @@
+user_email,vehicle_license,station_name,slot_number,scheduled_start_time,estimated_arrival,scheduling_type,target_soc,estimated_duration
+customer1@test.com,29A-12345,EV Station Hanoi Central,A-01,2025-10-27 14:00:00,2025-10-27 13:55:00,immediate,80,60
+customer2@test.com,30B-67890,EV Station HCMC District 1,B-02,2025-10-27 15:00:00,2025-10-27 14:50:00,scheduled,100,90
+customer3@test.com,51G-11111,EV Station Da Nang Beach,C-03,2025-10-28 10:00:00,2025-10-28 09:45:00,scheduled,85,75
+customer1@test.com,29A-12345,EV Station Hanoi Cau Giay,A-02,2025-10-28 16:00:00,2025-10-28 15:55:00,scheduled,90,70
+customer2@test.com,30B-67890,EV Station HCMC Tan Binh,B-03,2025-10-29 08:00:00,2025-10-29 07:50:00,immediate,75,50

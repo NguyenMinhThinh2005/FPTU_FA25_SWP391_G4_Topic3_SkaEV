@@ -59,6 +59,23 @@ Mở file `appsettings.json` hoặc `appsettings.Development.json` và cập nh�
    sqlcmd -L
    ```
 
+### 4. Cấu hình Google Maps Directions API
+
+Để tính toán chỉ đường dựa trên Google Maps, backend cần API key hợp lệ:
+
+1. Truy cập [Google Cloud Console](https://console.cloud.google.com/) và tạo API key mới (hoặc sử dụng key hiện có)
+2. Kích hoạt **Directions API** cho project đó
+3. Mở file `appsettings.Development.json` (hoặc file bạn đang dùng) và bổ sung:
+
+  ```json
+  "GoogleMaps": {
+    "DirectionsApiKey": "YOUR_GOOGLE_MAPS_DIRECTIONS_API_KEY"
+  }
+  ```
+
+4. Khuyến khích giới hạn API key theo domain/IP để tránh lạm dụng
+5. Không commit API key thật lên Git – chỉ cập nhật trong file local của bạn
+
 ## 🔒 Các file được gitignore
 
 Các file sau **KHÔNG** được push lên Git:

@@ -1397,9 +1397,19 @@ ALTER TABLE [dbo].[payments]  WITH CHECK ADD CHECK  (([payment_type]='e_wallet' 
 GO
 ALTER TABLE [dbo].[payments]  WITH CHECK ADD CHECK  (([status]='refunded' OR [status]='failed' OR [status]='completed' OR [status]='pending'))
 GO
-ALTER TABLE [dbo].[pricing_rules]  WITH CHECK ADD  CONSTRAINT [CK_pricing_vehicle_type] CHECK  (([vehicle_type]='car' OR [vehicle_type]='motorcycle' OR [vehicle_type] IS NULL))
+ALTER TABLE [dbo].[pricing_rules]  WITH CHECK ADD  CONSTRAINT [CK_pricing_vehicle_type] CHECK  (([vehicle_type] IS NULL OR [vehicle_type] IN ('car','motorcycle','AC','DC','DC_FAST','PARKING')))
 GO
 ALTER TABLE [dbo].[pricing_rules] CHECK CONSTRAINT [CK_pricing_vehicle_type]
+GO
+IF NOT EXISTS (SELECT 1 FROM [dbo].[pricing_rules] WHERE [station_id] IS NULL)
+BEGIN
+    INSERT INTO [dbo].[pricing_rules] (station_id, vehicle_type, time_range_start, time_range_end, base_price, is_active, created_at, updated_at)
+    VALUES
+        (NULL, 'AC', NULL, NULL, 3500, 1, SYSUTCDATETIME(), SYSUTCDATETIME()),
+        (NULL, 'DC', NULL, NULL, 6500, 1, SYSUTCDATETIME(), SYSUTCDATETIME()),
+        (NULL, 'DC_FAST', NULL, NULL, 9000, 1, SYSUTCDATETIME(), SYSUTCDATETIME()),
+        (NULL, 'PARKING', NULL, NULL, 5000, 1, SYSUTCDATETIME(), SYSUTCDATETIME());
+END
 GO
 ALTER TABLE [dbo].[reviews]  WITH CHECK ADD CHECK  (([rating]>=(1) AND [rating]<=(5)))
 GO
@@ -2083,3 +2093,4 @@ USE [master]
 GO
 ALTER DATABASE [SkaEV_DB] SET  READ_WRITE 
 GO
+    

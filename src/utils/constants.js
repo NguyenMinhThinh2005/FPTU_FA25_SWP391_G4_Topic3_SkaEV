@@ -57,6 +57,7 @@ export const CONNECTOR_TYPES = {
   TYPE2: "Type 2",
   CCS2: "CCS2",
   CHADEMO: "CHAdeMO",
+  GB_T: "GB/T",
 };
 
 // Power Levels

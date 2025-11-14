@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.EntityFrameworkCore;
@@ -20,6 +20,8 @@ public interface IStationService
     Task<bool> UpdateStationAsync(int stationId, UpdateStationDto dto);
     Task<bool> DeleteStationAsync(int stationId);
     Task<List<SlotDetailDto>> GetStationSlotsDetailsAsync(int stationId);
+    Task<List<SlotDetailDto>> GetAvailableSlotsAsync(int stationId);
+    Task<List<ChargingPostWithSlotsDto>> GetAvailablePostsAsync(int stationId);
 }
 
 internal record StationAggregates(
@@ -154,7 +156,9 @@ public class StationService : IStationService
     private static StationDto ComposeStationDto(
         ChargingStation station,
         StationAggregates aggregates,
-        StationStaff? assignment)
+        StationStaff? assignment,
+        StationPricingInfo pricing,
+        List<ChargingPostDto>? postsDto)
     {
         return new StationDto
         {
@@ -180,13 +184,17 @@ public class StationService : IStationService
             ManagerUserId = assignment?.StaffUserId,
             ManagerName = assignment?.StaffUser.FullName,
             ManagerEmail = assignment?.StaffUser.Email,
-            ManagerPhoneNumber = assignment?.StaffUser.PhoneNumber
+            ManagerPhoneNumber = assignment?.StaffUser.PhoneNumber,
+            AcRate = pricing?.AcRate,
+            DcRate = pricing?.DcRate,
+            DcFastRate = pricing?.DcFastRate,
+            ParkingFee = pricing?.ParkingFee,
+            ChargingPosts = postsDto
         };
     }
 
     public async Task<List<StationDto>> SearchStationsByLocationAsync(SearchStationsRequestDto request)
     {
-        // Use stored procedure sp_search_stations_by_location
         var latParam = new SqlParameter("@latitude", request.Latitude);
         var lonParam = new SqlParameter("@longitude", request.Longitude);
         var radiusParam = new SqlParameter("@radius_km", request.RadiusKm);
@@ -205,6 +213,7 @@ public class StationService : IStationService
 
         var stationIds = stationsRaw.Select(s => s.StationId).Distinct().ToList();
 
+        // Load posts and pricing and manager assignments in batch to avoid N+1
         var postsLookup = await _context.ChargingPosts
             .Where(post => stationIds.Contains(post.StationId))
             .Include(post => post.ChargingSlots)
@@ -223,16 +232,39 @@ public class StationService : IStationService
 
         var managerAssignments = await GetActiveManagerAssignmentsAsync(stationIds);
 
+        var pricingLookup = await BuildPricingLookupAsync(stationIds);
+
         var stations = stationsRaw.Select(station =>
         {
             managerAssignments.TryGetValue(station.StationId, out var assignment);
             postsByStation.TryGetValue(station.StationId, out var stationPosts);
-            var activeSessions = activeBookingCounts.TryGetValue(station.StationId, out var count)
-                ? count
-                : 0;
+            var activeSessions = activeBookingCounts.TryGetValue(station.StationId, out var count) ? count : 0;
 
             var aggregates = CalculateAggregates(stationPosts, activeSessions, station.Status);
-            return ComposeStationDto(station, aggregates, assignment);
+
+            var pricing = pricingLookup.TryGetValue(station.StationId, out var p) ? p : StationPricingInfo.CreateDefault();
+
+            List<ChargingPostDto>? postsDto = null;
+            if (stationPosts != null && stationPosts.Any())
+            {
+                postsDto = stationPosts.Select(p => new ChargingPostDto
+                {
+                    PostId = p.PostId,
+                    PostName = p.PostNumber.ToString(),
+                    PostType = p.PostType,
+                    Slots = p.ChargingSlots.Select(s => new ChargingSlotSimpleDto
+                    {
+                        SlotId = s.SlotId,
+                        SlotNumber = int.TryParse(s.SlotNumber, out var n) ? n : 0,
+                        ConnectorType = s.ConnectorType,
+                        MaxPower = s.MaxPower,
+                        Status = s.Status,
+                        CurrentBookingId = s.CurrentBookingId
+                    }).ToList()
+                }).ToList();
+            }
+
+            return ComposeStationDto(station, aggregates, assignment, pricing, postsDto);
         }).ToList();
 
         return stations;
@@ -252,7 +284,7 @@ public class StationService : IStationService
         if (stationEntity == null)
             return null;
 
-        var assignment = await _context.StationStaff
+        var manager = await _context.StationStaff
             .Include(ss => ss.StaffUser)
             .Where(ss => ss.StationId == stationId && ss.IsActive)
             .OrderByDescending(ss => ss.AssignedAt)
@@ -261,7 +293,31 @@ public class StationService : IStationService
 
         var activeSessions = stationEntity.Bookings?.Count ?? 0;
         var aggregates = CalculateAggregates(stationEntity.ChargingPosts, activeSessions, stationEntity.Status);
-        return ComposeStationDto(stationEntity, aggregates, assignment);
+
+        var pricingLookup = await BuildPricingLookupAsync(new[] { stationEntity.StationId });
+        var pricing = pricingLookup.TryGetValue(stationEntity.StationId, out var value) ? value : StationPricingInfo.CreateDefault();
+
+        List<ChargingPostDto>? postsDto = null;
+        if (stationEntity.ChargingPosts != null && stationEntity.ChargingPosts.Any())
+        {
+            postsDto = stationEntity.ChargingPosts.Select(p => new ChargingPostDto
+            {
+                PostId = p.PostId,
+                PostName = p.PostNumber.ToString(),
+                PostType = p.PostType,
+                Slots = p.ChargingSlots.Select(s => new ChargingSlotSimpleDto
+                {
+                    SlotId = s.SlotId,
+                    SlotNumber = int.TryParse(s.SlotNumber, out var n) ? n : 0,
+                    ConnectorType = s.ConnectorType,
+                    MaxPower = s.MaxPower,
+                    Status = s.Status,
+                    CurrentBookingId = s.CurrentBookingId
+                }).ToList()
+            }).ToList();
+        }
+
+        return ComposeStationDto(stationEntity, aggregates, manager, pricing, postsDto);
     }
 
     public async Task<List<StationDto>> GetAllStationsAsync(string? city = null, string? status = null)
@@ -294,12 +350,48 @@ public class StationService : IStationService
         var stationIds = stationsRaw.Select(s => s.StationId).ToList();
         var managerAssignments = await GetActiveManagerAssignmentsAsync(stationIds);
 
-        var stations = stationsRaw.Select(station =>
+        var pricingLookup = await BuildPricingLookupAsync(stationIds);
+
+        // Load charging posts and slots for all stations
+        var chargingPosts = await _context.ChargingPosts
+            .Where(p => stationIds.Contains(p.StationId))
+            .Include(p => p.ChargingSlots)
+            .ToListAsync();
+
+        var stations = stationsRaw.Select(s =>
         {
-            managerAssignments.TryGetValue(station.StationId, out var assignment);
-            var activeSessions = station.Bookings?.Count ?? 0;
-            var aggregates = CalculateAggregates(station.ChargingPosts, activeSessions, station.Status);
-            return ComposeStationDto(station, aggregates, assignment);
+            managerAssignments.TryGetValue(s.StationId, out var assignment);
+            var activeSessions = s.Bookings?.Count ?? 0;
+            var aggregates = CalculateAggregates(s.ChargingPosts, activeSessions, s.Status);
+
+            var pricing = pricingLookup.TryGetValue(s.StationId, out var p) ? p : StationPricingInfo.CreateDefault();
+
+            List<ChargingPostDto>? postsDto = null;
+            var posts = chargingPosts.Where(p => p.StationId == s.StationId).ToList();
+            if (posts.Any())
+            {
+                postsDto = posts.Select(p => new ChargingPostDto
+                {
+                    PostId = p.PostId,
+                    PostName = p.PostNumber.ToString(),
+                    PostType = p.PostType,
+                    Slots = p.ChargingSlots.Select(slot => new ChargingSlotSimpleDto
+                    {
+                        SlotId = slot.SlotId,
+                        SlotNumber = int.TryParse(slot.SlotNumber, out var num) ? num : 0,
+                        ConnectorType = slot.ConnectorType,
+                        MaxPower = slot.MaxPower,
+                        Status = slot.Status,
+                        CurrentBookingId = slot.CurrentBookingId
+                    }).ToList()
+                }).ToList();
+            }
+            else if (s.TotalPosts > 0)
+            {
+                postsDto = CreateDefaultChargingPosts(s.TotalPosts, s.AvailablePosts);
+            }
+
+            return ComposeStationDto(s, aggregates, assignment, pricing, postsDto);
         }).ToList();
 
         return stations;
@@ -320,6 +412,75 @@ public class StationService : IStationService
         return assignments
             .GroupBy(ss => ss.StationId)
             .ToDictionary(g => g.Key, g => g.First());
+    }
+
+    private List<ChargingPostDto> CreateDefaultChargingPosts(int totalPosts, int availablePosts)
+    {
+        var posts = new List<ChargingPostDto>();
+        
+        // Distribute posts between AC and DC (60% AC, 40% DC)
+        int acPosts = (int)Math.Ceiling(totalPosts * 0.6);
+        int dcPosts = totalPosts - acPosts;
+        
+        int availableAC = (int)Math.Ceiling(availablePosts * 0.6);
+        int availableDC = availablePosts - availableAC;
+        
+        // Create AC posts
+        for (int i = 1; i <= acPosts; i++)
+        {
+            var slots = new List<ChargingSlotSimpleDto>();
+            // Each AC post has 2 slots (Type 2)
+            for (int j = 1; j <= 2; j++)
+            {
+                bool isAvailable = availableAC > 0;
+                slots.Add(new ChargingSlotSimpleDto
+                {
+                    SlotId = (i * 100) + j, // Virtual ID
+                    SlotNumber = j,
+                    ConnectorType = "Type 2",
+                    MaxPower = 22,
+                    Status = isAvailable ? "Available" : "In Use",
+                    CurrentBookingId = null
+                });
+                if (isAvailable) availableAC--;
+            }
+            
+            posts.Add(new ChargingPostDto
+            {
+                PostId = i,
+                PostName = $"AC Post {i}",
+                PostType = "AC",
+                Slots = slots
+            });
+        }
+        
+        // Create DC posts
+        for (int i = 1; i <= dcPosts; i++)
+        {
+            var slots = new List<ChargingSlotSimpleDto>();
+            // Each DC post has 1 CCS2 slot
+            bool isAvailable = availableDC > 0;
+            slots.Add(new ChargingSlotSimpleDto
+            {
+                SlotId = ((acPosts + i) * 100) + 1, // Virtual ID
+                SlotNumber = 1,
+                ConnectorType = "CCS2",
+                MaxPower = 50,
+                Status = isAvailable ? "Available" : "In Use",
+                CurrentBookingId = null
+            });
+            if (isAvailable) availableDC--;
+            
+            posts.Add(new ChargingPostDto
+            {
+                PostId = acPosts + i,
+                PostName = $"DC Post {i}",
+                PostType = "DC",
+                Slots = slots
+            });
+        }
+        
+        return posts;
     }
 
     public async Task<StationDto> CreateStationAsync(CreateStationDto dto)
@@ -344,8 +505,28 @@ public class StationService : IStationService
         _context.ChargingStations.Add(station);
         await _context.SaveChangesAsync();
 
-        var aggregates = CalculateAggregates(Enumerable.Empty<ChargingPost>(), 0, station.Status);
-        return ComposeStationDto(station, aggregates, null);
+        var pricingLookup = await BuildPricingLookupAsync(new[] { station.StationId });
+        var pricing = pricingLookup.TryGetValue(station.StationId, out var value) ? value : StationPricingInfo.CreateDefault();
+
+        return new StationDto
+        {
+            StationId = station.StationId,
+            StationName = station.StationName,
+            Address = station.Address,
+            City = station.City,
+            Latitude = station.Latitude,
+            Longitude = station.Longitude,
+            TotalPosts = station.TotalPosts,
+            AvailablePosts = station.AvailablePosts,
+            OperatingHours = station.OperatingHours,
+            Amenities = dto.Amenities,
+            StationImageUrl = station.StationImageUrl,
+            Status = station.Status,
+            AcRate = pricing.AcRate,
+            DcRate = pricing.DcRate,
+            DcFastRate = pricing.DcFastRate,
+            ParkingFee = pricing.ParkingFee
+        };
     }
 
     public async Task<bool> UpdateStationAsync(int stationId, UpdateStationDto dto)
@@ -417,5 +598,164 @@ public class StationService : IStationService
                          };
 
         return await slotsQuery.ToListAsync();
+    }
+
+    public async Task<List<SlotDetailDto>> GetAvailableSlotsAsync(int stationId)
+    {
+        // Return all slots (same as GetStationSlotsDetailsAsync)
+        return await GetStationSlotsDetailsAsync(stationId);
+    }
+
+    public async Task<List<ChargingPostWithSlotsDto>> GetAvailablePostsAsync(int stationId)
+    {
+        var posts = await _context.ChargingPosts
+            .Include(post => post.ChargingSlots)
+            .Include(post => post.ChargingStation)
+            .Where(post => post.StationId == stationId)
+            .ToListAsync();
+
+        // Build per-post summaries with slot breakdown so the frontend can render availability without extra joins
+        var result = posts.Select(post =>
+        {
+            var slotDtos = (post.ChargingSlots ?? new List<Domain.Entities.ChargingSlot>())
+                .OrderBy(slot => slot.SlotNumber)
+                .Select(slot => new ChargingSlotDto
+                {
+                    SlotId = slot.SlotId,
+                    PostId = slot.PostId,
+                    PostName = post.PostNumber,
+                    PostType = post.PostType,
+                    StationId = post.StationId,
+                    StationName = post.ChargingStation?.StationName ?? string.Empty,
+                    Status = slot.Status,
+                    ConnectorType = slot.ConnectorType,
+                    PowerKw = slot.MaxPower,
+                    CurrentBookingId = slot.CurrentBookingId
+                })
+                .ToList();
+
+            var computedTotalSlots = slotDtos.Count;
+            var computedAvailableSlots = slotDtos.Count(slot => string.Equals(slot.Status, "available", StringComparison.OrdinalIgnoreCase));
+
+            return new ChargingPostWithSlotsDto
+            {
+                PostId = post.PostId,
+                PostNumber = post.PostNumber,
+                PostType = post.PostType,
+                PowerOutput = post.PowerOutput,
+                TotalSlots = computedTotalSlots > 0 ? computedTotalSlots : post.TotalSlots,
+                AvailableSlots = computedTotalSlots > 0 ? computedAvailableSlots : post.AvailableSlots,
+                Status = post.Status,
+                Slots = slotDtos
+            };
+        })
+        .OrderByDescending(post => post.AvailableSlots)
+        .ThenBy(post => post.PostNumber)
+        .ToList();
+
+        return result;
+    }
+
+    private async Task<Dictionary<int, StationPricingInfo>> BuildPricingLookupAsync(IEnumerable<int> stationIds)
+    {
+        var ids = stationIds?.Distinct().ToList() ?? new List<int>();
+        if (ids.Count == 0)
+        {
+            return new Dictionary<int, StationPricingInfo>();
+        }
+
+        var pricingRules = await _context.PricingRules
+            .Where(r => r.IsActive && (!r.StationId.HasValue || ids.Contains(r.StationId.Value)))
+            .ToListAsync();
+
+        var lookup = ids.ToDictionary(id => id, _ => StationPricingInfo.CreateDefault());
+
+        var globalPricing = StationPricingInfo.FromRules(pricingRules.Where(r => !r.StationId.HasValue));
+        foreach (var id in ids)
+        {
+            lookup[id] = globalPricing.Clone();
+        }
+
+        foreach (var group in pricingRules.Where(r => r.StationId.HasValue).GroupBy(r => r.StationId!.Value))
+        {
+            if (!lookup.TryGetValue(group.Key, out var pricing))
+            {
+                pricing = globalPricing.Clone();
+                lookup[group.Key] = pricing;
+            }
+
+            pricing.ApplyRules(group);
+        }
+
+        return lookup;
+    }
+
+    private sealed class StationPricingInfo
+    {
+        public decimal? AcRate { get; private set; }
+        public decimal? DcRate { get; private set; }
+        public decimal? DcFastRate { get; private set; }
+        public decimal? ParkingFee { get; private set; }
+
+        private StationPricingInfo()
+        {
+            ParkingFee = 0;
+        }
+
+        public static StationPricingInfo CreateDefault() => new StationPricingInfo();
+
+        public static StationPricingInfo FromRules(IEnumerable<PricingRule> rules)
+        {
+            var info = CreateDefault();
+            info.ApplyRules(rules);
+            return info;
+        }
+
+        public StationPricingInfo Clone()
+        {
+            return new StationPricingInfo
+            {
+                AcRate = AcRate,
+                DcRate = DcRate,
+                DcFastRate = DcFastRate,
+                ParkingFee = ParkingFee
+            };
+        }
+
+        public void ApplyRules(IEnumerable<PricingRule> rules)
+        {
+            foreach (var rule in rules)
+            {
+                if (rule == null)
+                    continue;
+
+                var key = rule.VehicleType?.Trim().ToUpperInvariant();
+                if (string.IsNullOrEmpty(key))
+                    continue;
+
+                var value = rule.BasePrice;
+
+                switch (key)
+                {
+                    case "AC":
+                        AcRate = value;
+                        break;
+                    case "DC":
+                        DcRate = value;
+                        break;
+                    case "DC_FAST":
+                    case "DCFAST":
+                    case "DC-FAST":
+                    case "DC_FAST_CHARGING":
+                    case "DC_FAST_RATE":
+                        DcFastRate = value;
+                        break;
+                    case "PARKING":
+                    case "PARKING_FEE":
+                        ParkingFee = value;
+                        break;
+                }
+            }
+        }
     }
 }

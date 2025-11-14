@@ -1,4 +1,4 @@
-namespace SkaEV.API.Application.DTOs.Stations;
+﻿namespace SkaEV.API.Application.DTOs.Stations;
 
 public class StationDto
 {
@@ -22,10 +22,39 @@ public class StationDto
     public string? StationImageUrl { get; set; }
     public string Status { get; set; } = string.Empty;
     public decimal? DistanceKm { get; set; }
+
+    // Manager fields (optional)
     public int? ManagerUserId { get; set; }
     public string? ManagerName { get; set; }
     public string? ManagerEmail { get; set; }
     public string? ManagerPhoneNumber { get; set; }
+
+    // Pricing
+    public decimal? AcRate { get; set; }
+    public decimal? DcRate { get; set; }
+    public decimal? DcFastRate { get; set; }
+    public decimal? ParkingFee { get; set; }
+
+    // Detailed charging infrastructure
+    public List<ChargingPostDto>? ChargingPosts { get; set; }
+}
+
+public class ChargingPostDto
+{
+    public int PostId { get; set; }
+    public string PostName { get; set; } = string.Empty;
+    public string PostType { get; set; } = string.Empty; // AC or DC
+    public List<ChargingSlotSimpleDto> Slots { get; set; } = new();
+}
+
+public class ChargingSlotSimpleDto
+{
+    public int SlotId { get; set; }
+    public int SlotNumber { get; set; }
+    public string ConnectorType { get; set; } = string.Empty;
+    public decimal MaxPower { get; set; }
+    public string Status { get; set; } = string.Empty;
+    public int? CurrentBookingId { get; set; }
 }
 
 public class SearchStationsRequestDto

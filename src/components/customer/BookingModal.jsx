@@ -47,6 +47,31 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
   const [bookingResult, setBookingResult] = useState(null);
   const [resultMessage, setResultMessage] = useState("");
 
+  // Debug: log station changes
+  React.useEffect(() => {
+    console.log('📋 BookingModal received station:', {
+      id: station?.id,
+      name: station?.name,
+      statsAvailable: station?.stats?.available,
+      chargingAvailablePorts: station?.charging?.availablePorts,
+      connectorTypes: station?.charging?.connectorTypes
+    });
+  }, [station]);
+
+  // Reset all state when modal opens or station changes
+  React.useEffect(() => {
+    if (open) {
+      setActiveStep(0);
+      setSelectedChargingType(null);
+      setSelectedPort(null);
+      setSelectedDateTime(null);
+      setAgreeTerms(false);
+      setLoading(false);
+      setBookingResult(null);
+      setResultMessage("");
+    }
+  }, [open, station?.id]);
+
   const steps = [
     "Chọn loại sạc",
     "Chọn cổng sạc",
@@ -81,47 +106,118 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
 
   // Get unique charging types from all poles
   const getChargingTypes = () => {
-    if (!station?.charging?.poles) return [];
+    const pricing = station?.charging?.pricing || {};
 
-    const typesMap = new Map();
-    station.charging.poles.forEach((pole) => {
-      const key = `${pole.type}-${pole.power}`;
-      if (!typesMap.has(key)) {
-        typesMap.set(key, {
-          id: key,
-          type: pole.type,
-          power: pole.power,
-          voltage: pole.voltage,
-          name:
-            pole.type === "AC"
-              ? `Sạc chậm AC`
-              : pole.power >= 150
-              ? `Sạc siêu nhanh DC`
-              : `Sạc nhanh DC`,
-          rate:
-            pole.type === "AC"
-              ? station.charging.pricing.acRate
-              : pole.power >= 150
-              ? station.charging.pricing.dcFastRate ||
-                station.charging.pricing.dcRate
-              : station.charging.pricing.dcRate,
-          availableCount: 0,
+    // If station has detailed poles data, use it
+    if (station?.charging?.poles && station.charging.poles.length > 0) {
+      const typesMap = new Map();
+      station.charging.poles.forEach((pole) => {
+        const key = `${pole.type}-${pole.power}`;
+        if (!typesMap.has(key)) {
+          typesMap.set(key, {
+            id: key,
+            type: pole.type,
+            power: pole.power,
+            voltage: pole.voltage,
+            name:
+              pole.type === "AC"
+                ? `Sạc chậm AC`
+                : pole.power >= 150
+                ? `Sạc siêu nhanh DC`
+                : `Sạc nhanh DC`,
+            rate:
+              pole.type === "AC"
+                ? pricing.acRate ?? pricing.dcRate ?? 0
+                : pole.power >= 150
+                ? pricing.dcFastRate ?? pricing.dcRate ?? pricing.acRate ?? 0
+                : pricing.dcRate ?? pricing.acRate ?? 0,
+            availableCount: 0,
+          });
+        }
+        // Count available ports on this pole
+        const availablePorts = (pole.ports || []).filter(
+          (p) => p.status === "available"
+        ).length;
+        const current = typesMap.get(key);
+        current.availableCount += availablePorts;
+      });
+
+      return Array.from(typesMap.values());
+    }
+
+    // Fallback: If no poles data, create types from connector types and stats
+    if (station?.charging?.connectorTypes && station.charging.connectorTypes.length > 0) {
+      const types = [];
+      const connectorTypes = station.charging.connectorTypes;
+      const availablePorts = station.stats?.available || station.charging?.availablePorts || 0;
+      
+      console.log('🔍 BookingModal - Creating fallback charging types:', {
+        stationId: station.id,
+        stationName: station.name,
+        connectorTypes,
+        statsAvailable: station.stats?.available,
+        chargingAvailablePorts: station.charging?.availablePorts,
+        finalAvailablePorts: availablePorts
+      });
+      
+      // Distribute available ports evenly across connector types
+      const portsPerType = Math.floor(availablePorts / connectorTypes.length);
+      const remainder = availablePorts % connectorTypes.length;
+      
+      connectorTypes.forEach((connector, index) => {
+        const isDC = connector.includes("CCS") || connector.includes("CHAdeMO");
+        const power = isDC ? 60 : 22; // Default DC: 60kW, AC: 22kW
+        const portCount = portsPerType + (index < remainder ? 1 : 0);
+        
+        console.log(`  - Connector ${index}: ${connector}, isDC=${isDC}, portCount=${portCount}`);
+        
+        types.push({
+          id: `${connector}-${power}`,
+          type: isDC ? "DC" : "AC",
+          power: power,
+          voltage: isDC ? 400 : 230,
+          connectorType: connector,
+          name: isDC ? `Sạc nhanh DC (${connector})` : `Sạc chậm AC (${connector})`,
+          rate: isDC ? (pricing.dcRate || 5000) : (pricing.acRate || 3500),
+          availableCount: portCount,
         });
-      }
-      // Count available ports on this pole
-      const availablePorts = (pole.ports || []).filter(
-        (p) => p.status === "available"
-      ).length;
-      const current = typesMap.get(key);
-      current.availableCount += availablePorts;
-    });
+      });
+      
+      return types;
+    }
 
-    return Array.from(typesMap.values());
+    return [];
   };
 
   // Get all ports matching selected charging type
   const getPortsForType = () => {
-    if (!selectedChargingType || !station?.charging?.poles) return [];
+    if (!selectedChargingType) return [];
+
+    // FALLBACK: If using fallback data (has connectorType), create virtual ports
+    if (selectedChargingType.connectorType) {
+      console.log('🔄 Creating virtual ports for fallback type:', selectedChargingType.name);
+      const virtualPorts = [];
+      const availableCount = selectedChargingType.availableCount || 0;
+      
+      for (let i = 1; i <= availableCount; i++) {
+        virtualPorts.push({
+          id: `virtual-${selectedChargingType.connectorType}-${i}`,
+          name: `Port ${i}`,
+          status: 'Available',
+          poleName: `Pole ${selectedChargingType.connectorType}`,
+          poleId: `virtual-pole-${selectedChargingType.connectorType}`,
+          power: selectedChargingType.power,
+          type: selectedChargingType.type,
+          connectorType: selectedChargingType.connectorType,
+        });
+      }
+      
+      console.log(`✅ Created ${virtualPorts.length} virtual ports`);
+      return virtualPorts;
+    }
+
+    // NORMAL: Use actual poles data
+    if (!station?.charging?.poles) return [];
 
     const ports = [];
     station.charging.poles.forEach((pole) => {
@@ -181,7 +277,16 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
 
     setLoading(true);
     try {
-      const baseRate = selectedChargingType.rate;
+      if (!station?.id || !station?.name) {
+        setBookingResult("error");
+        setResultMessage(
+          "❌ Thiếu thông tin trạm sạc. Vui lòng thử lại hoặc chọn trạm khác."
+        );
+        return;
+      }
+
+      const stationPricing = station?.charging?.pricing || {};
+      const baseRate = selectedChargingType.rate ?? 0;
 
       const bookingData = {
         stationId: station.id,
@@ -202,7 +307,7 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
         },
         pricing: {
           baseRate,
-          parkingFee: station.charging.pricing.parkingFee || 0,
+          parkingFee: stationPricing.parkingFee ?? 0,
         },
         bookingTime: new Date().toISOString(),
         schedulingType: selectedDateTime?.schedulingType || "scheduled", // Changed from "immediate" to "scheduled"
@@ -254,19 +359,23 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
         handleClose();
       }, 3000);
     } catch (error) {
-      console.error('❌ Booking error:', error);
+      console.error("❌ Booking error:", error);
       setBookingResult("error");
-      
+
       // Check for specific error messages
-      const errorMessage = error?.response?.data?.message || error?.message || '';
-      
-      if (errorMessage.includes('Slot is not available') || errorMessage.includes('not available')) {
+      const errorMessage =
+        error?.response?.data?.message || error?.message || "";
+
+      if (
+        errorMessage.includes("Slot is not available") ||
+        errorMessage.includes("not available")
+      ) {
         setResultMessage(
           "❌ Cổng sạc này hiện không còn trống!\n\n" +
-          "Vui lòng chọn cổng sạc khác hoặc trạm khác.\n" +
-          "Danh sách trạm sẽ được làm mới sau khi đóng."
+            "Vui lòng chọn cổng sạc khác hoặc trạm khác.\n" +
+            "Danh sách trạm sẽ được làm mới sau khi đóng."
         );
-        
+
         // Refresh stations list after closing
         setTimeout(() => {
           initializeData();
@@ -274,7 +383,7 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
       } else {
         setResultMessage(
           "❌ Có lỗi xảy ra khi đặt chỗ\n\n" +
-          (errorMessage || "Vui lòng thử lại hoặc chọn trạm khác.")
+            (errorMessage || "Vui lòng thử lại hoặc chọn trạm khác.")
         );
       }
     } finally {
@@ -738,13 +847,44 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
                     />
                   }
                   label={
-                    <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', fontSize: 16 }}>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                        fontSize: 16,
+                      }}
+                    >
                       <span style={{ marginRight: 6 }}>Tôi đồng ý với</span>
-                      <Button variant="text" sx={{ p: 0, minWidth: 'unset', textTransform: 'none', color: 'primary.main', fontWeight: 500, fontSize: 16, mx: 0.5 }} onClick={() => setOpenTerms(true)}>
+                      <Button
+                        variant="text"
+                        sx={{
+                          p: 0,
+                          minWidth: "unset",
+                          textTransform: "none",
+                          color: "primary.main",
+                          fontWeight: 500,
+                          fontSize: 16,
+                          mx: 0.5,
+                        }}
+                        onClick={() => setOpenTerms(true)}
+                      >
                         điều khoản sử dụng
                       </Button>
-                      <span style={{ margin: '0 6px' }}>và</span>
-                      <Button variant="text" sx={{ p: 0, minWidth: 'unset', textTransform: 'none', color: 'primary.main', fontWeight: 500, fontSize: 16, mx: 0.5 }} onClick={() => setOpenPolicy(true)}>
+                      <span style={{ margin: "0 6px" }}>và</span>
+                      <Button
+                        variant="text"
+                        sx={{
+                          p: 0,
+                          minWidth: "unset",
+                          textTransform: "none",
+                          color: "primary.main",
+                          fontWeight: 500,
+                          fontSize: 16,
+                          mx: 0.5,
+                        }}
+                        onClick={() => setOpenPolicy(true)}
+                      >
                         chính sách thanh toán
                       </Button>
                     </Box>
@@ -752,34 +892,212 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
                 />
 
                 {/* Modal: Điều khoản sử dụng */}
-                <Dialog open={openTerms} onClose={() => setOpenTerms(false)} maxWidth="md" fullWidth>
+                <Dialog
+                  open={openTerms}
+                  onClose={() => setOpenTerms(false)}
+                  maxWidth="md"
+                  fullWidth
+                >
                   <DialogTitle>Điều khoản sử dụng</DialogTitle>
                   <DialogContent dividers>
-                    <Typography variant="subtitle1" fontWeight="bold" gutterBottom>A. ĐIỀU KHOẢN SỬ DỤNG</Typography>
-                    <Typography variant="body2" paragraph>1. Phạm vi áp dụng<br/>Các điều khoản này áp dụng cho tất cả người dùng đặt chỗ, sử dụng dịch vụ sạc tại các trạm sạc trong hệ thống của SkaEV thông qua ứng dụng di động hoặc website.</Typography>
-                    <Typography variant="body2" paragraph>2. Quy định về Đặt chỗ<br/>Xác nhận đặt chỗ: Việc đặt chỗ của bạn chỉ được xem là thành công khi nhận được thông báo xác nhận qua ứng dụng hoặc email từ hệ thống của chúng tôi.<br/>Thời gian giữ chỗ: Hệ thống sẽ giữ chỗ sạc cho bạn trong vòng 10 phút kể từ thời điểm bạn đặt. Nếu bạn không đến và kết nối sạc trong khoảng thời gian này, lượt đặt chỗ của bạn có thể sẽ tự động bị hủy để nhường cho người dùng khác.<br/>Hủy đặt chỗ: Bạn có thể hủy lượt đặt chỗ miễn phí trước thời điểm hẹn 15 phút.</Typography>
-                    <Typography variant="body2" paragraph>3. Trách nhiệm của Người dùng<br/>Cung cấp thông tin chính xác khi đăng ký tài khoản và đặt chỗ.<br/>Tuân thủ đúng hướng dẫn sử dụng tại trạm sạc để đảm bảo an toàn cho bản thân, phương tiện và thiết bị.<br/>Sử dụng đúng loại cổng sạc tương thích với xe của mình. SkaEV không chịu trách nhiệm cho các hư hỏng nếu người dùng kết nối sai loại sạc.<br/>Khi sạc đầy hoặc hết thời gian đặt chỗ, người dùng có trách nhiệm di chuyển xe ra khỏi vị trí sạc để nhường cho người khác. Việc chiếm dụng vị trí sau khi đã sạc xong có thể bị tính "phí chiếm chỗ" (chi tiết trong Chính sách Thanh toán).<br/>Báo ngay cho bộ phận hỗ trợ của chúng tôi qua hotline 0917123123 nếu phát hiện bất kỳ sự cố, hư hỏng nào tại trạm sạc.<br/>Tự bảo quản tài sản cá nhân. Chúng tôi không chịu trách nhiệm cho bất kỳ mất mát hay hư hỏng nào đối với tài sản của bạn tại trạm sạc.</Typography>
-                    <Typography variant="body2" paragraph>4. Quyền và Trách nhiệm của chúng tôi<br/>Đảm bảo cung cấp dịch vụ ổn định và thiết bị sạc hoạt động tốt.<br/>Có quyền từ chối hoặc hủy phiên sạc nếu phát hiện người dùng vi phạm các điều khoản, có hành vi gian lận hoặc gây mất an toàn.<br/>Trong trường hợp trạm sạc gặp sự cố kỹ thuật đột xuất, chúng tôi sẽ nỗ lực thông báo sớm nhất cho bạn và hỗ trợ tìm kiếm trạm sạc thay thế gần nhất. Chúng tôi không chịu trách nhiệm bồi thường cho bất kỳ thiệt hại gián tiếp nào phát sinh từ sự cố này.</Typography>
-                    <Typography variant="body2" paragraph>5. Miễn trừ Trách nhiệm<br/>Chúng tôi không chịu trách nhiệm cho bất kỳ hư hỏng nào đối với phương tiện của bạn, trừ khi lỗi đó được xác định là do thiết bị của chúng tôi gây ra một cách trực tiếp.</Typography>
+                    <Typography
+                      variant="subtitle1"
+                      fontWeight="bold"
+                      gutterBottom
+                    >
+                      A. ĐIỀU KHOẢN SỬ DỤNG
+                    </Typography>
+                    <Typography variant="body2" paragraph>
+                      1. Phạm vi áp dụng
+                      <br />
+                      Các điều khoản này áp dụng cho tất cả người dùng đặt chỗ,
+                      sử dụng dịch vụ sạc tại các trạm sạc trong hệ thống của
+                      SkaEV thông qua ứng dụng di động hoặc website.
+                    </Typography>
+                    <Typography variant="body2" paragraph>
+                      2. Quy định về Đặt chỗ
+                      <br />
+                      Xác nhận đặt chỗ: Việc đặt chỗ của bạn chỉ được xem là
+                      thành công khi nhận được thông báo xác nhận qua ứng dụng
+                      hoặc email từ hệ thống của chúng tôi.
+                      <br />
+                      Thời gian giữ chỗ: Hệ thống sẽ giữ chỗ sạc cho bạn trong
+                      vòng 10 phút kể từ thời điểm bạn đặt. Nếu bạn không đến và
+                      kết nối sạc trong khoảng thời gian này, lượt đặt chỗ của
+                      bạn có thể sẽ tự động bị hủy để nhường cho người dùng
+                      khác.
+                      <br />
+                      Hủy đặt chỗ: Bạn có thể hủy lượt đặt chỗ miễn phí trước
+                      thời điểm hẹn 15 phút.
+                    </Typography>
+                    <Typography variant="body2" paragraph>
+                      3. Trách nhiệm của Người dùng
+                      <br />
+                      Cung cấp thông tin chính xác khi đăng ký tài khoản và đặt
+                      chỗ.
+                      <br />
+                      Tuân thủ đúng hướng dẫn sử dụng tại trạm sạc để đảm bảo an
+                      toàn cho bản thân, phương tiện và thiết bị.
+                      <br />
+                      Sử dụng đúng loại cổng sạc tương thích với xe của mình.
+                      SkaEV không chịu trách nhiệm cho các hư hỏng nếu người
+                      dùng kết nối sai loại sạc.
+                      <br />
+                      Khi sạc đầy hoặc hết thời gian đặt chỗ, người dùng có
+                      trách nhiệm di chuyển xe ra khỏi vị trí sạc để nhường cho
+                      người khác. Việc chiếm dụng vị trí sau khi đã sạc xong có
+                      thể bị tính "phí chiếm chỗ" (chi tiết trong Chính sách
+                      Thanh toán).
+                      <br />
+                      Báo ngay cho bộ phận hỗ trợ của chúng tôi qua hotline
+                      0917123123 nếu phát hiện bất kỳ sự cố, hư hỏng nào tại
+                      trạm sạc.
+                      <br />
+                      Tự bảo quản tài sản cá nhân. Chúng tôi không chịu trách
+                      nhiệm cho bất kỳ mất mát hay hư hỏng nào đối với tài sản
+                      của bạn tại trạm sạc.
+                    </Typography>
+                    <Typography variant="body2" paragraph>
+                      4. Quyền và Trách nhiệm của chúng tôi
+                      <br />
+                      Đảm bảo cung cấp dịch vụ ổn định và thiết bị sạc hoạt động
+                      tốt.
+                      <br />
+                      Có quyền từ chối hoặc hủy phiên sạc nếu phát hiện người
+                      dùng vi phạm các điều khoản, có hành vi gian lận hoặc gây
+                      mất an toàn.
+                      <br />
+                      Trong trường hợp trạm sạc gặp sự cố kỹ thuật đột xuất,
+                      chúng tôi sẽ nỗ lực thông báo sớm nhất cho bạn và hỗ trợ
+                      tìm kiếm trạm sạc thay thế gần nhất. Chúng tôi không chịu
+                      trách nhiệm bồi thường cho bất kỳ thiệt hại gián tiếp nào
+                      phát sinh từ sự cố này.
+                    </Typography>
+                    <Typography variant="body2" paragraph>
+                      5. Miễn trừ Trách nhiệm
+                      <br />
+                      Chúng tôi không chịu trách nhiệm cho bất kỳ hư hỏng nào
+                      đối với phương tiện của bạn, trừ khi lỗi đó được xác định
+                      là do thiết bị của chúng tôi gây ra một cách trực tiếp.
+                    </Typography>
                   </DialogContent>
                   <DialogActions>
-                    <Button onClick={() => setOpenTerms(false)} variant="contained">Đóng</Button>
+                    <Button
+                      onClick={() => setOpenTerms(false)}
+                      variant="contained"
+                    >
+                      Đóng
+                    </Button>
                   </DialogActions>
                 </Dialog>
 
                 {/* Modal: Chính sách thanh toán */}
-                <Dialog open={openPolicy} onClose={() => setOpenPolicy(false)} maxWidth="md" fullWidth>
+                <Dialog
+                  open={openPolicy}
+                  onClose={() => setOpenPolicy(false)}
+                  maxWidth="md"
+                  fullWidth
+                >
                   <DialogTitle>Chính sách thanh toán</DialogTitle>
                   <DialogContent dividers>
-                    <Typography variant="subtitle1" fontWeight="bold" gutterBottom>B. CHÍNH SÁCH THANH TOÁN</Typography>
-                    <Typography variant="body2" paragraph>1. Chi phí Sạc<br/>Chi phí cho phiên sạc được tính dựa trên lượng điện năng tiêu thụ (số kWh) nhân với đơn giá tại thời điểm sạc.<br/>Đơn giá (VNĐ/kWh) được niêm yết rõ ràng trên ứng dụng và tại màn hình trụ sạc trước khi bạn bắt đầu phiên sạc.<br/>Ngoài chi phí sạc, có thể phát sinh các loại phí sau:<br/>Phí chiếm chỗ: Áp dụng nếu xe của bạn vẫn chiếm vị trí sạc sau khi đã sạc đầy một khoảng thời gian nhất định (ví dụ: sau 15 phút). Mức phí này sẽ được thông báo rõ trên ứng dụng.</Typography>
-                    <Typography variant="body2" paragraph>2. Phương thức Thanh toán<br/>Chúng tôi chấp nhận thanh toán qua các phương thức sau:<br/>Thẻ tín dụng/ghi nợ quốc tế (Visa, Mastercard).<br/>Thẻ ATM nội địa.<br/>Ví điện tử (Momo, ZaloPay, VNPay,...).<br/>Bạn cần liên kết một phương thức thanh toán hợp lệ vào tài khoản trên ứng dụng để có thể bắt đầu phiên sạc.</Typography>
-                    <Typography variant="body2" paragraph>3. Quy trình Thanh toán<br/>Khi phiên sạc kết thúc, tổng chi phí sẽ được tính toán tự động.<br/>Hệ thống sẽ tự động trừ tiền từ phương thức thanh toán mà bạn đã chọn được đăng ký trên tài khoản.<br/>Hóa đơn chi tiết cho phiên sạc sẽ được gửi đến email của bạn và lưu lại trong lịch sử giao dịch trên ứng dụng.</Typography>
-                    <Typography variant="body2" paragraph>4. Hoàn tiền<br/>Việc hoàn tiền chỉ được xem xét trong trường hợp phiên sạc không thành công hoặc bị gián đoạn do lỗi từ hệ thống hoặc thiết bị của chúng tôi.<br/>Vui lòng liên hệ bộ phận chăm sóc khách hàng qua hotline 0917123123 để được hướng dẫn và xử lý yêu cầu hoàn tiền.</Typography>
-                    <Typography variant="body2" paragraph>5. Thay đổi Chính sách<br/>Chúng tôi có quyền thay đổi, cập nhật biểu phí và chính sách thanh toán. Mọi thay đổi sẽ được thông báo đến bạn qua ứng dụng hoặc email trước khi có hiệu lực.</Typography>
+                    <Typography
+                      variant="subtitle1"
+                      fontWeight="bold"
+                      gutterBottom
+                    >
+                      B. CHÍNH SÁCH THANH TOÁN
+                    </Typography>
+                    <Typography variant="body2" paragraph>
+                      1. Chi phí Sạc
+                      <br />
+                      Chi phí cho phiên sạc được tính dựa trên lượng điện năng
+                      tiêu thụ (số kWh) nhân với đơn giá tại thời điểm sạc.
+                      <br />
+                      Đơn giá (VNĐ/kWh) được niêm yết rõ ràng trên ứng dụng và
+                      tại màn hình trụ sạc trước khi bạn bắt đầu phiên sạc.
+                      <br />
+                      Ngoài chi phí sạc, có thể phát sinh các loại phí sau:
+                      <br />
+                      Phí chiếm chỗ: Áp dụng nếu xe của bạn vẫn chiếm vị trí sạc
+                      sau khi đã sạc đầy một khoảng thời gian nhất định (ví dụ:
+                      sau 15 phút). Mức phí này sẽ được thông báo rõ trên ứng
+                      dụng.
+                    </Typography>
+                    <Typography variant="body2" paragraph>
+                      2. Phương thức Thanh toán
+                      <br />
+                      SkaEV sử dụng cổng thanh toán VNPay để xử lý các giao dịch thanh toán.
+                      <br />
+                      Bạn có thể thanh toán qua các phương thức được hỗ trợ bởi VNPay:
+                      <br />
+                      • Thẻ ATM nội địa (có đăng ký Internet Banking)
+                      <br />
+                      • Thẻ tín dụng/ghi nợ quốc tế (Visa, Mastercard, JCB)
+                      <br />
+                      • Ví điện tử VNPay
+                      <br />
+                      • QR Code ngân hàng (VietQR)
+                      <br />
+                      <strong>Lưu ý:</strong> Bạn không cần liên kết phương thức thanh toán trước.
+                      Thanh toán sẽ được thực hiện sau khi hoàn thành phiên sạc.
+                    </Typography>
+                    <Typography variant="body2" paragraph>
+                      3. Quy trình Thanh toán
+                      <br />
+                      <strong>Bước 1:</strong> Sau khi phiên sạc kết thúc, hệ thống sẽ tự động tính toán
+                      tổng chi phí dựa trên lượng điện tiêu thụ thực tế (kWh) và đơn giá.
+                      <br />
+                      <strong>Bước 2:</strong> Hệ thống tạo hóa đơn điện tử và hiển thị thông tin thanh toán.
+                      <br />
+                      <strong>Bước 3:</strong> Bạn nhấn nút "Thanh toán" để được chuyển đến cổng thanh toán VNPay.
+                      <br />
+                      <strong>Bước 4:</strong> Tại cổng VNPay, chọn phương thức thanh toán phù hợp (thẻ ngân hàng,
+                      ví điện tử, QR Code) và hoàn tất giao dịch.
+                      <br />
+                      <strong>Bước 5:</strong> Sau khi thanh toán thành công, bạn sẽ được chuyển về trang xác nhận.
+                      Hóa đơn chi tiết sẽ được gửi đến email và lưu trong lịch sử giao dịch.
+                      <br />
+                      <br />
+                      <strong>Bảo mật:</strong> Mọi giao dịch được mã hóa và xử lý an toàn qua
+                      cổng thanh toán VNPay. SkaEV không lưu trữ thông tin thẻ ngân hàng của bạn.
+                    </Typography>
+                    <Typography variant="body2" paragraph>
+                      4. Hoàn tiền
+                      <br />
+                      Việc hoàn tiền chỉ được xem xét trong các trường hợp sau:
+                      <br />
+                      • Phiên sạc không thành công hoặc bị gián đoạn do lỗi từ hệ thống/thiết bị của chúng tôi
+                      <br />
+                      • Thanh toán bị trừ tiền nhưng không nhận được dịch vụ
+                      <br />
+                      • Lỗi kỹ thuật trong quá trình thanh toán qua VNPay
+                      <br />
+                      <br />
+                      <strong>Quy trình hoàn tiền:</strong>
+                      <br />
+                      1. Liên hệ bộ phận chăm sóc khách hàng qua hotline 0917123123
+                      <br />
+                      2. Cung cấp mã giao dịch và thông tin liên quan
+                      <br />
+                      3. Yêu cầu hoàn tiền sẽ được xử lý trong vòng 7-14 ngày làm việc
+                      <br />
+                      4. Tiền sẽ được hoàn về tài khoản/thẻ ngân hàng bạn đã sử dụng để thanh toán
+                    </Typography>
+                    <Typography variant="body2" paragraph>
+                      5. Thay đổi Chính sách
+                      <br />
+                      Chúng tôi có quyền thay đổi, cập nhật biểu phí và chính
+                      sách thanh toán. Mọi thay đổi sẽ được thông báo đến bạn
+                      qua ứng dụng hoặc email trước khi có hiệu lực.
+                    </Typography>
                   </DialogContent>
                   <DialogActions>
-                    <Button onClick={() => setOpenPolicy(false)} variant="contained">Đóng</Button>
+                    <Button
+                      onClick={() => setOpenPolicy(false)}
+                      variant="contained"
+                    >
+                      Đóng
+                    </Button>
                   </DialogActions>
                 </Dialog>
               </>

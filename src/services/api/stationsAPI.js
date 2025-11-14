@@ -17,12 +17,21 @@ export const getStationById = async (id) => {
 };
 
 /**
+ * Get all slots/ports for a station with real-time status
+ */
+export const getStationSlots = async (stationId) => {
+  const response = await api.get(`/stations/${stationId}/slots`);
+  return response.data;
+};
+
+/**
  * Get available slots for a station
  */
 export const getAvailableSlots = async (stationId, date) => {
-  const response = await api.get(`/stations/${stationId}/available-slots`, {
-    params: { date }
-  });
+  // Backend endpoint: GET /api/Stations/{stationId}/slots
+  // Optional date param currently unused by API; include only if provided
+  const config = date ? { params: { date } } : undefined;
+  const response = await api.get(`/stations/${stationId}/slots`, config);
   return response.data;
 };
 
@@ -67,6 +76,7 @@ export const filterStations = async (filters) => {
 export default {
   getAllStations,
   getStationById,
+  getStationSlots,
   getAvailableSlots,
   getNearbyStations,
   searchStations,

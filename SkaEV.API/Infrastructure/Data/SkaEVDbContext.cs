@@ -45,8 +45,14 @@ public class SkaEVDbContext : DbContext
         base.OnModelCreating(modelBuilder);
 
         // Configure table names to match database
-        modelBuilder.Entity<User>().ToTable("users");
-        modelBuilder.Entity<UserProfile>().ToTable("user_profiles");
+        modelBuilder.Entity<User>().ToTable("users", tb =>
+        {
+            tb.HasTrigger("trg_users_updated_at");
+        });
+        modelBuilder.Entity<UserProfile>().ToTable("user_profiles", tb =>
+        {
+            tb.HasTrigger("trg_user_profiles_updated_at");
+        });
         modelBuilder.Entity<Vehicle>().ToTable("vehicles");
         modelBuilder.Entity<ChargingStation>().ToTable("charging_stations");
         modelBuilder.Entity<ChargingPost>().ToTable("charging_posts");
@@ -57,7 +63,10 @@ public class SkaEVDbContext : DbContext
         modelBuilder.Entity<QRCode>().ToTable("qr_codes");
         modelBuilder.Entity<Notification>().ToTable("notifications");
         modelBuilder.Entity<SystemLog>().ToTable("system_logs");
-        modelBuilder.Entity<Review>().ToTable("reviews");
+        modelBuilder.Entity<Review>().ToTable("reviews", tb =>
+        {
+            tb.HasTrigger("trg_reviews_updated_at");
+        });
         modelBuilder.Entity<PricingRule>().ToTable("pricing_rules");
         modelBuilder.Entity<StationStaff>().ToTable("station_staff");
         modelBuilder.Entity<ServicePlan>().ToTable("service_plans");
@@ -109,11 +118,17 @@ public class SkaEVDbContext : DbContext
             entity.HasKey(e => e.VehicleId);
             entity.Property(e => e.VehicleId).HasColumnName("vehicle_id");
             entity.Property(e => e.UserId).HasColumnName("user_id");
-            entity.Property(e => e.VehicleType).HasColumnName("vehicle_type").HasMaxLength(50).IsRequired();
+            entity.Property(e => e.VehicleName).HasColumnName("vehicle_name").HasMaxLength(120).IsRequired();
+            entity.Property(e => e.VehicleType).HasColumnName("vehicle_type").HasMaxLength(40).IsRequired();
             entity.Property(e => e.Brand).HasColumnName("brand").HasMaxLength(100);
-            entity.Property(e => e.Model).HasColumnName("model").HasMaxLength(100);
-            entity.Property(e => e.LicensePlate).HasColumnName("license_plate").HasMaxLength(20);
+            entity.Property(e => e.Model).HasColumnName("model").HasMaxLength(120);
+            entity.Property(e => e.VehicleYear).HasColumnName("vehicle_year");
+            entity.Property(e => e.Vin).HasColumnName("vin").HasMaxLength(32);
+            entity.Property(e => e.LicensePlate).HasColumnName("license_plate").HasMaxLength(32);
+            entity.Property(e => e.Color).HasColumnName("color").HasMaxLength(50);
             entity.Property(e => e.BatteryCapacity).HasColumnName("battery_capacity").HasColumnType("decimal(10,2)");
+            entity.Property(e => e.MaxChargingSpeed).HasColumnName("max_charging_speed").HasColumnType("decimal(10,2)");
+            entity.Property(e => e.ConnectorTypes).HasColumnName("connector_types");
             entity.Property(e => e.ChargingPortType).HasColumnName("charging_port_type").HasMaxLength(50);
             entity.Property(e => e.IsPrimary).HasColumnName("is_primary");
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").IsRequired();
@@ -125,7 +140,12 @@ public class SkaEVDbContext : DbContext
                 .HasForeignKey(e => e.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            entity.HasIndex(e => e.LicensePlate).IsUnique();
+            entity.HasIndex(e => e.LicensePlate)
+                .IsUnique()
+                .HasFilter("[license_plate] IS NOT NULL");
+            entity.HasIndex(e => e.Vin)
+                .IsUnique()
+                .HasFilter("[vin] IS NOT NULL");
             entity.HasQueryFilter(e => e.DeletedAt == null); // Global query filter for soft delete
         });
 
