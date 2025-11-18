@@ -109,18 +109,22 @@ public class InvoicesController : ControllerBase
             }
             else if (bookingId.StartsWith("BOOK", StringComparison.OrdinalIgnoreCase))
             {
-                // Extract numeric part from BOOK code (e.g., BOOK17634522777517)
-                var numericPart = bookingId.Substring(4);
-                if (int.TryParse(numericPart, out numericId))
+                // BOOK prefix detected - this might be a timestamp-based code from the frontend
+                // Find the most recent booking for this user/session
+                var recentBooking = await _context.Bookings
+                    .Where(b => userRole != "customer" || b.UserId == userId)
+                    .OrderByDescending(b => b.CreatedAt)
+                    .FirstOrDefaultAsync();
+                
+                if (recentBooking != null)
                 {
-                    // Try to find booking with this ID
-                    invoice = await _invoiceService.GetInvoiceByBookingIdAsync(numericId);
+                    invoice = await _invoiceService.GetInvoiceByBookingIdAsync(recentBooking.BookingId);
+                    _logger.LogInformation("Found booking ID {BookingId} for code {BookingCode}", recentBooking.BookingId, bookingId);
                 }
                 else
                 {
-                    // If the number after BOOK is too large, it might be a timestamp-based code
-                    // Try to find by searching for bookings with similar creation time
-                    return BadRequest(new { message = "Invalid booking code format. Expected BOOK{BookingId} or numeric BookingId." });
+                    _logger.LogWarning("No booking found for code {BookingCode}", bookingId);
+                    return NotFound(new { message = "No recent booking found" });
                 }
             }
             else
