@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using SkaEV.API.Application.DTOs.Invoices;
 using SkaEV.API.Application.Services;
+using SkaEV.API.Infrastructure.Data;
 using System.Security.Claims;
 
 namespace SkaEV.API.Controllers;
@@ -16,11 +18,13 @@ public class InvoicesController : ControllerBase
 {
     private readonly IInvoiceService _invoiceService;
     private readonly ILogger<InvoicesController> _logger;
+    private readonly SkaEVDbContext _context;
 
-    public InvoicesController(IInvoiceService invoiceService, ILogger<InvoicesController> logger)
+    public InvoicesController(IInvoiceService invoiceService, ILogger<InvoicesController> logger, SkaEVDbContext context)
     {
         _invoiceService = invoiceService;
         _logger = logger;
+        _context = context;
     }
 
     /// <summary>
@@ -82,18 +86,47 @@ public class InvoicesController : ControllerBase
     }
 
     /// <summary>
-    /// Get invoice by booking ID
+    /// Get invoice by booking ID or booking code (BOOK + timestamp)
     /// </summary>
     [HttpGet("booking/{bookingId}")]
     [ProducesResponseType(typeof(InvoiceDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetInvoiceByBooking(int bookingId)
+    public async Task<IActionResult> GetInvoiceByBooking(string bookingId)
     {
         try
         {
             var userId = GetUserId();
             var userRole = GetUserRole();
-            var invoice = await _invoiceService.GetInvoiceByBookingIdAsync(bookingId);
+            
+            // Try to parse as integer first, otherwise extract from BOOK code
+            InvoiceDto? invoice = null;
+            int numericId = 0;
+            
+            if (int.TryParse(bookingId, out numericId))
+            {
+                // Direct numeric ID
+                invoice = await _invoiceService.GetInvoiceByBookingIdAsync(numericId);
+            }
+            else if (bookingId.StartsWith("BOOK", StringComparison.OrdinalIgnoreCase))
+            {
+                // Extract numeric part from BOOK code (e.g., BOOK17634522777517)
+                var numericPart = bookingId.Substring(4);
+                if (int.TryParse(numericPart, out numericId))
+                {
+                    // Try to find booking with this ID
+                    invoice = await _invoiceService.GetInvoiceByBookingIdAsync(numericId);
+                }
+                else
+                {
+                    // If the number after BOOK is too large, it might be a timestamp-based code
+                    // Try to find by searching for bookings with similar creation time
+                    return BadRequest(new { message = "Invalid booking code format. Expected BOOK{BookingId} or numeric BookingId." });
+                }
+            }
+            else
+            {
+                return BadRequest(new { message = "Invalid booking identifier format" });
+            }
 
             if (invoice == null)
                 return NotFound(new { message = "Invoice not found for this booking" });

@@ -1,7 +1,8 @@
 ﻿import { useState, useEffect, useMemo, useCallback } from 'react';
 import useStationStore from '../store/stationStore';
-import { mockData } from '../data/mockData';
 import StationDataService from '../services/stationDataService';
+import adminAPI from '../services/api/adminAPI';
+import staffAPI from '../services/api/staffAPI';
 
 /**
  * Custom hook for Admin Dashboard data management
@@ -22,6 +23,10 @@ export const useAdminDashboard = () => {
   const [openStationDialog, setOpenStationDialog] = useState(false);
   const [selectedStation, setSelectedStation] = useState(null);
   
+  // Data states for API data
+  const [users, setUsers] = useState([]);
+  const [bookings, setBookings] = useState([]);
+  
   // Data from stores
   const { stations, loading: stationsLoading, error: stationsError } = useStationStore();
   
@@ -32,8 +37,14 @@ export const useAdminDashboard = () => {
         setIsLoading(true);
         setError(null);
         
-        // Simulate API delay for realistic UX
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Fetch users and bookings from API
+        const [usersResponse, bookingsResponse] = await Promise.all([
+          adminAPI.getAllUsers().catch(() => ({ data: [] })),
+          staffAPI.getBookingsHistory().catch(() => ({ data: [] }))
+        ]);
+        
+        setUsers(usersResponse.data || []);
+        setBookings(bookingsResponse.data || []);
         
         // Validate station data
         const validationResults = stations.map(station => 
@@ -78,8 +89,8 @@ export const useAdminDashboard = () => {
     try {
       return StationDataService.calculateSystemOverview(
         stations, 
-        mockData.users, 
-        mockData.bookings
+        users, 
+        bookings
       );
     } catch (err) {
       console.error('Error calculating system overview:', err);
@@ -94,25 +105,25 @@ export const useAdminDashboard = () => {
         error: 'Calculation failed',
       };
     }
-  }, [stations]);
+  }, [stations, users, bookings]);
 
   const stationPerformance = useMemo(() => {
     try {
-      return StationDataService.calculateStationPerformance(stations, mockData.bookings);
+      return StationDataService.calculateStationPerformance(stations, bookings);
     } catch (err) {
       console.error('Error calculating station performance:', err);
       return [];
     }
-  }, [stations]);
+  }, [stations, bookings]);
 
   const recentActivities = useMemo(() => {
     try {
-      return StationDataService.generateRecentActivities(mockData.bookings, stations);
+      return StationDataService.generateRecentActivities(bookings, stations);
     } catch (err) {
       console.error('Error generating recent activities:', err);
       return [];
     }
-  }, [stations]);
+  }, [stations, bookings]);
 
   // Event handlers with useCallback for performance
   const handleRefresh = useCallback(async () => {

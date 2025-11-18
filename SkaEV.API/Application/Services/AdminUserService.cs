@@ -6,7 +6,7 @@ using BCrypt.Net;
 
 namespace SkaEV.API.Application.Services;
 
-public class AdminUserService : IAdminUserService
+public partial class AdminUserService : IAdminUserService
 {
     private readonly SkaEVDbContext _context;
     private readonly ILogger<AdminUserService> _logger;

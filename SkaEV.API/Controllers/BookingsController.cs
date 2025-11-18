@@ -23,6 +23,7 @@ public class BookingsController : ControllerBase
         _env = env;
     }
 
+
     /// <summary>
     /// Get user's bookings
     /// </summary>
