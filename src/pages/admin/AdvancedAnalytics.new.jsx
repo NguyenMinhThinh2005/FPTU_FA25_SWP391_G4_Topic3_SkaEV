@@ -63,6 +63,7 @@ const AdvancedAnalytics = () => {
   const [usageData, setUsageData] = useState([]);
   const [stationPerformanceData, setStationPerformanceData] = useState([]);
   const [peakHoursData, setPeakHoursData] = useState([]);
+  const [revenueByConnectorData, setRevenueByConnectorData] = useState([]);
 
   // Fetch all analytics data
   const fetchAnalyticsData = useCallback(async () => {
@@ -87,12 +88,13 @@ const AdvancedAnalytics = () => {
       }
       if (groupBy && groupBy !== "auto") params.groupBy = groupBy;
 
-      // Fetch data in parallel
+      // Fetch data in parallel (including connector-level revenue)
       const [
         revenueResponse,
         usageResponse,
         performanceResponse,
         peakHoursResponse,
+        revenueConnectorResponse,
       ] = await Promise.all([
         reportsAPI.getRevenueReports(params),
         reportsAPI.getUsageReports(params),
@@ -103,12 +105,16 @@ const AdvancedAnalytics = () => {
                      "last90days",
           ...(groupBy && groupBy !== 'auto' ? { groupBy } : {}),
         }),
+        reportsAPI.getRevenueByConnector(params),
       ]);
 
       setRevenueData(revenueResponse.data || []);
       setUsageData(usageResponse.data || []);
       setStationPerformanceData(performanceResponse.data || []);
       setPeakHoursData(peakHoursResponse.data?.hourlyUsage || []);
+      // Normalize revenueByConnector payload: prefer `data` array if present
+      const connectorPayload = revenueConnectorResponse?.data?.data || revenueConnectorResponse?.data || revenueConnectorResponse || [];
+      setRevenueByConnectorData(connectorPayload);
       
     } catch (err) {
       console.error("Error fetching analytics data:", err);
@@ -122,26 +128,18 @@ const AdvancedAnalytics = () => {
     fetchAnalyticsData();
   }, [fetchAnalyticsData]);
 
-  // Calculate KPIs from real data
+  // Calculate KPIs from loaded data
   const calculateKPIs = () => {
     const totalRevenue = revenueData.reduce((sum, r) => sum + (r.totalRevenue || 0), 0);
     const totalSessions = usageData.reduce((sum, u) => sum + (u.completedSessions || 0), 0);
     const totalBookings = usageData.reduce((sum, u) => sum + (u.totalBookings || 0), 0);
     const totalEnergy = revenueData.reduce((sum, r) => sum + (r.totalEnergySoldKwh || 0), 0);
-    const avgUtilization = usageData.length > 0 
+    const avgUtilization = usageData.length > 0
       ? usageData.reduce((sum, u) => sum + (u.utilizationRatePercent || 0), 0) / usageData.length
       : 0;
 
-    // Calculate growth (compare first half vs second half of data)
-    const halfLength = Math.ceil(revenueData.length / 2);
-    const firstHalf = revenueData.slice(0, halfLength);
-    const secondHalf = revenueData.slice(halfLength);
-    
-    const firstHalfRevenue = firstHalf.reduce((sum, r) => sum + (r.totalRevenue || 0), 0);
-    const secondHalfRevenue = secondHalf.reduce((sum, r) => sum + (r.totalRevenue || 0), 0);
-    const revenueGrowth = firstHalfRevenue > 0 
-      ? ((secondHalfRevenue - firstHalfRevenue) / firstHalfRevenue) * 100 
-      : 0;
+    const arps = totalSessions > 0 ? totalRevenue / totalSessions : 0;
+    const conversionRate = totalBookings > 0 ? (totalSessions / totalBookings) * 100 : null;
 
     return {
       totalRevenue,
@@ -149,55 +147,94 @@ const AdvancedAnalytics = () => {
       totalBookings,
       totalEnergy,
       avgUtilization,
-      revenueGrowth,
+      arps,
+      conversionRate,
     };
   };
 
   const kpis = calculateKPIs();
 
-  // Transform revenue data for charts (group by day/week/month based on timeRange)
-  const getRevenueChartData = () => {
-    if (revenueData.length === 0) return [];
-    
-    return revenueData.map(item => ({
-      label: item.stationName || `Trạm ${item.stationId}`,
-      dateLabel: `${item.month}/${item.year}`,
-      revenue: item.totalRevenue || 0,
-      energy: item.totalEnergySoldKwh || 0,
-      sessions: item.totalTransactions || 0,
-    }));
-  };
-
-  // Transform usage data for sessions chart
-  const getSessionsChartData = () => {
-    if (usageData.length === 0) return [];
-    
-    return usageData.map(item => ({
-      label: item.stationName || `Trạm ${item.stationId}`,
-      dateLabel: `${item.month}/${item.year}`,
-      sessions: item.completedSessions || 0,
-      bookings: item.totalBookings || 0,
-      utilization: item.utilizationRatePercent || 0,
-    }));
-  };
-
   // Revenue by charging type
   const getRevenueByType = () => {
-    // Group revenue by charging type from station performance
+    // Prefer connector-level revenue if available (authoritative source)
     const typeRevenue = {};
-    stationPerformanceData.forEach(station => {
-      const type = station.chargingType || "Standard AC";
-      if (!typeRevenue[type]) {
-        typeRevenue[type] = 0;
-      }
-      typeRevenue[type] += station.totalRevenue || 0;
-    });
 
-    return Object.entries(typeRevenue).map(([name, revenue]) => ({
-      name,
-      revenue,
-      value: revenue, // For pie chart percentage
-    }));
+    const normalizeType = (raw) => {
+      if (!raw) return "Standard AC";
+      let s = String(raw);
+      // Replace non-breaking spaces and weird unicode spaces
+      s = s.replace(/\u00A0/g, ' ');
+      // Remove punctuation except spaces and alphanumerics
+      s = s.replace(/[\u2000-\u206F\u2E00-\u2E7F\p{P}\p{S}]+/gu, '');
+      // Collapse whitespace
+      s = s.replace(/\s+/g, ' ').trim();
+      const simple = s.replace(/[^A-Za-z0-9]/g, '').toLowerCase();
+
+      if (/^ccs2?$/.test(simple) || /ccs2?/.test(simple)) return "CCS2";
+      if (/chademo/.test(simple) || /chademo/.test(s.toLowerCase())) return "CHAdeMO";
+      if (/^type2$/.test(simple) || /type2/.test(simple)) return "Type 2";
+
+      // Title-case remaining normalized string for display
+      return s.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+    };
+
+    const connectorArray = Array.isArray(revenueByConnectorData)
+      ? revenueByConnectorData
+      : (revenueByConnectorData?.data || []);
+
+    if (Array.isArray(connectorArray) && connectorArray.length > 0) {
+      connectorArray.forEach(item => {
+        const rawType = item.connectorType || item.ConnectorType || item.chargingType || item.name;
+        const type = normalizeType(rawType) || "Standard AC";
+        if (!typeRevenue[type]) typeRevenue[type] = 0;
+        const rev = item.revenue || item.totalRevenue || item.TotalRevenue || 0;
+        typeRevenue[type] += rev;
+      });
+    } else {
+      // Fallback to station performance aggregation
+      stationPerformanceData.forEach(station => {
+        const type = normalizeType(station.chargingType) || "Standard AC";
+        if (!typeRevenue[type]) {
+          typeRevenue[type] = 0;
+        }
+        typeRevenue[type] += station.totalRevenue || 0;
+      });
+    }
+
+    return Object.entries(typeRevenue)
+      .map(([name, revenue]) => ({ name, revenue: Number(revenue || 0), value: Number(revenue || 0) }))
+      .filter(x => x.revenue > 0)
+      .sort((a, b) => b.revenue - a.revenue);
+  };
+
+  // Helpers for chart data
+  const getRevenueChartData = () => {
+    if (Array.isArray(revenueData) && revenueData.length > 0) {
+      return revenueData.map(r => ({
+        dateLabel: r.label || (r.month ? `${r.month}/${r.year}` : r.date || r.label),
+        revenue: r.totalRevenue || r.revenue || 0,
+        sessions: r.completedSessions || r.sessions || 0,
+      }));
+    }
+    if (Array.isArray(usageData) && usageData.length > 0) {
+      return usageData.map(u => ({
+        dateLabel: u.label || (u.month ? `${u.month}/${u.year}` : u.date),
+        revenue: u.totalRevenue || 0,
+        sessions: u.completedSessions || 0,
+      }));
+    }
+    return [];
+  };
+
+  const getSessionsChartData = () => {
+    if (Array.isArray(usageData) && usageData.length > 0) {
+      return usageData.map(u => ({
+        dateLabel: u.label || (u.month ? `${u.month}/${u.year}` : u.date),
+        sessions: u.completedSessions || 0,
+        utilization: u.utilizationRatePercent || u.utilizationRate || 0,
+      }));
+    }
+    return [];
   };
 
   // Chart colors
@@ -262,7 +299,7 @@ const AdvancedAnalytics = () => {
             Phân tích tổng quan
           </Typography>
           <Typography variant="body1" color="text.secondary">
-            Báo cáo chi tiết về doanh thu, sử dụng và hiệu suất hệ thống
+            Báo cáo chi tiết về doanh thu, sử dụng và hiệu suất hệ thống — {getTimeRangeLabel()}
           </Typography>
         </Box>
 
@@ -475,36 +512,61 @@ const AdvancedAnalytics = () => {
                 Doanh thu theo loại sạc
               </Typography>
               <Box sx={{ height: 300 }}>
-                {getRevenueByType().length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={getRevenueByType()}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={({ name, percent }) =>
-                          `${name} (${(percent * 100).toFixed(0)}%)`
-                        }
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="value"
-                      >
-                        {getRevenueByType().map((entry, index) => (
-                          <Cell
-                            key={`cell-${index}`}
-                            fill={pieColors[index % pieColors.length]}
-                          />
-                        ))}
-                      </Pie>
-                      <RechartsTooltip formatter={(value) => formatCurrency(value)} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%" }}>
-                    <Typography color="text.secondary">Chưa có dữ liệu</Typography>
-                  </Box>
-                )}
+                {(() => {
+                  const revenueByType = getRevenueByType();
+                  const totalInChart = revenueByType.reduce((s, r) => s + (r.revenue || 0), 0);
+                  const overallRevenue = kpis.totalRevenue || 0;
+
+                  if (revenueByType.length === 0) {
+                    return (
+                      <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%" }}>
+                        <Typography color="text.secondary">Chưa có dữ liệu</Typography>
+                      </Box>
+                    );
+                  }
+
+                  return (
+                    <>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={revenueByType}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={false}
+                            label={({ name, percent }) =>
+                              `${name} (${(percent * 100).toFixed(0)}%)`
+                            }
+                            outerRadius={80}
+                            fill="#8884d8"
+                            dataKey="value"
+                          >
+                            {revenueByType.map((entry, index) => (
+                              <Cell
+                                key={`cell-${index}`}
+                                fill={pieColors[index % pieColors.length]}
+                              />
+                            ))}
+                          </Pie>
+                          <RechartsTooltip formatter={(value) => formatCurrency(value)} />
+                        </PieChart>
+                      </ResponsiveContainer>
+
+                      <Box sx={{ mt: 1 }}>
+                        <Typography variant="caption" color="text.secondary">
+                          Tổng trong biểu đồ: {formatCurrency(totalInChart)}{
+                            overallRevenue ? ` — Tổng báo cáo: ${formatCurrency(overallRevenue)}` : ''
+                          }
+                        </Typography>
+                        {overallRevenue && Math.abs(totalInChart - overallRevenue) > 1 && (
+                          <Typography variant="caption" color="error" sx={{ display: 'block' }}>
+                            Lưu ý: Tổng theo loại sạc khác tổng báo cáo (chênh lệch {formatCurrency(Math.abs(totalInChart - overallRevenue))}).
+                          </Typography>
+                        )}
+                      </Box>
+                    </>
+                  );
+                })()}
               </Box>
             </CardContent>
           </Card>

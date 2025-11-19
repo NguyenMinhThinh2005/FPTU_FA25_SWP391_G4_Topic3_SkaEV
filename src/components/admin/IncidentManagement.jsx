@@ -37,6 +37,7 @@ import {
 import incidentStore from '../../store/incidentStore';
 import stationStore from '../../store/stationStore';
 import axiosInstance from '../../services/axiosConfig';
+import stationStaffAPI from '../../services/stationStaffAPI';
 
 const IncidentManagement = () => {
   const {
@@ -88,11 +89,19 @@ const IncidentManagement = () => {
     // fetch staff and maintenance teams for assignment dropdown
     (async () => {
       try {
-        const [staffRes, teamsRes] = await Promise.all([
-          axiosInstance.get('/maintenance/staff'),
+        // Use StationStaff API to fetch only operational staff (active + assigned stations)
+        const [staffList, teamsRes] = await Promise.all([
+          stationStaffAPI.getAvailableStaff(),
           axiosInstance.get('/maintenance/teams')
         ]);
-        setStaffOptions(staffRes.data || []);
+
+        // Normalize returned shapes (support both camelCase and PascalCase from different endpoints)
+        const normalizedStaff = (staffList || []).map((s) => ({
+          userId: s.userId ?? s.UserId,
+          fullName: s.fullName ?? s.FullName
+        }));
+
+        setStaffOptions(normalizedStaff);
         setTeamOptions(teamsRes.data || []);
       } catch (err) {
         // non-fatal: log and continue

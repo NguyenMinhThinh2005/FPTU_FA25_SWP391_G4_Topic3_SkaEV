@@ -20,7 +20,7 @@ namespace SkaEV.API.Controllers
         /// Get demand forecast for a specific station
         /// </summary>
         [HttpGet("station/{stationId}")]
-        [Authorize(Roles = "Admin,Staff")]
+        [Authorize(Roles = "admin,staff")]
         public async Task<IActionResult> GetStationForecast(int stationId, [FromQuery] DateTime? startDate, [FromQuery] DateTime? endDate)
         {
             try
@@ -41,7 +41,7 @@ namespace SkaEV.API.Controllers
         /// Predict peak hours for a station on a given date
         /// </summary>
         [HttpGet("station/{stationId}/peak-hours")]
-        [Authorize(Roles = "Admin,Staff")]
+        [Authorize(Roles = "admin,staff")]
         public async Task<IActionResult> GetPeakHoursPrediction(int stationId, [FromQuery] DateTime? date)
         {
             try
@@ -60,7 +60,7 @@ namespace SkaEV.API.Controllers
         /// Get demand scores for all stations
         /// </summary>
         [HttpGet("demand-scores")]
-        [Authorize(Roles = "Admin,Staff")]
+        [Authorize(Roles = "admin,staff")]
         public async Task<IActionResult> GetDemandScores()
         {
             try

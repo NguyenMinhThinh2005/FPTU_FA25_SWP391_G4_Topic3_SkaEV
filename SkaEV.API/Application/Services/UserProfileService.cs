@@ -40,7 +40,7 @@ public class UserProfileService : IUserProfileService
 
         if (updateDto.FullName != null)
             user.FullName = updateDto.FullName;
-        
+
         if (updateDto.PhoneNumber != null)
             user.PhoneNumber = updateDto.PhoneNumber;
 
@@ -146,10 +146,15 @@ public class UserProfileService : IUserProfileService
         if (user == null)
             throw new ArgumentException("User not found");
 
-    // Verify current password (would use proper hashing in production)
-    // For now, skip verification as we store plain passwords in this environment
+        // Verify current password using shared PasswordHasher (supports BCrypt and legacy plain)
+        var currentStored = user.PasswordHash ?? string.Empty;
+        var providedCurrent = changePasswordDto.CurrentPassword ?? string.Empty;
 
-    user.PasswordHash = changePasswordDto.NewPassword;
+        if (!PasswordHasher.Verify(currentStored, providedCurrent))
+            throw new ArgumentException("Current password is incorrect");
+
+        // Store new password hashed
+        user.PasswordHash = PasswordHasher.HashPassword(changePasswordDto.NewPassword);
         user.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();

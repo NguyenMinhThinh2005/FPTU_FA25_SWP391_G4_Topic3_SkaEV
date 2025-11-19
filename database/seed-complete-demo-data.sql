@@ -30,7 +30,12 @@ PRINT '';
 PRINT 'Step 1/7: Creating 60 new users...';
 GO
 
-DECLARE @StartUserId INT = 15; -- Current max is 14
+-- Enable explicit identity inserts for `users` during this seeding block
+SET IDENTITY_INSERT users ON;
+GO
+
+DECLARE @StartUserId INT;
+SELECT @StartUserId = ISNULL(MAX(user_id), 0) + 1 FROM users;
 DECLARE @UserCounter INT = 0;
 
 -- Vietnamese names pools
@@ -138,6 +143,8 @@ BEGIN
 END
 
 PRINT 'Created ' + CAST(@UserCounter AS VARCHAR) + ' new users (50 customers, 8 staff, 2 admins)';
+-- Disable identity insert for users
+SET IDENTITY_INSERT users OFF;
 GO
 
 -- ====================================================================
@@ -147,7 +154,12 @@ PRINT '';
 PRINT 'Step 2/7: Creating 40 new vehicles...';
 GO
 
-DECLARE @StartVehicleId INT = 7; -- Current max is 6
+-- Enable identity insert for vehicles for deterministic IDs
+SET IDENTITY_INSERT vehicles ON;
+GO
+
+DECLARE @StartVehicleId INT;
+SELECT @StartVehicleId = ISNULL(MAX(vehicle_id), 0) + 1 FROM vehicles;
 DECLARE @VehicleCounter INT = 0;
 
 -- Vehicle brands and models
@@ -229,6 +241,8 @@ BEGIN
 END
 
 PRINT 'Created ' + CAST(@VehicleCounter AS VARCHAR) + ' new vehicles';
+-- Disable identity insert for vehicles
+SET IDENTITY_INSERT vehicles OFF;
 GO
 
 -- ====================================================================
@@ -237,8 +251,12 @@ GO
 PRINT '';
 PRINT 'Step 3/7: Creating 400 new bookings...';
 GO
+-- Enable identity insert for bookings (explicit booking_id values used)
+SET IDENTITY_INSERT bookings ON;
+GO
 
-DECLARE @StartBookingId INT = 24; -- Current max is 23
+DECLARE @StartBookingId INT;
+SELECT @StartBookingId = ISNULL(MAX(booking_id), 0) + 1 FROM bookings;
 DECLARE @BookingCounter INT = 0;
 
 -- Get all stations
@@ -279,7 +297,8 @@ BEGIN
     
     -- Generate random date in range
     DECLARE @RandomDay INT = ABS(CHECKSUM(NEWID())) % @TotalDays;
-    DECLARE @BookingDate DATE = DATEADD(DAY, @RandomDay, @StartDate);
+    -- Use DATETIME2 so DATEADD with HOUR is supported
+    DECLARE @BookingDate DATETIME2 = DATEADD(DAY, @RandomDay, @StartDate);
     
     -- Generate hour with peak preference
     DECLARE @HourWeight INT = ABS(CHECKSUM(NEWID())) % 10; -- 0-9
@@ -326,6 +345,8 @@ BEGIN
 END
 
 PRINT 'Created ' + CAST(@BookingCounter AS VARCHAR) + ' new bookings';
+-- Disable identity insert for bookings
+SET IDENTITY_INSERT bookings OFF;
 GO
 
 -- ====================================================================
@@ -334,16 +355,15 @@ GO
 PRINT '';
 PRINT 'Step 4/7: Creating 400 new invoices...';
 GO
-
-DECLARE @StartInvoiceId INT = 23; -- Current max is 22
+-- We'll let the database assign invoice_id (avoid explicit IDs to prevent conflicts)
 DECLARE @InvoiceCounter INT = 0;
 
 -- Get all new bookings
 DECLARE @NewBookings TABLE (BookingId INT, UserId INT, ActualStartTime DATETIME2, ActualEndTime DATETIME2, Status NVARCHAR(50));
 INSERT INTO @NewBookings 
 SELECT booking_id, user_id, actual_start_time, actual_end_time, status 
-FROM bookings 
-WHERE booking_id >= 24;
+FROM bookings b
+WHERE NOT EXISTS (SELECT 1 FROM invoices i WHERE i.booking_id = b.booking_id);
 
 DECLARE @InvoiceBookingId INT, @InvoiceUserId INT, @InvoiceStartTime DATETIME2, @InvoiceEndTime DATETIME2, @InvoiceStatus NVARCHAR(50);
 
@@ -370,9 +390,9 @@ BEGIN
     ELSE
         SET @UnitPrice = 5500; -- 5,500 VND/kWh for DC ultra fast
     
-    DECLARE @Subtotal DECIMAL(10,2) = @EnergyKwh * @UnitPrice;
-    DECLARE @TaxAmount DECIMAL(10,2) = @Subtotal * 0.1; -- 10% VAT
-    DECLARE @TotalAmount DECIMAL(10,2) = @Subtotal + @TaxAmount;
+    DECLARE @Subtotal DECIMAL(18,2) = ROUND(CAST(@EnergyKwh * @UnitPrice AS DECIMAL(18,4)), 2);
+    DECLARE @TaxAmount DECIMAL(18,2) = ROUND(CAST(@Subtotal * 0.1 AS DECIMAL(18,4)), 2); -- 10% VAT
+    DECLARE @TotalAmount DECIMAL(18,2) = ROUND(CAST(@Subtotal + @TaxAmount AS DECIMAL(18,4)), 2);
     
     -- Payment method and status
     DECLARE @PaymentMethod NVARCHAR(50) = (SELECT TOP 1 Method FROM (VALUES ('momo'), ('vnpay'), ('zalopay'), ('banking')) AS Methods(Method) ORDER BY NEWID());
@@ -398,9 +418,9 @@ BEGIN
     ELSE
         SET @PaymentStatus = 'cancelled';
     
-    INSERT INTO invoices (invoice_id, booking_id, user_id, total_energy_kwh, unit_price, subtotal, 
-                         tax_amount, total_amount, payment_method, payment_status, paid_at, created_at, updated_at)
-    VALUES (@StartInvoiceId + @InvoiceCounter, @InvoiceBookingId, @InvoiceUserId, @EnergyKwh, @UnitPrice, 
+        INSERT INTO invoices (booking_id, user_id, total_energy_kwh, unit_price, subtotal, 
+                 tax_amount, total_amount, payment_method, payment_status, paid_at, created_at, updated_at)
+        VALUES (@InvoiceBookingId, @InvoiceUserId, @EnergyKwh, @UnitPrice, 
             @Subtotal, @TaxAmount, @TotalAmount, @PaymentMethod, @PaymentStatus, @PaidAt, @InvoiceStartTime, @InvoiceStartTime);
     
     SET @InvoiceCounter = @InvoiceCounter + 1;
@@ -522,7 +542,12 @@ PRINT '';
 PRINT 'Step 6/7: Creating 35 new support requests...';
 GO
 
-DECLARE @StartRequestId INT = 10; -- Current max is 9
+-- Enable identity insert for support_requests (explicit request_id values used)
+SET IDENTITY_INSERT support_requests ON;
+GO
+
+DECLARE @StartRequestId INT;
+SELECT @StartRequestId = ISNULL(MAX(request_id), 0) + 1 FROM support_requests;
 DECLARE @RequestCounter INT = 0;
 
 -- Support request templates
@@ -534,12 +559,12 @@ INSERT INTO @RequestTemplates VALUES
 ('billing', N'Bị tính phí sai', N'Hóa đơn của tôi cao hơn dự kiến. Tôi chỉ sạc 30 phút nhưng bị tính 2 giờ.', 'high'),
 ('billing', N'Chưa nhận được hóa đơn', N'Đã 3 ngày sau khi sạc xong nhưng tôi vẫn chưa nhận được hóa đơn qua email.', 'low'),
 ('billing', N'Thanh toán bị lỗi', N'Tôi đã thanh toán qua MoMo nhưng hệ thống vẫn hiển thị chưa thanh toán.', 'high'),
-('location', N'Không tìm thấy trạm sạc', N'Bản đồ chỉ dẫn sai địa chỉ trạm AEON Mall Bình Tân. Tôi đến nơi nhưng không thấy trạm.', 'medium'),
-('location', N'Đề xuất thêm trạm sạc mới', N'Khu vực Quận 2 còn thiếu trạm sạc. Đề xuất xây dựng thêm trạm tại khu Thảo Điền.', 'low'),
+('station', N'Không tìm thấy trạm sạc', N'Bản đồ chỉ dẫn sai địa chỉ trạm AEON Mall Bình Tân. Tôi đến nơi nhưng không thấy trạm.', 'medium'),
+('station', N'Đề xuất thêm trạm sạc mới', N'Khu vực Quận 2 còn thiếu trạm sạc. Đề xuất xây dựng thêm trạm tại khu Thảo Điền.', 'low'),
 ('account', N'Quên mật khẩu', N'Tôi không thể đăng nhập vào tài khoản. Email reset password không được gửi đến.', 'medium'),
 ('account', N'Cập nhật thông tin xe', N'Tôi muốn thêm xe mới vào tài khoản nhưng không tìm thấy chức năng này trên app.', 'low'),
-('feedback', N'Đề xuất cải thiện UI app', N'Giao diện app nên hiển thị rõ hơn trạng thái sạc hiện tại và thời gian còn lại.', 'low'),
-('feedback', N'Yêu cầu thêm tính năng đặt chỗ', N'Hy vọng app sẽ có tính năng đặt chỗ trước để không phải chờ đợi vào giờ cao điểm.', 'low'),
+('other', N'Đề xuất cải thiện UI app', N'Giao diện app nên hiển thị rõ hơn trạng thái sạc hiện tại và thời gian còn lại.', 'low'),
+('other', N'Yêu cầu thêm tính năng đặt chỗ', N'Hy vọng app sẽ có tính năng đặt chỗ trước để không phải chờ đợi vào giờ cao điểm.', 'low'),
 ('other', N'Câu hỏi về membership', N'Tôi muốn biết thêm thông tin về gói membership và ưu đãi cho khách hàng thường xuyên.', 'low'),
 ('other', N'Hỏi về bảo trì trạm', N'Khi nào trạm Landmark 81 sẽ hoàn thành bảo trì và hoạt động trở lại?', 'medium');
 
@@ -591,6 +616,8 @@ BEGIN
 END
 
 PRINT 'Created ' + CAST(@RequestCounter AS VARCHAR) + ' new support requests';
+-- Disable identity insert for support_requests
+SET IDENTITY_INSERT support_requests OFF;
 GO
 
 -- ====================================================================

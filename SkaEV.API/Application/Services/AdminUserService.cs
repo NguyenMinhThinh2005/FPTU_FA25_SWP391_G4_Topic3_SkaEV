@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using SkaEV.API.Application.DTOs.Admin;
 using SkaEV.API.Domain.Entities;
 using SkaEV.API.Infrastructure.Data;
+using SkaEV.API.Application.Services;
 
 namespace SkaEV.API.Application.Services;
 
@@ -164,7 +165,7 @@ public partial class AdminUserService : IAdminUserService
         var user = new User
         {
             Email = createDto.Email,
-            PasswordHash = createDto.Password,
+            PasswordHash = PasswordHasher.HashPassword(createDto.Password),
             FullName = createDto.FullName,
             PhoneNumber = createDto.PhoneNumber,
             Role = createDto.Role,
@@ -340,7 +341,7 @@ public partial class AdminUserService : IAdminUserService
         _logger.LogInformation("Deleted (soft) user {UserId}", userId);
     }
 
-    public async Task<ResetPasswordResultDto> ResetUserPasswordAsync(int userId)
+    public async Task<ResetPasswordResultDto> ResetUserPasswordAsync(int userId, int? performedByUserId = null)
     {
         var user = await _context.Users
             .FirstOrDefaultAsync(u => u.UserId == userId);
@@ -350,12 +351,32 @@ public partial class AdminUserService : IAdminUserService
 
         // Generate temporary password
         var tempPassword = GenerateTemporaryPassword();
-        user.PasswordHash = tempPassword;
+        // Store hashed temporary password (BCrypt)
+        user.PasswordHash = PasswordHasher.HashPassword(tempPassword);
         user.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
 
-        _logger.LogInformation("Reset password for user {UserId}", userId);
+        _logger.LogInformation("Reset password for user {UserId} (performedBy={PerformedBy})", userId, performedByUserId);
+
+        // Audit log entry
+        try
+        {
+            _context.SystemLogs.Add(new SkaEV.API.Domain.Entities.SystemLog
+            {
+                LogType = "admin_action",
+                Severity = "info",
+                Message = $"Reset password for user {userId}",
+                UserId = performedByUserId,
+                Endpoint = $"admin/users/{userId}/reset-password",
+                CreatedAt = DateTime.UtcNow
+            });
+            await _context.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to write audit log for password reset (user {UserId})", userId);
+        }
 
         return new ResetPasswordResultDto
         {
@@ -363,6 +384,46 @@ public partial class AdminUserService : IAdminUserService
             Message = "Password has been reset. User should change it on next login."
         };
     }
+
+    public async Task<int> ResetAllAdminPasswordsAsync(string newPassword, int? performedByUserId = null)
+    {
+        var admins = await _context.Users
+            .Where(u => u.Role != null && u.Role.Equals("admin", StringComparison.OrdinalIgnoreCase) && u.IsActive)
+            .ToListAsync();
+
+        var hashed = PasswordHasher.HashPassword(newPassword);
+        foreach (var admin in admins)
+        {
+            admin.PasswordHash = hashed;
+            admin.UpdatedAt = DateTime.UtcNow;
+        }
+
+        await _context.SaveChangesAsync();
+
+        _logger.LogWarning("Reset passwords for {AdminCount} admin accounts (performedBy={PerformedBy})", admins.Count, performedByUserId);
+
+        try
+        {
+            _context.SystemLogs.Add(new SkaEV.API.Domain.Entities.SystemLog
+            {
+                LogType = "admin_action",
+                Severity = "warning",
+                Message = $"Reset all admin passwords (count={admins.Count})",
+                UserId = performedByUserId,
+                Endpoint = "admin/reset-all-admin-passwords",
+                CreatedAt = DateTime.UtcNow
+            });
+            await _context.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to write audit log for reset-all-admin-passwords (performedBy={PerformedBy})", performedByUserId);
+        }
+
+        return admins.Count;
+    }
+
+    // Use shared PasswordHasher (wraps BCrypt)
 
     public async Task<UserActivitySummaryDto> GetUserActivitySummaryAsync(int userId)
     {

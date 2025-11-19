@@ -20,7 +20,7 @@ namespace SkaEV.API.Controllers
         /// Broadcast station status update to all connected clients
         /// </summary>
         [HttpPost("broadcast/station/{stationId}")]
-        [Authorize(Roles = "Admin,Staff")]
+        [Authorize(Roles = "admin,staff")]
         public async Task<IActionResult> BroadcastStationStatus(int stationId)
         {
             try
@@ -38,7 +38,7 @@ namespace SkaEV.API.Controllers
         /// Broadcast slot status update to all connected clients
         /// </summary>
         [HttpPost("broadcast/slot/{slotId}")]
-        [Authorize(Roles = "Admin,Staff")]
+        [Authorize(Roles = "admin,staff")]
         public async Task<IActionResult> BroadcastSlotStatus(int slotId)
         {
             try
@@ -56,7 +56,7 @@ namespace SkaEV.API.Controllers
         /// Broadcast system alert to all connected clients
         /// </summary>
         [HttpPost("broadcast/alert")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "admin")]
         public async Task<IActionResult> BroadcastAlert([FromBody] AlertRequest request)
         {
             try

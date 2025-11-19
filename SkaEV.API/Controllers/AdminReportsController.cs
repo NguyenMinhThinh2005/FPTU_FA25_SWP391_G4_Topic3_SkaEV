@@ -293,8 +293,48 @@ public class AdminReportsController : ControllerBase
         try
         {
             var data = await _reportService.GetRevenueByConnectorAsync(stationId, startDate, endDate);
-            // Return empty array if no data found (caller can decide how to render)
-            return Ok(new { success = true, data = data ?? Enumerable.Empty<ConnectorRevenueDto>() });
+            // Map DTOs to camelCase and aggregate by normalized connector type
+            var rawList = (data ?? Enumerable.Empty<ConnectorRevenueDto>()).ToList();
+
+            // Normalization helper (server-side) to mirror frontend normalization
+            static string NormalizeConnector(string raw)
+            {
+                if (string.IsNullOrWhiteSpace(raw)) return "Standard AC";
+                var s = raw.Normalize();
+                // Replace various unicode spaces with regular spaces
+                s = System.Text.RegularExpressions.Regex.Replace(s, "\\u00A0", " ");
+                // Remove punctuation/symbols
+                s = System.Text.RegularExpressions.Regex.Replace(s, "[\\p{P}\\p{S}]+", "");
+                s = System.Text.RegularExpressions.Regex.Replace(s, "\\s+", " ").Trim();
+                var simple = System.Text.RegularExpressions.Regex.Replace(s, "[^A-Za-z0-9]", "").ToLowerInvariant();
+
+                if (System.Text.RegularExpressions.Regex.IsMatch(simple, "^ccs2?$")) return "CCS2";
+                if (simple.Contains("chademo") || s.IndexOf("chademo", StringComparison.OrdinalIgnoreCase) >= 0) return "CHAdeMO";
+                if (System.Text.RegularExpressions.Regex.IsMatch(simple, "^type2$") || simple.Contains("type2")) return "Type 2";
+
+                // Title case
+                var parts = s.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                for (int i = 0; i < parts.Length; i++)
+                {
+                    var p = parts[i];
+                    parts[i] = p.Length > 1 ? char.ToUpperInvariant(p[0]) + p.Substring(1).ToLowerInvariant() : p.ToUpperInvariant();
+                }
+                return string.Join(' ', parts);
+            }
+
+            var aggregated = rawList
+                .GroupBy(d => NormalizeConnector(d.ConnectorType))
+                .Select(g => new
+                {
+                    connectorType = g.Key,
+                    totalRevenue = g.Sum(x => x.TotalRevenue),
+                    totalEnergyKwh = g.Sum(x => x.TotalEnergyKwh),
+                    totalTransactions = g.Sum(x => x.TotalTransactions)
+                })
+                .OrderByDescending(x => x.totalRevenue)
+                .ToList();
+
+            return Ok(new { success = true, data = aggregated });
         }
         catch (Exception ex)
         {

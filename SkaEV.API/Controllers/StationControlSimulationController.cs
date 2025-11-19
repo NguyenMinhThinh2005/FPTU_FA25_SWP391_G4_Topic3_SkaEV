@@ -11,7 +11,7 @@ namespace SkaEV.API.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/admin/station-control")]
-[Authorize(Roles = "Admin,Staff")]
+[Authorize(Roles = "admin,staff")]
 public class StationControlSimulationController : ControllerBase
 {
     private readonly SkaEVDbContext _context;

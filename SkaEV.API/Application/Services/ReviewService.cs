@@ -18,15 +18,16 @@ public class ReviewService : IReviewService
 
     public async Task<IEnumerable<ReviewDto>> GetStationReviewsAsync(int stationId, int page, int pageSize)
     {
-        return await _context.Reviews
+        var query = _context.Reviews
             .Include(r => r.User)
             .Include(r => r.ChargingStation)
             .Where(r => r.StationId == stationId)
             .OrderByDescending(r => r.CreatedAt)
             .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .Select(r => MapToDto(r))
-            .ToListAsync();
+            .Take(pageSize);
+
+        var list = await query.ToListAsync();
+        return list.Select(r => MapToDto(r)).ToList();
     }
 
     public async Task<int> GetStationReviewCountAsync(int stationId)
@@ -38,13 +39,14 @@ public class ReviewService : IReviewService
 
     public async Task<IEnumerable<ReviewDto>> GetUserReviewsAsync(int userId)
     {
-        return await _context.Reviews
+        var list = await _context.Reviews
             .Include(r => r.User)
             .Include(r => r.ChargingStation)
             .Where(r => r.UserId == userId)
             .OrderByDescending(r => r.CreatedAt)
-            .Select(r => MapToDto(r))
             .ToListAsync();
+
+        return list.Select(r => MapToDto(r)).ToList();
     }
 
     public async Task<ReviewDto?> GetReviewByIdAsync(int reviewId)
@@ -99,7 +101,7 @@ public class ReviewService : IReviewService
             .Include(r => r.ChargingStation)
             .FirstAsync(r => r.ReviewId == review.ReviewId);
 
-        _logger.LogInformation("Created review {ReviewId} for station {StationId} by user {UserId}", 
+        _logger.LogInformation("Created review {ReviewId} for station {StationId} by user {UserId}",
             review.ReviewId, createDto.StationId, userId);
 
         return MapToDto(review);

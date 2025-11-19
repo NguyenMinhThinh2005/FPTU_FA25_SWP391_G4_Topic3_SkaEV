@@ -25,15 +25,25 @@ public class MaintenanceController : ControllerBase
     }
 
     // GET: api/maintenance/staff
-    // Returns basic staff list (id + name) for UI assignment
+    // Returns basic active staff list (id + cleaned name) for UI assignment
     [HttpGet("staff")]
     public async Task<ActionResult<List<object>>> GetStaff()
     {
         var staff = await _context.Users
-            .Where(u => u.Role == "staff")
-            .Select(u => new { userId = u.UserId, fullName = u.FullName })
+            .Where(u => u.Role == "staff" && u.IsActive)
+            .Select(u => new
+            {
+                userId = u.UserId,
+                // Normalize display name: remove common suffix markers inserted in legacy data
+                fullName = (u.FullName ?? string.Empty)
+                    .Replace(" (Staff)", string.Empty)
+                    .Replace(" (staff)", string.Empty)
+                    .Replace(" (Đã nghỉ)", string.Empty)
+                    .Trim()
+            })
             .OrderBy(u => u.fullName)
             .ToListAsync();
+
         return Ok(staff);
     }
 }

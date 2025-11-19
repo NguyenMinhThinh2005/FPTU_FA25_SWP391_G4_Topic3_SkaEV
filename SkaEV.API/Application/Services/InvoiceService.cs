@@ -19,13 +19,14 @@ public class InvoiceService : IInvoiceService
 
     public async Task<IEnumerable<InvoiceDto>> GetUserInvoicesAsync(int userId)
     {
-        return await _context.Invoices
+        var list = await _context.Invoices
             .Include(i => i.User)
             .Include(i => i.Booking)
             .Where(i => i.UserId == userId)
             .OrderByDescending(i => i.CreatedAt)
-            .Select(i => MapToDto(i))
             .ToListAsync();
+
+        return list.Select(i => MapToDto(i)).ToList();
     }
 
     public async Task<InvoiceDto?> GetInvoiceByIdAsync(int invoiceId)
@@ -67,7 +68,7 @@ public class InvoiceService : IInvoiceService
         {
             var paymentMethod = await _context.PaymentMethods
                 .FirstOrDefaultAsync(pm => pm.PaymentMethodId == processDto.PaymentMethodId);
-            
+
             if (paymentMethod != null)
             {
                 paymentMethodName = paymentMethod.Type ?? "Unknown";
@@ -119,10 +120,10 @@ public class InvoiceService : IInvoiceService
             throw new ArgumentException("Invalid payment status");
 
         invoice.PaymentStatus = statusDto.Status;
-        
+
         if (statusDto.Status == "paid" && invoice.PaidAt == null)
             invoice.PaidAt = DateTime.UtcNow;
-        
+
         invoice.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
@@ -159,13 +160,14 @@ public class InvoiceService : IInvoiceService
 
     public async Task<IEnumerable<InvoiceDto>> GetUnpaidInvoicesAsync()
     {
-        return await _context.Invoices
+        var list = await _context.Invoices
             .Include(i => i.User)
             .Include(i => i.Booking)
             .Where(i => i.PaymentStatus == "pending")
             .OrderByDescending(i => i.CreatedAt)
-            .Select(i => MapToDto(i))
             .ToListAsync();
+
+        return list.Select(i => MapToDto(i)).ToList();
     }
 
     public async Task<byte[]> GenerateInvoicePdfAsync(int invoiceId)

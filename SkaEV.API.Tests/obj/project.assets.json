@@ -9849,11 +9849,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "d:\\Term5\\SWP391\\FPTU_FA25_SWP391_G4_Topic3_SkaEV\\SkaEV.API.Tests\\SkaEV.API.Tests.csproj",
+      "projectUniqueName": "D:\\Term5\\SWP391\\FPTU_FA25_SWP391_G4_Topic3_SkaEV\\SkaEV.API.Tests\\SkaEV.API.Tests.csproj",
       "projectName": "SkaEV.API.Tests",
-      "projectPath": "d:\\Term5\\SWP391\\FPTU_FA25_SWP391_G4_Topic3_SkaEV\\SkaEV.API.Tests\\SkaEV.API.Tests.csproj",
+      "projectPath": "D:\\Term5\\SWP391\\FPTU_FA25_SWP391_G4_Topic3_SkaEV\\SkaEV.API.Tests\\SkaEV.API.Tests.csproj",
       "packagesPath": "C:\\Users\\Admin\\.nuget\\packages\\",
-      "outputPath": "d:\\Term5\\SWP391\\FPTU_FA25_SWP391_G4_Topic3_SkaEV\\SkaEV.API.Tests\\obj\\",
+      "outputPath": "D:\\Term5\\SWP391\\FPTU_FA25_SWP391_G4_Topic3_SkaEV\\SkaEV.API.Tests\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -9875,8 +9875,8 @@
         "net9.0": {
           "targetAlias": "net9.0",
           "projectReferences": {
-            "d:\\Term5\\SWP391\\FPTU_FA25_SWP391_G4_Topic3_SkaEV\\SkaEV.API\\SkaEV.API.csproj": {
-              "projectPath": "d:\\Term5\\SWP391\\FPTU_FA25_SWP391_G4_Topic3_SkaEV\\SkaEV.API\\SkaEV.API.csproj"
+            "D:\\Term5\\SWP391\\FPTU_FA25_SWP391_G4_Topic3_SkaEV\\SkaEV.API\\SkaEV.API.csproj": {
+              "projectPath": "D:\\Term5\\SWP391\\FPTU_FA25_SWP391_G4_Topic3_SkaEV\\SkaEV.API\\SkaEV.API.csproj"
             }
           }
         }

@@ -271,7 +271,8 @@ public class AdminUsersController : ControllerBase
             if (existingUser == null)
                 return NotFound(new { message = "User not found" });
 
-            var result = await _adminUserService.ResetUserPasswordAsync(userId);
+            var performerId = GetUserId();
+            var result = await _adminUserService.ResetUserPasswordAsync(userId, performerId);
             return Ok(result);
         }
         catch (Exception ex)

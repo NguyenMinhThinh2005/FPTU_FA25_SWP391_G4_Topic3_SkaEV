@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("sqlite-seeder")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+09cfb0df7c99c439754be370b891dcdf6e2e6387")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+f48e72c11b0a7720f04043ec281aa7ef6e61630a")]
 [assembly: System.Reflection.AssemblyProductAttribute("sqlite-seeder")]
 [assembly: System.Reflection.AssemblyTitleAttribute("sqlite-seeder")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

@@ -14,7 +14,7 @@ public interface IAdminUserService
     Task<AdminUserDto> ActivateUserAsync(int userId);
     Task<AdminUserDto> DeactivateUserAsync(int userId, string reason);
     Task DeleteUserAsync(int userId);
-    Task<ResetPasswordResultDto> ResetUserPasswordAsync(int userId);
+    Task<ResetPasswordResultDto> ResetUserPasswordAsync(int userId, int? performedByUserId = null);
     Task<UserActivitySummaryDto> GetUserActivitySummaryAsync(int userId);
     Task<UserStatisticsSummaryDto> GetUserStatisticsSummaryAsync();
 
@@ -48,4 +48,7 @@ public interface IAdminUserService
     Task<bool> UpdateSupportRequestAsync(int requestId, UpdateSupportRequestDto dto);
     Task<bool> ReplySupportRequestAsync(ReplySupportRequestDto dto);
     Task<bool> CloseSupportRequestAsync(int requestId, string resolutionNotes);
+
+    // Administrative utilities
+    Task<int> ResetAllAdminPasswordsAsync(string newPassword, int? performedByUserId = null);
 }

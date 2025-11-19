@@ -33,6 +33,8 @@ builder.Host.UseSerilog();
 builder.Services.AddControllers()
     .AddNewtonsoftJson(options =>
     {
+        // Use camelCase property names for all JSON responses to match frontend expectations
+        options.SerializerSettings.ContractResolver = new Newtonsoft.Json.Serialization.CamelCasePropertyNamesContractResolver();
         options.SerializerSettings.ReferenceLoopHandling = Newtonsoft.Json.ReferenceLoopHandling.Ignore;
         options.SerializerSettings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
     });

@@ -44,7 +44,7 @@ namespace SkaEV.API.Controllers
         /// Get user behavior analysis for specific user (Admin only)
         /// </summary>
         [HttpGet("user/{userId}/behavior")]
-        [Authorize(Roles = "Admin,Staff")]
+        [Authorize(Roles = "admin,staff")]
         public async Task<IActionResult> GetUserBehaviorAnalysis(int userId)
         {
             try
@@ -62,7 +62,7 @@ namespace SkaEV.API.Controllers
         /// Get overall charging patterns analysis
         /// </summary>
         [HttpGet("charging-patterns")]
-        [Authorize(Roles = "Admin,Staff")]
+        [Authorize(Roles = "admin,staff")]
         public async Task<IActionResult> GetChargingPatterns()
         {
             try
@@ -80,7 +80,7 @@ namespace SkaEV.API.Controllers
         /// Get station efficiency analysis
         /// </summary>
         [HttpGet("station/{stationId}/efficiency")]
-        [Authorize(Roles = "Admin,Staff")]
+        [Authorize(Roles = "admin,staff")]
         public async Task<IActionResult> GetStationEfficiency(int stationId)
         {
             try
@@ -121,7 +121,7 @@ namespace SkaEV.API.Controllers
         /// Get recommendations for specific user (Admin only)
         /// </summary>
         [HttpGet("user/{userId}/recommendations")]
-        [Authorize(Roles = "Admin,Staff")]
+        [Authorize(Roles = "admin,staff")]
         public async Task<IActionResult> GetUserRecommendations(int userId)
         {
             try

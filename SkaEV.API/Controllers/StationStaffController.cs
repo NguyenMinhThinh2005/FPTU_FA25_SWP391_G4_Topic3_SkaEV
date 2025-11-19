@@ -34,7 +34,12 @@ public class StationStaffController : ControllerBase
                 .Select(u => new
                 {
                     u.UserId,
-                    u.FullName,
+                    // Clean up legacy name markers for UI display
+                    FullName = (u.FullName ?? string.Empty)
+                        .Replace(" (Staff)", string.Empty)
+                        .Replace(" (staff)", string.Empty)
+                        .Replace(" (Đã nghỉ)", string.Empty)
+                        .Trim(),
                     u.Email,
                     u.PhoneNumber,
                     AssignedStations = _context.StationStaff

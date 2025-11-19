@@ -287,6 +287,7 @@ namespace SkaEV.API.Migrations
                         .HasColumnName("latitude");
 
                     b.Property<Point>("Location")
+                        .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("geography")
                         .HasColumnName("location");
 
@@ -345,6 +346,10 @@ namespace SkaEV.API.Migrations
                     b.Property<int?>("AssignedToStaffId")
                         .HasColumnType("int")
                         .HasColumnName("assigned_to_staff_id");
+
+                    b.Property<int?>("AssignedToTeamId")
+                        .HasColumnType("int")
+                        .HasColumnName("assigned_to_team_id");
 
                     b.Property<DateTime?>("ClosedAt")
                         .HasColumnType("datetime2")
@@ -418,6 +423,8 @@ namespace SkaEV.API.Migrations
                     b.HasKey("IncidentId");
 
                     b.HasIndex("AssignedToStaffId");
+
+                    b.HasIndex("AssignedToTeamId");
 
                     b.HasIndex("PostId");
 
@@ -503,6 +510,44 @@ namespace SkaEV.API.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("invoices", (string)null);
+                });
+
+            modelBuilder.Entity("SkaEV.API.Domain.Entities.MaintenanceTeam", b =>
+                {
+                    b.Property<int>("MaintenanceTeamId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasColumnName("maintenance_team_id");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("MaintenanceTeamId"));
+
+                    b.Property<string>("ContactPerson")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)")
+                        .HasColumnName("contact_person");
+
+                    b.Property<string>("ContactPhone")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasColumnName("contact_phone");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)")
+                        .HasColumnName("name");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("MaintenanceTeamId");
+
+                    b.ToTable("maintenance_teams", (string)null);
                 });
 
             modelBuilder.Entity("SkaEV.API.Domain.Entities.Notification", b =>
@@ -1011,6 +1056,145 @@ namespace SkaEV.API.Migrations
                     b.HasIndex("StationId");
 
                     b.ToTable("station_staff", (string)null);
+                });
+
+            modelBuilder.Entity("SkaEV.API.Domain.Entities.SupportRequest", b =>
+                {
+                    b.Property<int>("RequestId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasColumnName("request_id");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("RequestId"));
+
+                    b.Property<int?>("AssignedTo")
+                        .HasColumnType("int")
+                        .HasColumnName("assigned_to");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasColumnName("category");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("Priority")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasColumnName("priority");
+
+                    b.Property<int?>("RelatedBookingId")
+                        .HasColumnType("int")
+                        .HasColumnName("related_booking_id");
+
+                    b.Property<int?>("RelatedStationId")
+                        .HasColumnType("int")
+                        .HasColumnName("related_station_id");
+
+                    b.Property<string>("ResolutionNotes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)")
+                        .HasColumnName("resolution_notes");
+
+                    b.Property<DateTime?>("ResolvedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("resolved_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)")
+                        .HasColumnName("subject");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("updated_at");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("RequestId");
+
+                    b.HasIndex("AssignedTo")
+                        .HasDatabaseName("IX_support_requests_assigned");
+
+                    b.HasIndex("CreatedAt")
+                        .HasDatabaseName("IX_support_requests_created");
+
+                    b.HasIndex("RelatedBookingId");
+
+                    b.HasIndex("RelatedStationId");
+
+                    b.HasIndex("Status")
+                        .HasDatabaseName("IX_support_requests_status");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("IX_support_requests_user");
+
+                    b.ToTable("support_requests", (string)null);
+                });
+
+            modelBuilder.Entity("SkaEV.API.Domain.Entities.SupportRequestMessage", b =>
+                {
+                    b.Property<int>("MessageId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasColumnName("message_id");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("MessageId"));
+
+                    b.Property<bool>("IsStaffReply")
+                        .HasColumnType("bit")
+                        .HasColumnName("is_staff_reply");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)")
+                        .HasColumnName("message");
+
+                    b.Property<int>("RequestId")
+                        .HasColumnType("int")
+                        .HasColumnName("request_id");
+
+                    b.Property<int>("SenderId")
+                        .HasColumnType("int")
+                        .HasColumnName("sender_id");
+
+                    b.Property<string>("SenderRole")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasColumnName("sender_role");
+
+                    b.Property<DateTime>("SentAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("sent_at");
+
+                    b.HasKey("MessageId");
+
+                    b.HasIndex("RequestId");
+
+                    b.HasIndex("SenderId");
+
+                    b.ToTable("support_request_messages", (string)null);
                 });
 
             modelBuilder.Entity("SkaEV.API.Domain.Entities.SystemLog", b =>
@@ -1593,6 +1777,11 @@ namespace SkaEV.API.Migrations
                         .HasForeignKey("AssignedToStaffId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("SkaEV.API.Domain.Entities.MaintenanceTeam", "AssignedToTeam")
+                        .WithMany()
+                        .HasForeignKey("AssignedToTeamId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("SkaEV.API.Domain.Entities.ChargingPost", "ChargingPost")
                         .WithMany()
                         .HasForeignKey("PostId")
@@ -1615,6 +1804,8 @@ namespace SkaEV.API.Migrations
                         .IsRequired();
 
                     b.Navigation("AssignedToStaff");
+
+                    b.Navigation("AssignedToTeam");
 
                     b.Navigation("ChargingPost");
 
@@ -1777,6 +1968,57 @@ namespace SkaEV.API.Migrations
                     b.Navigation("StaffUser");
                 });
 
+            modelBuilder.Entity("SkaEV.API.Domain.Entities.SupportRequest", b =>
+                {
+                    b.HasOne("SkaEV.API.Domain.Entities.User", "AssignedStaff")
+                        .WithMany()
+                        .HasForeignKey("AssignedTo")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("SkaEV.API.Domain.Entities.Booking", "RelatedBooking")
+                        .WithMany()
+                        .HasForeignKey("RelatedBookingId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("SkaEV.API.Domain.Entities.ChargingStation", "RelatedStation")
+                        .WithMany()
+                        .HasForeignKey("RelatedStationId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("SkaEV.API.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AssignedStaff");
+
+                    b.Navigation("RelatedBooking");
+
+                    b.Navigation("RelatedStation");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("SkaEV.API.Domain.Entities.SupportRequestMessage", b =>
+                {
+                    b.HasOne("SkaEV.API.Domain.Entities.SupportRequest", "Request")
+                        .WithMany("Messages")
+                        .HasForeignKey("RequestId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("SkaEV.API.Domain.Entities.User", "Sender")
+                        .WithMany()
+                        .HasForeignKey("SenderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Request");
+
+                    b.Navigation("Sender");
+                });
+
             modelBuilder.Entity("SkaEV.API.Domain.Entities.SystemLog", b =>
                 {
                     b.HasOne("SkaEV.API.Domain.Entities.User", "User")
@@ -1843,6 +2085,11 @@ namespace SkaEV.API.Migrations
                     b.Navigation("Reviews");
 
                     b.Navigation("StationStaff");
+                });
+
+            modelBuilder.Entity("SkaEV.API.Domain.Entities.SupportRequest", b =>
+                {
+                    b.Navigation("Messages");
                 });
 
             modelBuilder.Entity("SkaEV.API.Domain.Entities.User", b =>

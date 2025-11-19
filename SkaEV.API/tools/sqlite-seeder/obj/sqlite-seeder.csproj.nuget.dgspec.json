@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "d:\\Term5\\SWP391\\FPTU_FA25_SWP391_G4_Topic3_SkaEV\\SkaEV.API\\tools\\sqlite-seeder\\sqlite-seeder.csproj": {}
+    "D:\\Term5\\SWP391\\FPTU_FA25_SWP391_G4_Topic3_SkaEV\\SkaEV.API\\tools\\sqlite-seeder\\sqlite-seeder.csproj": {}
   },
   "projects": {
-    "d:\\Term5\\SWP391\\FPTU_FA25_SWP391_G4_Topic3_SkaEV\\SkaEV.API\\tools\\sqlite-seeder\\sqlite-seeder.csproj": {
+    "D:\\Term5\\SWP391\\FPTU_FA25_SWP391_G4_Topic3_SkaEV\\SkaEV.API\\tools\\sqlite-seeder\\sqlite-seeder.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "d:\\Term5\\SWP391\\FPTU_FA25_SWP391_G4_Topic3_SkaEV\\SkaEV.API\\tools\\sqlite-seeder\\sqlite-seeder.csproj",
+        "projectUniqueName": "D:\\Term5\\SWP391\\FPTU_FA25_SWP391_G4_Topic3_SkaEV\\SkaEV.API\\tools\\sqlite-seeder\\sqlite-seeder.csproj",
         "projectName": "sqlite-seeder",
-        "projectPath": "d:\\Term5\\SWP391\\FPTU_FA25_SWP391_G4_Topic3_SkaEV\\SkaEV.API\\tools\\sqlite-seeder\\sqlite-seeder.csproj",
+        "projectPath": "D:\\Term5\\SWP391\\FPTU_FA25_SWP391_G4_Topic3_SkaEV\\SkaEV.API\\tools\\sqlite-seeder\\sqlite-seeder.csproj",
         "packagesPath": "C:\\Users\\Admin\\.nuget\\packages\\",
-        "outputPath": "d:\\Term5\\SWP391\\FPTU_FA25_SWP391_G4_Topic3_SkaEV\\SkaEV.API\\tools\\sqlite-seeder\\obj\\",
+        "outputPath": "D:\\Term5\\SWP391\\FPTU_FA25_SWP391_G4_Topic3_SkaEV\\SkaEV.API\\tools\\sqlite-seeder\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
