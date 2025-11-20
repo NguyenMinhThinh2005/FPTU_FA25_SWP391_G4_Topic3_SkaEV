@@ -58,7 +58,8 @@ public class AuthService : IAuthService
         var user = await _context.Users
             .FirstOrDefaultAsync(u => u.Email == request.Email && u.IsActive);
 
-        if (user == null || user.PasswordHash != request.Password)
+        // If user not found or password does not verify, return null (Unauthorized)
+        if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password ?? string.Empty, user.PasswordHash ?? string.Empty))
         {
             return null;
         }
@@ -113,7 +114,7 @@ public class AuthService : IAuthService
         var user = new User
         {
             Email = request.Email,
-            PasswordHash = request.Password, // Lưu ý: Nên hash password trước khi lưu (hiện tại đang lưu plain text theo yêu cầu cũ)
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password), // Hash mật khẩu trước khi lưu
             FullName = request.FullName,
             PhoneNumber = request.PhoneNumber,
             Role = request.Role,

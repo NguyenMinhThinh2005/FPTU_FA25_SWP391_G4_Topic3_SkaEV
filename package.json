@@ -8,10 +8,10 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-        "test": "vitest",
-        "test:run": "vitest run",
-        "test:cov": "vitest run --coverage",
-        "smoke:admin": "powershell.exe -File tools/run-smoke-tests.ps1 -ApiBaseUrl http://localhost:5000 -AdminEmail admin@skaev.com -AdminPassword Admin@123"
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:cov": "vitest run --coverage",
+    "smoke:admin": "powershell.exe -File tools/run-smoke-tests.ps1 -ApiBaseUrl http://localhost:5000 -AdminEmail admin@skaev.com -AdminPassword Admin@123"
   },
   "dependencies": {
     "@emotion/react": "^11.13.5",
