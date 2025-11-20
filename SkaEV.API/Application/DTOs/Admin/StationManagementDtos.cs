@@ -33,6 +33,11 @@ public class StationListDto
     public decimal CurrentPowerUsageKw { get; set; }
     public decimal TotalPowerCapacityKw { get; set; }
     public decimal UtilizationRate { get; set; } // Percentage
+    public decimal MonthlyRevenue { get; set; }
+    public int MonthlyCompletedSessions { get; set; }
+    public double AverageSessionDurationMinutes { get; set; }
+    public decimal TodayRevenue { get; set; }
+    public int TodayCompletedSessions { get; set; }
 
     // Error indicators
     public int ErrorCount { get; set; }
@@ -84,6 +89,11 @@ public class StationDetailDto
     public decimal TodayRevenue { get; set; }
     public int TodaySessionCount { get; set; }
 
+    // Analytics broken down by common time windows
+    public PeriodMetrics DailyMetrics { get; set; } = new();
+    public PeriodMetrics MonthlyMetrics { get; set; } = new();
+    public PeriodMetrics YearlyMetrics { get; set; } = new();
+
     // Charging Points
     public List<ChargingPointDetailDto> ChargingPoints { get; set; } = new();
 
@@ -99,7 +109,22 @@ public class StationDetailDto
 }
 
 /// <summary>
+<<<<<<< HEAD
 /// DTO chi tiết trụ sạc (post) với thông tin các khe sạc.
+=======
+/// Simple aggregated metrics for a time window
+/// </summary>
+public class PeriodMetrics
+{
+    public int SessionCount { get; set; }
+    public decimal Revenue { get; set; }
+    public decimal EnergyKwh { get; set; }
+    public double AverageSessionDurationMinutes { get; set; }
+}
+
+/// <summary>
+/// Charging point (post) with all slots detail
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
 /// </summary>
 public class ChargingPointDetailDto
 {
@@ -290,6 +315,7 @@ public class StationErrorLogDto
     public string ErrorCode { get; set; } = string.Empty;
     public string Message { get; set; } = string.Empty;
     public string? Details { get; set; }
+    public string ClassificationSource { get; set; } = "manual"; // manual or auto
 
     public DateTime OccurredAt { get; set; }
     public bool IsResolved { get; set; }

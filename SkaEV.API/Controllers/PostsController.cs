@@ -83,6 +83,7 @@ public class PostsController : BaseApiController
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> CreatePost([FromBody] CreatePostDto createDto)
     {
+<<<<<<< HEAD
         var post = await _postService.CreatePostAsync(createDto);
         
         return CreatedResponse(
@@ -90,6 +91,27 @@ public class PostsController : BaseApiController
             new { id = post.PostId },
             post
         );
+=======
+        try
+        {
+            var post = await _postService.CreatePostAsync(createDto);
+
+            return CreatedAtAction(
+                nameof(GetPost),
+                new { id = post.PostId },
+                post
+            );
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating post");
+            return StatusCode(500, new { message = "An error occurred" });
+        }
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
     }
 
     /// <summary>
@@ -129,8 +151,24 @@ public class PostsController : BaseApiController
         if (existingPost == null)
             return NotFoundResponse("Post not found");
 
+<<<<<<< HEAD
         await _postService.DeletePostAsync(id);
         return OkResponse<object>(new { }, "Post deleted successfully");
+=======
+            await _postService.DeletePostAsync(id);
+            return NoContent();
+        }
+        catch (ArgumentException ex)
+        {
+            // Business rule prevented deletion (e.g., has bookings) -> Conflict
+            return Conflict(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting post {Id}", id);
+            return StatusCode(500, new { message = "An error occurred" });
+        }
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
     }
 
     /// <summary>

@@ -133,15 +133,52 @@ public class PostService : IPostService
     public async Task DeletePostAsync(int postId)
     {
         var post = await _context.ChargingPosts
+            .Include(p => p.ChargingSlots)
+            .Include(p => p.ChargingStation)
             .FirstOrDefaultAsync(p => p.PostId == postId);
 
         if (post == null)
             throw new ArgumentException("Post not found");
 
-        _context.ChargingPosts.Remove(post);
+        // If any slot has bookings, prevent permanent deletion - encourage archive
+        var slotIds = post.ChargingSlots.Select(s => s.SlotId).ToList();
+        if (slotIds.Count > 0)
+        {
+            var hasBookings = await _context.Bookings
+                .Where(b => slotIds.Contains(b.SlotId))
+                .AnyAsync();
+
+            if (hasBookings)
+            {
+                throw new ArgumentException("Cannot delete charging post that has bookings. Archive post instead.");
+            }
+        }
+
+        // Soft-delete the post and its slots so history remains in DB
+        var utcNow = DateTime.UtcNow;
+        post.DeletedAt = utcNow;
+        post.Status = "inactive";
+
+        // Update station counts where applicable
+        var station = post.ChargingStation;
+        if (station != null && station.TotalPosts > 0)
+        {
+            station.TotalPosts = Math.Max(0, station.TotalPosts - 1);
+            if (post.Status == "available")
+                station.AvailablePosts = Math.Max(0, station.AvailablePosts - 1);
+            station.UpdatedAt = utcNow;
+        }
+
+        foreach (var slot in post.ChargingSlots)
+        {
+            slot.DeletedAt = utcNow;
+            slot.Status = "inactive";
+            slot.UpdatedAt = utcNow;
+        }
+
         await _context.SaveChangesAsync();
 
-        _logger.LogInformation("Deleted charging post {PostId}", postId);
+        _logger.LogInformation("Soft-deleted charging post {PostId}", postId);
     }
 
     /// <summary>

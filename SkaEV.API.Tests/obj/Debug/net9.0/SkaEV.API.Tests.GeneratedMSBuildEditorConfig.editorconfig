@@ -1,5 +1,10 @@
 is_global = true
 build_property.TargetFramework = net9.0
+<<<<<<< HEAD
+=======
+build_property.TargetFrameworkIdentifier = .NETCoreApp
+build_property.TargetFrameworkVersion = v9.0
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
 build_property.TargetPlatformMinVersion = 
 build_property.UsingMicrosoftNETSdkWeb = 
 build_property.ProjectTypeGuids = 
@@ -8,7 +13,11 @@ build_property.PlatformNeutralAssembly =
 build_property.EnforceExtendedAnalyzerRules = 
 build_property._SupportedPlatformList = Linux,macOS,Windows
 build_property.RootNamespace = SkaEV.API.Tests
+<<<<<<< HEAD
 build_property.ProjectDir = D:\FPT_University\FPTU_StudySource\term5\SWP391\Project\SkaEV_SWP_Project\SkaEV.API.Tests\
+=======
+build_property.ProjectDir = D:\Term5\SWP391\FPTU_FA25_SWP391_G4_Topic3_SkaEV\SkaEV.API.Tests\
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
 build_property.EnableComHosting = 
 build_property.EnableGeneratedComInterfaceComImportInterop = 
 build_property.EffectiveAnalysisLevelStyle = 9.0

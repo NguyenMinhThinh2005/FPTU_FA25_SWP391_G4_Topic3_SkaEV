@@ -1,10 +1,18 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SkaEV.API.Infrastructure.Data;
 
 namespace SkaEV.API.Controllers;
 
+<<<<<<< HEAD
 public class TestController : BaseApiController
+=======
+[ApiController]
+[Route("api/[controller]")]
+[Authorize(Roles = "admin")]
+public class TestController : ControllerBase
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
 {
     private readonly SkaEVDbContext _context;
 

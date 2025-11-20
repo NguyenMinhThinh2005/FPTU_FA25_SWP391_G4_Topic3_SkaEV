@@ -154,7 +154,17 @@ public class SlotsController : BaseApiController
         }
         catch (ArgumentException ex)
         {
+<<<<<<< HEAD
             return BadRequestResponse(ex.Message);
+=======
+            // Business rule prevented deletion (e.g., has bookings) -> Conflict
+            return Conflict(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting slot {Id}", id);
+            return StatusCode(500, new { message = "An error occurred" });
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
         }
     }
 

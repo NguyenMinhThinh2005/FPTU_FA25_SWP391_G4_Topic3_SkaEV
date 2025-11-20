@@ -73,7 +73,7 @@ BEGIN
     );
 END;
 
--- Ensure there is at least one unassigned station for UI validation
+-- Ensure demo station 3 exists to cover central region scenarios
 IF NOT EXISTS (SELECT 1 FROM dbo.charging_stations WHERE station_name = N'SkaEV Demo Station 3')
 BEGIN
     INSERT INTO dbo.charging_stations (
@@ -107,9 +107,6 @@ BEGIN
         SYSDATETIME()
     );
 END;
-
-DECLARE @Station1Id INT = (SELECT station_id FROM dbo.charging_stations WHERE station_name = N'SkaEV Demo Station 1');
-DECLARE @Station2Id INT = (SELECT station_id FROM dbo.charging_stations WHERE station_name = N'SkaEV Demo Station 2');
 
 -- Ensure demo staff users exist
 IF NOT EXISTS (SELECT 1 FROM dbo.users WHERE email = 'demo.staff1@skaev.com')
@@ -160,49 +157,151 @@ BEGIN
     );
 END;
 
-DECLARE @Staff1Id INT = (SELECT user_id FROM dbo.users WHERE email = 'demo.staff1@skaev.com');
-DECLARE @Staff2Id INT = (SELECT user_id FROM dbo.users WHERE email = 'demo.staff2@skaev.com');
-
--- Helper: deactivate existing active assignments for the given station or staff
-IF @Staff1Id IS NOT NULL
+IF NOT EXISTS (SELECT 1 FROM dbo.users WHERE email = 'demo.staff3@skaev.com')
 BEGIN
-    UPDATE dbo.station_staff
-    SET is_active = 0
-    WHERE staff_user_id = @Staff1Id AND is_active = 1;
+    INSERT INTO dbo.users (
+        email,
+        password_hash,
+        full_name,
+        phone_number,
+        role,
+        is_active,
+        created_at,
+        updated_at
+    )
+    VALUES (
+        'demo.staff3@skaev.com',
+        CONVERT(nvarchar(255), HASHBYTES('SHA2_256', 'Temp123!'), 1),
+        N'Nguyễn Minh Hùng',
+        '0923456789',
+        'staff',
+        1,
+        SYSDATETIME(),
+        SYSDATETIME()
+    );
 END;
 
-IF @Staff2Id IS NOT NULL
+DECLARE @TotalStations INT = (
+    SELECT COUNT(*)
+    FROM dbo.charging_stations
+    WHERE deleted_at IS NULL
+);
+
+DECLARE @ActiveStaffCount INT = (
+    SELECT COUNT(*)
+    FROM dbo.users
+    WHERE role = 'staff' AND is_active = 1 AND deleted_at IS NULL
+);
+
+DECLARE @ExistingStaffCount INT = (
+    SELECT COUNT(*)
+    FROM dbo.users
+    WHERE role = 'staff' AND deleted_at IS NULL
+);
+
+IF @ActiveStaffCount < @TotalStations
 BEGIN
-    UPDATE dbo.station_staff
-    SET is_active = 0
-    WHERE staff_user_id = @Staff2Id AND is_active = 1;
+    DECLARE @Needed INT = @TotalStations - @ActiveStaffCount;
+    DECLARE @Counter INT = 1;
+
+    WHILE @Counter <= @Needed
+    BEGIN
+        DECLARE @NewIndex INT = @ExistingStaffCount + @Counter;
+        DECLARE @GeneratedEmail NVARCHAR(100) =
+            CONCAT('auto.staff', RIGHT('0000' + CAST(@NewIndex AS NVARCHAR(4)), 4), '@skaev.com');
+
+        IF NOT EXISTS (SELECT 1 FROM dbo.users WHERE email = @GeneratedEmail)
+        BEGIN
+            INSERT INTO dbo.users (
+                email,
+                password_hash,
+                full_name,
+                phone_number,
+                role,
+                is_active,
+                created_at,
+                updated_at
+            )
+            VALUES (
+                @GeneratedEmail,
+                CONVERT(nvarchar(255), HASHBYTES('SHA2_256', 'Temp123!'), 1),
+                N'Nhân viên tự động ' + CAST(@NewIndex AS NVARCHAR(10)),
+                CONCAT('093', RIGHT('000000' + CAST(@NewIndex AS NVARCHAR(6)), 6)),
+                'staff',
+                1,
+                SYSDATETIME(),
+                SYSDATETIME()
+            );
+        END
+        ELSE
+        BEGIN
+            UPDATE dbo.users
+            SET is_active = 1,
+                updated_at = SYSDATETIME()
+            WHERE email = @GeneratedEmail;
+        END
+
+        SET @Counter += 1;
+    END
+END
+
+DECLARE @StaffPool TABLE (
+    RowNum INT,
+    UserId INT
+);
+
+INSERT INTO @StaffPool (RowNum, UserId)
+SELECT ROW_NUMBER() OVER (ORDER BY user_id) AS RowNum,
+       user_id
+FROM dbo.users
+WHERE role = 'staff' AND is_active = 1 AND deleted_at IS NULL;
+
+IF NOT EXISTS (SELECT 1 FROM @StaffPool)
+BEGIN
+    RAISERROR (N'Không có nhân viên nào khả dụng để phân công.', 16, 1);
+    RETURN;
 END;
 
-IF @Station1Id IS NOT NULL
-BEGIN
-    UPDATE dbo.station_staff
-    SET is_active = 0
-    WHERE station_id = @Station1Id AND is_active = 1;
-END;
+DECLARE @StaffCount INT = (SELECT COUNT(*) FROM @StaffPool);
 
-IF @Station2Id IS NOT NULL
-BEGIN
-    UPDATE dbo.station_staff
-    SET is_active = 0
-    WHERE station_id = @Station2Id AND is_active = 1;
-END;
+UPDATE dbo.station_staff
+SET is_active = 0
+WHERE is_active = 1;
 
--- Assign staff to stations (one station per staff)
-IF @Staff1Id IS NOT NULL AND @Station1Id IS NOT NULL
-BEGIN
-    INSERT INTO dbo.station_staff (staff_user_id, station_id, assigned_at, is_active)
-    VALUES (@Staff1Id, @Station1Id, SYSDATETIME(), 1);
-END;
+DECLARE @Assignments TABLE (
+    StationId INT,
+    StaffUserId INT
+);
 
-IF @Staff2Id IS NOT NULL AND @Station2Id IS NOT NULL
-BEGIN
-    INSERT INTO dbo.station_staff (staff_user_id, station_id, assigned_at, is_active)
-    VALUES (@Staff2Id, @Station2Id, SYSDATETIME(), 1);
-END;
+WITH StationList AS (
+    SELECT station_id,
+           ROW_NUMBER() OVER (ORDER BY station_id) AS RowNum
+    FROM dbo.charging_stations
+    WHERE deleted_at IS NULL
+)
+INSERT INTO @Assignments (StationId, StaffUserId)
+SELECT s.station_id,
+       sp.UserId
+FROM StationList s
+CROSS APPLY (
+    SELECT UserId
+    FROM @StaffPool
+    WHERE RowNum = ((s.RowNum - 1) % @StaffCount) + 1
+) sp;
 
-PRINT 'Demo station manager data ensured successfully.';
+DELETE ss
+FROM dbo.station_staff ss
+JOIN @Assignments a ON ss.station_id = a.StationId AND ss.staff_user_id = a.StaffUserId;
+
+INSERT INTO dbo.station_staff (staff_user_id, station_id, assigned_at, is_active)
+SELECT StaffUserId, StationId, SYSDATETIME(), 1
+FROM @Assignments;
+
+UPDATE cs
+SET manager_user_id = a.StaffUserId,
+    updated_at = SYSDATETIME()
+FROM dbo.charging_stations cs
+JOIN @Assignments a ON cs.station_id = a.StationId;
+
+DECLARE @AssignedCount INT = (SELECT COUNT(*) FROM @Assignments);
+PRINT CONCAT(N'✅ Đã phân công ', CONVERT(NVARCHAR(10), @AssignedCount), N' trạm cho các nhân viên quản lý.');

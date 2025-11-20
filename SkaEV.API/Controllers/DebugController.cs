@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SkaEV.API.Infrastructure.Data;
@@ -5,11 +6,18 @@ using SkaEV.API.Domain.Entities;
 
 namespace SkaEV.API.Controllers;
 
+<<<<<<< HEAD
 /// <summary>
 /// Controller dùng cho mục đích debug và kiểm thử.
 /// Chứa các endpoint để tạo dữ liệu mẫu và kiểm tra trạng thái hệ thống.
 /// </summary>
 public class DebugController : BaseApiController
+=======
+[ApiController]
+[Route("api/[controller]")]
+[Authorize(Roles = "admin")]
+public class DebugController : ControllerBase
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
 {
     private readonly SkaEVDbContext _context;
 

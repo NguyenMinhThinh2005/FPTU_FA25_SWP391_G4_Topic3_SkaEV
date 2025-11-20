@@ -480,7 +480,224 @@ const StaffProfile = () => {
           </Grid>
         </CardContent>
       </Card>
+<<<<<<< HEAD
         </>
+=======
+
+      {/* Tabs */}
+      <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
+        <Tabs value={tabValue} onChange={handleTabChange}>
+          <Tab label="Thông tin cá nhân & Công việc" />
+          <Tab label="Nhật ký hoạt động" />
+        </Tabs>
+      </Box>
+
+      {/* Tab Content */}
+      {tabValue === 0 && (
+        <Card>
+          <CardContent>
+            <Typography variant="h6" fontWeight="bold" gutterBottom>
+              Thông tin cá nhân
+            </Typography>
+            <Grid container spacing={3}>
+              <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    label="Họ"
+                    value={profileData.firstName}
+                    onChange={(e) =>
+                      handleProfileChange("firstName", e.target.value)
+                    }
+                    disabled
+                  />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    label="Tên"
+                    value={profileData.lastName}
+                    onChange={(e) =>
+                      handleProfileChange("lastName", e.target.value)
+                    }
+                    disabled
+                  />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Email"
+                  type="email"
+                  value={profileData.email}
+                  onChange={(e) => handleProfileChange("email", e.target.value)}
+                  disabled={!editMode}
+                  InputProps={{
+                    startAdornment: (
+                      <Email sx={{ mr: 1, color: "text.secondary" }} />
+                    ),
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Số điện thoại"
+                  value={profileData.phone}
+                  onChange={(e) => handleProfileChange("phone", e.target.value)}
+                  disabled={!editMode}
+                  InputProps={{
+                    startAdornment: (
+                      <Phone sx={{ mr: 1, color: "text.secondary" }} />
+                    ),
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Địa điểm"
+                  value={profileData.location}
+                  onChange={(e) =>
+                    handleProfileChange("location", e.target.value)
+                  }
+                  disabled={!editMode}
+                  InputProps={{
+                    startAdornment: (
+                      <LocationOn sx={{ mr: 1, color: "text.secondary" }} />
+                    ),
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Ngày vào làm"
+                  value={profileData.joinDate}
+                  disabled
+                  InputProps={{
+                    startAdornment: (
+                      <CalendarToday sx={{ mr: 1, color: "text.secondary" }} />
+                    ),
+                  }}
+                />
+              </Grid>
+
+              {/* Phần Chi tiết công việc - GỘP VÀO ĐÂY */}
+              <Grid item xs={12} sx={{ mt: 2 }}>
+                <Divider />
+                <Typography variant="h6" fontWeight="bold" gutterBottom sx={{ mt: 2 }}>
+                  Chi tiết công việc
+                </Typography>
+              </Grid>
+              
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Mã nhân viên"
+                  value={profileData.employeeId}
+                  disabled
+                  InputProps={{
+                    startAdornment: (
+                      <Badge sx={{ mr: 1, color: "text.secondary" }} />
+                    ),
+                  }}
+                />
+              </Grid>
+              
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Phòng ban"
+                  value={profileData.department}
+                  disabled
+                  InputProps={{
+                    startAdornment: (
+                      <Work sx={{ mr: 1, color: "text.secondary" }} />
+                    ),
+                  }}
+                />
+              </Grid>
+              
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Chức vụ"
+                  value={profileData.position}
+                  disabled
+                  InputProps={{
+                    startAdornment: (
+                      <Work sx={{ mr: 1, color: "text.secondary" }} />
+                    ),
+                  }}
+                />
+              </Grid>
+              
+              {/* Certifications - render if present to avoid unused variable eslint warnings */}
+              {certifications && certifications.length > 0 && (
+                <Grid item xs={12} sx={{ mt: 2 }}>
+                  <Divider />
+                  <Typography variant="h6" fontWeight="bold" gutterBottom sx={{ mt: 2 }}>
+                    Chứng chỉ
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                    {certifications.map((cert, idx) => (
+                      <Chip
+                        key={idx}
+                        label={cert.name}
+                        size="small"
+                        color={getCertificationColor(cert.status)}
+                      />
+                    ))}
+                  </Box>
+                </Grid>
+              )}
+            </Grid>
+          </CardContent>
+        </Card>
+      )}
+
+      {tabValue === 1 && (
+        <Card>
+          <CardContent>
+            <Typography variant="h6" fontWeight="bold" gutterBottom>
+              Hoạt động gần đây
+            </Typography>
+            <List>
+              {recentActivities.map((activity) => (
+                <ListItem key={activity.id} divider>
+                  <ListItemText
+                    primary={activity.action}
+                    secondary={
+                      <Box>
+                        <Typography variant="body2" color="text.secondary">
+                          {activity.location}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {activity.time}
+                        </Typography>
+                      </Box>
+                    }
+                  />
+                  <ListItemSecondaryAction>
+                    <Chip
+                      label={
+                        activity.status === "success"
+                          ? "Thành công"
+                          : activity.status === "info"
+                          ? "Thông tin"
+                          : activity.status === "warning"
+                          ? "Cảnh báo"
+                          : activity.status
+                      }
+                      color={getActivityColor(activity.status)}
+                      size="small"
+                    />
+                  </ListItemSecondaryAction>
+                </ListItem>
+              ))}
+            </List>
+          </CardContent>
+        </Card>
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
       )}
     </Box>
   );

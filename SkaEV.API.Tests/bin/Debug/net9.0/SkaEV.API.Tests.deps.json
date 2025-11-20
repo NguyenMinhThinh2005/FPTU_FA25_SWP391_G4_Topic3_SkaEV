@@ -8,21 +8,30 @@
     ".NETCoreApp,Version=v9.0": {
       "SkaEV.API.Tests/1.0.0": {
         "dependencies": {
+<<<<<<< HEAD
           "Microsoft.EntityFrameworkCore.InMemory": "8.0.11",
           "Microsoft.NET.Test.Sdk": "17.11.1",
           "SkaEV.API": "1.0.0",
           "coverlet.collector": "6.0.0",
           "xunit": "2.9.2",
           "xunit.runner.visualstudio": "2.8.2"
+=======
+          "Microsoft.NET.Test.Sdk": "18.0.0",
+          "SkaEV.API": "1.0.0",
+          "xunit": "2.4.2"
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
         },
         "runtime": {
           "SkaEV.API.Tests.dll": {}
         }
       },
       "AutoMapper/12.0.1": {
+<<<<<<< HEAD
         "dependencies": {
           "Microsoft.CSharp": "4.7.0"
         },
+=======
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
         "runtime": {
           "lib/netstandard2.1/AutoMapper.dll": {
             "assemblyVersion": "12.0.0.0",
@@ -32,8 +41,12 @@
       },
       "AutoMapper.Extensions.Microsoft.DependencyInjection/12.0.1": {
         "dependencies": {
+<<<<<<< HEAD
           "AutoMapper": "12.0.1",
           "Microsoft.Extensions.Options": "8.0.2"
+=======
+          "AutoMapper": "12.0.1"
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
         },
         "runtime": {
           "lib/netstandard2.1/AutoMapper.Extensions.Microsoft.DependencyInjection.dll": {
@@ -46,12 +59,16 @@
         "dependencies": {
           "Microsoft.Bcl.AsyncInterfaces": "1.1.1",
           "System.ClientModel": "1.0.0",
+<<<<<<< HEAD
           "System.Diagnostics.DiagnosticSource": "6.0.1",
           "System.Memory.Data": "1.0.2",
           "System.Numerics.Vectors": "4.5.0",
           "System.Text.Encodings.Web": "6.0.0",
           "System.Text.Json": "4.7.2",
           "System.Threading.Tasks.Extensions": "4.5.4"
+=======
+          "System.Memory.Data": "1.0.2"
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
         },
         "runtime": {
           "lib/net6.0/Azure.Core.dll": {
@@ -65,10 +82,14 @@
           "Azure.Core": "1.38.0",
           "Microsoft.Identity.Client": "4.61.3",
           "Microsoft.Identity.Client.Extensions.Msal": "4.61.3",
+<<<<<<< HEAD
           "System.Memory": "4.5.4",
           "System.Security.Cryptography.ProtectedData": "6.0.0",
           "System.Text.Json": "4.7.2",
           "System.Threading.Tasks.Extensions": "4.5.4"
+=======
+          "System.Security.Cryptography.ProtectedData": "6.0.0"
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
         },
         "runtime": {
           "lib/netstandard2.0/Azure.Identity.dll": {
@@ -85,7 +106,10 @@
           }
         }
       },
+<<<<<<< HEAD
       "coverlet.collector/6.0.0": {},
+=======
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
       "FluentValidation/11.5.1": {
         "runtime": {
           "lib/net7.0/FluentValidation.dll": {
@@ -108,8 +132,12 @@
       },
       "FluentValidation.DependencyInjectionExtensions/11.5.1": {
         "dependencies": {
+<<<<<<< HEAD
           "FluentValidation": "11.5.1",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "8.0.2"
+=======
+          "FluentValidation": "11.5.1"
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
         },
         "runtime": {
           "lib/netstandard2.1/FluentValidation.DependencyInjectionExtensions.dll": {
@@ -131,7 +159,10 @@
       },
       "Microsoft.AspNetCore.JsonPatch/8.0.11": {
         "dependencies": {
+<<<<<<< HEAD
           "Microsoft.CSharp": "4.7.0",
+=======
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
           "Newtonsoft.Json": "13.0.3"
         },
         "runtime": {
@@ -162,6 +193,7 @@
           }
         }
       },
+<<<<<<< HEAD
       "Microsoft.CodeCoverage/17.11.1": {
         "runtime": {
           "lib/netcoreapp3.1/Microsoft.VisualStudio.CodeCoverage.Shim.dll": {
@@ -171,6 +203,16 @@
         }
       },
       "Microsoft.CSharp/4.7.0": {},
+=======
+      "Microsoft.CodeCoverage/18.0.0": {
+        "runtime": {
+          "lib/net8.0/Microsoft.VisualStudio.CodeCoverage.Shim.dll": {
+            "assemblyVersion": "15.0.0.0",
+            "fileVersion": "18.0.425.47602"
+          }
+        }
+      },
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
       "Microsoft.Data.SqlClient/5.1.6": {
         "dependencies": {
           "Azure.Identity": "1.11.4",
@@ -180,12 +222,16 @@
           "Microsoft.IdentityModel.Protocols.OpenIdConnect": "7.1.2",
           "Microsoft.SqlServer.Server": "1.0.0",
           "System.Configuration.ConfigurationManager": "6.0.1",
+<<<<<<< HEAD
           "System.Diagnostics.DiagnosticSource": "6.0.1",
           "System.Runtime.Caching": "6.0.0",
           "System.Security.Cryptography.Cng": "5.0.0",
           "System.Security.Principal.Windows": "5.0.0",
           "System.Text.Encoding.CodePages": "6.0.0",
           "System.Text.Encodings.Web": "6.0.0"
+=======
+          "System.Runtime.Caching": "6.0.0"
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
         },
         "runtime": {
           "lib/net6.0/Microsoft.Data.SqlClient.dll": {
@@ -245,10 +291,14 @@
       },
       "Microsoft.EntityFrameworkCore/8.0.11": {
         "dependencies": {
+<<<<<<< HEAD
           "Microsoft.EntityFrameworkCore.Abstractions": "8.0.11",
           "Microsoft.EntityFrameworkCore.Analyzers": "8.0.11",
           "Microsoft.Extensions.Caching.Memory": "8.0.1",
           "Microsoft.Extensions.Logging": "8.0.1"
+=======
+          "Microsoft.EntityFrameworkCore.Abstractions": "8.0.11"
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
         },
         "runtime": {
           "lib/net8.0/Microsoft.EntityFrameworkCore.dll": {
@@ -265,6 +315,7 @@
           }
         }
       },
+<<<<<<< HEAD
       "Microsoft.EntityFrameworkCore.Analyzers/8.0.11": {},
       "Microsoft.EntityFrameworkCore.InMemory/8.0.11": {
         "dependencies": {
@@ -281,6 +332,11 @@
         "dependencies": {
           "Microsoft.EntityFrameworkCore": "8.0.11",
           "Microsoft.Extensions.Configuration.Abstractions": "8.0.0"
+=======
+      "Microsoft.EntityFrameworkCore.Relational/8.0.11": {
+        "dependencies": {
+          "Microsoft.EntityFrameworkCore": "8.0.11"
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
         },
         "runtime": {
           "lib/net8.0/Microsoft.EntityFrameworkCore.Relational.dll": {
@@ -311,8 +367,12 @@
       "Microsoft.EntityFrameworkCore.SqlServer/8.0.11": {
         "dependencies": {
           "Microsoft.Data.SqlClient": "5.1.6",
+<<<<<<< HEAD
           "Microsoft.EntityFrameworkCore.Relational": "8.0.11",
           "System.Formats.Asn1": "8.0.1"
+=======
+          "Microsoft.EntityFrameworkCore.Relational": "8.0.11"
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
         },
         "runtime": {
           "lib/net8.0/Microsoft.EntityFrameworkCore.SqlServer.dll": {
@@ -334,6 +394,7 @@
           }
         }
       },
+<<<<<<< HEAD
       "Microsoft.Extensions.ApiDescription.Server/6.0.5": {},
       "Microsoft.Extensions.Caching.Abstractions/8.0.0": {
         "dependencies": {
@@ -365,6 +426,8 @@
         }
       },
       "Microsoft.Extensions.DependencyInjection.Abstractions/8.0.2": {},
+=======
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
       "Microsoft.Extensions.DependencyModel/8.0.2": {
         "runtime": {
           "lib/net8.0/Microsoft.Extensions.DependencyModel.dll": {
@@ -373,6 +436,7 @@
           }
         }
       },
+<<<<<<< HEAD
       "Microsoft.Extensions.Diagnostics.Abstractions/8.0.1": {
         "dependencies": {
           "Microsoft.Extensions.DependencyInjection.Abstractions": "8.0.2",
@@ -393,6 +457,11 @@
           "Microsoft.EntityFrameworkCore.Relational": "8.0.11",
           "Microsoft.Extensions.Diagnostics.HealthChecks": "8.0.11",
           "Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions": "8.0.11"
+=======
+      "Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore/8.0.11": {
+        "dependencies": {
+          "Microsoft.EntityFrameworkCore.Relational": "8.0.11"
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
         },
         "runtime": {
           "lib/net8.0/Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore.dll": {
@@ -401,6 +470,7 @@
           }
         }
       },
+<<<<<<< HEAD
       "Microsoft.Extensions.FileProviders.Abstractions/8.0.0": {
         "dependencies": {
           "Microsoft.Extensions.Primitives": "8.0.0"
@@ -438,6 +508,11 @@
         "dependencies": {
           "Microsoft.IdentityModel.Abstractions": "7.1.2",
           "System.Diagnostics.DiagnosticSource": "6.0.1"
+=======
+      "Microsoft.Identity.Client/4.61.3": {
+        "dependencies": {
+          "Microsoft.IdentityModel.Abstractions": "7.1.2"
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
         },
         "runtime": {
           "lib/net6.0/Microsoft.Identity.Client.dll": {
@@ -523,10 +598,17 @@
           }
         }
       },
+<<<<<<< HEAD
       "Microsoft.NET.Test.Sdk/17.11.1": {
         "dependencies": {
           "Microsoft.CodeCoverage": "17.11.1",
           "Microsoft.TestPlatform.TestHost": "17.11.1"
+=======
+      "Microsoft.NET.Test.Sdk/18.0.0": {
+        "dependencies": {
+          "Microsoft.CodeCoverage": "18.0.0",
+          "Microsoft.TestPlatform.TestHost": "18.0.0"
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
         }
       },
       "Microsoft.OpenApi/1.2.3": {
@@ -545,6 +627,7 @@
           }
         }
       },
+<<<<<<< HEAD
       "Microsoft.TestPlatform.ObjectModel/17.11.1": {
         "dependencies": {
           "System.Reflection.Metadata": "1.6.0"
@@ -640,10 +723,105 @@
             "locale": "zh-Hant"
           },
           "lib/netcoreapp3.1/zh-Hant/Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll": {
+=======
+      "Microsoft.TestPlatform.ObjectModel/18.0.0": {
+        "runtime": {
+          "lib/net8.0/Microsoft.TestPlatform.CoreUtilities.dll": {
+            "assemblyVersion": "15.0.0.0",
+            "fileVersion": "18.0.25.50104"
+          },
+          "lib/net8.0/Microsoft.TestPlatform.PlatformAbstractions.dll": {
+            "assemblyVersion": "15.0.0.0",
+            "fileVersion": "18.0.25.50104"
+          },
+          "lib/net8.0/Microsoft.VisualStudio.TestPlatform.ObjectModel.dll": {
+            "assemblyVersion": "15.0.0.0",
+            "fileVersion": "18.0.25.50104"
+          }
+        },
+        "resources": {
+          "lib/net8.0/cs/Microsoft.TestPlatform.CoreUtilities.resources.dll": {
+            "locale": "cs"
+          },
+          "lib/net8.0/cs/Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll": {
+            "locale": "cs"
+          },
+          "lib/net8.0/de/Microsoft.TestPlatform.CoreUtilities.resources.dll": {
+            "locale": "de"
+          },
+          "lib/net8.0/de/Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll": {
+            "locale": "de"
+          },
+          "lib/net8.0/es/Microsoft.TestPlatform.CoreUtilities.resources.dll": {
+            "locale": "es"
+          },
+          "lib/net8.0/es/Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll": {
+            "locale": "es"
+          },
+          "lib/net8.0/fr/Microsoft.TestPlatform.CoreUtilities.resources.dll": {
+            "locale": "fr"
+          },
+          "lib/net8.0/fr/Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll": {
+            "locale": "fr"
+          },
+          "lib/net8.0/it/Microsoft.TestPlatform.CoreUtilities.resources.dll": {
+            "locale": "it"
+          },
+          "lib/net8.0/it/Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll": {
+            "locale": "it"
+          },
+          "lib/net8.0/ja/Microsoft.TestPlatform.CoreUtilities.resources.dll": {
+            "locale": "ja"
+          },
+          "lib/net8.0/ja/Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll": {
+            "locale": "ja"
+          },
+          "lib/net8.0/ko/Microsoft.TestPlatform.CoreUtilities.resources.dll": {
+            "locale": "ko"
+          },
+          "lib/net8.0/ko/Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll": {
+            "locale": "ko"
+          },
+          "lib/net8.0/pl/Microsoft.TestPlatform.CoreUtilities.resources.dll": {
+            "locale": "pl"
+          },
+          "lib/net8.0/pl/Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll": {
+            "locale": "pl"
+          },
+          "lib/net8.0/pt-BR/Microsoft.TestPlatform.CoreUtilities.resources.dll": {
+            "locale": "pt-BR"
+          },
+          "lib/net8.0/pt-BR/Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll": {
+            "locale": "pt-BR"
+          },
+          "lib/net8.0/ru/Microsoft.TestPlatform.CoreUtilities.resources.dll": {
+            "locale": "ru"
+          },
+          "lib/net8.0/ru/Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll": {
+            "locale": "ru"
+          },
+          "lib/net8.0/tr/Microsoft.TestPlatform.CoreUtilities.resources.dll": {
+            "locale": "tr"
+          },
+          "lib/net8.0/tr/Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll": {
+            "locale": "tr"
+          },
+          "lib/net8.0/zh-Hans/Microsoft.TestPlatform.CoreUtilities.resources.dll": {
+            "locale": "zh-Hans"
+          },
+          "lib/net8.0/zh-Hans/Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll": {
+            "locale": "zh-Hans"
+          },
+          "lib/net8.0/zh-Hant/Microsoft.TestPlatform.CoreUtilities.resources.dll": {
+            "locale": "zh-Hant"
+          },
+          "lib/net8.0/zh-Hant/Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll": {
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
             "locale": "zh-Hant"
           }
         }
       },
+<<<<<<< HEAD
       "Microsoft.TestPlatform.TestHost/17.11.1": {
         "dependencies": {
           "Microsoft.TestPlatform.ObjectModel": "17.11.1",
@@ -787,6 +965,151 @@
             "locale": "zh-Hant"
           },
           "lib/netcoreapp3.1/zh-Hant/Microsoft.VisualStudio.TestPlatform.Common.resources.dll": {
+=======
+      "Microsoft.TestPlatform.TestHost/18.0.0": {
+        "dependencies": {
+          "Microsoft.TestPlatform.ObjectModel": "18.0.0",
+          "Newtonsoft.Json": "13.0.3"
+        },
+        "runtime": {
+          "lib/net8.0/Microsoft.TestPlatform.CommunicationUtilities.dll": {
+            "assemblyVersion": "15.0.0.0",
+            "fileVersion": "18.0.25.50104"
+          },
+          "lib/net8.0/Microsoft.TestPlatform.CrossPlatEngine.dll": {
+            "assemblyVersion": "15.0.0.0",
+            "fileVersion": "18.0.25.50104"
+          },
+          "lib/net8.0/Microsoft.TestPlatform.Utilities.dll": {
+            "assemblyVersion": "15.0.0.0",
+            "fileVersion": "18.0.25.50104"
+          },
+          "lib/net8.0/Microsoft.VisualStudio.TestPlatform.Common.dll": {
+            "assemblyVersion": "15.0.0.0",
+            "fileVersion": "18.0.25.50104"
+          },
+          "lib/net8.0/testhost.dll": {
+            "assemblyVersion": "15.0.0.0",
+            "fileVersion": "18.0.25.50104"
+          }
+        },
+        "resources": {
+          "lib/net8.0/cs/Microsoft.TestPlatform.CommunicationUtilities.resources.dll": {
+            "locale": "cs"
+          },
+          "lib/net8.0/cs/Microsoft.TestPlatform.CrossPlatEngine.resources.dll": {
+            "locale": "cs"
+          },
+          "lib/net8.0/cs/Microsoft.VisualStudio.TestPlatform.Common.resources.dll": {
+            "locale": "cs"
+          },
+          "lib/net8.0/de/Microsoft.TestPlatform.CommunicationUtilities.resources.dll": {
+            "locale": "de"
+          },
+          "lib/net8.0/de/Microsoft.TestPlatform.CrossPlatEngine.resources.dll": {
+            "locale": "de"
+          },
+          "lib/net8.0/de/Microsoft.VisualStudio.TestPlatform.Common.resources.dll": {
+            "locale": "de"
+          },
+          "lib/net8.0/es/Microsoft.TestPlatform.CommunicationUtilities.resources.dll": {
+            "locale": "es"
+          },
+          "lib/net8.0/es/Microsoft.TestPlatform.CrossPlatEngine.resources.dll": {
+            "locale": "es"
+          },
+          "lib/net8.0/es/Microsoft.VisualStudio.TestPlatform.Common.resources.dll": {
+            "locale": "es"
+          },
+          "lib/net8.0/fr/Microsoft.TestPlatform.CommunicationUtilities.resources.dll": {
+            "locale": "fr"
+          },
+          "lib/net8.0/fr/Microsoft.TestPlatform.CrossPlatEngine.resources.dll": {
+            "locale": "fr"
+          },
+          "lib/net8.0/fr/Microsoft.VisualStudio.TestPlatform.Common.resources.dll": {
+            "locale": "fr"
+          },
+          "lib/net8.0/it/Microsoft.TestPlatform.CommunicationUtilities.resources.dll": {
+            "locale": "it"
+          },
+          "lib/net8.0/it/Microsoft.TestPlatform.CrossPlatEngine.resources.dll": {
+            "locale": "it"
+          },
+          "lib/net8.0/it/Microsoft.VisualStudio.TestPlatform.Common.resources.dll": {
+            "locale": "it"
+          },
+          "lib/net8.0/ja/Microsoft.TestPlatform.CommunicationUtilities.resources.dll": {
+            "locale": "ja"
+          },
+          "lib/net8.0/ja/Microsoft.TestPlatform.CrossPlatEngine.resources.dll": {
+            "locale": "ja"
+          },
+          "lib/net8.0/ja/Microsoft.VisualStudio.TestPlatform.Common.resources.dll": {
+            "locale": "ja"
+          },
+          "lib/net8.0/ko/Microsoft.TestPlatform.CommunicationUtilities.resources.dll": {
+            "locale": "ko"
+          },
+          "lib/net8.0/ko/Microsoft.TestPlatform.CrossPlatEngine.resources.dll": {
+            "locale": "ko"
+          },
+          "lib/net8.0/ko/Microsoft.VisualStudio.TestPlatform.Common.resources.dll": {
+            "locale": "ko"
+          },
+          "lib/net8.0/pl/Microsoft.TestPlatform.CommunicationUtilities.resources.dll": {
+            "locale": "pl"
+          },
+          "lib/net8.0/pl/Microsoft.TestPlatform.CrossPlatEngine.resources.dll": {
+            "locale": "pl"
+          },
+          "lib/net8.0/pl/Microsoft.VisualStudio.TestPlatform.Common.resources.dll": {
+            "locale": "pl"
+          },
+          "lib/net8.0/pt-BR/Microsoft.TestPlatform.CommunicationUtilities.resources.dll": {
+            "locale": "pt-BR"
+          },
+          "lib/net8.0/pt-BR/Microsoft.TestPlatform.CrossPlatEngine.resources.dll": {
+            "locale": "pt-BR"
+          },
+          "lib/net8.0/pt-BR/Microsoft.VisualStudio.TestPlatform.Common.resources.dll": {
+            "locale": "pt-BR"
+          },
+          "lib/net8.0/ru/Microsoft.TestPlatform.CommunicationUtilities.resources.dll": {
+            "locale": "ru"
+          },
+          "lib/net8.0/ru/Microsoft.TestPlatform.CrossPlatEngine.resources.dll": {
+            "locale": "ru"
+          },
+          "lib/net8.0/ru/Microsoft.VisualStudio.TestPlatform.Common.resources.dll": {
+            "locale": "ru"
+          },
+          "lib/net8.0/tr/Microsoft.TestPlatform.CommunicationUtilities.resources.dll": {
+            "locale": "tr"
+          },
+          "lib/net8.0/tr/Microsoft.TestPlatform.CrossPlatEngine.resources.dll": {
+            "locale": "tr"
+          },
+          "lib/net8.0/tr/Microsoft.VisualStudio.TestPlatform.Common.resources.dll": {
+            "locale": "tr"
+          },
+          "lib/net8.0/zh-Hans/Microsoft.TestPlatform.CommunicationUtilities.resources.dll": {
+            "locale": "zh-Hans"
+          },
+          "lib/net8.0/zh-Hans/Microsoft.TestPlatform.CrossPlatEngine.resources.dll": {
+            "locale": "zh-Hans"
+          },
+          "lib/net8.0/zh-Hans/Microsoft.VisualStudio.TestPlatform.Common.resources.dll": {
+            "locale": "zh-Hans"
+          },
+          "lib/net8.0/zh-Hant/Microsoft.TestPlatform.CommunicationUtilities.resources.dll": {
+            "locale": "zh-Hant"
+          },
+          "lib/net8.0/zh-Hant/Microsoft.TestPlatform.CrossPlatEngine.resources.dll": {
+            "locale": "zh-Hant"
+          },
+          "lib/net8.0/zh-Hant/Microsoft.VisualStudio.TestPlatform.Common.resources.dll": {
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
             "locale": "zh-Hant"
           }
         }
@@ -808,9 +1131,12 @@
         }
       },
       "NetTopologySuite/2.5.0": {
+<<<<<<< HEAD
         "dependencies": {
           "System.Memory": "4.5.4"
         },
+=======
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
         "runtime": {
           "lib/netstandard2.0/NetTopologySuite.dll": {
             "assemblyVersion": "2.0.0.0",
@@ -866,8 +1192,11 @@
       },
       "Serilog.AspNetCore/8.0.0": {
         "dependencies": {
+<<<<<<< HEAD
           "Microsoft.Extensions.DependencyInjection": "8.0.1",
           "Microsoft.Extensions.Logging": "8.0.1",
+=======
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
           "Serilog": "3.1.1",
           "Serilog.Extensions.Hosting": "8.0.0",
           "Serilog.Extensions.Logging": "8.0.0",
@@ -886,9 +1215,12 @@
       },
       "Serilog.Extensions.Hosting/8.0.0": {
         "dependencies": {
+<<<<<<< HEAD
           "Microsoft.Extensions.DependencyInjection.Abstractions": "8.0.2",
           "Microsoft.Extensions.Hosting.Abstractions": "8.0.1",
           "Microsoft.Extensions.Logging.Abstractions": "8.0.2",
+=======
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
           "Serilog": "3.1.1",
           "Serilog.Extensions.Logging": "8.0.0"
         },
@@ -901,7 +1233,10 @@
       },
       "Serilog.Extensions.Logging/8.0.0": {
         "dependencies": {
+<<<<<<< HEAD
           "Microsoft.Extensions.Logging": "8.0.1",
+=======
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
           "Serilog": "3.1.1"
         },
         "runtime": {
@@ -924,7 +1259,10 @@
       },
       "Serilog.Settings.Configuration/8.0.0": {
         "dependencies": {
+<<<<<<< HEAD
           "Microsoft.Extensions.Configuration.Binder": "8.0.0",
+=======
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
           "Microsoft.Extensions.DependencyModel": "8.0.2",
           "Serilog": "3.1.1"
         },
@@ -981,9 +1319,12 @@
         }
       },
       "SQLitePCLRaw.core/2.1.6": {
+<<<<<<< HEAD
         "dependencies": {
           "System.Memory": "4.5.4"
         },
+=======
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
         "runtime": {
           "lib/netstandard2.0/SQLitePCLRaw.core.dll": {
             "assemblyVersion": "2.1.6.2060",
@@ -1108,7 +1449,10 @@
       },
       "Swashbuckle.AspNetCore/6.5.0": {
         "dependencies": {
+<<<<<<< HEAD
           "Microsoft.Extensions.ApiDescription.Server": "6.0.5",
+=======
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
           "Swashbuckle.AspNetCore.Swagger": "6.5.0",
           "Swashbuckle.AspNetCore.SwaggerGen": "6.5.0",
           "Swashbuckle.AspNetCore.SwaggerUI": "6.5.0"
@@ -1146,8 +1490,12 @@
       },
       "System.ClientModel/1.0.0": {
         "dependencies": {
+<<<<<<< HEAD
           "System.Memory.Data": "1.0.2",
           "System.Text.Json": "4.7.2"
+=======
+          "System.Memory.Data": "1.0.2"
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
         },
         "runtime": {
           "lib/net6.0/System.ClientModel.dll": {
@@ -1168,11 +1516,14 @@
           }
         }
       },
+<<<<<<< HEAD
       "System.Diagnostics.DiagnosticSource/6.0.1": {
         "dependencies": {
           "System.Runtime.CompilerServices.Unsafe": "6.0.0"
         }
       },
+=======
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
       "System.Drawing.Common/6.0.0": {
         "dependencies": {
           "Microsoft.Win32.SystemEvents": "6.0.0"
@@ -1198,7 +1549,10 @@
           }
         }
       },
+<<<<<<< HEAD
       "System.Formats.Asn1/8.0.1": {},
+=======
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
       "System.IdentityModel.Tokens.Jwt/7.1.2": {
         "dependencies": {
           "Microsoft.IdentityModel.JsonWebTokens": "7.1.2",
@@ -1211,12 +1565,16 @@
           }
         }
       },
+<<<<<<< HEAD
       "System.Memory/4.5.4": {},
       "System.Memory.Data/1.0.2": {
         "dependencies": {
           "System.Text.Encodings.Web": "6.0.0",
           "System.Text.Json": "4.7.2"
         },
+=======
+      "System.Memory.Data/1.0.2": {
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
         "runtime": {
           "lib/netstandard2.0/System.Memory.Data.dll": {
             "assemblyVersion": "1.0.2.0",
@@ -1224,8 +1582,11 @@
           }
         }
       },
+<<<<<<< HEAD
       "System.Numerics.Vectors/4.5.0": {},
       "System.Reflection.Metadata/1.6.0": {},
+=======
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
       "System.Runtime.Caching/6.0.0": {
         "dependencies": {
           "System.Configuration.ConfigurationManager": "6.0.1"
@@ -1245,6 +1606,7 @@
           }
         }
       },
+<<<<<<< HEAD
       "System.Runtime.CompilerServices.Unsafe/6.0.0": {},
       "System.Security.AccessControl/6.0.0": {},
       "System.Security.Cryptography.Cng/5.0.0": {
@@ -1252,6 +1614,8 @@
           "System.Formats.Asn1": "8.0.1"
         }
       },
+=======
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
       "System.Security.Cryptography.ProtectedData/6.0.0": {
         "runtime": {
           "lib/net6.0/System.Security.Cryptography.ProtectedData.dll": {
@@ -1270,7 +1634,10 @@
       },
       "System.Security.Permissions/6.0.0": {
         "dependencies": {
+<<<<<<< HEAD
           "System.Security.AccessControl": "6.0.0",
+=======
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
           "System.Windows.Extensions": "6.0.0"
         },
         "runtime": {
@@ -1280,6 +1647,7 @@
           }
         }
       },
+<<<<<<< HEAD
       "System.Security.Principal.Windows/5.0.0": {},
       "System.Text.Encoding.CodePages/6.0.0": {
         "dependencies": {
@@ -1293,6 +1661,8 @@
       },
       "System.Text.Json/4.7.2": {},
       "System.Threading.Tasks.Extensions/4.5.4": {},
+=======
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
       "System.Windows.Extensions/6.0.0": {
         "dependencies": {
           "System.Drawing.Common": "6.0.0"
@@ -1312,11 +1682,18 @@
           }
         }
       },
+<<<<<<< HEAD
       "xunit/2.9.2": {
         "dependencies": {
           "xunit.analyzers": "1.16.0",
           "xunit.assert": "2.9.2",
           "xunit.core": "2.9.2"
+=======
+      "xunit/2.4.2": {
+        "dependencies": {
+          "xunit.assert": "2.4.2",
+          "xunit.core": "2.4.2"
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
         }
       },
       "xunit.abstractions/2.0.3": {
@@ -1327,6 +1704,7 @@
           }
         }
       },
+<<<<<<< HEAD
       "xunit.analyzers/1.16.0": {},
       "xunit.assert/2.9.2": {
         "runtime": {
@@ -1343,11 +1721,29 @@
         }
       },
       "xunit.extensibility.core/2.9.2": {
+=======
+      "xunit.assert/2.4.2": {
+        "runtime": {
+          "lib/netstandard1.1/xunit.assert.dll": {
+            "assemblyVersion": "2.4.2.0",
+            "fileVersion": "2.4.2.0"
+          }
+        }
+      },
+      "xunit.core/2.4.2": {
+        "dependencies": {
+          "xunit.extensibility.core": "2.4.2",
+          "xunit.extensibility.execution": "2.4.2"
+        }
+      },
+      "xunit.extensibility.core/2.4.2": {
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
         "dependencies": {
           "xunit.abstractions": "2.0.3"
         },
         "runtime": {
           "lib/netstandard1.1/xunit.core.dll": {
+<<<<<<< HEAD
             "assemblyVersion": "2.9.2.0",
             "fileVersion": "2.9.2.0"
           }
@@ -1365,6 +1761,24 @@
         }
       },
       "xunit.runner.visualstudio/2.8.2": {},
+=======
+            "assemblyVersion": "2.4.2.0",
+            "fileVersion": "2.4.2.0"
+          }
+        }
+      },
+      "xunit.extensibility.execution/2.4.2": {
+        "dependencies": {
+          "xunit.extensibility.core": "2.4.2"
+        },
+        "runtime": {
+          "lib/netstandard1.1/xunit.execution.dotnet.dll": {
+            "assemblyVersion": "2.4.2.0",
+            "fileVersion": "2.4.2.0"
+          }
+        }
+      },
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
       "SkaEV.API/1.0.0": {
         "dependencies": {
           "AutoMapper": "12.0.1",
@@ -1435,6 +1849,7 @@
       "path": "bcrypt.net-next/4.0.3",
       "hashPath": "bcrypt.net-next.4.0.3.nupkg.sha512"
     },
+<<<<<<< HEAD
     "coverlet.collector/6.0.0": {
       "type": "package",
       "serviceable": true,
@@ -1442,6 +1857,8 @@
       "path": "coverlet.collector/6.0.0",
       "hashPath": "coverlet.collector.6.0.0.nupkg.sha512"
     },
+=======
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
     "FluentValidation/11.5.1": {
       "type": "package",
       "serviceable": true,
@@ -1491,6 +1908,7 @@
       "path": "microsoft.bcl.asyncinterfaces/1.1.1",
       "hashPath": "microsoft.bcl.asyncinterfaces.1.1.1.nupkg.sha512"
     },
+<<<<<<< HEAD
     "Microsoft.CodeCoverage/17.11.1": {
       "type": "package",
       "serviceable": true,
@@ -1504,6 +1922,14 @@
       "sha512": "sha512-pTj+D3uJWyN3My70i2Hqo+OXixq3Os2D1nJ2x92FFo6sk8fYS1m1WLNTs0Dc1uPaViH0YvEEwvzddQ7y4rhXmA==",
       "path": "microsoft.csharp/4.7.0",
       "hashPath": "microsoft.csharp.4.7.0.nupkg.sha512"
+=======
+    "Microsoft.CodeCoverage/18.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-DFPhMrsIofgJ1DDU3ModqqRArDm15/bNl4ecmcuBspZkZ4ONYnCC0R8U27WzK7cYv6r8l6Q/fRmvg7cb+I/dJA==",
+      "path": "microsoft.codecoverage/18.0.0",
+      "hashPath": "microsoft.codecoverage.18.0.0.nupkg.sha512"
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
     },
     "Microsoft.Data.SqlClient/5.1.6": {
       "type": "package",
@@ -1540,6 +1966,7 @@
       "path": "microsoft.entityframeworkcore.abstractions/8.0.11",
       "hashPath": "microsoft.entityframeworkcore.abstractions.8.0.11.nupkg.sha512"
     },
+<<<<<<< HEAD
     "Microsoft.EntityFrameworkCore.Analyzers/8.0.11": {
       "type": "package",
       "serviceable": true,
@@ -1554,6 +1981,8 @@
       "path": "microsoft.entityframeworkcore.inmemory/8.0.11",
       "hashPath": "microsoft.entityframeworkcore.inmemory.8.0.11.nupkg.sha512"
     },
+=======
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
     "Microsoft.EntityFrameworkCore.Relational/8.0.11": {
       "type": "package",
       "serviceable": true,
@@ -1589,6 +2018,7 @@
       "path": "microsoft.entityframeworkcore.sqlserver.nettopologysuite/8.0.11",
       "hashPath": "microsoft.entityframeworkcore.sqlserver.nettopologysuite.8.0.11.nupkg.sha512"
     },
+<<<<<<< HEAD
     "Microsoft.Extensions.ApiDescription.Server/6.0.5": {
       "type": "package",
       "serviceable": true,
@@ -1638,6 +2068,8 @@
       "path": "microsoft.extensions.dependencyinjection.abstractions/8.0.2",
       "hashPath": "microsoft.extensions.dependencyinjection.abstractions.8.0.2.nupkg.sha512"
     },
+=======
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
     "Microsoft.Extensions.DependencyModel/8.0.2": {
       "type": "package",
       "serviceable": true,
@@ -1645,6 +2077,7 @@
       "path": "microsoft.extensions.dependencymodel/8.0.2",
       "hashPath": "microsoft.extensions.dependencymodel.8.0.2.nupkg.sha512"
     },
+<<<<<<< HEAD
     "Microsoft.Extensions.Diagnostics.Abstractions/8.0.1": {
       "type": "package",
       "serviceable": true,
@@ -1666,6 +2099,8 @@
       "path": "microsoft.extensions.diagnostics.healthchecks.abstractions/8.0.11",
       "hashPath": "microsoft.extensions.diagnostics.healthchecks.abstractions.8.0.11.nupkg.sha512"
     },
+=======
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
     "Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore/8.0.11": {
       "type": "package",
       "serviceable": true,
@@ -1673,6 +2108,7 @@
       "path": "microsoft.extensions.diagnostics.healthchecks.entityframeworkcore/8.0.11",
       "hashPath": "microsoft.extensions.diagnostics.healthchecks.entityframeworkcore.8.0.11.nupkg.sha512"
     },
+<<<<<<< HEAD
     "Microsoft.Extensions.FileProviders.Abstractions/8.0.0": {
       "type": "package",
       "serviceable": true,
@@ -1715,6 +2151,8 @@
       "path": "microsoft.extensions.primitives/8.0.0",
       "hashPath": "microsoft.extensions.primitives.8.0.0.nupkg.sha512"
     },
+=======
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
     "Microsoft.Identity.Client/4.61.3": {
       "type": "package",
       "serviceable": true,
@@ -1771,12 +2209,21 @@
       "path": "microsoft.identitymodel.tokens/7.1.2",
       "hashPath": "microsoft.identitymodel.tokens.7.1.2.nupkg.sha512"
     },
+<<<<<<< HEAD
     "Microsoft.NET.Test.Sdk/17.11.1": {
       "type": "package",
       "serviceable": true,
       "sha512": "sha512-U3Ty4BaGoEu+T2bwSko9tWqWUOU16WzSFkq6U8zve75oRBMSLTBdMAZrVNNz1Tq12aCdDom9fcOcM9QZaFHqFg==",
       "path": "microsoft.net.test.sdk/17.11.1",
       "hashPath": "microsoft.net.test.sdk.17.11.1.nupkg.sha512"
+=======
+    "Microsoft.NET.Test.Sdk/18.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-bvxj2Asb7nT+tqOFFerrhQeEjUYLwx0Poi0Rznu63WbqN+A4uDn1t5NWXfAOOQsF6lpmK6N2v+Vvgso7KWZS7g==",
+      "path": "microsoft.net.test.sdk/18.0.0",
+      "hashPath": "microsoft.net.test.sdk.18.0.0.nupkg.sha512"
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
     },
     "Microsoft.OpenApi/1.2.3": {
       "type": "package",
@@ -1792,6 +2239,7 @@
       "path": "microsoft.sqlserver.server/1.0.0",
       "hashPath": "microsoft.sqlserver.server.1.0.0.nupkg.sha512"
     },
+<<<<<<< HEAD
     "Microsoft.TestPlatform.ObjectModel/17.11.1": {
       "type": "package",
       "serviceable": true,
@@ -1805,6 +2253,21 @@
       "sha512": "sha512-DnG+GOqJXO/CkoqlJWeDFTgPhqD/V6VqUIL3vINizCWZ3X+HshCtbbyDdSHQQEjrc2Sl/K3yaxX6s+5LFEdYuw==",
       "path": "microsoft.testplatform.testhost/17.11.1",
       "hashPath": "microsoft.testplatform.testhost.17.11.1.nupkg.sha512"
+=======
+    "Microsoft.TestPlatform.ObjectModel/18.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-Al/a99ymb8UdEEh6DKNiaoFn5i8fvX5PdM9LfU9Z/Q8NJrlyHHzF+LRHLbR+t89gRsJ2fFMpwYxgEn3eH1BQwA==",
+      "path": "microsoft.testplatform.objectmodel/18.0.0",
+      "hashPath": "microsoft.testplatform.objectmodel.18.0.0.nupkg.sha512"
+    },
+    "Microsoft.TestPlatform.TestHost/18.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-aAxE8Thr9ZHGrljOYaDeLJqitQi75iE4xeEFn6CEGFirlHSn1KwpKPniuEn6zCLZ90Z3XqNlrC3ZJTuvBov45w==",
+      "path": "microsoft.testplatform.testhost/18.0.0",
+      "hashPath": "microsoft.testplatform.testhost.18.0.0.nupkg.sha512"
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
     },
     "Microsoft.Win32.SystemEvents/6.0.0": {
       "type": "package",
@@ -1981,6 +2444,7 @@
       "path": "system.configuration.configurationmanager/6.0.1",
       "hashPath": "system.configuration.configurationmanager.6.0.1.nupkg.sha512"
     },
+<<<<<<< HEAD
     "System.Diagnostics.DiagnosticSource/6.0.1": {
       "type": "package",
       "serviceable": true,
@@ -1988,6 +2452,8 @@
       "path": "system.diagnostics.diagnosticsource/6.0.1",
       "hashPath": "system.diagnostics.diagnosticsource.6.0.1.nupkg.sha512"
     },
+=======
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
     "System.Drawing.Common/6.0.0": {
       "type": "package",
       "serviceable": true,
@@ -1995,6 +2461,7 @@
       "path": "system.drawing.common/6.0.0",
       "hashPath": "system.drawing.common.6.0.0.nupkg.sha512"
     },
+<<<<<<< HEAD
     "System.Formats.Asn1/8.0.1": {
       "type": "package",
       "serviceable": true,
@@ -2002,6 +2469,8 @@
       "path": "system.formats.asn1/8.0.1",
       "hashPath": "system.formats.asn1.8.0.1.nupkg.sha512"
     },
+=======
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
     "System.IdentityModel.Tokens.Jwt/7.1.2": {
       "type": "package",
       "serviceable": true,
@@ -2009,6 +2478,7 @@
       "path": "system.identitymodel.tokens.jwt/7.1.2",
       "hashPath": "system.identitymodel.tokens.jwt.7.1.2.nupkg.sha512"
     },
+<<<<<<< HEAD
     "System.Memory/4.5.4": {
       "type": "package",
       "serviceable": true,
@@ -2016,6 +2486,8 @@
       "path": "system.memory/4.5.4",
       "hashPath": "system.memory.4.5.4.nupkg.sha512"
     },
+=======
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
     "System.Memory.Data/1.0.2": {
       "type": "package",
       "serviceable": true,
@@ -2023,6 +2495,7 @@
       "path": "system.memory.data/1.0.2",
       "hashPath": "system.memory.data.1.0.2.nupkg.sha512"
     },
+<<<<<<< HEAD
     "System.Numerics.Vectors/4.5.0": {
       "type": "package",
       "serviceable": true,
@@ -2037,6 +2510,8 @@
       "path": "system.reflection.metadata/1.6.0",
       "hashPath": "system.reflection.metadata.1.6.0.nupkg.sha512"
     },
+=======
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
     "System.Runtime.Caching/6.0.0": {
       "type": "package",
       "serviceable": true,
@@ -2044,6 +2519,7 @@
       "path": "system.runtime.caching/6.0.0",
       "hashPath": "system.runtime.caching.6.0.0.nupkg.sha512"
     },
+<<<<<<< HEAD
     "System.Runtime.CompilerServices.Unsafe/6.0.0": {
       "type": "package",
       "serviceable": true,
@@ -2065,6 +2541,8 @@
       "path": "system.security.cryptography.cng/5.0.0",
       "hashPath": "system.security.cryptography.cng.5.0.0.nupkg.sha512"
     },
+=======
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
     "System.Security.Cryptography.ProtectedData/6.0.0": {
       "type": "package",
       "serviceable": true,
@@ -2079,6 +2557,7 @@
       "path": "system.security.permissions/6.0.0",
       "hashPath": "system.security.permissions.6.0.0.nupkg.sha512"
     },
+<<<<<<< HEAD
     "System.Security.Principal.Windows/5.0.0": {
       "type": "package",
       "serviceable": true,
@@ -2114,6 +2593,8 @@
       "path": "system.threading.tasks.extensions/4.5.4",
       "hashPath": "system.threading.tasks.extensions.4.5.4.nupkg.sha512"
     },
+=======
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
     "System.Windows.Extensions/6.0.0": {
       "type": "package",
       "serviceable": true,
@@ -2121,12 +2602,21 @@
       "path": "system.windows.extensions/6.0.0",
       "hashPath": "system.windows.extensions.6.0.0.nupkg.sha512"
     },
+<<<<<<< HEAD
     "xunit/2.9.2": {
       "type": "package",
       "serviceable": true,
       "sha512": "sha512-7LhFS2N9Z6Xgg8aE5lY95cneYivRMfRI8v+4PATa4S64D5Z/Plkg0qa8dTRHSiGRgVZ/CL2gEfJDE5AUhOX+2Q==",
       "path": "xunit/2.9.2",
       "hashPath": "xunit.2.9.2.nupkg.sha512"
+=======
+    "xunit/2.4.2": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-6Mj73Ont3zj2CJuoykVJfE0ZmRwn7C+pTuRP8c4bnaaTFjwNG6tGe0prJ1yIbMe9AHrpDys63ctWacSsFJWK/w==",
+      "path": "xunit/2.4.2",
+      "hashPath": "xunit.2.4.2.nupkg.sha512"
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
     },
     "xunit.abstractions/2.0.3": {
       "type": "package",
@@ -2135,6 +2625,7 @@
       "path": "xunit.abstractions/2.0.3",
       "hashPath": "xunit.abstractions.2.0.3.nupkg.sha512"
     },
+<<<<<<< HEAD
     "xunit.analyzers/1.16.0": {
       "type": "package",
       "serviceable": true,
@@ -2176,6 +2667,35 @@
       "sha512": "sha512-vm1tbfXhFmjFMUmS4M0J0ASXz3/U5XvXBa6DOQUL3fEz4Vt6YPhv+ESCarx6M6D+9kJkJYZKCNvJMas1+nVfmQ==",
       "path": "xunit.runner.visualstudio/2.8.2",
       "hashPath": "xunit.runner.visualstudio.2.8.2.nupkg.sha512"
+=======
+    "xunit.assert/2.4.2": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-pxJISOFjn2XTTi1mcDCkRZrTFb9OtRRCtx2kZFNF51GdReLr1ls2rnyxvAS4JO247K3aNtflvh5Q0346K5BROA==",
+      "path": "xunit.assert/2.4.2",
+      "hashPath": "xunit.assert.2.4.2.nupkg.sha512"
+    },
+    "xunit.core/2.4.2": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-KB4yGCxNqIVyekhJLXtKSEq6BaXVp/JO3mbGVE1hxypZTLEe7h+sTbAhpA+yZW2dPtXTuiW+C1B2oxxHEkrmOw==",
+      "path": "xunit.core/2.4.2",
+      "hashPath": "xunit.core.2.4.2.nupkg.sha512"
+    },
+    "xunit.extensibility.core/2.4.2": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-W1BoXTIN1C6kpVSMw25huSet25ky6IAQUNovu3zGOGN/jWnbgSoTyCrlIhmXSg0tH5nEf8q7h3OjNHOjyu5PfA==",
+      "path": "xunit.extensibility.core/2.4.2",
+      "hashPath": "xunit.extensibility.core.2.4.2.nupkg.sha512"
+    },
+    "xunit.extensibility.execution/2.4.2": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-CZmgcKkwpyo8FlupZdWpJCryrAOWLh1FBPG6gmVZuPQkGQsim/oL4PcP4nfrC2hHgXUFtluvaJ0Sp9PQKUMNpg==",
+      "path": "xunit.extensibility.execution/2.4.2",
+      "hashPath": "xunit.extensibility.execution.2.4.2.nupkg.sha512"
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
     },
     "SkaEV.API/1.0.0": {
       "type": "project",

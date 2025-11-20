@@ -74,7 +74,7 @@ const PublicRoute = ({ children }) => {
     // Redirect to appropriate dashboard based on role
     switch (user?.role) {
       case "admin":
-        return <Navigate to="/admin/dashboard" replace />;
+        return <Navigate to="/admin/stations" replace />; // Admin goes to Station Management
       case "staff":
         return <Navigate to="/staff/dashboard" replace />;
       case "customer":

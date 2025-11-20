@@ -1,0 +1,39 @@
+name: Smoke Tests (manual)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  smoke-tests:
+    runs-on: windows-latest
+    if: ${{ github.event.inputs.run_smoke == 'true' }}
+    env:
+      BASE_URL: ${{ secrets.SKA_EV_BASE_URL }} # e.g. http://localhost:5000
+      DB_CONNECTION: ${{ secrets.SKA_EV_DB_CONNECTION }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run lint
+        run: npm run -s lint
+
+      - name: Run smoke tests
+        shell: pwsh
+        env:
+          BASE_URL: ${{ secrets.SKA_EV_BASE_URL }}
+        run: |
+          Write-Host "Running smoke tests against $env:BASE_URL"
+          npm run smoke:admin
+
+# Important: This workflow requires secrets to be set in the repository:
+# - SKA_EV_BASE_URL: base URL where the backend is reachable (e.g. http://internal-host:5000)
+# - SKA_EV_DB_CONNECTION: optional DB connection string if a seed step is added
+# Use workflow_dispatch inputs to control running seeds or destructive steps.

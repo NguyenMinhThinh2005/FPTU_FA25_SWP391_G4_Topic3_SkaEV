@@ -54,6 +54,7 @@ public class AdvancedAnalyticsController : BaseApiController
         return OkResponse(analysis);
     }
 
+<<<<<<< HEAD
     /// <summary>
     /// Lấy phân tích tổng quan về các mô hình sạc (Charging Patterns).
     /// Giúp hiểu rõ xu hướng sạc của toàn hệ thống.
@@ -93,11 +94,67 @@ public class AdvancedAnalyticsController : BaseApiController
     {
         if (CurrentUserId == 0)
             return Unauthorized(ApiResponse<object>.Fail("Invalid user token"));
+=======
+        /// <summary>
+        /// Get user behavior analysis for specific user (Admin only)
+        /// </summary>
+        [HttpGet("user/{userId}/behavior")]
+        [Authorize(Roles = "admin,staff")]
+        public async Task<IActionResult> GetUserBehaviorAnalysis(int userId)
+        {
+            try
+            {
+                var analysis = await _analyticsService.AnalyzeUserBehaviorAsync(userId);
+                return Ok(analysis);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Error analyzing user behavior", error = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Get overall charging patterns analysis
+        /// </summary>
+        [HttpGet("charging-patterns")]
+        [Authorize(Roles = "admin,staff")]
+        public async Task<IActionResult> GetChargingPatterns()
+        {
+            try
+            {
+                var analysis = await _analyticsService.AnalyzeChargingPatternsAsync();
+                return Ok(analysis);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Error analyzing charging patterns", error = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Get station efficiency analysis
+        /// </summary>
+        [HttpGet("station/{stationId}/efficiency")]
+        [Authorize(Roles = "admin,staff")]
+        public async Task<IActionResult> GetStationEfficiency(int stationId)
+        {
+            try
+            {
+                var analysis = await _analyticsService.AnalyzeStationEfficiencyAsync(stationId);
+                return Ok(analysis);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Error analyzing station efficiency", error = ex.Message });
+            }
+        }
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
 
         var recommendations = await _analyticsService.GetRecommendationsAsync(CurrentUserId);
         return OkResponse(recommendations);
     }
 
+<<<<<<< HEAD
     /// <summary>
     /// Lấy các đề xuất cho một người dùng cụ thể (Dành cho Admin/Staff).
     /// </summary>
@@ -110,5 +167,33 @@ public class AdvancedAnalyticsController : BaseApiController
     {
         var recommendations = await _analyticsService.GetRecommendationsAsync(userId);
         return OkResponse(recommendations);
+=======
+                var recommendations = await _analyticsService.GetRecommendationsAsync(userId);
+                return Ok(recommendations);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Error generating recommendations", error = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Get recommendations for specific user (Admin only)
+        /// </summary>
+        [HttpGet("user/{userId}/recommendations")]
+        [Authorize(Roles = "admin,staff")]
+        public async Task<IActionResult> GetUserRecommendations(int userId)
+        {
+            try
+            {
+                var recommendations = await _analyticsService.GetRecommendationsAsync(userId);
+                return Ok(recommendations);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Error generating recommendations", error = ex.Message });
+            }
+        }
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
     }
 }

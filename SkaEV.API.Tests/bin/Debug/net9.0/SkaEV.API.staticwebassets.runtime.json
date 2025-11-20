@@ -1,1 +1,5 @@
+<<<<<<< HEAD
 {"ContentRoots":["D:\\FPT_University\\FPTU_StudySource\\term5\\SWP391\\Project\\SkaEV_SWP_Project\\SkaEV.API\\wwwroot\\","D:\\FPT_University\\FPTU_StudySource\\term5\\SWP391\\Project\\SkaEV_SWP_Project\\SkaEV.API\\obj\\Debug\\net9.0\\compressed\\"],"Root":{"Children":{"index.html":{"Children":null,"Asset":{"ContentRootIndex":0,"SubPath":"index.html"},"Patterns":null},"index.html.gz":{"Children":null,"Asset":{"ContentRootIndex":1,"SubPath":"uspwwvo9t9-jop0ba9j1o.gz"},"Patterns":null}},"Asset":null,"Patterns":[{"ContentRootIndex":0,"Pattern":"**","Depth":0}]}}
+=======
+{"ContentRoots":["d:\\Term5\\SWP391\\FPTU_FA25_SWP391_G4_Topic3_SkaEV\\SkaEV.API\\wwwroot\\","d:\\Term5\\SWP391\\FPTU_FA25_SWP391_G4_Topic3_SkaEV\\SkaEV.API\\obj\\Debug\\net9.0\\compressed\\"],"Root":{"Children":{"index.html":{"Children":null,"Asset":{"ContentRootIndex":0,"SubPath":"index.html"},"Patterns":null},"index.html.gz":{"Children":null,"Asset":{"ContentRootIndex":1,"SubPath":"qx9nu4t2ny-{0}-jop0ba9j1o-jop0ba9j1o.gz"},"Patterns":null}},"Asset":null,"Patterns":[{"ContentRootIndex":0,"Pattern":"**","Depth":0}]}}
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949

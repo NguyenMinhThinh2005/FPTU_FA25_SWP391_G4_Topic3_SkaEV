@@ -58,8 +58,32 @@ public class AuthService : IAuthService
         var user = await _context.Users
             .FirstOrDefaultAsync(u => u.Email == request.Email && u.IsActive);
 
+<<<<<<< HEAD
         // If user not found or password does not verify, return null (Unauthorized)
         if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password ?? string.Empty, user.PasswordHash ?? string.Empty))
+=======
+        if (user == null)
+        {
+            return null;
+        }
+
+        // BCrypt.Verify can throw when the stored password hash is in an unexpected format
+        // (for example legacy hashes). Treat verification errors as failed login instead
+        // of allowing an exception to bubble up (which caused HTTP 500 in logs).
+        bool passwordMatches = false;
+        try
+        {
+            passwordMatches = BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
+        }
+        catch (BCrypt.Net.SaltParseException)
+        {
+            // Optional: log the issue to help debugging (keeps behavior stable).
+            // We don't have a logger injected here; swallowing is acceptable to avoid 500.
+            passwordMatches = false;
+        }
+
+        if (!passwordMatches)
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
         {
             return null;
         }

@@ -193,6 +193,11 @@ export const bookingsAPI = {
     return axiosInstance.get("/bookings", { params });
   },
 
+  // Backwards-compatible alias used in some hooks/components
+  get: (params) => {
+    return axiosInstance.get("/bookings", { params });
+  },
+
   getById: (id) => {
     return axiosInstance.get(`/bookings/${id}`);
   },

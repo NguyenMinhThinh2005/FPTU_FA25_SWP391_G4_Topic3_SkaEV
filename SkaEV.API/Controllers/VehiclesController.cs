@@ -80,14 +80,25 @@ public class VehiclesController : BaseApiController
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> AddVehicle([FromBody] CreateVehicleDto createDto)
     {
-        var vehicle = await _vehicleService.CreateVehicleAsync(CurrentUserId, createDto);
-        
-        return CreatedResponse(
-            nameof(GetVehicle),
-            new { id = vehicle.VehicleId },
-            vehicle,
-            "Vehicle created successfully"
-        );
+        try
+        {
+            var userId = GetUserId();
+            var vehicle = await _vehicleService.CreateVehicleAsync(userId, createDto);
+            return CreatedAtAction(
+                nameof(GetVehicle),
+                new { id = vehicle.VehicleId },
+                vehicle
+            );
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating vehicle");
+            return StatusCode(500, new { message = "An error occurred" });
+        }
     }
 
     /// <summary>
@@ -145,8 +156,20 @@ public class VehiclesController : BaseApiController
         if (existingVehicle.UserId != CurrentUserId)
             return ForbiddenResponse();
 
-        await _vehicleService.DeleteVehicleAsync(id);
-        return OkResponse<object>(new { }, "Vehicle deleted successfully");
+        try
+        {
+            await _vehicleService.DeleteVehicleAsync(id);
+            return NoContent();
+        }
+        catch (ArgumentException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting vehicle {Id}", id);
+            return StatusCode(500, new { message = "An error occurred" });
+        }
     }
 
     /// <summary>

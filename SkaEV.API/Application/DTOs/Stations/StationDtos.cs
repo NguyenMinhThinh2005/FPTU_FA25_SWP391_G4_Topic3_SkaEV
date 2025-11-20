@@ -31,12 +31,12 @@ public class StationDto
     public string? ManagerName { get; set; }
     public string? ManagerEmail { get; set; }
     public string? ManagerPhoneNumber { get; set; }
-
     // Pricing
     public decimal? AcRate { get; set; }
     public decimal? DcRate { get; set; }
     public decimal? DcFastRate { get; set; }
     public decimal? ParkingFee { get; set; }
+    public decimal? BasePricePerKwh { get; set; }
 
     // Detailed charging infrastructure
     public List<ChargingPostDto>? ChargingPosts { get; set; }
@@ -91,6 +91,14 @@ public class CreateStationDto
     public string? OperatingHours { get; set; }
     public List<string>? Amenities { get; set; }
     public string? StationImageUrl { get; set; }
+    public string Status { get; set; } = "active";
+    public int TotalPorts { get; set; }
+    public int FastChargePorts { get; set; }
+    public int StandardPorts { get; set; }
+    public decimal? PricePerKwh { get; set; }
+    public decimal? FastChargePowerKw { get; set; }
+    public decimal? StandardChargePowerKw { get; set; }
+    public int? ManagerUserId { get; set; }
 }
 
 /// <summary>
@@ -104,4 +112,11 @@ public class UpdateStationDto
     public List<string>? Amenities { get; set; }
     public string? StationImageUrl { get; set; }
     public string? Status { get; set; }
+    public int? TotalPorts { get; set; }
+    public int? FastChargePorts { get; set; }
+    public int? StandardPorts { get; set; }
+    public decimal? PricePerKwh { get; set; }
+    public decimal? FastChargePowerKw { get; set; }
+    public decimal? StandardChargePowerKw { get; set; }
+    public int? ManagerUserId { get; set; }
 }

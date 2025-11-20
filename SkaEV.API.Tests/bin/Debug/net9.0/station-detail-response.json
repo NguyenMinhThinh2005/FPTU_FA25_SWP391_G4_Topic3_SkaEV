@@ -1,0 +1,87 @@
+﻿{
+    "success":  true,
+    "data":  {
+                 "stationId":  1,
+                 "stationName":  "VinFast Green Charging - Vinhomes Central Park",
+                 "address":  "208 Nguyễn Hữu Cảnh, Phường 22, Bình Thạnh, TP.HCM",
+                 "city":  "Hồ Chí Minh",
+                 "latitude":  10.79748200,
+                 "longitude":  106.72152400,
+                 "operatingHours":  "24/7",
+                 "amenities":  "WiFi miễn phí, Khu vực chờ có điều hòa, Cà phê, Nhà vệ sinh, Bãi đỗ xe rộng rãi, An ninh 24/7",
+                 "stationImageUrl":  "https://images.unsplash.com/photo-1593941707882-a5bba14938c7?w=800",
+                 "status":  "inactive",
+                 "isOnline":  false,
+                 "lastOnline":  "2025-11-02T14:32:39.6466667",
+                 "totalPosts":  12,
+                 "availablePosts":  1,
+                 "totalSlots":  3,
+                 "availableSlots":  2,
+                 "activeSessions":  0,
+                 "currentPowerUsageKw":  0.0,
+                 "totalPowerCapacityKw":  150.00,
+                 "utilizationRate":  91.66666666666666666666666667,
+                 "todayEnergyConsumedKwh":  0.0,
+                 "todayRevenue":  0.0,
+                 "todaySessionCount":  0,
+                 "chargingPoints":  [
+                                        {
+                                            "postId":  4,
+                                            "stationId":  1,
+                                            "postNumber":  "POST-01",
+                                            "postType":  "DC",
+                                            "powerOutput":  150.00,
+                                            "connectorTypes":  "CCS2",
+                                            "status":  "available",
+                                            "isOnline":  true,
+                                            "totalSlots":  3,
+                                            "availableSlots":  2,
+                                            "occupiedSlots":  1,
+                                            "currentPowerUsageKw":  0.0,
+                                            "activeSessionsCount":  0,
+                                            "slots":  [
+                                                          {
+                                                              "slotId":  3,
+                                                              "postId":  4,
+                                                              "slotNumber":  "A1",
+                                                              "connectorType":  "CCS2",
+                                                              "maxPower":  150.00,
+                                                              "status":  "available",
+                                                              "isAvailable":  true,
+                                                              "createdAt":  "2025-10-23T02:54:34.5433333",
+                                                              "updatedAt":  "2025-10-23T09:56:08.5333333"
+                                                          },
+                                                          {
+                                                              "slotId":  4,
+                                                              "postId":  4,
+                                                              "slotNumber":  "A2",
+                                                              "connectorType":  "CCS2",
+                                                              "maxPower":  150.00,
+                                                              "status":  "available",
+                                                              "isAvailable":  true,
+                                                              "createdAt":  "2025-10-23T02:54:34.5433333",
+                                                              "updatedAt":  "2025-10-23T02:54:34.5433333"
+                                                          },
+                                                          {
+                                                              "slotId":  5,
+                                                              "postId":  4,
+                                                              "slotNumber":  "A3",
+                                                              "connectorType":  "Type 2",
+                                                              "maxPower":  50.00,
+                                                              "status":  "available",
+                                                              "isAvailable":  true,
+                                                              "createdAt":  "2025-10-23T02:54:34.5433333",
+                                                              "updatedAt":  "2025-10-23T02:54:34.5433333"
+                                                          }
+                                                      ],
+                                            "createdAt":  "2025-10-23T02:54:26.0633333",
+                                            "updatedAt":  "2025-10-23T09:56:08.54"
+                                        }
+                                    ],
+                 "recentErrors":  [
+
+                                  ],
+                 "createdAt":  "2025-10-19T19:46:12.8566667",
+                 "updatedAt":  "2025-11-02T14:32:39.6466667"
+             }
+}

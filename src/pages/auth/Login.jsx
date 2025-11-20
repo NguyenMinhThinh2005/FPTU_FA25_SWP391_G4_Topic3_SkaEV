@@ -82,7 +82,7 @@ const LoginPage = () => {
       // Navigate based on user role
       switch (userRole) {
         case "admin":
-          navigate("/admin/dashboard");
+          navigate("/admin/stations"); // Redirect to Station Management instead of Dashboard
           break;
         case "staff":
           navigate("/staff/dashboard");

@@ -27,28 +27,55 @@ class StationDataService {
             0
           );
 
-          // Calculate ports from poles with validation
+
+          // Calculate ports/poles. Prefer detailed poles->ports data, fall back to summarized fields.
           let totalPorts = 0;
           let occupiedPorts = 0;
           let polesCount = 0;
 
-          if (station.charging?.poles && Array.isArray(station.charging.poles)) {
+          if (Array.isArray(station.charging?.poles) && station.charging.poles.length > 0) {
             station.charging.poles.forEach((pole) => {
-              if (pole.ports && Array.isArray(pole.ports)) {
+              if (Array.isArray(pole.ports)) {
                 totalPorts += pole.ports.length;
                 polesCount++;
 
                 pole.ports.forEach((port) => {
-                  if (port.status === "occupied") occupiedPorts += 1;
+                  if (port.status === "occupied" || port.status === 'charging') occupiedPorts += 1;
                 });
+              } else if (typeof pole.totalPorts === 'number') {
+                // If pole lists counts instead of full slots
+                totalPorts += pole.totalPorts;
+                polesCount++;
+                if (typeof pole.occupiedPorts === 'number') occupiedPorts += pole.occupiedPorts;
               }
             });
           }
 
-          const utilization =
-            totalPorts > 0
-              ? Math.min(100, (occupiedPorts / totalPorts) * 100)
-              : 0;
+          // If no detailed poles/ports data, use summarized station-level fields
+          if (totalPorts === 0) {
+            totalPorts =
+              station.charging?.totalPorts ??
+              station.totalSlots ??
+              station.totalPorts ??
+              station.stats?.total ??
+              0;
+
+            occupiedPorts =
+              station.charging?.occupiedPorts ??
+              station.occupiedSlots ??
+              station.stats?.occupied ??
+              station.activeSessions ??
+              0;
+
+            // If occupied is reported as greater than total (bad data), clamp it
+            if (occupiedPorts > totalPorts) occupiedPorts = totalPorts;
+          }
+
+          // Ensure numeric and non-negative
+          totalPorts = Number.isFinite(totalPorts) ? Math.max(0, totalPorts) : 0;
+          occupiedPorts = Number.isFinite(occupiedPorts) ? Math.max(0, occupiedPorts) : 0;
+
+          const utilization = totalPorts > 0 ? Math.min(100, (occupiedPorts / totalPorts) * 100) : 0;
 
           return {
             ...station,

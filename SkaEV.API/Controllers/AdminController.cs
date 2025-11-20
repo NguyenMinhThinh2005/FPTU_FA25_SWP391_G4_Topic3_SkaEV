@@ -6,6 +6,7 @@ using SkaEV.API.Infrastructure.Data;
 
 namespace SkaEV.API.Controllers;
 
+<<<<<<< HEAD
 /// <summary>
 /// Controller quản lý các tác vụ quản trị chung (Admin).
 /// Cung cấp các API để reset mật khẩu người dùng và reset mật khẩu admin (chỉ dùng cho development).
@@ -13,21 +14,38 @@ namespace SkaEV.API.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 public class AdminController : BaseApiController
+=======
+using SkaEV.API.Application.Services;
+using Microsoft.AspNetCore.Authorization;
+
+[ApiController]
+[Route("api/[controller]")]
+[Authorize(Roles = "admin")]
+public class AdminController : ControllerBase
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
 {
     // DbContext để truy cập cơ sở dữ liệu
     private readonly SkaEVDbContext _context;
     // Logger để ghi lại các hoạt động quan trọng
     private readonly ILogger<AdminController> _logger;
+    private readonly IAdminUserService _adminUserService;
+    private readonly IWebHostEnvironment _env;
 
+<<<<<<< HEAD
     /// <summary>
     /// Constructor nhận vào DbContext và Logger thông qua Dependency Injection.
     /// </summary>
     /// <param name="context">Đối tượng DbContext để làm việc với DB.</param>
     /// <param name="logger">Đối tượng Logger để ghi log.</param>
     public AdminController(SkaEVDbContext context, ILogger<AdminController> logger)
+=======
+    public AdminController(SkaEVDbContext context, ILogger<AdminController> logger, IAdminUserService adminUserService, IWebHostEnvironment env)
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
     {
         _context = context;
         _logger = logger;
+        _adminUserService = adminUserService;
+        _env = env;
     }
 
     /// <summary>
@@ -41,6 +59,7 @@ public class AdminController : BaseApiController
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> ResetUserPassword(int userId, [FromBody] ResetPasswordRequest request)
     {
+<<<<<<< HEAD
         // Tìm người dùng theo ID
         var user = await _context.Users.FindAsync(userId);
         
@@ -66,6 +85,24 @@ public class AdminController : BaseApiController
             userId = user.UserId,
             email = user.Email
         }, "Password reset successful");
+=======
+        try
+        {
+            // Use AdminUserService to perform safe reset (hashing handled there)
+            var performerId = int.TryParse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, out var id) ? id : (int?)null;
+            var result = await _adminUserService.ResetUserPasswordAsync(userId, performerId);
+            return Ok(new { message = result.Message, temporaryPassword = result.TemporaryPassword });
+        }
+        catch (ArgumentException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error resetting password for user {UserId}", userId);
+            return StatusCode(500, new { message = "An error occurred" });
+        }
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
     }
 
     /// <summary>
@@ -76,6 +113,7 @@ public class AdminController : BaseApiController
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> ResetAllAdminPasswords()
     {
+<<<<<<< HEAD
         // Mật khẩu mặc định
         const string defaultPassword = "Admin123!@#";
 
@@ -86,11 +124,14 @@ public class AdminController : BaseApiController
 
         // Cập nhật mật khẩu cho từng tài khoản Admin
         foreach (var user in adminUsers)
+=======
+        if (!_env.IsDevelopment())
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
         {
-            user.PasswordHash = defaultPassword;
-            user.UpdatedAt = DateTime.UtcNow;
+            return BadRequest(new { success = false, message = "Seeding/resetting all admin passwords is allowed only in Development environment." });
         }
 
+<<<<<<< HEAD
         // Lưu tất cả thay đổi vào cơ sở dữ liệu
         await _context.SaveChangesAsync();
 
@@ -103,6 +144,26 @@ public class AdminController : BaseApiController
             defaultPassword = defaultPassword,
             affectedUsers = adminUsers.Select(u => new { u.UserId, u.Email, u.FullName })
         }, $"Reset {adminUsers.Count} admin passwords to default");
+=======
+        const string defaultPassword = "Admin123!@#";
+
+        try
+        {
+            var performerId = int.TryParse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, out var id) ? id : (int?)null;
+            var count = await _adminUserService.ResetAllAdminPasswordsAsync(defaultPassword, performerId);
+            return Ok(new
+            {
+                message = $"Reset {count} admin passwords to default",
+                defaultPassword = defaultPassword,
+                affectedCount = count
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error resetting all admin passwords");
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
     }
 }
 

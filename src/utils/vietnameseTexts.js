@@ -75,7 +75,7 @@ export const VIETNAMESE_TEXTS = {
     stationManagement: "Quản lý trạm sạc",
     userManagement: "Quản lý người dùng",
     analytics: "Phân tích",
-    advancedAnalytics: "Phân tích nâng cao",
+    advancedAnalytics: "Phân tích tổng quan",
     settings: "Cài đặt",
     welcome: "Chào mừng",
     home: "Trang chủ",

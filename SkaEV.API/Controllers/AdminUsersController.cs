@@ -215,12 +215,19 @@ public class AdminUsersController : BaseApiController
     public async Task<IActionResult> ResetUserPassword(int userId)
     {
         var existingUser = await _adminUserService.GetUserDetailAsync(userId);
-
         if (existingUser == null)
             return NotFoundResponse("User not found");
-
-        var result = await _adminUserService.ResetUserPasswordAsync(userId);
-        return OkResponse(result);
+        try
+        {
+            var performerId = GetUserId();
+            var result = await _adminUserService.ResetUserPasswordAsync(userId, performerId);
+            return OkResponse(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error resetting password for user {UserId}", userId);
+            return StatusCode(500, new { message = "An error occurred" });
+        }
     }
 
     /// <summary>
@@ -284,6 +291,223 @@ public class AdminUsersController : BaseApiController
     {
         var history = await _adminUserService.GetUserPaymentHistoryAsync(userId, page, pageSize);
         return OkResponse(new { data = history });
+    }
+
+    /// <summary>
+    /// Get user vehicles
+    /// </summary>
+    [HttpGet("{userId}/vehicles")]
+    [ProducesResponseType(typeof(IEnumerable<AdminUserVehicleDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetUserVehicles(int userId)
+    {
+        try
+        {
+            var vehicles = await _adminUserService.GetUserVehiclesAsync(userId);
+            return Ok(new { success = true, data = vehicles });
+        }
+        catch (ArgumentException ex)
+        {
+            _logger.LogWarning(ex, "User not found when fetching vehicles {UserId}", userId);
+            return NotFound(new { success = false, message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting user vehicles {UserId}", userId);
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
+    }
+
+    /// <summary>
+    /// Get station assignments for staff accounts
+    /// </summary>
+    [HttpGet("{userId}/staff/stations")]
+    [ProducesResponseType(typeof(IEnumerable<AdminStaffStationDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetStaffStations(int userId)
+    {
+        try
+        {
+            var user = await _adminUserService.GetUserDetailAsync(userId);
+
+            if (user == null)
+                return NotFound(new { success = false, message = "User not found" });
+
+            if (!string.Equals(user.Role, "staff", StringComparison.OrdinalIgnoreCase))
+                return BadRequest(new { success = false, message = "Chỉ áp dụng cho tài khoản nhân viên" });
+
+            var stations = await _adminUserService.GetStaffStationAssignmentsAsync(userId);
+            return Ok(new { success = true, data = stations });
+        }
+        catch (ArgumentException ex)
+        {
+            return NotFound(new { success = false, message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting staff stations {UserId}", userId);
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
+    }
+
+    /// <summary>
+    /// Get upcoming schedule for staff accounts
+    /// </summary>
+    [HttpGet("{userId}/staff/schedule")]
+    [ProducesResponseType(typeof(IEnumerable<AdminStaffScheduleDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetStaffSchedule(int userId)
+    {
+        try
+        {
+            var user = await _adminUserService.GetUserDetailAsync(userId);
+
+            if (user == null)
+                return NotFound(new { success = false, message = "User not found" });
+
+            if (!string.Equals(user.Role, "staff", StringComparison.OrdinalIgnoreCase))
+                return BadRequest(new { success = false, message = "Chỉ áp dụng cho tài khoản nhân viên" });
+
+            var schedule = await _adminUserService.GetStaffScheduleAsync(userId);
+            return Ok(new { success = true, data = schedule });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting staff schedule {UserId}", userId);
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
+    }
+
+    /// <summary>
+    /// Get recent activities (incidents, maintenance) for staff accounts
+    /// </summary>
+    [HttpGet("{userId}/staff/activities")]
+    [ProducesResponseType(typeof(IEnumerable<AdminStaffActivityDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetStaffActivities(int userId, [FromQuery] int limit = 25)
+    {
+        try
+        {
+            var user = await _adminUserService.GetUserDetailAsync(userId);
+
+            if (user == null)
+                return NotFound(new { success = false, message = "User not found" });
+
+            if (!string.Equals(user.Role, "staff", StringComparison.OrdinalIgnoreCase))
+                return BadRequest(new { success = false, message = "Chỉ áp dụng cho tài khoản nhân viên" });
+
+            var activities = await _adminUserService.GetStaffActivitiesAsync(userId, limit);
+            return Ok(new { success = true, data = activities });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting staff activities {UserId}", userId);
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
+    }
+
+    /// <summary>
+    /// Get overview metrics for admin account
+    /// </summary>
+    [HttpGet("{userId}/admin/overview")]
+    [ProducesResponseType(typeof(AdminOverviewDto), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAdminOverview(int userId)
+    {
+        try
+        {
+            var user = await _adminUserService.GetUserDetailAsync(userId);
+
+            if (user == null)
+                return NotFound(new { success = false, message = "User not found" });
+
+            if (!string.Equals(user.Role, "admin", StringComparison.OrdinalIgnoreCase))
+                return BadRequest(new { success = false, message = "Chỉ áp dụng cho tài khoản quản trị" });
+
+            var overview = await _adminUserService.GetAdminOverviewAsync(userId);
+            return Ok(new { success = true, data = overview });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting admin overview {UserId}", userId);
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
+    }
+
+    /// <summary>
+    /// Get recent system activities associated with admin account
+    /// </summary>
+    [HttpGet("{userId}/admin/activity-log")]
+    [ProducesResponseType(typeof(IEnumerable<AdminActivityLogDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAdminActivityLog(int userId, [FromQuery] int limit = 25)
+    {
+        try
+        {
+            var user = await _adminUserService.GetUserDetailAsync(userId);
+
+            if (user == null)
+                return NotFound(new { success = false, message = "User not found" });
+
+            if (!string.Equals(user.Role, "admin", StringComparison.OrdinalIgnoreCase))
+                return BadRequest(new { success = false, message = "Chỉ áp dụng cho tài khoản quản trị" });
+
+            var logs = await _adminUserService.GetAdminActivityLogAsync(userId, limit);
+            return Ok(new { success = true, data = logs });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting admin activity log {UserId}", userId);
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
+    }
+
+    /// <summary>
+    /// Get permission matrix for admin account
+    /// </summary>
+    [HttpGet("{userId}/admin/permissions")]
+    [ProducesResponseType(typeof(IEnumerable<AdminPermissionDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAdminPermissions(int userId)
+    {
+        try
+        {
+            var user = await _adminUserService.GetUserDetailAsync(userId);
+
+            if (user == null)
+                return NotFound(new { success = false, message = "User not found" });
+
+            if (!string.Equals(user.Role, "admin", StringComparison.OrdinalIgnoreCase))
+                return BadRequest(new { success = false, message = "Chỉ áp dụng cho tài khoản quản trị" });
+
+            var permissions = await _adminUserService.GetAdminPermissionsAsync(userId);
+            return Ok(new { success = true, data = permissions });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting admin permissions {UserId}", userId);
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
+    }
+
+    /// <summary>
+    /// Get audit log focused on security/high severity entries for admin account
+    /// </summary>
+    [HttpGet("{userId}/admin/audit-log")]
+    [ProducesResponseType(typeof(IEnumerable<AdminAuditLogDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAdminAuditLog(int userId, [FromQuery] int limit = 50)
+    {
+        try
+        {
+            var user = await _adminUserService.GetUserDetailAsync(userId);
+
+            if (user == null)
+                return NotFound(new { success = false, message = "User not found" });
+
+            if (!string.Equals(user.Role, "admin", StringComparison.OrdinalIgnoreCase))
+                return BadRequest(new { success = false, message = "Chỉ áp dụng cho tài khoản quản trị" });
+
+            var logs = await _adminUserService.GetAdminAuditLogAsync(userId, limit);
+            return Ok(new { success = true, data = logs });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting admin audit log {UserId}", userId);
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
     }
 
     // ==================== NOTIFICATIONS ====================

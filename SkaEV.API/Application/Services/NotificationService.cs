@@ -114,10 +114,11 @@ public class NotificationService : INotificationService
         if (notification == null)
             throw new ArgumentException("Notification not found");
 
-        _context.Notifications.Remove(notification);
+        // Soft-delete notification
+        notification.DeletedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
 
-        _logger.LogInformation("Deleted notification {NotificationId}", notificationId);
+        _logger.LogInformation("Soft-deleted notification {NotificationId}", notificationId);
     }
 
     /// <summary>
@@ -130,10 +131,16 @@ public class NotificationService : INotificationService
             .Where(n => n.UserId == userId && n.IsRead)
             .ToListAsync();
 
-        _context.Notifications.RemoveRange(notifications);
+        // Soft-delete read notifications in bulk
+        var now = DateTime.UtcNow;
+        foreach (var n in notifications)
+        {
+            n.DeletedAt = now;
+        }
+
         await _context.SaveChangesAsync();
 
-        _logger.LogInformation("Deleted {Count} read notifications for user {UserId}", notifications.Count, userId);
+        _logger.LogInformation("Soft-deleted {Count} read notifications for user {UserId}", notifications.Count, userId);
     }
 
     /// <summary>

@@ -17,6 +17,7 @@ public class Incident
     public string Description { get; set; } = string.Empty;
     public string? ResolutionNotes { get; set; }
     public int? AssignedToStaffId { get; set; }
+    public int? AssignedToTeamId { get; set; }
     public DateTime ReportedAt { get; set; } = DateTime.UtcNow;
     public DateTime? AcknowledgedAt { get; set; }
     public DateTime? ResolvedAt { get; set; }
@@ -30,5 +31,6 @@ public class Incident
     public ChargingSlot? ChargingSlot { get; set; }
     public User? ReportedByUser { get; set; }
     public User? AssignedToStaff { get; set; }
+    public MaintenanceTeam? AssignedToTeam { get; set; }
 }
 

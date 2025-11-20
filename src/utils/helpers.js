@@ -15,6 +15,14 @@ export const formatCurrency = (amount, currency = "VND") => {
 };
 
 /**
+ * Format currency or return N/A when value is missing/zero
+ */
+export const formatCurrencyOrNA = (amount, currency = "VND") => {
+  if (amount == null || Number(amount) === 0) return "N/A";
+  return formatCurrency(Number(amount), currency);
+};
+
+/**
  * Format date with Vietnamese locale
  */
 export const formatDate = (date, options = {}) => {

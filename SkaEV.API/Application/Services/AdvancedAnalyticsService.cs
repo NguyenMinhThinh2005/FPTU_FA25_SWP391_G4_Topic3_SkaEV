@@ -99,7 +99,7 @@ namespace SkaEV.API.Application.Services
 
             // Frequency analysis
             var firstBooking = userBookings.Where(b => b.ActualStartTime != null).Min(b => b.ActualStartTime);
-            var daysSinceFirst = firstBooking != null ? (DateTime.UtcNow - firstBooking.Value).TotalDays : 0;
+            var daysSinceFirst = firstBooking != null ? (DateTime.UtcNow - firstBooking!.Value).TotalDays : 0;
             var avgDaysBetweenBookings = daysSinceFirst / Math.Max(1, userBookings.Count - 1);
 
             // User category
@@ -293,7 +293,7 @@ namespace SkaEV.API.Application.Services
             var avgEnergy = userBookings.Average(b => b.Invoice?.TotalEnergyKwh ?? 0);
             var preferredHour = userBookings
                 .Where(b => b.ActualStartTime != null)
-                .GroupBy(b => b.ActualStartTime.Value.Hour)
+                .GroupBy(b => b.ActualStartTime!.Value.Hour)
                 .OrderByDescending(g => g.Count())
                 .FirstOrDefault()?.Key ?? 12;
 

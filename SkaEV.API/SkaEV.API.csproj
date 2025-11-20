@@ -32,4 +32,9 @@
     <PackageReference Include="VNPAY.NET" Version="2.1.0" />
   </ItemGroup>
 
+  <!-- Exclude tool projects/source files (like the sqlite-seeder) from the main API compile to avoid build collisions -->
+  <ItemGroup>
+    <Compile Remove="tools\**\*.cs" />
+  </ItemGroup>
+
 </Project>

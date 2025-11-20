@@ -31,15 +31,24 @@ public class InvoiceService : IInvoiceService
     /// <returns>Danh sách hóa đơn.</returns>
     public async Task<IEnumerable<InvoiceDto>> GetUserInvoicesAsync(int userId)
     {
+<<<<<<< HEAD
         var invoices = await _context.Invoices
+=======
+        var list = await _context.Invoices
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
             .Include(i => i.User)
             .Include(i => i.Booking)
                 .ThenInclude(b => b.ChargingStation)
             .Where(i => i.UserId == userId)
             .OrderByDescending(i => i.CreatedAt)
             .ToListAsync();
+<<<<<<< HEAD
         
         return invoices.Select(i => MapToDto(i)).ToList();
+=======
+
+        return list.Select(i => MapToDto(i)).ToList();
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
     }
 
     /// <summary>
@@ -91,12 +100,22 @@ public class InvoiceService : IInvoiceService
 
         if (invoice.PaymentStatus == "paid")
         {
+<<<<<<< HEAD
             _logger.LogInformation(
                 "Payment skipped for already settled invoice {InvoiceId} by staff {StaffId}",
                 invoiceId,
                 processedByUserId);
 
             return MapToDto(invoice);
+=======
+            var paymentMethod = await _context.PaymentMethods
+                .FirstOrDefaultAsync(pm => pm.PaymentMethodId == processDto.PaymentMethodId);
+
+            if (paymentMethod != null)
+            {
+                paymentMethodName = paymentMethod.Type ?? "Unknown";
+            }
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
         }
 
         if (processDto.Amount <= 0)
@@ -210,9 +229,12 @@ public class InvoiceService : IInvoiceService
         if (statusDto.Status == "paid" && invoice.PaidAt == null)
             invoice.PaidAt = DateTime.UtcNow;
 
+<<<<<<< HEAD
         if (statusDto.Status != "paid")
             invoice.PaidAt = null;
 
+=======
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
         invoice.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
@@ -263,13 +285,14 @@ public class InvoiceService : IInvoiceService
     /// <returns>Danh sách hóa đơn chưa thanh toán.</returns>
     public async Task<IEnumerable<InvoiceDto>> GetUnpaidInvoicesAsync()
     {
-        return await _context.Invoices
+        var list = await _context.Invoices
             .Include(i => i.User)
             .Include(i => i.Booking)
             .Where(i => i.PaymentStatus == "pending")
             .OrderByDescending(i => i.CreatedAt)
-            .Select(i => MapToDto(i))
             .ToListAsync();
+
+        return list.Select(i => MapToDto(i)).ToList();
     }
 
     /// <summary>

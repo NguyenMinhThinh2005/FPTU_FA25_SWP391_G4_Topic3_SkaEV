@@ -33,11 +33,12 @@ import {
   ListItemIcon,
   ListItemText,
   IconButton,
+  Tooltip,
 } from "@mui/material";
 import {
   LocationOn,
   ElectricCar,
-  Settings,
+  
   Add,
   Edit,
   Delete,
@@ -54,15 +55,20 @@ import {
 import { useNavigate } from "react-router-dom";
 import ConfirmDialog from "../../components/ui/ConfirmDialog";
 import useStationStore from "../../store/stationStore";
-import useBookingStore from "../../store/bookingStore";
 import useUserStore from "../../store/userStore";
-import { formatCurrency } from "../../utils/helpers";
+// helper functions not required in this component
 
 const StationManagement = () => {
   const navigate = useNavigate();
-  const { stations, addStation, updateStation, deleteStation, remoteDisableStation, remoteEnableStation } =
-    useStationStore();
-  const { bookings } = useBookingStore();
+  const {
+    stations,
+    addStation,
+    updateStation,
+    deleteStation,
+    remoteDisableStation,
+    remoteEnableStation,
+    fetchAdminStations
+  } = useStationStore();
   const { users, fetchUsers } = useUserStore();
   const [selectedStation, setSelectedStation] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -92,61 +98,90 @@ const StationManagement = () => {
   // Fetch users on component mount
   React.useEffect(() => {
     fetchUsers();
+    fetchAdminStations({ pageSize: 100 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  React.useEffect(() => {
+    if (!stations || stations.length === 0) {
+      fetchAdminStations({ pageSize: 100 });
+    }
+  }, [fetchAdminStations, stations]);
+
+  const lastUpdated = React.useMemo(() => new Date().toLocaleString(), []);
 
   // Get staff users for dropdown
   const staffUsers = React.useMemo(() => {
     return users.filter(u => u.role === "staff");
   }, [users]);
 
-  // Station analytics data
+  // Station analytics data (with deterministic fallbacks so UI never shows 0)
   const stationAnalytics = stations.map((station) => {
-    const stationBookings = bookings.filter(
-      (b) => b.stationId === station.id
+    const ports = station.charging?.totalPorts ?? 0;
+    const pricePerKwh = Number(
+      station.charging?.pricePerKwh ??
+      station.charging?.pricing?.acRate ??
+      station.basePricePerKwh ??
+      0
     );
-    const thisMonthBookings = stationBookings.filter((b) => {
-      const bookingDate = new Date(b.startTime);
-      const now = new Date();
-      return (
-        bookingDate.getMonth() === now.getMonth() &&
-        bookingDate.getFullYear() === now.getFullYear()
-      );
-    });
 
-    const revenue = thisMonthBookings.reduce((sum, b) => sum + b.cost, 0);
-    const totalPorts = station.charging.totalPorts || 0;
-    const availablePorts = station.charging.availablePorts || 0;
-    const utilization =
-      totalPorts > 0
-        ? ((totalPorts - availablePorts) / totalPorts) * 100
-        : 0;
-    const avgSessionTime =
-      stationBookings.length > 0
-        ? stationBookings.reduce((sum, b) => sum + (b.duration || 60), 0) /
-          stationBookings.length
-        : 0;
+    const monthlyRevenue = Number(
+      station.monthlyRevenue ?? station.revenue ?? 0
+    );
+
+    const monthlyBookings =
+      station.monthlyBookings ??
+      station.monthlyCompletedSessions ??
+      0;
+
+    const utilization = Number.isFinite(station.utilizationRate)
+      ? station.utilizationRate
+      : Number(station.utilization ?? 0);
+
+    const avgSessionTime = Number(
+      station.avgSessionTime ?? station.averageSessionDurationMinutes ?? 0
+    );
+
+    const todayRevenue = Number(station.todayRevenue ?? 0);
+    const todayCompletedSessions = station.todayCompletedSessions ?? 0;
 
     return {
       ...station,
-      monthlyRevenue: revenue,
-      monthlyBookings: thisMonthBookings.length,
-      utilization: utilization || 0,
-      avgSessionTime
+      monthlyRevenue,
+      monthlyBookings,
+      utilization,
+      avgSessionTime,
+      todayRevenue,
+      todayCompletedSessions,
+      charging: {
+        ...station.charging,
+        pricePerKwh,
+        pricing: {
+          ...(station.charging?.pricing || {}),
+          baseRate: station.charging?.pricing?.baseRate ?? pricePerKwh,
+          acRate: station.charging?.pricing?.acRate ?? pricePerKwh,
+          dcRate: station.charging?.pricing?.dcRate ?? pricePerKwh,
+          dcFastRate: station.charging?.pricing?.dcFastRate ?? pricePerKwh,
+        },
+        totalPorts: ports,
+      },
     };
   });
 
   const handleStationClick = (station) => {
+    const location = station.location ?? {};
+    const charging = station.charging ?? {};
+
     setSelectedStation(station);
     setStationForm({
       name: station.name,
-      address: station.location.address,
-      totalPorts: station.charging.totalPorts,
-      fastChargePorts: station.charging.fastChargePorts || 0,
-      standardPorts: station.charging.standardPorts || station.charging.totalPorts,
-      pricePerKwh: station.charging.pricePerKwh,
+      address: location.address ?? "",
+      totalPorts: charging.totalPorts ?? 0,
+      fastChargePorts: charging.fastChargePorts ?? 0,
+      standardPorts: charging.standardPorts ?? charging.totalPorts ?? 0,
+      pricePerKwh: charging.pricePerKwh ?? 0,
       status: station.status,
-      availableSlots: station.charging.availablePorts || station.charging.totalPorts,
+      availableSlots: charging.availablePorts ?? charging.totalPorts ?? 0,
       managerUserId: station.managerUserId || null,
     });
     setDialogOpen(true);
@@ -168,6 +203,8 @@ const StationManagement = () => {
     setDialogOpen(true);
     setErrors({});
   };
+
+  
 
   const handleDeleteClick = (station) => {
     setDeleteDialog({
@@ -212,20 +249,16 @@ const StationManagement = () => {
     if (!validateForm()) return;
 
     const stationData = {
-      name: stationForm.name,
-      location: {
-        address: stationForm.address
-      },
-      charging: {
-        totalPorts: parseInt(stationForm.totalPorts),
-        availablePorts: parseInt(stationForm.availableSlots),
-        fastChargePorts: parseInt(stationForm.fastChargePorts),
-        standardPorts: parseInt(stationForm.standardPorts),
-        pricePerKwh: parseFloat(stationForm.pricePerKwh)
-      },
+      stationName: stationForm.name,
+      address: stationForm.address,
       status: stationForm.status,
+      totalPorts: Number(stationForm.totalPorts) || 0,
+      fastChargePorts: Number(stationForm.fastChargePorts) || 0,
+      standardPorts: Number(stationForm.standardPorts) || 0,
+      pricePerKwh: Number(stationForm.pricePerKwh) || 0,
+      fastChargePowerKw: stationForm.fastChargePorts > 0 ? 120 : null,
+      standardChargePowerKw: stationForm.standardPorts > 0 ? 22 : null,
       managerUserId: stationForm.managerUserId || null,
-      lastUpdated: new Date().toISOString(),
     };
 
     try {
@@ -262,12 +295,6 @@ const StationManagement = () => {
     }
   };
 
-  const getUtilizationColor = (utilization) => {
-    if (utilization > 80) return "error";
-    if (utilization > 60) return "warning";
-    return "success";
-  };
-
   return (
     <Box>
       {/* Header */}
@@ -281,7 +308,7 @@ const StationManagement = () => {
       >
         <Box>
           <Typography variant="h4" fontWeight="bold" gutterBottom>
-            Quản lý trạm sạc ⚡
+            Quản lý trạm sạc 
           </Typography>
           <Typography variant="body1" color="text.secondary">
             Giám sát và quản lý mạng lưới trạm sạc xe điện của bạn
@@ -310,25 +337,31 @@ const StationManagement = () => {
           >
             Thêm trạm sạc
           </Button>
+          
         </Box>
       </Box>
 
       {/* Summary Cards */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} sm={6} md={3}>
+      <Grid container spacing={3} sx={{ mb: 4 }} alignItems="stretch">
+        <Grid item xs={12} sm={6} md={3} sx={{ display: 'flex' }}>
           <Card
             sx={{
               background: "linear-gradient(135deg, #1379FF 0%, #0D5FDD 100%)",
               color: "white",
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              minHeight: 120,
             }}
           >
-            <CardContent>
+            <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, justifyContent: 'space-between', height: '100%' }}>
               <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                <Avatar sx={{ bgcolor: "rgba(255,255,255,0.2)" }}>
+                <Avatar sx={{ bgcolor: "rgba(255,255,255,0.2)", width:48, height:48 }}>
                   <LocationOn />
                 </Avatar>
                 <Box>
-                  <Typography variant="h4" fontWeight="bold">
+                  <Typography variant="h5" fontWeight="700">
                     {filteredStations.length}
                   </Typography>
                   <Typography variant="body2" sx={{ opacity: 0.9 }}>
@@ -340,24 +373,26 @@ const StationManagement = () => {
           </Card>
         </Grid>
 
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={3} sx={{ display: 'flex' }}>
           <Card
             sx={{
               background: "linear-gradient(135deg, #10B981 0%, #059669 100%)",
               color: "white",
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              minHeight: 120,
             }}
           >
-            <CardContent>
+            <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, justifyContent: 'space-between', height: '100%' }}>
               <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                <Avatar sx={{ bgcolor: "rgba(255,255,255,0.2)" }}>
+                <Avatar sx={{ bgcolor: "rgba(255,255,255,0.2)", width:48, height:48 }}>
                   <CheckCircle />
                 </Avatar>
                 <Box>
-                  <Typography variant="h4" fontWeight="bold">
-                    {
-                      filteredStations.filter((s) => s.status === "active")
-                        .length
-                    }
+                  <Typography variant="h5" fontWeight="700">
+                    {filteredStations.filter((s) => s.status === "active").length}
                   </Typography>
                   <Typography variant="body2" sx={{ opacity: 0.9 }}>
                     Trạm đang hoạt động
@@ -368,24 +403,30 @@ const StationManagement = () => {
           </Card>
         </Grid>
 
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={3} sx={{ display: 'flex' }}>
           <Card
             sx={{
               background: "linear-gradient(135deg, #F59E0B 0%, #D97706 100%)",
               color: "white",
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              minHeight: 120,
             }}
           >
-            <CardContent>
+            <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, justifyContent: 'space-between', height: '100%' }}>
               <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                <Avatar sx={{ bgcolor: "rgba(255,255,255,0.2)" }}>
+                <Avatar sx={{ bgcolor: "rgba(255,255,255,0.2)", width:48, height:48 }}>
                   <ElectricCar />
                 </Avatar>
                 <Box>
-                  <Typography variant="h4" fontWeight="bold">
-                    {filteredStations.reduce(
-                      (sum, s) => sum + (s.charging.availablePorts || 0),
-                      0
-                    )}
+                  <Typography variant="h5" fontWeight="700">
+                    {filteredStations.reduce((sum, s) => {
+                      const charging = s.charging ?? {};
+                      const availablePorts = charging.availablePorts ?? charging.totalPorts ?? 0;
+                      return sum + (Number.isFinite(availablePorts) ? availablePorts : 0);
+                    }, 0)}
                   </Typography>
                   <Typography variant="body2" sx={{ opacity: 0.9 }}>
                     Tổng số cổng khả dụng hiện tại
@@ -396,30 +437,33 @@ const StationManagement = () => {
           </Card>
         </Grid>
 
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={3} sx={{ display: 'flex' }}>
           <Card
             sx={{
               background: "linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%)",
               color: "white",
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              minHeight: 120,
             }}
           >
-            <CardContent>
+            <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, justifyContent: 'space-between', height: '100%' }}>
               <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                <Avatar sx={{ bgcolor: "rgba(255,255,255,0.2)" }}>
-                  <TrendingUp />
+                <Avatar sx={{ bgcolor: "rgba(255,255,255,0.2)", width:48, height:48 }}>
+                  <Battery80 />
                 </Avatar>
                 <Box>
-                  <Typography variant="h4" fontWeight="bold">
-                    {formatCurrency(
-                      filteredStations.reduce(
-                        (sum, s) => sum + s.monthlyRevenue,
-                        0
-                      )
-                    )}
-                  </Typography>
+                  <Tooltip title={`Cập nhật: ${lastUpdated}`} arrow>
+                    <Typography variant="h5" fontWeight="700" aria-label="active-sessions-count">
+                      {new Intl.NumberFormat().format(filteredStations.reduce((sum, s) => sum + (s.activeSessions ?? 0), 0))}
+                    </Typography>
+                  </Tooltip>
                   <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                    Doanh thu hôm nay
+                    Phiên sạc đang hoạt động
                   </Typography>
+                  {/* Removed visible "last updated" line per request */}
                 </Box>
               </Box>
             </CardContent>
@@ -431,7 +475,7 @@ const StationManagement = () => {
       <Card>
         <CardContent>
           <Typography variant="h6" fontWeight="bold" gutterBottom>
-            Tổng quan hiệu suất trạm sạc
+            Tổng quan trạm sạc
           </Typography>
           <TableContainer>
             <Table>
@@ -440,26 +484,35 @@ const StationManagement = () => {
                   <TableCell width="22%">Trạm sạc</TableCell>
                   <TableCell align="center" width="8%">Trạng thái</TableCell>
                   <TableCell align="center" width="10%">Cổng</TableCell>
-                  <TableCell align="center" width="12%">Sử dụng</TableCell>
                   <TableCell width="18%">Nhân viên quản lý</TableCell>
-                  <TableCell align="center" width="12%">Doanh thu tháng</TableCell>
-                  <TableCell align="center" width="8%">Phiên</TableCell>
-                  <TableCell align="center" width="8%">Phiên TB</TableCell>
+                  {/* Removed columns: Doanh thu tháng, Phiên, Thời gian/Phiên per design */}
                   <TableCell align="center" width="8%">Thao tác</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                   {filteredStations.map((station) => {
-                    const managerName = station.manager?.name ?? station.managerName ?? null;
-                    const managerEmail = station.manager?.email ?? station.managerEmail ?? null;
-                    const managerPhone = station.manager?.phone ?? station.managerPhoneNumber ?? null;
-                    const managerId = station.manager?.userId ?? station.managerUserId ?? null;
+                    const location = station.location ?? {};
+                    const charging = station.charging ?? {};
+
+                    // Prefer explicit manager info from API DTO; fall back to user store lookup when missing
+                    const managerFromUsers = users.find(
+                      (u) => u.userId === (station.managerUserId ?? station.manager?.userId)
+                    );
+
+                    const managerName = station.managerName ?? managerFromUsers?.fullName ?? station.manager?.name ?? null;
+                    const managerEmail = station.managerEmail ?? managerFromUsers?.email ?? station.manager?.email ?? null;
+                    const managerPhone = station.managerPhoneNumber ?? managerFromUsers?.phoneNumber ?? station.manager?.phone ?? null;
+                    const managerId = station.managerUserId ?? station.manager?.userId ?? managerFromUsers?.userId ?? null;
 
                     return (
                     <TableRow key={station.id} hover>
                     <TableCell>
                       <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 2 }}
+                        sx={{ display: "flex", alignItems: "center", gap: 2, cursor: 'pointer' }}
+                        onClick={() => navigate(`/admin/stations/${station.id}/analytics`)}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/admin/stations/${station.id}/analytics`); }}
                       >
                         <Avatar
                           sx={{
@@ -475,7 +528,7 @@ const StationManagement = () => {
                             {station.name}
                           </Typography>
                           <Typography variant="caption" color="text.secondary">
-                            {station.location.address}
+                            {location.address || "Địa chỉ chưa cập nhật"}
                           </Typography>
                         </Box>
                       </Box>
@@ -489,26 +542,14 @@ const StationManagement = () => {
                     </TableCell>
                     <TableCell align="center">
                       <Typography variant="body2">
-                        {station.charging.availablePorts}/
-                        {station.charging.totalPorts}
+                        {(Number.isFinite(charging.availablePorts) ? charging.availablePorts : 0)}/
+                        {(Number.isFinite(charging.totalPorts) ? charging.totalPorts : Math.max(charging.availablePorts ?? 0, 0))}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
                         có sẵn
                       </Typography>
                     </TableCell>
-                    <TableCell align="center">
-                      <Box sx={{ minWidth: 80 }}>
-                        <LinearProgress
-                          variant="determinate"
-                          value={station.utilization}
-                          color={getUtilizationColor(station.utilization)}
-                          sx={{ mb: 0.5 }}
-                        />
-                        <Typography variant="caption">
-                          {station.utilization.toFixed(0)}%
-                        </Typography>
-                      </Box>
-                    </TableCell>
+                    {/* Removed 'Sử dụng' column per design - utilization removed from table view */}
                       <TableCell>
                         {managerName || managerEmail || managerPhone ? (
                           <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
@@ -538,19 +579,7 @@ const StationManagement = () => {
                           <Chip label="Chưa phân công" size="small" variant="outlined" color="default" />
                         )}
                       </TableCell>
-                    <TableCell align="center">
-                      <Typography variant="body2" fontWeight="medium">
-                        {formatCurrency(station.monthlyRevenue)}
-                      </Typography>
-                    </TableCell>
-                    <TableCell align="center">
-                      {station.monthlyBookings}
-                    </TableCell>
-                    <TableCell align="center">
-                      <Typography variant="body2">
-                        {station.avgSessionTime.toFixed(0)}m
-                      </Typography>
-                    </TableCell>
+                    {/* Doanh thu tháng / Phiên / Thời gian/Phiên removed per design */}
                     <TableCell align="center">
                       <Box sx={{ display: "flex", gap: 0.5, justifyContent: "center" }}>
                         <IconButton
@@ -762,8 +791,8 @@ const StationManagement = () => {
       {/* Delete Confirmation Dialog */}
       <ConfirmDialog
         open={deleteDialog.open}
-        title="Xác nhận xóa"
-        message={`Bạn có chắc chắn muốn xóa trạm sạc "${deleteDialog.stationName}"? Hành động này không thể hoàn tác.`}
+        title="Xác nhận xóa (lưu trữ)"
+        message={`Hành động này sẽ lưu trữ trạm sạc "${deleteDialog.stationName}" (soft-delete). Trạm có thể được khôi phục từ trang quản trị nếu cần.`}
         onConfirm={handleDeleteConfirm}
         onCancel={() => setDeleteDialog({ open: false, stationId: null, stationName: "" })}
       />

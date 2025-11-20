@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Data.SqlClient;
@@ -5,11 +6,18 @@ using SkaEV.API.Infrastructure.Data;
 
 namespace SkaEV.API.Controllers;
 
+<<<<<<< HEAD
 /// <summary>
 /// Controller dùng để chẩn đoán hệ thống.
 /// Cung cấp thông tin kết nối database và kiểm tra dữ liệu thô.
 /// </summary>
 public class DiagnosticController : BaseApiController
+=======
+[ApiController]
+[Route("api/[controller]")]
+[Authorize(Roles = "admin")]
+public class DiagnosticController : ControllerBase
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
 {
     private readonly SkaEVDbContext _context;
 

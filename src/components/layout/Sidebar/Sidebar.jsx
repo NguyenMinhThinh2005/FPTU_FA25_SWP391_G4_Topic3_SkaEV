@@ -37,16 +37,8 @@ const Sidebar = ({ open, onClose }) => {
     switch (user?.role) {
       case "admin":
         return [
-          {
-            text: getText("nav.dashboard"),
-            icon: <Dashboard />,
-            path: "/admin/dashboard",
-          },
-          {
-            text: getText("nav.advancedAnalytics"),
-            icon: <Analytics />,
-            path: "/admin/analytics",
-          },
+          // Reordered for admin: station management first, then users,
+          // analytics, and incidents as requested by the product owner.
           {
             text: getText("nav.stationManagement"),
             icon: <LocationOn />,
@@ -56,6 +48,11 @@ const Sidebar = ({ open, onClose }) => {
             text: getText("nav.userManagement"),
             icon: <People />,
             path: "/admin/users",
+          },
+          {
+            text: getText("nav.advancedAnalytics"),
+            icon: <Analytics />,
+            path: "/admin/analytics",
           },
           {
             text: "Quản lý báo cáo sự cố",
@@ -116,6 +113,10 @@ const Sidebar = ({ open, onClose }) => {
   };
 
   const navigationItems = getNavigationItems();
+  // Hide admin dashboard menu entry by default per admin UX request
+  const filteredNavigationItems = navigationItems.filter(
+    (item) => !(user?.role === "admin" && item.path === "/admin/dashboard")
+  );
 
   const handleNavigation = (path) => {
     navigate(path);
@@ -318,7 +319,7 @@ const Sidebar = ({ open, onClose }) => {
         ) : (
           // For other roles (admin, staff)
           <>
-            {navigationItems.map((item) => (
+            {filteredNavigationItems.map((item) => (
               <ListItem key={item.text} disablePadding sx={{ mb: 0.5 }}>
                 <ListItemButton
                   onClick={() => handleNavigation(item.path)}

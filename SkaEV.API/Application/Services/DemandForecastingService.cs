@@ -122,7 +122,7 @@ namespace SkaEV.API.Application.Services
             var historicalData = await _context.Bookings
                 .Where(b => b.StationId == stationId &&
                            b.ActualStartTime != null &&
-                           b.ActualStartTime.Value.DayOfWeek == dayOfWeek &&
+                           b.ActualStartTime!.Value.DayOfWeek == dayOfWeek &&
                            b.ActualStartTime >= date.AddDays(-60) &&
                            b.ActualStartTime < date &&
                            b.DeletedAt == null)

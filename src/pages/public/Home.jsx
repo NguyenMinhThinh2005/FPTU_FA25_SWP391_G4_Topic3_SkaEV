@@ -116,7 +116,7 @@ const HomePage = () => {
     if (isAuthenticated) {
       // Redirect to appropriate dashboard/main page
       const redirectPath = {
-        admin: "/admin/dashboard",
+        admin: "/admin/stations", // Admin goes to Station Management
         staff: "/staff/dashboard",
         customer: "/customer/charging", // Customer goes to charging flow
       }[user?.role];

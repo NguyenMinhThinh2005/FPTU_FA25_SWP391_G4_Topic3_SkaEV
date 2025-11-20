@@ -13,6 +13,7 @@ public class Notification
     public bool IsRead { get; set; } = false;
     public int? RelatedBookingId { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? DeletedAt { get; set; }
 
     // Navigation properties
     public User User { get; set; } = null!;

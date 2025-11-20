@@ -41,9 +41,23 @@ public class DemandForecastingController : BaseApiController
         var start = startDate ?? DateTime.UtcNow;
         var end = endDate ?? DateTime.UtcNow.AddDays(7);
 
+<<<<<<< HEAD
         var forecast = await _forecastingService.ForecastDemandAsync(stationId, start, end);
         return OkResponse(forecast);
     }
+=======
+        /// <summary>
+        /// Get demand forecast for a specific station
+        /// </summary>
+        [HttpGet("station/{stationId}")]
+        [Authorize(Roles = "admin,staff")]
+        public async Task<IActionResult> GetStationForecast(int stationId, [FromQuery] DateTime? startDate, [FromQuery] DateTime? endDate)
+        {
+            try
+            {
+                var start = startDate ?? DateTime.UtcNow;
+                var end = endDate ?? DateTime.UtcNow.AddDays(7);
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
 
     /// <summary>
     /// Dự đoán các giờ cao điểm cho một trạm vào một ngày cụ thể.
@@ -61,6 +75,7 @@ public class DemandForecastingController : BaseApiController
         return OkResponse(predictions);
     }
 
+<<<<<<< HEAD
     /// <summary>
     /// Lấy điểm số nhu cầu (Demand Scores) cho tất cả các trạm.
     /// Điểm số này phản ánh mức độ "hot" của trạm.
@@ -73,5 +88,43 @@ public class DemandForecastingController : BaseApiController
     {
         var scores = await _forecastingService.GetStationDemandScoresAsync();
         return OkResponse(scores);
+=======
+        /// <summary>
+        /// Predict peak hours for a station on a given date
+        /// </summary>
+        [HttpGet("station/{stationId}/peak-hours")]
+        [Authorize(Roles = "admin,staff")]
+        public async Task<IActionResult> GetPeakHoursPrediction(int stationId, [FromQuery] DateTime? date)
+        {
+            try
+            {
+                var targetDate = date ?? DateTime.UtcNow;
+                var predictions = await _forecastingService.PredictPeakHoursAsync(stationId, targetDate);
+                return Ok(predictions);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Error predicting peak hours", error = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Get demand scores for all stations
+        /// </summary>
+        [HttpGet("demand-scores")]
+        [Authorize(Roles = "admin,staff")]
+        public async Task<IActionResult> GetDemandScores()
+        {
+            try
+            {
+                var scores = await _forecastingService.GetStationDemandScoresAsync();
+                return Ok(scores);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Error calculating demand scores", error = ex.Message });
+            }
+        }
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
     }
 }

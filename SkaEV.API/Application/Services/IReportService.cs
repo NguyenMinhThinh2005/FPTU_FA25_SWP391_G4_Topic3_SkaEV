@@ -23,6 +23,9 @@ public interface IReportService
     Task<IEnumerable<object>> GetSystemHealthAsync();
     Task<IEnumerable<object>> GetUserGrowthAsync(string? dateRange = "last30days");
 
+    // Revenue by connector type (e.g. CCS2, Type2) for a station or whole system
+    Task<IEnumerable<SkaEV.API.Application.DTOs.Reports.ConnectorRevenueDto>> GetRevenueByConnectorAsync(int? stationId = null, DateTime? startDate = null, DateTime? endDate = null);
+
     // Station-Specific Detailed Analytics
     Task<StationDetailedAnalyticsDto> GetStationDetailedAnalyticsAsync(int stationId, DateTime? startDate = null, DateTime? endDate = null);
     Task<List<DailyAnalyticsDto>> GetStationDailyAnalyticsAsync(int stationId, DateTime? startDate = null, DateTime? endDate = null);

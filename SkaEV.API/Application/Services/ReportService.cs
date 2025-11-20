@@ -12,10 +12,12 @@ namespace SkaEV.API.Application.Services;
 public class ReportService : IReportService
 {
     private readonly SkaEVDbContext _context;
+    private readonly ILogger<ReportService> _logger;
 
-    public ReportService(SkaEVDbContext context)
+    public ReportService(SkaEVDbContext context, ILogger<ReportService> logger)
     {
         _context = context;
+        _logger = logger;
     }
 
     #region Customer Reports
@@ -230,27 +232,96 @@ public class ReportService : IReportService
     }
 
     /// <summary>
+<<<<<<< HEAD
     /// Lấy báo cáo mức độ sử dụng trạm sạc (Admin).
     /// </summary>
     /// <param name="stationId">ID trạm sạc (tùy chọn).</param>
     /// <param name="year">Năm (tùy chọn).</param>
     /// <param name="month">Tháng (tùy chọn).</param>
     /// <returns>Danh sách báo cáo sử dụng.</returns>
+=======
+    /// Aggregate revenue by connector type (connector type comes from ChargingSlot.ConnectorType)
+    /// Filters by station and optional date range (invoice.CreatedAt)
+    /// </summary>
+    public async Task<IEnumerable<SkaEV.API.Application.DTOs.Reports.ConnectorRevenueDto>> GetRevenueByConnectorAsync(int? stationId = null, DateTime? startDate = null, DateTime? endDate = null)
+    {
+        try
+        {
+            // Default range: last 30 days
+            endDate ??= DateTime.UtcNow;
+            startDate ??= endDate.Value.AddDays(-30);
+
+            var query = from invoice in _context.Invoices
+                        join booking in _context.Bookings on invoice.BookingId equals booking.BookingId
+                        join slot in _context.ChargingSlots on booking.SlotId equals slot.SlotId
+                        where invoice.PaymentStatus == "paid"
+                        select new { invoice, booking, slot };
+
+            if (stationId.HasValue)
+                query = query.Where(x => x.booking.StationId == stationId.Value);
+
+            if (startDate.HasValue)
+                query = query.Where(x => x.invoice.CreatedAt >= startDate.Value);
+
+            if (endDate.HasValue)
+                query = query.Where(x => x.invoice.CreatedAt <= endDate.Value);
+
+            var data = await query.ToListAsync();
+
+            var grouped = data
+                .GroupBy(x => string.IsNullOrWhiteSpace(x.slot.ConnectorType) ? "unknown" : x.slot.ConnectorType)
+                .Select(g => new SkaEV.API.Application.DTOs.Reports.ConnectorRevenueDto
+                {
+                    ConnectorType = g.Key,
+                    TotalRevenue = g.Sum(x => x.invoice.TotalAmount),
+                    TotalEnergyKwh = g.Sum(x => x.invoice.TotalEnergyKwh),
+                    TotalTransactions = g.Count()
+                })
+                .OrderByDescending(r => r.TotalRevenue)
+                .ToList();
+
+            return grouped;
+        }
+        catch
+        {
+            return new List<SkaEV.API.Application.DTOs.Reports.ConnectorRevenueDto>();
+        }
+    }
+
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
     public async Task<IEnumerable<UsageReportDto>> GetUsageReportsAsync(int? stationId = null, int? year = null, int? month = null)
     {
         // Sử dụng kết nối SQL trực tiếp để bypass EF Core và tối ưu hiệu năng cho báo cáo phức tạp
         try
         {
-            using var connection = new Microsoft.Data.SqlClient.SqlConnection("Server=ADMIN-PC\\MSSQLSERVER01;Database=SkaEV_DB;TrustServerCertificate=True;Integrated Security=True;");
+            // Use the application's configured DB connection string to avoid hardcoding
+            var connectionString = _context.Database.GetDbConnection().ConnectionString;
+            using var connection = new Microsoft.Data.SqlClient.SqlConnection(connectionString);
             await connection.OpenAsync();
 
             using var command = connection.CreateCommand();
 
-            var sql = "SELECT station_id, station_name, year, month, total_bookings, completed_sessions, cancelled_sessions, no_show_sessions, total_usage_minutes, avg_session_duration_minutes, peak_usage_hour, utilization_rate_percent FROM v_admin_usage_reports WHERE year IS NOT NULL";
+            // Use explicit aliases matching DTO/property names to avoid any schema casing/order issues
+            var sql = new StringBuilder();
+            sql.AppendLine("SELECT\n");
+            sql.AppendLine("    StationId = station_id,\n");
+            sql.AppendLine("    StationName = station_name,\n");
+            sql.AppendLine("    Year = year,\n");
+            sql.AppendLine("    Month = month,\n");
+            sql.AppendLine("    TotalBookings = total_bookings,\n");
+            sql.AppendLine("    CompletedSessions = completed_sessions,\n");
+            sql.AppendLine("    CancelledSessions = cancelled_sessions,\n");
+            sql.AppendLine("    NoShowSessions = no_show_sessions,\n");
+            sql.AppendLine("    TotalUsageMinutes = total_usage_minutes,\n");
+            sql.AppendLine("    AvgSessionDurationMinutes = avg_session_duration_minutes,\n");
+            sql.AppendLine("    PeakUsageHour = peak_usage_hour,\n");
+            sql.AppendLine("    UtilizationRatePercent = utilization_rate_percent\n");
+            sql.AppendLine("FROM v_admin_usage_reports\n");
+            sql.AppendLine("WHERE year IS NOT NULL");
 
             if (stationId.HasValue)
             {
-                sql += " AND station_id = @stationId";
+                sql.AppendLine(" AND station_id = @stationId");
                 var param = command.CreateParameter();
                 param.ParameterName = "@stationId";
                 param.Value = stationId.Value;
@@ -258,7 +329,7 @@ public class ReportService : IReportService
             }
             if (year.HasValue)
             {
-                sql += " AND year = @year";
+                sql.AppendLine(" AND year = @year");
                 var param = command.CreateParameter();
                 param.ParameterName = "@year";
                 param.Value = year.Value;
@@ -266,15 +337,15 @@ public class ReportService : IReportService
             }
             if (month.HasValue)
             {
-                sql += " AND month = @month";
+                sql.AppendLine(" AND month = @month");
                 var param = command.CreateParameter();
                 param.ParameterName = "@month";
                 param.Value = month.Value;
                 command.Parameters.Add(param);
             }
 
-            sql += " ORDER BY total_bookings DESC";
-            command.CommandText = sql;
+            sql.AppendLine("ORDER BY total_bookings DESC");
+            command.CommandText = sql.ToString();
 
             var results = new List<UsageReportDto>();
             using var reader = await command.ExecuteReaderAsync();
@@ -284,14 +355,14 @@ public class ReportService : IReportService
                 results.Add(new UsageReportDto
                 {
                     StationId = reader.GetInt32(0),
-                    StationName = reader.IsDBNull(1) ? "" : reader.GetString(1),
+                    StationName = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
                     Year = reader.IsDBNull(2) ? null : reader.GetInt32(2),
                     Month = reader.IsDBNull(3) ? null : reader.GetInt32(3),
-                    TotalBookings = reader.GetInt32(4),
-                    CompletedSessions = reader.GetInt32(5),
-                    CancelledSessions = reader.GetInt32(6),
-                    NoShowSessions = reader.GetInt32(7),
-                    TotalUsageMinutes = reader.GetInt32(8),
+                    TotalBookings = reader.IsDBNull(4) ? 0 : reader.GetInt32(4),
+                    CompletedSessions = reader.IsDBNull(5) ? 0 : reader.GetInt32(5),
+                    CancelledSessions = reader.IsDBNull(6) ? 0 : reader.GetInt32(6),
+                    NoShowSessions = reader.IsDBNull(7) ? 0 : reader.GetInt32(7),
+                    TotalUsageMinutes = reader.IsDBNull(8) ? 0 : reader.GetInt32(8),
                     AvgSessionDurationMinutes = reader.IsDBNull(9) ? null : reader.GetInt32(9),
                     PeakUsageHour = reader.IsDBNull(10) ? null : reader.GetInt32(10),
                     UtilizationRatePercent = reader.IsDBNull(11) ? null : reader.GetDecimal(11)
@@ -301,9 +372,9 @@ public class ReportService : IReportService
             if (results.Count > 0)
                 return results;
         }
-        catch
+        catch (Exception ex)
         {
-            // If fails, return empty
+            _logger?.LogError(ex, "Error reading usage reports from view v_admin_usage_reports");
             return new List<UsageReportDto>();
         }
 

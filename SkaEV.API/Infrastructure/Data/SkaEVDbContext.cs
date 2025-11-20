@@ -34,6 +34,7 @@ public class SkaEVDbContext : DbContext
     public DbSet<Payment> Payments { get; set; }
     public DbSet<ServicePlan> ServicePlans { get; set; }
     public DbSet<Incident> Incidents { get; set; }
+    public DbSet<MaintenanceTeam> MaintenanceTeams { get; set; }
 
     // DbSets - Views (read-only)
     public DbSet<UserCostReport> UserCostReports { get; set; }
@@ -170,7 +171,12 @@ public class SkaEVDbContext : DbContext
             }
             else
             {
-                entity.Property(e => e.Location).HasColumnName("location").HasColumnType("geography");
+                // The `location` column in the database is computed (geography point from lat/lon).
+                // Mark it as value-generated so EF Core does not attempt to set/modify it during inserts/updates.
+                entity.Property(e => e.Location)
+                    .HasColumnName("location")
+                    .HasColumnType("geography")
+                    .ValueGeneratedOnAddOrUpdate();
             }
             entity.Property(e => e.TotalPosts).HasColumnName("total_posts");
             entity.Property(e => e.AvailablePosts).HasColumnName("available_posts");
@@ -200,6 +206,9 @@ public class SkaEVDbContext : DbContext
             entity.Property(e => e.Status).HasColumnName("status").HasMaxLength(50).IsRequired();
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").IsRequired();
             entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").IsRequired();
+            entity.Property(e => e.DeletedAt).HasColumnName("deleted_at");
+
+            entity.HasQueryFilter(e => e.DeletedAt == null); // Global query filter for soft delete
 
             entity.HasOne(e => e.ChargingStation)
                 .WithMany(s => s.ChargingPosts)
@@ -220,6 +229,9 @@ public class SkaEVDbContext : DbContext
             entity.Property(e => e.CurrentBookingId).HasColumnName("current_booking_id");
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").IsRequired();
             entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").IsRequired();
+            entity.Property(e => e.DeletedAt).HasColumnName("deleted_at");
+
+            entity.HasQueryFilter(e => e.DeletedAt == null); // Global query filter for soft delete
 
             entity.HasOne(e => e.ChargingPost)
                 .WithMany(p => p.ChargingSlots)
@@ -367,11 +379,14 @@ public class SkaEVDbContext : DbContext
             entity.Property(e => e.IsRead).HasColumnName("is_read");
             entity.Property(e => e.RelatedBookingId).HasColumnName("related_booking_id");
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").IsRequired();
+            entity.Property(e => e.DeletedAt).HasColumnName("deleted_at");
 
             entity.HasOne(e => e.User)
                 .WithMany(u => u.Notifications)
                 .HasForeignKey(e => e.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasQueryFilter(e => e.DeletedAt == null);
         });
 
         // SystemLog configuration
@@ -406,6 +421,7 @@ public class SkaEVDbContext : DbContext
             entity.Property(e => e.Comment).HasColumnName("comment");
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").IsRequired();
             entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").IsRequired();
+            entity.Property(e => e.DeletedAt).HasColumnName("deleted_at");
 
             entity.HasOne(e => e.Booking)
                 .WithOne(b => b.Review)
@@ -421,6 +437,8 @@ public class SkaEVDbContext : DbContext
                 .WithMany(s => s.Reviews)
                 .HasForeignKey(e => e.StationId)
                 .OnDelete(DeleteBehavior.NoAction);
+
+            entity.HasQueryFilter(e => e.DeletedAt == null);
         });
 
         // PricingRule configuration
@@ -564,6 +582,7 @@ public class SkaEVDbContext : DbContext
             entity.Property(e => e.Description).HasColumnName("description");
             entity.Property(e => e.ResolutionNotes).HasColumnName("resolution_notes");
             entity.Property(e => e.AssignedToStaffId).HasColumnName("assigned_to_staff_id");
+            entity.Property(e => e.AssignedToTeamId).HasColumnName("assigned_to_team_id");
             entity.Property(e => e.ReportedAt).HasColumnName("reported_at").IsRequired();
             entity.Property(e => e.AcknowledgedAt).HasColumnName("acknowledged_at");
             entity.Property(e => e.ResolvedAt).HasColumnName("resolved_at");
@@ -596,6 +615,24 @@ public class SkaEVDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.AssignedToStaffId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(e => e.AssignedToTeam)
+                .WithMany()
+                .HasForeignKey(e => e.AssignedToTeamId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // MaintenanceTeam configuration
+        modelBuilder.Entity<MaintenanceTeam>(entity =>
+        {
+            entity.HasKey(e => e.MaintenanceTeamId);
+            entity.ToTable("maintenance_teams");
+            entity.Property(e => e.MaintenanceTeamId).HasColumnName("maintenance_team_id");
+            entity.Property(e => e.Name).HasColumnName("name").HasMaxLength(255).IsRequired();
+            entity.Property(e => e.ContactPerson).HasColumnName("contact_person").HasMaxLength(255);
+            entity.Property(e => e.ContactPhone).HasColumnName("contact_phone").HasMaxLength(50);
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at").IsRequired();
+            entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").IsRequired();
         });
 
         // Configure Views (read-only, no keys needed)

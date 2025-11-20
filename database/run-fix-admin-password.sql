@@ -1,0 +1,7 @@
+SET QUOTED_IDENTIFIER ON;
+SET ANSI_NULLS ON;
+SET XACT_ABORT ON;
+SET NOCOUNT ON;
+GO
+:r .\fix-admin-password-bcrypt.sql
+GO

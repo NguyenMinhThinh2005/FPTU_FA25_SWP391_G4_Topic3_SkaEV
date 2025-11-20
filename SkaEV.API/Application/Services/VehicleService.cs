@@ -168,10 +168,12 @@ public class VehicleService : IVehicleService
         var vehicle = await _context.Vehicles.FirstOrDefaultAsync(v => v.VehicleId == vehicleId)
             ?? throw new ArgumentException("Vehicle not found");
 
-        _context.Vehicles.Remove(vehicle);
+        // Soft-delete vehicle to preserve historical bookings
+        vehicle.DeletedAt = DateTime.UtcNow;
+        vehicle.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
 
-        _logger.LogInformation("Deleted vehicle {VehicleId}", vehicleId);
+        _logger.LogInformation("Soft-deleted vehicle {VehicleId}", vehicleId);
     }
 
     /// <summary>

@@ -2,7 +2,11 @@
 import useStationStore from '../store/stationStore';
 import StationDataService from '../services/stationDataService';
 import adminAPI from '../services/api/adminAPI';
+<<<<<<< HEAD
 import staffAPI from '../services/api/staffAPI';
+=======
+import { bookingsAPI } from '../services/api';
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
 
 /**
  * Custom hook for Admin Dashboard data management
@@ -29,6 +33,9 @@ export const useAdminDashboard = () => {
   
   // Data from stores
   const { stations, loading: stationsLoading, error: stationsError } = useStationStore();
+  // Live data from backend
+  const [users, setUsers] = useState([]);
+  const [bookings, setBookings] = useState([]);
   
   // Initialize data loading
   useEffect(() => {
@@ -36,6 +43,7 @@ export const useAdminDashboard = () => {
       try {
         setIsLoading(true);
         setError(null);
+<<<<<<< HEAD
         
         // Fetch users and bookings from API
         const [usersResponse, bookingsResponse] = await Promise.all([
@@ -46,6 +54,26 @@ export const useAdminDashboard = () => {
         setUsers(usersResponse.data || []);
         setBookings(bookingsResponse.data || []);
         
+=======
+        // Fetch users and bookings from backend (live DB)
+        const [usersResp, bookingsResp] = await Promise.allSettled([
+          adminAPI.getUsers({ pageNumber: 1, pageSize: 1000 }),
+          bookingsAPI.get({ pageNumber: 1, pageSize: 1000 }),
+        ]);
+
+        if (usersResp.status === 'fulfilled') {
+          setUsers(usersResp.value.data?.data || usersResp.value.data || []);
+        } else {
+          console.warn('Failed to load users for admin dashboard:', usersResp.reason?.message || usersResp.reason);
+        }
+
+        if (bookingsResp.status === 'fulfilled') {
+          setBookings(bookingsResp.value.data?.data || bookingsResp.value.data || []);
+        } else {
+          console.warn('Failed to load bookings for admin dashboard:', bookingsResp.reason?.message || bookingsResp.reason);
+        }
+
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
         // Validate station data
         const validationResults = stations.map(station => 
           StationDataService.validateStationData(station)
@@ -88,8 +116,13 @@ export const useAdminDashboard = () => {
   const systemOverview = useMemo(() => {
     try {
       return StationDataService.calculateSystemOverview(
+<<<<<<< HEAD
         stations, 
         users, 
+=======
+        stations,
+        users,
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
         bookings
       );
     } catch (err) {

@@ -67,7 +67,11 @@ import useAdminDashboard from '../../hooks/useAdminDashboard';
 const AdminDashboard = () => {
   const navigate = useNavigate();
   useAuthStore();
+<<<<<<< HEAD
   const { stations, fetchStations, updateStation, deleteStation } = useStationStore();
+=======
+  const { stations, fetchAdminStations, fetchStations } = useStationStore();
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
   const [_anchorEl, _setAnchorEl] = useState(null);
   const [_openStationDialog, setOpenStationDialog] = useState(false);
   const [_selectedStation, _setSelectedStation] = useState(null);
@@ -86,18 +90,23 @@ const AdminDashboard = () => {
   const [showSuccess, setShowSuccess] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
-  // Real-time stats from API
+  // Real-time stats from API (use hook-provided performance when available)
   const [stationPerformance, setStationPerformance] = useState([]);
   const [_loading, setLoading] = useState(true);
-  const { recentActivities, isLoading: dashboardLoading, error: dashboardError } = useAdminDashboard();
+  const { recentActivities, stationPerformance: dashboardStationPerformance, isLoading: dashboardLoading, error: dashboardError } = useAdminDashboard();
 
   // Fetch stations on component mount
   useEffect(() => {
-    console.log("🔄 Admin Dashboard mounted - fetching stations...");
+    console.log("🔄 Admin Dashboard mounted - fetching admin stations...");
     const loadDashboardData = async () => {
       try {
         setLoading(true);
-        await fetchStations();
+        // For admin area, use admin-specific stations endpoint to keep data consistent
+        if (typeof fetchAdminStations === 'function') {
+          await fetchAdminStations();
+        } else {
+          await fetchStations();
+        }
         setLoading(false);
         console.log("✅ Stations loaded successfully");
       } catch (error) {
@@ -107,47 +116,43 @@ const AdminDashboard = () => {
     };
     
     loadDashboardData();
-  }, [fetchStations]);
+  }, [fetchAdminStations, fetchStations]);
 
   // Tính toán hiệu suất trạm từ dữ liệu trạm
   useEffect(() => {
+    // Prefer the station performance computed in the dashboard hook (ensures consistent metrics)
+    if (Array.isArray(dashboardStationPerformance) && dashboardStationPerformance.length > 0) {
+      setStationPerformance(dashboardStationPerformance);
+      return;
+    }
+
+    // Fallback: build minimal performance info from stations if hook data is missing
     if (stations.length > 0) {
       const performance = stations.map((station) => {
-        // Lấy dữ liệu THỰC từ backend (không tính toán lại)
         const totalPosts = station.totalPosts || station.charging?.totalPosts || 0;
-        
-        // Logic: Mỗi trụ có 2 cổng
         const totalSlots = totalPosts * 2;
-        
-        // Active sessions từ backend
         const activeSessions = station.activeSessions || station.charging?.activeSessions || 0;
-        
-        // Số cổng khả dụng = Tổng cổng - Số phiên đang hoạt động
         const availableSlots = Math.max(0, totalSlots - activeSessions);
-        
-        // Tỷ lệ sử dụng từ backend (nếu có) hoặc tính từ activeSessions
-        const utilization = station.utilizationRate !== undefined 
-          ? station.utilizationRate 
+        const utilization = station.utilizationRate !== undefined
+          ? station.utilizationRate
           : (totalSlots > 0 ? (activeSessions / totalSlots) * 100 : 0);
-
-        // Doanh thu từ backend
         const revenue = station.todayRevenue || station.revenue || 0;
 
         return {
           ...station,
-          bookingsCount: activeSessions,  // Số phiên đang hoạt động
-          revenue: revenue,
-          utilization: utilization,
-          totalSlots: totalSlots,          // Tổng cổng = trụ * 2
-          availableSlots: availableSlots,  // Khả dụng = total - active
-          occupiedSlots: activeSessions,   // Đang sử dụng = active sessions
-          chargingPostsCount: totalPosts,  // Số trụ từ backend
+          bookingsCount: activeSessions,
+          revenue,
+          utilization,
+          totalSlots,
+          availableSlots,
+          occupiedSlots: activeSessions,
+          chargingPostsCount: totalPosts,
         };
       });
-      
+
       setStationPerformance(performance);
     }
-  }, [stations]);
+  }, [stations, dashboardStationPerformance]);
 
   // Lọc trạm dựa trên tìm kiếm và trạng thái
   const filteredStations = stationPerformance.filter((station) => {
@@ -296,6 +301,15 @@ const AdminDashboard = () => {
   {/* Show a thin loading bar while dashboard data loads */}
   {dashboardLoading && <LinearProgress color="primary" sx={{ mb: 2 }} />}
 
+  {/* Show dashboard error if present */}
+  {dashboardError && (
+    <Box sx={{ mb: 2 }}>
+      <Alert severity="error">
+        Lỗi tải dữ liệu tổng quan: {dashboardError?.message || dashboardError?.details || JSON.stringify(dashboardError)}
+      </Alert>
+    </Box>
+  )}
+
   <Grid container spacing={3}>
         {/* Station List */}
         <Grid item xs={12} lg={9}>
@@ -422,7 +436,7 @@ const AdminDashboard = () => {
                                 sx={{ fontSize: 16, color: "primary.main" }}
                               />
                               <Typography variant="body2">
-                                {station.chargingPostsCount} trụ, {station.totalSlots} cổng
+                                {station.charging?.totalPoles ?? station.totalPosts ?? station.chargingPostsCount ?? 0} trụ, {station.charging?.totalPorts ?? station.totalSlots ?? 0} cổng
                               </Typography>
                             </Box>
                             <Box
@@ -551,11 +565,11 @@ const AdminDashboard = () => {
                   </Box>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                     <Typography variant="body2" color="text.secondary">Số trụ:</Typography>
-                    <Typography variant="body2" fontWeight="bold">{selectedStationForDetail.chargingPostsCount}</Typography>
+                    <Typography variant="body2" fontWeight="bold">{selectedStationForDetail.charging?.totalPoles ?? selectedStationForDetail.totalPosts ?? selectedStationForDetail.chargingPostsCount ?? 0}</Typography>
                   </Box>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                     <Typography variant="body2" color="text.secondary">Tổng cổng:</Typography>
-                    <Typography variant="body2" fontWeight="bold">{selectedStationForDetail.totalSlots}</Typography>
+                    <Typography variant="body2" fontWeight="bold">{selectedStationForDetail.charging?.totalPorts ?? selectedStationForDetail.totalSlots ?? 0}</Typography>
                   </Box>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                     <Typography variant="body2" color="text.secondary">Cổng khả dụng:</Typography>

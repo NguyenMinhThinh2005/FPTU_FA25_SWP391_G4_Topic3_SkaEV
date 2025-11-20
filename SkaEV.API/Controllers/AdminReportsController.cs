@@ -18,16 +18,24 @@ public class AdminReportsController : BaseApiController
     private readonly IReportService _reportService;
     // Logger để ghi lại các hoạt động
     private readonly ILogger<AdminReportsController> _logger;
+    private readonly IConfiguration _configuration;
+    private readonly IWebHostEnvironment _env;
 
+<<<<<<< HEAD
     /// <summary>
     /// Constructor nhận vào ReportService và Logger thông qua Dependency Injection.
     /// </summary>
     /// <param name="reportService">Service xử lý báo cáo.</param>
     /// <param name="logger">Logger hệ thống.</param>
     public AdminReportsController(IReportService reportService, ILogger<AdminReportsController> logger)
+=======
+    public AdminReportsController(IReportService reportService, ILogger<AdminReportsController> logger, IConfiguration configuration, IWebHostEnvironment env)
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
     {
         _reportService = reportService;
         _logger = logger;
+        _configuration = configuration;
+        _env = env;
     }
 
     /// <summary>
@@ -243,7 +251,128 @@ public class AdminReportsController : BaseApiController
     }
 
     /// <summary>
+<<<<<<< HEAD
     /// Lấy các chỉ số sức khỏe hệ thống.
+=======
+    /// Get revenue aggregated by connector type (e.g. CCS2, Type2)
+    /// Returns DB-driven results only. No demo fallback in production or development.
+    /// </summary>
+    [HttpGet("revenue-by-connector")]
+    public async Task<IActionResult> GetRevenueByConnector(
+        [FromQuery] int? stationId = null,
+        [FromQuery] DateTime? startDate = null,
+        [FromQuery] DateTime? endDate = null)
+    {
+        try
+        {
+            var data = await _reportService.GetRevenueByConnectorAsync(stationId, startDate, endDate);
+            // Map DTOs to camelCase and aggregate by normalized connector type
+            var rawList = (data ?? Enumerable.Empty<ConnectorRevenueDto>()).ToList();
+
+            // Normalization helper (server-side) to mirror frontend normalization
+            static string NormalizeConnector(string raw)
+            {
+                if (string.IsNullOrWhiteSpace(raw)) return "Standard AC";
+                var s = raw.Normalize();
+                // Replace various unicode spaces with regular spaces
+                s = System.Text.RegularExpressions.Regex.Replace(s, "\\u00A0", " ");
+                // Remove punctuation/symbols
+                s = System.Text.RegularExpressions.Regex.Replace(s, "[\\p{P}\\p{S}]+", "");
+                s = System.Text.RegularExpressions.Regex.Replace(s, "\\s+", " ").Trim();
+                var simple = System.Text.RegularExpressions.Regex.Replace(s, "[^A-Za-z0-9]", "").ToLowerInvariant();
+
+                if (System.Text.RegularExpressions.Regex.IsMatch(simple, "^ccs2?$")) return "CCS2";
+                if (simple.Contains("chademo") || s.IndexOf("chademo", StringComparison.OrdinalIgnoreCase) >= 0) return "CHAdeMO";
+                if (System.Text.RegularExpressions.Regex.IsMatch(simple, "^type2$") || simple.Contains("type2")) return "Type 2";
+
+                // Title case
+                var parts = s.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                for (int i = 0; i < parts.Length; i++)
+                {
+                    var p = parts[i];
+                    parts[i] = p.Length > 1 ? char.ToUpperInvariant(p[0]) + p.Substring(1).ToLowerInvariant() : p.ToUpperInvariant();
+                }
+                return string.Join(' ', parts);
+            }
+
+            var aggregated = rawList
+                .GroupBy(d => NormalizeConnector(d.ConnectorType))
+                .Select(g => new
+                {
+                    connectorType = g.Key,
+                    totalRevenue = g.Sum(x => x.TotalRevenue),
+                    totalEnergyKwh = g.Sum(x => x.TotalEnergyKwh),
+                    totalTransactions = g.Sum(x => x.TotalTransactions)
+                })
+                .OrderByDescending(x => x.totalRevenue)
+                .ToList();
+
+            return Ok(new { success = true, data = aggregated });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting revenue by connector");
+            return StatusCode(500, new { success = false, message = "An error occurred while retrieving revenue by connector" });
+        }
+    }
+
+    /// <summary>
+    /// Development-only: Seed minimal demo data into the configured SQL Server.
+    /// This endpoint will only run when the application is running in Development environment.
+    /// It reads the script at SkaEV.API/Tools/seed_minimal.sql and executes batches separated by GO.
+    /// </summary>
+    [HttpPost("seed-demo")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> SeedDemoData()
+    {
+        if (!_env.IsDevelopment())
+        {
+            return BadRequest(new { success = false, message = "Seeding is allowed only in Development environment." });
+        }
+
+        try
+        {
+            var scriptPath = Path.Combine(_env.ContentRootPath, "SkaEV.API", "Tools", "seed_minimal.sql");
+            if (!System.IO.File.Exists(scriptPath))
+            {
+                return BadRequest(new { success = false, message = $"Seed script not found: {scriptPath}" });
+            }
+
+            var script = await System.IO.File.ReadAllTextAsync(scriptPath);
+
+            var connectionString = _configuration.GetConnectionString("DefaultConnection");
+            if (string.IsNullOrWhiteSpace(connectionString))
+                return BadRequest(new { success = false, message = "DefaultConnection is not configured." });
+
+            // Split on GO statements (common in SQL Server scripts)
+            var batches = System.Text.RegularExpressions.Regex.Split(script, "\r?\nGO\r?\n", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+            using var conn = new Microsoft.Data.SqlClient.SqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            foreach (var batch in batches)
+            {
+                var trimmed = batch.Trim();
+                if (string.IsNullOrWhiteSpace(trimmed)) continue;
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = trimmed;
+                cmd.CommandTimeout = 120;
+                await cmd.ExecuteNonQueryAsync();
+            }
+
+            return Ok(new { success = true, message = "Seed script executed." });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Seed demo failed");
+            return StatusCode(500, new { success = false, message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Get system health metrics
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
     /// </summary>
     /// <returns>Thông tin sức khỏe hệ thống.</returns>
     [HttpGet("system-health")]

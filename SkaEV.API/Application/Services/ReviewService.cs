@@ -29,6 +29,7 @@ public class ReviewService : IReviewService
     /// <returns>Danh sách đánh giá.</returns>
     public async Task<IEnumerable<ReviewDto>> GetStationReviewsAsync(int stationId, int page, int pageSize)
     {
+<<<<<<< HEAD
         return await _context.Reviews
             .AsNoTracking()
             .Where(r => r.StationId == stationId)
@@ -37,6 +38,18 @@ public class ReviewService : IReviewService
             .Take(pageSize)
             .Select(ReviewProjection)
             .ToListAsync();
+=======
+        var query = _context.Reviews
+            .Include(r => r.User)
+            .Include(r => r.ChargingStation)
+            .Where(r => r.StationId == stationId)
+            .OrderByDescending(r => r.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize);
+
+        var list = await query.ToListAsync();
+        return list.Select(r => MapToDto(r)).ToList();
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
     }
 
     /// <summary>
@@ -58,12 +71,22 @@ public class ReviewService : IReviewService
     /// <returns>Danh sách đánh giá.</returns>
     public async Task<IEnumerable<ReviewDto>> GetUserReviewsAsync(int userId)
     {
+<<<<<<< HEAD
         return await _context.Reviews
             .AsNoTracking()
             .Where(r => r.UserId == userId)
             .OrderByDescending(r => r.CreatedAt)
             .Select(ReviewProjection)
+=======
+        var list = await _context.Reviews
+            .Include(r => r.User)
+            .Include(r => r.ChargingStation)
+            .Where(r => r.UserId == userId)
+            .OrderByDescending(r => r.CreatedAt)
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
             .ToListAsync();
+
+        return list.Select(r => MapToDto(r)).ToList();
     }
 
     /// <summary>
@@ -131,8 +154,13 @@ public class ReviewService : IReviewService
             .Select(ReviewProjection)
             .FirstAsync();
 
+<<<<<<< HEAD
         _logger.LogInformation("Created review {ReviewId} for station {StationId} by user {UserId}", 
             reviewDto.ReviewId, createDto.StationId, userId);
+=======
+        _logger.LogInformation("Created review {ReviewId} for station {StationId} by user {UserId}",
+            review.ReviewId, createDto.StationId, userId);
+>>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
 
         return reviewDto;
     }
@@ -189,10 +217,12 @@ public class ReviewService : IReviewService
         if (review == null)
             throw new ArgumentException("Review not found");
 
-        _context.Reviews.Remove(review);
+        // Soft-delete instead of hard remove to preserve history
+        review.DeletedAt = DateTime.UtcNow;
+        review.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
 
-        _logger.LogInformation("Deleted review {ReviewId}", reviewId);
+        _logger.LogInformation("Soft-deleted review {ReviewId}", reviewId);
     }
 
     /// <summary>

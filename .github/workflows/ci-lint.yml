@@ -1,0 +1,29 @@
+name: CI - Lint & Tests
+
+on:
+  pull_request:
+  push:
+    branches:
+      - feature/admin-real-data
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run lint
+        run: npm run -s lint
+
+      - name: Run unit tests
+        run: npm test --silent
+        continue-on-error: true # tests may be absent or environment-specific; keep PR feedback but avoid blocking
