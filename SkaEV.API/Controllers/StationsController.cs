@@ -94,18 +94,6 @@ public class StationsController : BaseApiController
     /// </summary>
     /// <param name="dto">Thông tin trạm sạc mới.</param>
     /// <returns>Chi tiết trạm sạc vừa tạo.</returns>
-    [HttpPost]
-<<<<<<< HEAD
-    [Authorize(Roles = Roles.Admin)] // Chỉ Admin mới có thể tạo trạm
-    [ProducesResponseType(typeof(ApiResponse<StationDto>), StatusCodes.Status201Created)]
-    public async Task<IActionResult> CreateStation([FromBody] CreateStationDto dto)
-    {
-        // Gọi service để tạo trạm
-        var station = await _stationService.CreateStationAsync(dto);
-        
-        // Trả về 201 Created với location header và dữ liệu trạm mới
-        return CreatedResponse(nameof(GetStation), new { id = station.StationId }, station);
-=======
     [Authorize(Roles = "admin")]
     public async Task<IActionResult> CreateStation()
     {
@@ -351,7 +339,6 @@ public class StationsController : BaseApiController
             _logger.LogError(ex, "Error creating station");
             return StatusCode(500, new { message = "An error occurred" });
         }
->>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
     }
 
     /// <summary>

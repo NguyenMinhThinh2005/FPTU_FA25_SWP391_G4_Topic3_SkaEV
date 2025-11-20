@@ -29,16 +29,6 @@ public class ReviewService : IReviewService
     /// <returns>Danh sách đánh giá.</returns>
     public async Task<IEnumerable<ReviewDto>> GetStationReviewsAsync(int stationId, int page, int pageSize)
     {
-<<<<<<< HEAD
-        return await _context.Reviews
-            .AsNoTracking()
-            .Where(r => r.StationId == stationId)
-            .OrderByDescending(r => r.CreatedAt)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .Select(ReviewProjection)
-            .ToListAsync();
-=======
         var query = _context.Reviews
             .Include(r => r.User)
             .Include(r => r.ChargingStation)
@@ -49,7 +39,6 @@ public class ReviewService : IReviewService
 
         var list = await query.ToListAsync();
         return list.Select(r => MapToDto(r)).ToList();
->>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
     }
 
     /// <summary>
@@ -71,19 +60,11 @@ public class ReviewService : IReviewService
     /// <returns>Danh sách đánh giá.</returns>
     public async Task<IEnumerable<ReviewDto>> GetUserReviewsAsync(int userId)
     {
-<<<<<<< HEAD
-        return await _context.Reviews
-            .AsNoTracking()
-            .Where(r => r.UserId == userId)
-            .OrderByDescending(r => r.CreatedAt)
-            .Select(ReviewProjection)
-=======
         var list = await _context.Reviews
             .Include(r => r.User)
             .Include(r => r.ChargingStation)
             .Where(r => r.UserId == userId)
             .OrderByDescending(r => r.CreatedAt)
->>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
             .ToListAsync();
 
         return list.Select(r => MapToDto(r)).ToList();
@@ -154,13 +135,8 @@ public class ReviewService : IReviewService
             .Select(ReviewProjection)
             .FirstAsync();
 
-<<<<<<< HEAD
-        _logger.LogInformation("Created review {ReviewId} for station {StationId} by user {UserId}", 
-            reviewDto.ReviewId, createDto.StationId, userId);
-=======
         _logger.LogInformation("Created review {ReviewId} for station {StationId} by user {UserId}",
-            review.ReviewId, createDto.StationId, userId);
->>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
+            reviewDto.ReviewId, createDto.StationId, userId);
 
         return reviewDto;
     }

@@ -6,6 +6,7 @@ using Microsoft.Data.SqlClient;
 using SkaEV.API.Infrastructure.Data;
 using SkaEV.API.Application.DTOs.Stations;
 using SkaEV.API.Application.DTOs.Slots;
+using SkaEV.API.Application.DTOs.Posts;
 using SkaEV.API.Domain.Entities;
 using SkaEV.API.Application.Services;
 
@@ -13,15 +14,6 @@ namespace SkaEV.API.Application.Services
 {
     public class StationService : IStationService
     {
-        public Task<List<StationDto>> SearchStationsByLocationAsync(SearchStationsRequestDto request)
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task<StationDto?> GetStationByIdAsync(int stationId)
-        {
-            throw new NotImplementedException();
-        }
         // Fields
         private readonly SkaEVDbContext _context;
 
@@ -75,7 +67,179 @@ namespace SkaEV.API.Application.Services
             decimal CurrentPowerUsageKw,
             decimal UtilizationRate);
 
-        // ...rest of the StationService methods...
+        public async Task<List<StationDto>> GetAllStationsAsync(string? city = null, string? status = null)
+        {
+            var query = _context.ChargingStations.AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(city))
+                query = query.Where(s => s.City.Contains(city));
+
+            if (!string.IsNullOrWhiteSpace(status))
+                query = query.Where(s => s.Status == status);
+
+            var stations = await query.ToListAsync();
+
+            return stations.Select(s => new StationDto
+            {
+                StationId = s.StationId,
+                StationName = s.StationName,
+                Address = s.Address,
+                City = s.City,
+                Latitude = s.Latitude,
+                Longitude = s.Longitude,
+                TotalPosts = s.TotalPosts,
+                Status = s.Status
+            }).ToList();
+        }
+
+        public async Task<List<StationDto>> SearchStationsByLocationAsync(SearchStationsRequestDto request)
+        {
+            // Simple distance calculation (not accurate for large distances)
+            var stations = await _context.ChargingStations
+                .Where(s => 
+                    (s.Latitude - request.Latitude) * (s.Latitude - request.Latitude) + 
+                    (s.Longitude - request.Longitude) * (s.Longitude - request.Longitude) <= request.RadiusKm * request.RadiusKm / 100 &&
+                    (string.IsNullOrEmpty(request.City) || s.City.Contains(request.City)) &&
+                    (string.IsNullOrEmpty(request.Status) || s.Status == request.Status))
+                .ToListAsync();
+
+            return stations.Select(s => new StationDto
+            {
+                StationId = s.StationId,
+                StationName = s.StationName,
+                Address = s.Address,
+                City = s.City,
+                Latitude = s.Latitude,
+                Longitude = s.Longitude,
+                TotalPosts = s.TotalPosts,
+                Status = s.Status
+            }).ToList();
+        }
+
+        public async Task<StationDto?> GetStationByIdAsync(int stationId)
+        {
+            var station = await _context.ChargingStations
+                .FirstOrDefaultAsync(s => s.StationId == stationId);
+
+            if (station == null) return null;
+
+            return new StationDto
+            {
+                StationId = station.StationId,
+                StationName = station.StationName,
+                Address = station.Address,
+                City = station.City,
+                Latitude = station.Latitude,
+                Longitude = station.Longitude,
+                TotalPosts = station.TotalPosts,
+                Status = station.Status
+            };
+        }
+
+        public async Task<StationDto> CreateStationAsync(CreateStationDto dto)
+        {
+            var station = new ChargingStation
+            {
+                StationName = dto.StationName,
+                Address = dto.Address,
+                City = dto.City,
+                Latitude = dto.Latitude,
+                Longitude = dto.Longitude,
+                Status = dto.Status,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _context.ChargingStations.Add(station);
+            await _context.SaveChangesAsync();
+
+            return new StationDto
+            {
+                StationId = station.StationId,
+                StationName = station.StationName,
+                Address = station.Address,
+                City = station.City,
+                Latitude = station.Latitude,
+                Longitude = station.Longitude,
+                TotalPosts = station.TotalPosts,
+                Status = station.Status
+            };
+        }
+
+        public async Task<List<ChargingSlotDto>> GetAvailableSlotsAsync(int stationId)
+        {
+            var slots = await _context.ChargingSlots
+                .Include(s => s.ChargingPost)
+                .Where(s => s.ChargingPost.StationId == stationId && s.Status == "available")
+                .ToListAsync();
+
+            return slots.Select(s => new ChargingSlotDto
+            {
+                SlotId = s.SlotId,
+                PostId = s.PostId,
+                Status = s.Status
+            }).ToList();
+        }
+
+        public async Task<List<PostDto>> GetAvailablePostsAsync(int stationId)
+        {
+            var posts = await _context.ChargingPosts
+                .Where(p => p.StationId == stationId && p.Status == "available")
+                .ToListAsync();
+
+            return posts.Select(p => new PostDto
+            {
+                PostId = p.PostId,
+                StationId = p.StationId,
+                PostName = p.PostNumber,
+                Status = p.Status,
+                IsAvailable = p.Status == "available"
+            }).ToList();
+        }
+
+        public async Task<bool> UpdateStationAsync(int stationId, UpdateStationDto dto)
+        {
+            var station = await _context.ChargingStations
+                .FirstOrDefaultAsync(s => s.StationId == stationId);
+
+            if (station == null) return false;
+
+            if (dto.StationName != null) station.StationName = dto.StationName;
+            if (dto.Address != null) station.Address = dto.Address;
+            if (dto.Status != null) station.Status = dto.Status;
+            station.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+            return true;
+        }
+
+        public async Task<List<SlotDetailDto>> GetStationSlotsDetailsAsync(int stationId)
+        {
+            var slots = await _context.ChargingSlots
+                .Include(s => s.ChargingPost)
+                .Where(s => s.ChargingPost.StationId == stationId)
+                .ToListAsync();
+
+            return slots.Select(s => new SlotDetailDto
+            {
+                SlotId = s.SlotId,
+                PostId = s.PostId,
+                Status = s.Status,
+                CreatedAt = s.CreatedAt,
+                UpdatedAt = s.UpdatedAt
+            }).ToList();
+        }
+
+        public async Task<bool> DeleteStationAsync(int stationId)
+        {
+            var station = await _context.ChargingStations
+                .FirstOrDefaultAsync(s => s.StationId == stationId);
+
+            if (station == null) return false;
+
+            station.DeletedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+            return true;
+        }
     }
 }
 

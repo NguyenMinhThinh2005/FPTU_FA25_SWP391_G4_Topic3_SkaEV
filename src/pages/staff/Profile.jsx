@@ -44,6 +44,7 @@ const StaffProfile = () => {
   const [loading, setLoading] = useState(true);
   const [saveMessage, setSaveMessage] = useState(null);
   const [saveError, setSaveError] = useState(null);
+  const [tabValue, setTabValue] = useState(0);
   
   // Get user from authStore
   const { user: authUser, updateProfile: updateAuthProfile } = useAuthStore();
@@ -65,6 +66,28 @@ const StaffProfile = () => {
     activeSessionsNow: 0,
     totalConnectors: 0,
   });
+
+  // Mock data for certifications and activities
+  const certifications = [];
+  const recentActivities = [];
+
+  const getCertificationColor = (status) => {
+    switch (status) {
+      case "active": return "success";
+      case "expired": return "error";
+      default: return "default";
+    }
+  };
+
+  const getActivityColor = (status) => {
+    switch (status) {
+      case "success": return "success";
+      case "info": return "info";
+      case "warning": return "warning";
+      case "error": return "error";
+      default: return "default";
+    }
+  };
 
   const loadStaffProfile = useCallback(async () => {
     setLoading(true);
@@ -480,9 +503,6 @@ const StaffProfile = () => {
           </Grid>
         </CardContent>
       </Card>
-<<<<<<< HEAD
-        </>
-=======
 
       {/* Tabs */}
       <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
@@ -697,10 +717,11 @@ const StaffProfile = () => {
             </List>
           </CardContent>
         </Card>
->>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
-      )}
-    </Box>
-  );
+        )}
+      </>
+    )}
+  </Box>
+);
 };
 
 export default StaffProfile;

@@ -2,27 +2,19 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SkaEV.API.Application.Common;
+using SkaEV.API.Application.Services;
 using SkaEV.API.Infrastructure.Data;
 
 namespace SkaEV.API.Controllers;
 
-<<<<<<< HEAD
 /// <summary>
 /// Controller quản lý các tác vụ quản trị chung (Admin).
 /// Cung cấp các API để reset mật khẩu người dùng và reset mật khẩu admin (chỉ dùng cho development).
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-public class AdminController : BaseApiController
-=======
-using SkaEV.API.Application.Services;
-using Microsoft.AspNetCore.Authorization;
-
-[ApiController]
-[Route("api/[controller]")]
 [Authorize(Roles = "admin")]
-public class AdminController : ControllerBase
->>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
+public class AdminController : BaseApiController
 {
     // DbContext để truy cập cơ sở dữ liệu
     private readonly SkaEVDbContext _context;
@@ -31,24 +23,20 @@ public class AdminController : ControllerBase
     private readonly IAdminUserService _adminUserService;
     private readonly IWebHostEnvironment _env;
 
-<<<<<<< HEAD
     /// <summary>
     /// Constructor nhận vào DbContext và Logger thông qua Dependency Injection.
     /// </summary>
     /// <param name="context">Đối tượng DbContext để làm việc với DB.</param>
     /// <param name="logger">Đối tượng Logger để ghi log.</param>
-    public AdminController(SkaEVDbContext context, ILogger<AdminController> logger)
-=======
+    /// <param name="adminUserService">Service xử lý user admin.</param>
+    /// <param name="env">Environment để kiểm tra development mode.</param>
     public AdminController(SkaEVDbContext context, ILogger<AdminController> logger, IAdminUserService adminUserService, IWebHostEnvironment env)
->>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
     {
         _context = context;
         _logger = logger;
         _adminUserService = adminUserService;
         _env = env;
     }
-
-    /// <summary>
     /// Reset mật khẩu cho một người dùng cụ thể (Chức năng dành cho Admin).
     /// </summary>
     /// <param name="userId">ID của người dùng cần reset mật khẩu.</param>
@@ -59,50 +47,31 @@ public class AdminController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> ResetUserPassword(int userId, [FromBody] ResetPasswordRequest request)
     {
-<<<<<<< HEAD
-        // Tìm người dùng theo ID
-        var user = await _context.Users.FindAsync(userId);
-        
-        // Nếu không tìm thấy người dùng, trả về lỗi 404
-        if (user == null)
-        {
-            return NotFoundResponse("User not found");
-        }
-
-        // Cập nhật mật khẩu mới (Lưu ý: Trong thực tế nên hash mật khẩu trước khi lưu)
-        user.PasswordHash = request.NewPassword;
-        user.UpdatedAt = DateTime.UtcNow;
-        
-        // Lưu thay đổi vào cơ sở dữ liệu
-        await _context.SaveChangesAsync();
-
-        // Ghi log thông tin reset mật khẩu
-        _logger.LogInformation("Password reset for user {UserId} ({Email})", userId, user.Email);
-
-        // Trả về phản hồi thành công
-        return OkResponse(new 
-        { 
-            userId = user.UserId,
-            email = user.Email
-        }, "Password reset successful");
-=======
         try
         {
             // Use AdminUserService to perform safe reset (hashing handled there)
             var performerId = int.TryParse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, out var id) ? id : (int?)null;
             var result = await _adminUserService.ResetUserPasswordAsync(userId, performerId);
-            return Ok(new { message = result.Message, temporaryPassword = result.TemporaryPassword });
+
+            // Ghi log thông tin reset mật khẩu
+            _logger.LogInformation("Password reset for user {UserId}", userId);
+
+            // Trả về phản hồi thành công
+            return OkResponse(new
+            {
+                userId = userId,
+                temporaryPassword = result.TemporaryPassword
+            }, result.Message);
         }
         catch (ArgumentException ex)
         {
-            return NotFound(new { message = ex.Message });
+            return NotFoundResponse(ex.Message);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error resetting password for user {UserId}", userId);
-            return StatusCode(500, new { message = "An error occurred" });
+            return ServerErrorResponse("An error occurred while resetting password");
         }
->>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
     }
 
     /// <summary>
@@ -113,57 +82,33 @@ public class AdminController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> ResetAllAdminPasswords()
     {
-<<<<<<< HEAD
-        // Mật khẩu mặc định
-        const string defaultPassword = "Admin123!@#";
-
-        // Lấy danh sách tất cả các tài khoản có vai trò là Admin và đang hoạt động
-        var adminUsers = await _context.Users
-            .Where(u => u.Role == "Admin" && u.IsActive)
-            .ToListAsync();
-
-        // Cập nhật mật khẩu cho từng tài khoản Admin
-        foreach (var user in adminUsers)
-=======
         if (!_env.IsDevelopment())
->>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
         {
-            return BadRequest(new { success = false, message = "Seeding/resetting all admin passwords is allowed only in Development environment." });
+            return BadRequestResponse("Seeding/resetting all admin passwords is allowed only in Development environment.");
         }
 
-<<<<<<< HEAD
-        // Lưu tất cả thay đổi vào cơ sở dữ liệu
-        await _context.SaveChangesAsync();
-
-        // Ghi log cảnh báo về việc reset hàng loạt mật khẩu Admin
-        _logger.LogWarning("Reset passwords for {AdminCount} admin accounts", adminUsers.Count);
-
-        // Trả về phản hồi thành công kèm danh sách tài khoản bị ảnh hưởng
-        return OkResponse(new 
-        { 
-            defaultPassword = defaultPassword,
-            affectedUsers = adminUsers.Select(u => new { u.UserId, u.Email, u.FullName })
-        }, $"Reset {adminUsers.Count} admin passwords to default");
-=======
         const string defaultPassword = "Admin123!@#";
 
         try
         {
             var performerId = int.TryParse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, out var id) ? id : (int?)null;
             var count = await _adminUserService.ResetAllAdminPasswordsAsync(defaultPassword, performerId);
-            return Ok(new
+
+            // Ghi log cảnh báo về việc reset hàng loạt mật khẩu Admin
+            _logger.LogWarning("Reset passwords for {AdminCount} admin accounts", count);
+
+            // Trả về phản hồi thành công kèm danh sách tài khoản bị ảnh hưởng
+            return OkResponse(new
             {
-                message = $"Reset {count} admin passwords to default",
                 defaultPassword = defaultPassword,
                 affectedCount = count
-            });
+            }, $"Reset {count} admin passwords to default");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error resetting all admin passwords");
-            return StatusCode(500, new { success = false, message = "An error occurred" });
+            return ServerErrorResponse("An error occurred while resetting admin passwords");
         }
->>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
     }
 }
 

@@ -1,5 +1,4 @@
 <Project Sdk="Microsoft.NET.Sdk">
-<<<<<<< HEAD
 
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
@@ -19,24 +18,9 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-=======
-  <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
-    <IsPackable>false</IsPackable>
-  </PropertyGroup>
-
-  <ItemGroup>
-  <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.0" />
-    <PackageReference Include="xunit" Version="2.4.2" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="2.4.5" />
->>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\SkaEV.API\SkaEV.API.csproj" />
   </ItemGroup>
-<<<<<<< HEAD
-
-=======
->>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
 </Project>

@@ -41,11 +41,7 @@ public class StationStaffController : BaseApiController
             // Build per-user assigned stations and only include users who actually have
             // at least one assigned station record with a resolvable station name.
             var staffUsers = await _context.Users
-<<<<<<< HEAD
-                .Where(u => u.Role == Roles.Staff && u.IsActive)
-=======
                 .Where(u => u.Role == "staff" && u.IsActive && _context.StationStaff.Any(ss => ss.StaffUserId == u.UserId && ss.IsActive))
->>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
                 .Select(u => new
                 {
                     u.UserId,

@@ -1,9 +1,5 @@
 import { create } from 'zustand';
-<<<<<<< HEAD
-import { incidentsAPI } from '../services/api';
-=======
 import axiosInstance from '../services/axiosConfig';
->>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
 
 const incidentStore = create((set, get) => ({
   incidents: [],
@@ -27,11 +23,6 @@ const incidentStore = create((set, get) => ({
       if (priority) params.priority = priority;
       if (stationId) params.stationId = stationId;
 
-<<<<<<< HEAD
-      const response = await incidentsAPI.getAll(params);
-      // Backend returns { data: [], pagination: {} }
-      set({ incidents: response.data || [], isLoading: false });
-=======
       const response = await axiosInstance.get(`/incident?${params.toString()}`);
       let data = response.data?.data || response.data || [];
       // Normalize legacy severity values (map 'high' -> 'critical') and normalize status
@@ -45,7 +36,6 @@ const incidentStore = create((set, get) => ({
         }));
       }
       set({ incidents: Array.isArray(data) ? data : [], isLoading: false });
->>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
     } catch (error) {
       set({ error: error.message, isLoading: false });
       console.error('Error fetching incidents:', error);
@@ -56,18 +46,13 @@ const incidentStore = create((set, get) => ({
   fetchIncidentById: async (id) => {
     set({ isLoading: true, error: null });
     try {
-<<<<<<< HEAD
-      const response = await incidentsAPI.getById(id);
-      set({ selectedIncident: response, isLoading: false });
-=======
-      const response = await axiosInstance.get(`/incident/${id}`);
-      let data = response.data?.data || response.data;
-      if (data) {
-        if (data.severity === 'high') data.severity = 'critical';
-        if (data.status === 'closed') data.status = 'resolved';
-      }
-      set({ selectedIncident: data, isLoading: false });
->>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
+  const response = await axiosInstance.get(`/incident/${id}`);
+  let data = response.data?.data || response.data;
+  if (data) {
+    if (data.severity === 'high') data.severity = 'critical';
+    if (data.status === 'closed') data.status = 'resolved';
+  }
+  set({ selectedIncident: data, isLoading: false });
     } catch (error) {
       set({ error: error.message, isLoading: false });
       console.error('Error fetching incident:', error);
@@ -78,14 +63,9 @@ const incidentStore = create((set, get) => ({
   fetchIncidentsByStation: async (stationId) => {
     set({ isLoading: true, error: null });
     try {
-<<<<<<< HEAD
-      const response = await incidentsAPI.getAll({ stationId });
-      set({ incidents: response.data || [], isLoading: false });
-=======
-      const response = await axiosInstance.get(`/incident/station/${stationId}`);
-      const data = response.data?.data || response.data || [];
-      set({ incidents: Array.isArray(data) ? data : [], isLoading: false });
->>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
+  const response = await axiosInstance.get(`/incident/station/${stationId}`);
+  const data = response.data?.data || response.data || [];
+  set({ incidents: Array.isArray(data) ? data : [], isLoading: false });
     } catch (error) {
       set({ error: error.message, isLoading: false });
       console.error('Error fetching station incidents:', error);
@@ -96,17 +76,10 @@ const incidentStore = create((set, get) => ({
   createIncident: async (incidentData) => {
     set({ isLoading: true, error: null });
     try {
-<<<<<<< HEAD
-      const response = await incidentsAPI.create(incidentData);
-      await get().fetchIncidents(); // Refresh list
-      set({ isLoading: false });
-      return response;
-=======
-      const response = await axiosInstance.post('/incident', incidentData);
-      await get().fetchIncidents(); // Refresh list
-      set({ isLoading: false });
-      return response.data?.data || response.data;
->>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
+  const response = await axiosInstance.post('/incident', incidentData);
+  await get().fetchIncidents(); // Refresh list
+  set({ isLoading: false });
+  return response.data?.data || response.data;
     } catch (error) {
       set({ error: error.message, isLoading: false });
       console.error('Error creating incident:', error);
@@ -118,18 +91,11 @@ const incidentStore = create((set, get) => ({
   updateIncident: async (id, updateData) => {
     set({ isLoading: true, error: null });
     try {
-<<<<<<< HEAD
-      const response = await incidentsAPI.update(id, updateData);
-      await get().fetchIncidents(); // Refresh list
-      set({ selectedIncident: response, isLoading: false });
-      return response;
-=======
-      const response = await axiosInstance.put(`/incident/${id}`, updateData);
-      await get().fetchIncidents(); // Refresh list
-      const data = response.data?.data || response.data;
-      set({ selectedIncident: data, isLoading: false });
-      return data;
->>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
+  const response = await axiosInstance.put(`/incident/${id}`, updateData);
+  await get().fetchIncidents(); // Refresh list
+  const data = response.data?.data || response.data;
+  set({ selectedIncident: data, isLoading: false });
+  return data;
     } catch (error) {
       set({ error: error.message, isLoading: false });
       console.error('Error updating incident:', error);
@@ -141,16 +107,10 @@ const incidentStore = create((set, get) => ({
   fetchStats: async (stationId = null) => {
     set({ isLoading: true, error: null });
     try {
-<<<<<<< HEAD
-      const params = stationId ? { stationId } : {};
-      const response = await incidentsAPI.getStatistics(params);
-      set({ stats: response, isLoading: false });
-=======
-      const params = stationId ? `?stationId=${stationId}` : '';
-      const response = await axiosInstance.get(`/incident/stats${params}`);
-      const data = response.data?.data || response.data;
-      set({ stats: data, isLoading: false });
->>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
+  const params = stationId ? `?stationId=${stationId}` : '';
+  const response = await axiosInstance.get(`/incident/stats${params}`);
+  const data = response.data?.data || response.data;
+  set({ stats: data, isLoading: false });
     } catch (error) {
       set({ error: error.message, isLoading: false });
       console.error('Error fetching stats:', error);

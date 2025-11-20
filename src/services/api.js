@@ -108,8 +108,8 @@ export const authAPI = {
     const response = await axiosInstance.post("/auth/login", credentials);
     // Store tokens
     if (response.token) {
-      localStorage.setItem("token", response.token);
-      localStorage.setItem("refreshToken", response.refreshToken || "");
+      sessionStorage.setItem("token", response.token);
+      sessionStorage.setItem("refreshToken", response.refreshToken || "");
     }
     return response;
   },
@@ -119,8 +119,8 @@ export const authAPI = {
   },
 
   logout: () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("refreshToken");
+    sessionStorage.removeItem("token");
+    sessionStorage.removeItem("refreshToken");
     return axiosInstance.post("/auth/logout");
   },
 

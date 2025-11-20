@@ -211,14 +211,9 @@ public class UserProfileService : IUserProfileService
         if (user == null)
             throw new ArgumentException("User not found");
 
-<<<<<<< HEAD
-    // Xác thực mật khẩu hiện tại (trong thực tế cần hash, ở đây tạm bỏ qua vì môi trường dev lưu plain text)
-    // TODO: Implement password hashing verification
-=======
-        // Verify current password using shared PasswordHasher (supports BCrypt and legacy plain)
-        var currentStored = user.PasswordHash ?? string.Empty;
-        var providedCurrent = changePasswordDto.CurrentPassword ?? string.Empty;
->>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
+    // Verify current password using shared PasswordHasher (supports BCrypt and legacy plain)
+    var currentStored = user.PasswordHash ?? string.Empty;
+    var providedCurrent = changePasswordDto.CurrentPassword ?? string.Empty;
 
         if (!PasswordHasher.Verify(currentStored, providedCurrent))
             throw new ArgumentException("Current password is incorrect");

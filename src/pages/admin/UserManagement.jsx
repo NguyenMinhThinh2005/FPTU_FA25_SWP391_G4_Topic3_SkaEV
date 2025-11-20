@@ -214,30 +214,12 @@ const UserManagement = () => {
           phone: form.phone,
           role: form.role,
         });
-<<<<<<< HEAD
-        if (result.success) {
-          setSnackbar({
-            open: true,
-            message: "Cập nhật người dùng thành công!",
-            severity: "success",
-          });
-=======
-
         if (result && result.success) {
           setSnackbar({ open: true, message: "Cập nhật người dùng thành công!", severity: "success" });
->>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
           setDialogOpen(false);
           fetchUsers();
         } else {
-<<<<<<< HEAD
-          setSnackbar({
-            open: true,
-            message: result.error || "Lỗi cập nhật người dùng",
-            severity: "error",
-          });
-=======
           setSnackbar({ open: true, message: (result && result.error) || "Lỗi cập nhật người dùng", severity: "error" });
->>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
         }
       } else {
         const result = await addUser({
@@ -246,47 +228,19 @@ const UserManagement = () => {
           lastName: form.lastName,
           phone: form.phone,
           role: form.role,
-<<<<<<< HEAD
-          password: form.password, // Sử dụng password từ form
-        });
-        if (result.success) {
-          setSnackbar({
-            open: true,
-            message: `Tạo người dùng thành công! Mật khẩu: ${form.password}`,
-            severity: "success",
-          });
-=======
           password: form.password || "Temp123!",
           managedStationId: form.role === "staff" ? form.managedStationId : undefined,
         });
-
         if (result && result.success) {
           setSnackbar({ open: true, message: `Tạo người dùng thành công! Mật khẩu: ${form.password || "Temp123!"}`, severity: "success" });
->>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
           setDialogOpen(false);
           fetchUsers();
         } else {
-<<<<<<< HEAD
-          setSnackbar({
-            open: true,
-            message: result.error || "Lỗi tạo người dùng",
-            severity: "error",
-          });
-        }
-      }
-    } catch (error) {
-      setSnackbar({
-        open: true,
-        message: error.message || "Có lỗi xảy ra",
-        severity: "error",
-      });
-=======
           setSnackbar({ open: true, message: (result && result.error) || "Lỗi tạo người dùng", severity: "error" });
         }
       }
     } catch (error) {
       setSnackbar({ open: true, message: error?.message || "Có lỗi xảy ra", severity: "error" });
->>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
     }
   };
 
@@ -294,33 +248,6 @@ const UserManagement = () => {
     if (!userToChangeRole || !newRole) return;
 
     try {
-<<<<<<< HEAD
-      const result = await changeUserRole(userToChangeRole.userId, newRole);
-      if (result.success) {
-        setSnackbar({
-          open: true,
-          message: `Đã thay đổi vai trò thành ${newRole}`,
-          severity: "success",
-        });
-        setRoleDialogOpen(false);
-        setUserToChangeRole(null);
-        setNewRole("");
-        // Refresh users list to ensure UI is updated
-        await fetchUsers();
-      } else {
-        setSnackbar({
-          open: true,
-          message: result.error || "Lỗi thay đổi vai trò",
-          severity: "error",
-        });
-      }
-    } catch (error) {
-      setSnackbar({
-        open: true,
-        message: error.message || "Có lỗi xảy ra",
-        severity: "error",
-      });
-=======
       const result = await updateUser(userToChangeRole.userId, { role: newRole });
       if (result && result.success) {
         setSnackbar({ open: true, message: `Đã thay đổi vai trò thành ${newRole}`, severity: "success" });
@@ -333,7 +260,6 @@ const UserManagement = () => {
       }
     } catch (error) {
       setSnackbar({ open: true, message: error?.message || "Có lỗi xảy ra", severity: "error" });
->>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
     }
   };
 
@@ -476,7 +402,6 @@ const UserManagement = () => {
                 onChange={(e) => setQuery(e.target.value)}
               />
             </Grid>
-<<<<<<< HEAD
             <Grid item xs={12} md={3}>
               <FormControl fullWidth>
                 <InputLabel>Vai trò</InputLabel>
@@ -494,8 +419,6 @@ const UserManagement = () => {
                 </Select>
               </FormControl>
             </Grid>
-=======
->>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
           </Grid>
         </CardContent>
       </Card>
@@ -690,13 +613,7 @@ const UserManagement = () => {
                     label="Mật khẩu *"
                     type="password"
                     value={form.password}
-<<<<<<< HEAD
-                    onChange={(e) =>
-                      setForm({ ...form, password: e.target.value })
-                    }
-=======
                     onChange={(e) => setForm({ ...form, password: e.target.value })}
->>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
                     required
                     helperText="Tối thiểu 6 ký tự. Ví dụ: Temp123!"
                     InputProps={{
@@ -710,12 +627,7 @@ const UserManagement = () => {
                 </Grid>
                 <Grid item xs={12}>
                   <Alert severity="info" icon={<CheckCircle />}>
-<<<<<<< HEAD
-                    Bạn có thể đặt mật khẩu tùy chỉnh hoặc sử dụng mật khẩu mẫu:{" "}
-                    <strong>Temp123!</strong>
-=======
                     Bạn có thể đặt mật khẩu tùy chỉnh hoặc sử dụng mật khẩu mẫu: <strong>Temp123!</strong>
->>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
                   </Alert>
                 </Grid>
               </>

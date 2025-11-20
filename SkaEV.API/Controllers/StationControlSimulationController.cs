@@ -12,13 +12,8 @@ namespace SkaEV.API.Controllers;
 /// Không cần phần cứng thật - chỉ cập nhật database.
 /// </summary>
 [Route("api/admin/station-control")]
-<<<<<<< HEAD
 [Authorize(Roles = Roles.Admin + "," + Roles.Staff)]
 public class StationControlSimulationController : BaseApiController
-=======
-[Authorize(Roles = "admin,staff")]
-public class StationControlSimulationController : ControllerBase
->>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
 {
     private readonly SkaEVDbContext _context;
     private readonly ILogger<StationControlSimulationController> _logger;

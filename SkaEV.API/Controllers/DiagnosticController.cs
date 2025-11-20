@@ -6,18 +6,10 @@ using SkaEV.API.Infrastructure.Data;
 
 namespace SkaEV.API.Controllers;
 
-<<<<<<< HEAD
-/// <summary>
-/// Controller dùng để chẩn đoán hệ thống.
-/// Cung cấp thông tin kết nối database và kiểm tra dữ liệu thô.
-/// </summary>
-public class DiagnosticController : BaseApiController
-=======
 [ApiController]
 [Route("api/[controller]")]
 [Authorize(Roles = "admin")]
 public class DiagnosticController : ControllerBase
->>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
 {
     private readonly SkaEVDbContext _context;
 
@@ -42,7 +34,7 @@ public class DiagnosticController : ControllerBase
         // Parse để ẩn thông tin nhạy cảm
         var builder = new SqlConnectionStringBuilder(connectionString ?? "");
 
-        return OkResponse(new
+        return Ok(new
         {
             dataSource = builder.DataSource,
             initialCatalog = builder.InitialCatalog,
@@ -64,7 +56,7 @@ public class DiagnosticController : ControllerBase
         var station1Posts = await _context.ChargingPosts.AsNoTracking().CountAsync(p => p.StationId == 1);
         var station2Posts = await _context.ChargingPosts.AsNoTracking().CountAsync(p => p.StationId == 2);
 
-        return OkResponse(new
+        return Ok(new
         {
             totalPosts,
             station1Posts,
@@ -85,7 +77,7 @@ public class DiagnosticController : ControllerBase
             stationId
         ).ToListAsync();
 
-        return OkResponse(new
+        return Ok(new
         {
             stationId,
             count = posts.Count,

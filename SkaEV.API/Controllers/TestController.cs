@@ -5,14 +5,10 @@ using SkaEV.API.Infrastructure.Data;
 
 namespace SkaEV.API.Controllers;
 
-<<<<<<< HEAD
-public class TestController : BaseApiController
-=======
 [ApiController]
 [Route("api/[controller]")]
 [Authorize(Roles = "admin")]
 public class TestController : ControllerBase
->>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
 {
     private readonly SkaEVDbContext _context;
 
@@ -40,9 +36,9 @@ public class TestController : ControllerBase
             .FirstOrDefaultAsync();
 
         if (station == null)
-            return NotFoundResponse("Station not found");
+            return NotFound("Station not found");
 
-        return OkResponse(new
+        return Ok(new
         {
             stationId = station.StationId,
             stationName = station.StationName,
@@ -95,7 +91,7 @@ public class TestController : ControllerBase
             .FromSqlInterpolated($"SELECT * FROM charging_posts WHERE station_id = {id}")
             .ToListAsync();
 
-        return OkResponse(new
+        return Ok(new
         {
             stationId = id,
             noIncludeCount = postsNoInclude.Count,

@@ -188,7 +188,34 @@ public class SkaEVDbContext : DbContext
             entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").IsRequired();
             entity.Property(e => e.DeletedAt).HasColumnName("deleted_at");
 
+            // Temporarily ignore ActiveSessions as it's not in the database schema
+            entity.Ignore(e => e.ActiveSessions);
+
             entity.HasQueryFilter(e => e.DeletedAt == null); // Global query filter for soft delete
+        });
+
+        // ChargingSlot configuration
+        modelBuilder.Entity<ChargingSlot>(entity =>
+        {
+            entity.HasKey(e => e.SlotId);
+            entity.Property(e => e.SlotId).HasColumnName("slot_id");
+            entity.Property(e => e.PostId).HasColumnName("post_id");
+            entity.Property(e => e.SlotNumber).HasColumnName("slot_number").HasMaxLength(50).IsRequired();
+            entity.Property(e => e.ConnectorType).HasColumnName("connector_type").HasMaxLength(50).IsRequired();
+            entity.Property(e => e.MaxPower).HasColumnName("max_power").HasColumnType("decimal(10,2)").IsRequired();
+            entity.Property(e => e.Status).HasColumnName("status").HasMaxLength(50).IsRequired();
+            entity.Property(e => e.CurrentBookingId).HasColumnName("current_booking_id");
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at").IsRequired();
+            entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").IsRequired();
+            entity.Property(e => e.DeletedAt).HasColumnName("deleted_at");
+
+            // Temporarily disable global query filter as deleted_at column doesn't exist in database
+            // entity.HasQueryFilter(e => e.DeletedAt == null); // Global query filter for soft delete
+
+            entity.HasOne(e => e.ChargingPost)
+                .WithMany(p => p.ChargingSlots)
+                .HasForeignKey(e => e.PostId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         // ChargingPost configuration
@@ -208,34 +235,12 @@ public class SkaEVDbContext : DbContext
             entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").IsRequired();
             entity.Property(e => e.DeletedAt).HasColumnName("deleted_at");
 
-            entity.HasQueryFilter(e => e.DeletedAt == null); // Global query filter for soft delete
+            // Temporarily disable global query filter as deleted_at column doesn't exist in database
+            // entity.HasQueryFilter(e => e.DeletedAt == null); // Global query filter for soft delete
 
             entity.HasOne(e => e.ChargingStation)
                 .WithMany(s => s.ChargingPosts)
                 .HasForeignKey(e => e.StationId)
-                .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        // ChargingSlot configuration
-        modelBuilder.Entity<ChargingSlot>(entity =>
-        {
-            entity.HasKey(e => e.SlotId);
-            entity.Property(e => e.SlotId).HasColumnName("slot_id");
-            entity.Property(e => e.PostId).HasColumnName("post_id");
-            entity.Property(e => e.SlotNumber).HasColumnName("slot_number").HasMaxLength(50).IsRequired();
-            entity.Property(e => e.ConnectorType).HasColumnName("connector_type").HasMaxLength(50).IsRequired();
-            entity.Property(e => e.MaxPower).HasColumnName("max_power").HasColumnType("decimal(10,2)").IsRequired();
-            entity.Property(e => e.Status).HasColumnName("status").HasMaxLength(50).IsRequired();
-            entity.Property(e => e.CurrentBookingId).HasColumnName("current_booking_id");
-            entity.Property(e => e.CreatedAt).HasColumnName("created_at").IsRequired();
-            entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").IsRequired();
-            entity.Property(e => e.DeletedAt).HasColumnName("deleted_at");
-
-            entity.HasQueryFilter(e => e.DeletedAt == null); // Global query filter for soft delete
-
-            entity.HasOne(e => e.ChargingPost)
-                .WithMany(p => p.ChargingSlots)
-                .HasForeignKey(e => e.PostId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

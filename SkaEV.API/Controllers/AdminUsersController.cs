@@ -18,14 +18,16 @@ public class AdminUsersController : BaseApiController
 {
     // Service quản lý người dùng admin
     private readonly IAdminUserService _adminUserService;
+    private readonly ILogger<AdminUsersController> _logger;
 
     /// <summary>
     /// Constructor nhận vào AdminUserService thông qua Dependency Injection.
     /// </summary>
     /// <param name="adminUserService">Service quản lý người dùng.</param>
-    public AdminUsersController(IAdminUserService adminUserService)
+    public AdminUsersController(IAdminUserService adminUserService, ILogger<AdminUsersController> logger)
     {
         _adminUserService = adminUserService;
+        _logger = logger;
     }
 
     /// <summary>

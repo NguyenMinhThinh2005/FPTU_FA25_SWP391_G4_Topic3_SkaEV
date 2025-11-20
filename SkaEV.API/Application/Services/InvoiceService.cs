@@ -31,24 +31,15 @@ public class InvoiceService : IInvoiceService
     /// <returns>Danh sách hóa đơn.</returns>
     public async Task<IEnumerable<InvoiceDto>> GetUserInvoicesAsync(int userId)
     {
-<<<<<<< HEAD
-        var invoices = await _context.Invoices
-=======
         var list = await _context.Invoices
->>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
             .Include(i => i.User)
             .Include(i => i.Booking)
                 .ThenInclude(b => b.ChargingStation)
             .Where(i => i.UserId == userId)
             .OrderByDescending(i => i.CreatedAt)
             .ToListAsync();
-<<<<<<< HEAD
-        
-        return invoices.Select(i => MapToDto(i)).ToList();
-=======
 
         return list.Select(i => MapToDto(i)).ToList();
->>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
     }
 
     /// <summary>
@@ -98,24 +89,17 @@ public class InvoiceService : IInvoiceService
         if (invoice == null)
             throw new KeyNotFoundException("Invoice not found");
 
+        var paymentMethodName = string.Empty;
+
         if (invoice.PaymentStatus == "paid")
         {
-<<<<<<< HEAD
-            _logger.LogInformation(
-                "Payment skipped for already settled invoice {InvoiceId} by staff {StaffId}",
-                invoiceId,
-                processedByUserId);
-
-            return MapToDto(invoice);
-=======
-            var paymentMethod = await _context.PaymentMethods
+            var existingPaymentMethod = await _context.PaymentMethods
                 .FirstOrDefaultAsync(pm => pm.PaymentMethodId == processDto.PaymentMethodId);
 
-            if (paymentMethod != null)
+            if (existingPaymentMethod != null)
             {
-                paymentMethodName = paymentMethod.Type ?? "Unknown";
+                paymentMethodName = existingPaymentMethod.Type ?? "Unknown";
             }
->>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
         }
 
         if (processDto.Amount <= 0)
@@ -137,7 +121,7 @@ public class InvoiceService : IInvoiceService
             throw new InvalidOperationException("Payment method is inactive");
 
         var now = DateTime.UtcNow;
-        var paymentMethodName = GetPaymentMethodLabel(paymentMethod);
+        paymentMethodName = GetPaymentMethodLabel(paymentMethod);
 
         var payment = new Payment
         {
@@ -228,13 +212,6 @@ public class InvoiceService : IInvoiceService
 
         if (statusDto.Status == "paid" && invoice.PaidAt == null)
             invoice.PaidAt = DateTime.UtcNow;
-
-<<<<<<< HEAD
-        if (statusDto.Status != "paid")
-            invoice.PaidAt = null;
-
-=======
->>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
         invoice.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();

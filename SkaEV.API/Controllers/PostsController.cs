@@ -15,14 +15,17 @@ namespace SkaEV.API.Controllers;
 public class PostsController : BaseApiController
 {
     private readonly IPostService _postService;
+    private readonly ILogger<PostsController> _logger;
 
     /// <summary>
     /// Constructor nhận vào PostService.
     /// </summary>
     /// <param name="postService">Service trụ sạc.</param>
-    public PostsController(IPostService postService)
+    /// <param name="logger">Logger hệ thống.</param>
+    public PostsController(IPostService postService, ILogger<PostsController> logger)
     {
         _postService = postService;
+        _logger = logger;
     }
 
     /// <summary>
@@ -83,15 +86,6 @@ public class PostsController : BaseApiController
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> CreatePost([FromBody] CreatePostDto createDto)
     {
-<<<<<<< HEAD
-        var post = await _postService.CreatePostAsync(createDto);
-        
-        return CreatedResponse(
-            nameof(GetPost),
-            new { id = post.PostId },
-            post
-        );
-=======
         try
         {
             var post = await _postService.CreatePostAsync(createDto);
@@ -111,7 +105,6 @@ public class PostsController : BaseApiController
             _logger.LogError(ex, "Error creating post");
             return StatusCode(500, new { message = "An error occurred" });
         }
->>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
     }
 
     /// <summary>
@@ -151,10 +144,8 @@ public class PostsController : BaseApiController
         if (existingPost == null)
             return NotFoundResponse("Post not found");
 
-<<<<<<< HEAD
-        await _postService.DeletePostAsync(id);
-        return OkResponse<object>(new { }, "Post deleted successfully");
-=======
+        try
+        {
             await _postService.DeletePostAsync(id);
             return NoContent();
         }
@@ -168,7 +159,6 @@ public class PostsController : BaseApiController
             _logger.LogError(ex, "Error deleting post {Id}", id);
             return StatusCode(500, new { message = "An error occurred" });
         }
->>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
     }
 
     /// <summary>

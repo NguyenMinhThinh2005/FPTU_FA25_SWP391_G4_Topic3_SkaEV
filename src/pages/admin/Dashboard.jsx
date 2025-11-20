@@ -67,11 +67,7 @@ import useAdminDashboard from '../../hooks/useAdminDashboard';
 const AdminDashboard = () => {
   const navigate = useNavigate();
   useAuthStore();
-<<<<<<< HEAD
-  const { stations, fetchStations, updateStation, deleteStation } = useStationStore();
-=======
   const { stations, fetchAdminStations, fetchStations } = useStationStore();
->>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
   const [_anchorEl, _setAnchorEl] = useState(null);
   const [_openStationDialog, setOpenStationDialog] = useState(false);
   const [_selectedStation, _setSelectedStation] = useState(null);

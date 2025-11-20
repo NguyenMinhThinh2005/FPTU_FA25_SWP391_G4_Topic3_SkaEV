@@ -109,9 +109,6 @@ public class StationDetailDto
 }
 
 /// <summary>
-<<<<<<< HEAD
-/// DTO chi tiết trụ sạc (post) với thông tin các khe sạc.
-=======
 /// Simple aggregated metrics for a time window
 /// </summary>
 public class PeriodMetrics
@@ -123,8 +120,7 @@ public class PeriodMetrics
 }
 
 /// <summary>
-/// Charging point (post) with all slots detail
->>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
+/// DTO chi tiết trụ sạc (post) với thông tin các khe sạc.
 /// </summary>
 public class ChargingPointDetailDto
 {

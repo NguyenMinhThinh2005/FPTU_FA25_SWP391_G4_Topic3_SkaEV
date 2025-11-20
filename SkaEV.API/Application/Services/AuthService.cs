@@ -58,10 +58,6 @@ public class AuthService : IAuthService
         var user = await _context.Users
             .FirstOrDefaultAsync(u => u.Email == request.Email && u.IsActive);
 
-<<<<<<< HEAD
-        // If user not found or password does not verify, return null (Unauthorized)
-        if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password ?? string.Empty, user.PasswordHash ?? string.Empty))
-=======
         if (user == null)
         {
             return null;
@@ -83,7 +79,6 @@ public class AuthService : IAuthService
         }
 
         if (!passwordMatches)
->>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
         {
             return null;
         }

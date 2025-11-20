@@ -14,10 +14,12 @@ namespace SkaEV.API.Controllers;
 public class VehiclesController : BaseApiController
 {
     private readonly IVehicleService _vehicleService;
+    private readonly ILogger<VehiclesController> _logger;
 
-    public VehiclesController(IVehicleService vehicleService)
+    public VehiclesController(IVehicleService vehicleService, ILogger<VehiclesController> logger)
     {
         _vehicleService = vehicleService;
+        _logger = logger;
     }
 
     /// <summary>
@@ -82,7 +84,7 @@ public class VehiclesController : BaseApiController
     {
         try
         {
-            var userId = GetUserId();
+            var userId = CurrentUserId;
             var vehicle = await _vehicleService.CreateVehicleAsync(userId, createDto);
             return CreatedAtAction(
                 nameof(GetVehicle),

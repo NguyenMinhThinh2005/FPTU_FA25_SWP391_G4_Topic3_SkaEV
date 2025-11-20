@@ -6,18 +6,10 @@ using SkaEV.API.Domain.Entities;
 
 namespace SkaEV.API.Controllers;
 
-<<<<<<< HEAD
-/// <summary>
-/// Controller dùng cho mục đích debug và kiểm thử.
-/// Chứa các endpoint để tạo dữ liệu mẫu và kiểm tra trạng thái hệ thống.
-/// </summary>
-public class DebugController : BaseApiController
-=======
 [ApiController]
 [Route("api/[controller]")]
 [Authorize(Roles = "admin")]
 public class DebugController : ControllerBase
->>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
 {
     private readonly SkaEVDbContext _context;
 
@@ -54,7 +46,7 @@ public class DebugController : ControllerBase
         _context.ChargingPosts.Add(testPost);
         await _context.SaveChangesAsync();
 
-        return OkResponse(new { message = "Test post created", postId = testPost.PostId });
+        return Ok(new { message = "Test post created", postId = testPost.PostId });
     }
 
     /// <summary>
@@ -68,7 +60,7 @@ public class DebugController : ControllerBase
             .Where(p => p.PostNumber.StartsWith("TEST-"))
             .ToListAsync();
 
-        return OkResponse(new
+        return Ok(new
         {
             count = testPosts.Count,
             posts = testPosts.Select(p => new
@@ -96,7 +88,7 @@ public class DebugController : ControllerBase
             .Take(20)
             .ToListAsync();
 
-        return OkResponse(new
+        return Ok(new
         {
             count = posts.Count,
             posts = posts.Select(p => new

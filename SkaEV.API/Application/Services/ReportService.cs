@@ -3,6 +3,7 @@ using SkaEV.API.Application.DTOs.Reports;
 using SkaEV.API.Domain.Entities.Views;
 using SkaEV.API.Infrastructure.Data;
 using System.Text;
+using System.Text.Json;
 
 namespace SkaEV.API.Application.Services;
 
@@ -232,63 +233,12 @@ public class ReportService : IReportService
     }
 
     /// <summary>
-<<<<<<< HEAD
     /// Lấy báo cáo mức độ sử dụng trạm sạc (Admin).
     /// </summary>
     /// <param name="stationId">ID trạm sạc (tùy chọn).</param>
     /// <param name="year">Năm (tùy chọn).</param>
     /// <param name="month">Tháng (tùy chọn).</param>
     /// <returns>Danh sách báo cáo sử dụng.</returns>
-=======
-    /// Aggregate revenue by connector type (connector type comes from ChargingSlot.ConnectorType)
-    /// Filters by station and optional date range (invoice.CreatedAt)
-    /// </summary>
-    public async Task<IEnumerable<SkaEV.API.Application.DTOs.Reports.ConnectorRevenueDto>> GetRevenueByConnectorAsync(int? stationId = null, DateTime? startDate = null, DateTime? endDate = null)
-    {
-        try
-        {
-            // Default range: last 30 days
-            endDate ??= DateTime.UtcNow;
-            startDate ??= endDate.Value.AddDays(-30);
-
-            var query = from invoice in _context.Invoices
-                        join booking in _context.Bookings on invoice.BookingId equals booking.BookingId
-                        join slot in _context.ChargingSlots on booking.SlotId equals slot.SlotId
-                        where invoice.PaymentStatus == "paid"
-                        select new { invoice, booking, slot };
-
-            if (stationId.HasValue)
-                query = query.Where(x => x.booking.StationId == stationId.Value);
-
-            if (startDate.HasValue)
-                query = query.Where(x => x.invoice.CreatedAt >= startDate.Value);
-
-            if (endDate.HasValue)
-                query = query.Where(x => x.invoice.CreatedAt <= endDate.Value);
-
-            var data = await query.ToListAsync();
-
-            var grouped = data
-                .GroupBy(x => string.IsNullOrWhiteSpace(x.slot.ConnectorType) ? "unknown" : x.slot.ConnectorType)
-                .Select(g => new SkaEV.API.Application.DTOs.Reports.ConnectorRevenueDto
-                {
-                    ConnectorType = g.Key,
-                    TotalRevenue = g.Sum(x => x.invoice.TotalAmount),
-                    TotalEnergyKwh = g.Sum(x => x.invoice.TotalEnergyKwh),
-                    TotalTransactions = g.Count()
-                })
-                .OrderByDescending(r => r.TotalRevenue)
-                .ToList();
-
-            return grouped;
-        }
-        catch
-        {
-            return new List<SkaEV.API.Application.DTOs.Reports.ConnectorRevenueDto>();
-        }
-    }
-
->>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
     public async Task<IEnumerable<UsageReportDto>> GetUsageReportsAsync(int? stationId = null, int? year = null, int? month = null)
     {
         // Sử dụng kết nối SQL trực tiếp để bypass EF Core và tối ưu hiệu năng cho báo cáo phức tạp
@@ -772,6 +722,74 @@ public class ReportService : IReportService
     }
 
     /// <summary>
+    /// Lấy doanh thu theo loại connector (CCS2, Type2, etc.).
+    /// </summary>
+    /// <param name="stationId">ID trạm sạc (tùy chọn).</param>
+    /// <param name="startDate">Ngày bắt đầu (tùy chọn).</param>
+    /// <param name="endDate">Ngày kết thúc (tùy chọn).</param>
+    /// <returns>Danh sách doanh thu theo loại connector.</returns>
+    public async Task<IEnumerable<ConnectorRevenueDto>> GetRevenueByConnectorAsync(int? stationId = null, DateTime? startDate = null, DateTime? endDate = null)
+    {
+        try
+        {
+            var query = from invoice in _context.Invoices
+                        join booking in _context.Bookings on invoice.BookingId equals booking.BookingId
+                        join slot in _context.ChargingSlots on booking.SlotId equals slot.SlotId
+                        join post in _context.ChargingPosts on slot.PostId equals post.PostId
+                        where invoice.PaymentStatus == "paid"
+                        select new
+                        {
+                            invoice,
+                            booking,
+                            post.ConnectorTypes,
+                            booking.StationId
+                        };
+
+            // Apply filters
+            if (stationId.HasValue)
+                query = query.Where(x => x.StationId == stationId.Value);
+
+            if (startDate.HasValue)
+                query = query.Where(x => x.invoice.CreatedAt >= startDate.Value);
+
+            if (endDate.HasValue)
+                query = query.Where(x => x.invoice.CreatedAt <= endDate.Value);
+
+            var data = await query.ToListAsync();
+
+            // Flatten connector types and group
+            var flattenedData = data
+                .SelectMany(x => DeserializeConnectorTypes(x.ConnectorTypes)
+                    .Select(connectorType => new
+                    {
+                        ConnectorType = connectorType,
+                        x.invoice.TotalAmount,
+                        x.invoice.TotalEnergyKwh
+                    }))
+                .ToList();
+
+            var grouped = flattenedData
+                .GroupBy(x => x.ConnectorType)
+                .Select(g => new ConnectorRevenueDto
+                {
+                    ConnectorType = g.Key,
+                    TotalRevenue = g.Sum(x => x.TotalAmount),
+                    TotalEnergyKwh = g.Sum(x => x.TotalEnergyKwh),
+                    TotalTransactions = g.Count()
+                })
+                .OrderByDescending(r => r.TotalRevenue)
+                .ToList();
+
+            return grouped;
+        }
+        catch
+        {
+            // Return empty list if no data or error
+            return new List<ConnectorRevenueDto>();
+        }
+    }
+
+    /// <summary>
     /// Phân tích giờ cao điểm sử dụng trạm sạc.
     /// </summary>
     /// <param name="stationId">ID trạm sạc (tùy chọn).</param>
@@ -961,6 +979,37 @@ public class ReportService : IReportService
         if (value >= goodThreshold) return "good";
         if (value >= goodThreshold * 0.8) return "warning";
         return "critical";
+    }
+
+    private static IReadOnlyList<string> DeserializeConnectorTypes(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return Array.Empty<string>();
+        }
+
+        try
+        {
+            var parsed = JsonSerializer.Deserialize<List<string>>(raw);
+            if (parsed == null)
+            {
+                return Array.Empty<string>();
+            }
+
+            return parsed
+                .Where(p => !string.IsNullOrWhiteSpace(p))
+                .Select(p => p.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+        catch
+        {
+            // Backwards compatibility for comma-separated values
+            return raw
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
     }
 
     #endregion

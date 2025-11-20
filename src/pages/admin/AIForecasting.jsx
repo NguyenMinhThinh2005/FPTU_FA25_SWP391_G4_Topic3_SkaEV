@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-import { useCallback, useEffect, useState } from "react";
-=======
 import { useEffect, useState, useCallback } from 'react';
->>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
 import {
   Box,
   Card,
@@ -54,11 +50,8 @@ const AIForecasting = () => {
   const [peakHours, setPeakHours] = useState([]);
   const [demandScores, setDemandScores] = useState([]);
 
-<<<<<<< HEAD
-=======
   // stabilize functions with useCallback so they can be safely included in
   // dependency arrays without triggering exhaustive-deps warnings
->>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
   const fetchStations = useCallback(async () => {
     try {
       const data = await stationsAPI.getAllStations();
@@ -72,11 +65,6 @@ const AIForecasting = () => {
     }
   }, []);
 
-<<<<<<< HEAD
-  const fetchForecast = useCallback(async () => {
-    if (!selectedStation) return;
-
-=======
   const fetchDemandScores = useCallback(async () => {
     try {
       const data = await demandForecastingAPI.getDemandScores();
@@ -88,7 +76,6 @@ const AIForecasting = () => {
 
   const fetchForecast = useCallback(async () => {
     if (!selectedStation) return;
->>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
     try {
       setLoading(true);
       const data = await demandForecastingAPI.getStationForecast(
@@ -105,10 +92,6 @@ const AIForecasting = () => {
 
   const fetchPeakHours = useCallback(async () => {
     if (!selectedStation) return;
-<<<<<<< HEAD
-
-=======
->>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
     try {
       const data = await demandForecastingAPI.getPeakHours(selectedStation);
       setPeakHours(data);
@@ -116,16 +99,6 @@ const AIForecasting = () => {
       console.error("Error fetching peak hours:", err);
     }
   }, [selectedStation]);
-
-<<<<<<< HEAD
-  const fetchDemandScores = useCallback(async () => {
-    try {
-      const data = await demandForecastingAPI.getDemandScores();
-      setDemandScores(data);
-    } catch (err) {
-      console.error("Error fetching demand scores:", err);
-    }
-  }, []);
 
   useEffect(() => {
     fetchStations();
@@ -137,18 +110,6 @@ const AIForecasting = () => {
       fetchForecast();
       fetchPeakHours();
     }
-=======
-  useEffect(() => {
-    fetchStations();
-    fetchDemandScores();
-  }, [fetchStations, fetchDemandScores]);
-
-  useEffect(() => {
-    if (selectedStation) {
-      fetchForecast();
-      fetchPeakHours();
-    }
->>>>>>> 63845a83230bd2c1c6a721f5e2c2559237204949
   }, [fetchForecast, fetchPeakHours, selectedStation]);
 
   const getTrendIcon = (trend) => {
