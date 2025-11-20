@@ -7,22 +7,28 @@ using SkaEV.API.Application.Services;
 namespace SkaEV.API.Controllers;
 
 /// <summary>
-/// Controller for managing user payment methods
+/// Controller quản lý phương thức thanh toán của người dùng.
+/// Cung cấp các API để thêm, sửa, xóa và xem danh sách phương thức thanh toán.
 /// </summary>
 [Authorize]
 public class PaymentMethodsController : BaseApiController
 {
+    // Service xử lý logic phương thức thanh toán
     private readonly IPaymentMethodService _paymentMethodService;
 
+    /// <summary>
+    /// Constructor nhận vào PaymentMethodService thông qua Dependency Injection.
+    /// </summary>
+    /// <param name="paymentMethodService">Service phương thức thanh toán.</param>
     public PaymentMethodsController(IPaymentMethodService paymentMethodService)
     {
         _paymentMethodService = paymentMethodService;
     }
 
     /// <summary>
-    /// Get all payment methods for the authenticated user
+    /// Lấy danh sách tất cả phương thức thanh toán của người dùng hiện tại.
     /// </summary>
-    /// <returns>List of user's payment methods</returns>
+    /// <returns>Danh sách phương thức thanh toán.</returns>
     [HttpGet]
     [ProducesResponseType(typeof(ApiResponse<IEnumerable<PaymentMethodDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetMyPaymentMethods()
@@ -32,9 +38,10 @@ public class PaymentMethodsController : BaseApiController
     }
 
     /// <summary>
-    /// Get a specific payment method by ID
+    /// Lấy chi tiết một phương thức thanh toán theo ID.
     /// </summary>
-    /// <param name="id">Payment method ID</param>
+    /// <param name="id">ID phương thức thanh toán.</param>
+    /// <returns>Chi tiết phương thức thanh toán.</returns>
     [HttpGet("{id}")]
     [ProducesResponseType(typeof(ApiResponse<PaymentMethodDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -46,7 +53,7 @@ public class PaymentMethodsController : BaseApiController
         if (paymentMethod == null)
             return NotFoundResponse("Payment method not found");
 
-        // Verify ownership
+        // Kiểm tra quyền sở hữu
         if (paymentMethod.UserId != CurrentUserId)
             return ForbiddenResponse();
 
@@ -54,9 +61,10 @@ public class PaymentMethodsController : BaseApiController
     }
 
     /// <summary>
-    /// Add a new payment method
+    /// Thêm mới một phương thức thanh toán.
     /// </summary>
-    /// <param name="createDto">Payment method details</param>
+    /// <param name="createDto">Thông tin phương thức thanh toán mới.</param>
+    /// <returns>Phương thức thanh toán vừa tạo.</returns>
     [HttpPost]
     [ProducesResponseType(typeof(ApiResponse<PaymentMethodDto>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
@@ -73,10 +81,11 @@ public class PaymentMethodsController : BaseApiController
     }
 
     /// <summary>
-    /// Update an existing payment method
+    /// Cập nhật thông tin phương thức thanh toán.
     /// </summary>
-    /// <param name="id">Payment method ID</param>
-    /// <param name="updateDto">Updated payment method details</param>
+    /// <param name="id">ID phương thức thanh toán.</param>
+    /// <param name="updateDto">Thông tin cập nhật.</param>
+    /// <returns>Phương thức thanh toán sau khi cập nhật.</returns>
     [HttpPut("{id}")]
     [ProducesResponseType(typeof(ApiResponse<PaymentMethodDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -96,9 +105,10 @@ public class PaymentMethodsController : BaseApiController
     }
 
     /// <summary>
-    /// Delete a payment method
+    /// Xóa một phương thức thanh toán.
     /// </summary>
-    /// <param name="id">Payment method ID</param>
+    /// <param name="id">ID phương thức thanh toán.</param>
+    /// <returns>Kết quả xóa.</returns>
     [HttpDelete("{id}")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -118,9 +128,10 @@ public class PaymentMethodsController : BaseApiController
     }
 
     /// <summary>
-    /// Set a payment method as default
+    /// Thiết lập phương thức thanh toán mặc định.
     /// </summary>
-    /// <param name="id">Payment method ID</param>
+    /// <param name="id">ID phương thức thanh toán.</param>
+    /// <returns>Phương thức thanh toán mặc định mới.</returns>
     [HttpPatch("{id}/set-default")]
     [ProducesResponseType(typeof(ApiResponse<PaymentMethodDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -140,8 +151,9 @@ public class PaymentMethodsController : BaseApiController
     }
 
     /// <summary>
-    /// Get default payment method for user
+    /// Lấy phương thức thanh toán mặc định của người dùng.
     /// </summary>
+    /// <returns>Phương thức thanh toán mặc định.</returns>
     [HttpGet("default")]
     [ProducesResponseType(typeof(ApiResponse<PaymentMethodDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]

@@ -8,21 +8,28 @@ using SkaEV.API.Application.Services;
 namespace SkaEV.API.Controllers;
 
 /// <summary>
-/// Controller for charging post management
+/// Controller quản lý trụ sạc.
+/// Cung cấp các API để xem, thêm, sửa, xóa và cập nhật trạng thái trụ sạc.
 /// </summary>
 [Route("api/[controller]")]
 public class PostsController : BaseApiController
 {
     private readonly IPostService _postService;
 
+    /// <summary>
+    /// Constructor nhận vào PostService.
+    /// </summary>
+    /// <param name="postService">Service trụ sạc.</param>
     public PostsController(IPostService postService)
     {
         _postService = postService;
     }
 
     /// <summary>
-    /// Get all charging posts for a station
+    /// Lấy danh sách tất cả trụ sạc của một trạm.
     /// </summary>
+    /// <param name="stationId">ID trạm sạc.</param>
+    /// <returns>Danh sách trụ sạc.</returns>
     [HttpGet("station/{stationId}")]
     [AllowAnonymous]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
@@ -33,8 +40,10 @@ public class PostsController : BaseApiController
     }
 
     /// <summary>
-    /// Get available charging posts for a station
+    /// Lấy danh sách các trụ sạc đang khả dụng của một trạm.
     /// </summary>
+    /// <param name="stationId">ID trạm sạc.</param>
+    /// <returns>Danh sách trụ sạc khả dụng.</returns>
     [HttpGet("station/{stationId}/available")]
     [AllowAnonymous]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
@@ -45,8 +54,10 @@ public class PostsController : BaseApiController
     }
 
     /// <summary>
-    /// Get post by ID
+    /// Lấy chi tiết một trụ sạc theo ID.
     /// </summary>
+    /// <param name="id">ID trụ sạc.</param>
+    /// <returns>Chi tiết trụ sạc.</returns>
     [HttpGet("{id}")]
     [AllowAnonymous]
     [ProducesResponseType(typeof(ApiResponse<PostDto>), StatusCodes.Status200OK)]
@@ -62,8 +73,10 @@ public class PostsController : BaseApiController
     }
 
     /// <summary>
-    /// Create a new charging post (Admin/Staff only)
+    /// Tạo mới một trụ sạc (Chỉ Admin/Staff).
     /// </summary>
+    /// <param name="createDto">Thông tin trụ sạc mới.</param>
+    /// <returns>Trụ sạc vừa tạo.</returns>
     [HttpPost]
     [Authorize(Roles = Roles.Admin + "," + Roles.Staff)]
     [ProducesResponseType(typeof(ApiResponse<PostDto>), StatusCodes.Status201Created)]
@@ -80,8 +93,11 @@ public class PostsController : BaseApiController
     }
 
     /// <summary>
-    /// Update a charging post (Admin/Staff only)
+    /// Cập nhật thông tin trụ sạc (Chỉ Admin/Staff).
     /// </summary>
+    /// <param name="id">ID trụ sạc.</param>
+    /// <param name="updateDto">Thông tin cập nhật.</param>
+    /// <returns>Trụ sạc sau khi cập nhật.</returns>
     [HttpPut("{id}")]
     [Authorize(Roles = Roles.Admin + "," + Roles.Staff)]
     [ProducesResponseType(typeof(ApiResponse<PostDto>), StatusCodes.Status200OK)]
@@ -98,8 +114,10 @@ public class PostsController : BaseApiController
     }
 
     /// <summary>
-    /// Delete a charging post (Admin only)
+    /// Xóa một trụ sạc (Chỉ Admin).
     /// </summary>
+    /// <param name="id">ID trụ sạc.</param>
+    /// <returns>Kết quả xóa.</returns>
     [HttpDelete("{id}")]
     [Authorize(Roles = Roles.Admin)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
@@ -112,12 +130,15 @@ public class PostsController : BaseApiController
             return NotFoundResponse("Post not found");
 
         await _postService.DeletePostAsync(id);
-        return OkResponse<object>(null, "Post deleted successfully");
+        return OkResponse<object>(new { }, "Post deleted successfully");
     }
 
     /// <summary>
-    /// Update post status (Staff only)
+    /// Cập nhật trạng thái trụ sạc (Chỉ Staff/Admin).
     /// </summary>
+    /// <param name="id">ID trụ sạc.</param>
+    /// <param name="statusDto">Trạng thái mới.</param>
+    /// <returns>Trụ sạc sau khi cập nhật trạng thái.</returns>
     [HttpPatch("{id}/status")]
     [Authorize(Roles = Roles.Staff + "," + Roles.Admin)]
     [ProducesResponseType(typeof(ApiResponse<PostDto>), StatusCodes.Status200OK)]
@@ -134,8 +155,10 @@ public class PostsController : BaseApiController
     }
 
     /// <summary>
-    /// Get post availability summary
+    /// Lấy tóm tắt tình trạng khả dụng của các trụ sạc tại một trạm.
     /// </summary>
+    /// <param name="stationId">ID trạm sạc.</param>
+    /// <returns>Tóm tắt tình trạng khả dụng.</returns>
     [HttpGet("station/{stationId}/summary")]
     [AllowAnonymous]
     [ProducesResponseType(typeof(ApiResponse<PostAvailabilitySummaryDto>), StatusCodes.Status200OK)]

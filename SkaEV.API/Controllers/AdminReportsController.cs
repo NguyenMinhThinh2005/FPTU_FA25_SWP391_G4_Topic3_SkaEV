@@ -8,14 +8,22 @@ using SkaEV.API.Application.Services;
 namespace SkaEV.API.Controllers;
 
 /// <summary>
-/// Controller for admin analytics and reporting
+/// Controller quản lý các báo cáo và phân tích dữ liệu dành cho Admin.
+/// Cung cấp các API để xem doanh thu, mức độ sử dụng, hiệu suất trạm sạc, và các thống kê khác.
 /// </summary>
 [Authorize(Roles = Roles.Admin + "," + Roles.Staff)]
 public class AdminReportsController : BaseApiController
 {
+    // Service xử lý logic báo cáo
     private readonly IReportService _reportService;
+    // Logger để ghi lại các hoạt động
     private readonly ILogger<AdminReportsController> _logger;
 
+    /// <summary>
+    /// Constructor nhận vào ReportService và Logger thông qua Dependency Injection.
+    /// </summary>
+    /// <param name="reportService">Service xử lý báo cáo.</param>
+    /// <param name="logger">Logger hệ thống.</param>
     public AdminReportsController(IReportService reportService, ILogger<AdminReportsController> logger)
     {
         _reportService = reportService;
@@ -23,11 +31,12 @@ public class AdminReportsController : BaseApiController
     }
 
     /// <summary>
-    /// Get revenue reports for all or specific station
+    /// Lấy báo cáo doanh thu cho tất cả hoặc một trạm cụ thể.
     /// </summary>
-    /// <param name="stationId">Optional station ID filter</param>
-    /// <param name="year">Optional year filter</param>
-    /// <param name="month">Optional month filter</param>
+    /// <param name="stationId">ID trạm (tùy chọn, nếu null sẽ lấy tất cả).</param>
+    /// <param name="year">Năm lọc báo cáo (tùy chọn).</param>
+    /// <param name="month">Tháng lọc báo cáo (tùy chọn).</param>
+    /// <returns>Dữ liệu báo cáo doanh thu và tóm tắt tổng quan.</returns>
     [HttpGet("revenue")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetRevenueReports(
@@ -35,12 +44,15 @@ public class AdminReportsController : BaseApiController
         [FromQuery] int? year = null,
         [FromQuery] int? month = null)
     {
+        // Lấy dữ liệu báo cáo từ service
         var reports = await _reportService.GetRevenueReportsAsync(stationId, year, month);
 
+        // Tính toán các chỉ số tổng hợp
         var totalRevenue = reports.Sum(r => r.TotalRevenue);
         var totalEnergy = reports.Sum(r => r.TotalEnergySoldKwh);
         var totalTransactions = reports.Sum(r => r.TotalTransactions);
 
+        // Trả về kết quả bao gồm chi tiết và tóm tắt
         return OkResponse(new
         {
             data = reports,
@@ -55,11 +67,12 @@ public class AdminReportsController : BaseApiController
     }
 
     /// <summary>
-    /// Get usage statistics for all or specific station
+    /// Lấy thống kê mức độ sử dụng cho tất cả hoặc một trạm cụ thể.
     /// </summary>
-    /// <param name="stationId">Optional station ID filter</param>
-    /// <param name="year">Optional year filter</param>
-    /// <param name="month">Optional month filter</param>
+    /// <param name="stationId">ID trạm (tùy chọn).</param>
+    /// <param name="year">Năm (tùy chọn).</param>
+    /// <param name="month">Tháng (tùy chọn).</param>
+    /// <returns>Dữ liệu thống kê sử dụng và tóm tắt.</returns>
     [HttpGet("usage")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetUsageReports(
@@ -67,12 +80,15 @@ public class AdminReportsController : BaseApiController
         [FromQuery] int? year = null,
         [FromQuery] int? month = null)
     {
+        // Lấy dữ liệu báo cáo sử dụng từ service
         var reports = await _reportService.GetUsageReportsAsync(stationId, year, month);
 
+        // Tính toán các chỉ số tổng hợp
         var totalBookings = reports.Sum(r => r.TotalBookings);
         var totalCompleted = reports.Sum(r => r.CompletedSessions);
         var avgUtilization = reports.Any() ? reports.Average(r => r.UtilizationRatePercent ?? 0) : 0;
 
+        // Trả về kết quả
         return OkResponse(new
         {
             data = reports,
@@ -87,7 +103,7 @@ public class AdminReportsController : BaseApiController
     }
 
     /// <summary>
-    /// Debug endpoint to test view access
+    /// Endpoint debug để kiểm tra quyền truy cập vào View trong database.
     /// </summary>
     [HttpGet("test-view")]
     public async Task<IActionResult> TestViewAccess()
@@ -95,6 +111,7 @@ public class AdminReportsController : BaseApiController
         try
         {
             _logger.LogInformation("Testing direct SQL access to view...");
+            // Kết nối trực tiếp SQL để kiểm tra (Lưu ý: Hardcoded connection string chỉ dùng cho debug/test)
             using var connection = new Microsoft.Data.SqlClient.SqlConnection("Server=ADMIN-PC\\MSSQLSERVER01;Database=SkaEV_DB;TrustServerCertificate=True;Integrated Security=True;");
             await connection.OpenAsync();
             using var command = connection.CreateCommand();
@@ -105,7 +122,7 @@ public class AdminReportsController : BaseApiController
                 : System.Convert.ToInt32(scalarResult);
             _logger.LogInformation($"Direct SQL returned {count} records");
 
-            // Now test through service
+            // Kiểm tra thông qua Service
             _logger.LogInformation("Testing through ReportService...");
             var serviceResult = await _reportService.GetUsageReportsAsync();
             _logger.LogInformation($"Service returned {serviceResult.Count()} records");
@@ -125,9 +142,10 @@ public class AdminReportsController : BaseApiController
     }
 
     /// <summary>
-    /// Get real-time station performance metrics
+    /// Lấy các chỉ số hiệu suất trạm sạc theo thời gian thực.
     /// </summary>
-    /// <param name="stationId">Optional station ID filter</param>
+    /// <param name="stationId">ID trạm (tùy chọn).</param>
+    /// <returns>Dữ liệu hiệu suất trạm.</returns>
     [HttpGet("station-performance")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetStationPerformance([FromQuery] int? stationId = null)
@@ -137,11 +155,12 @@ public class AdminReportsController : BaseApiController
     }
 
     /// <summary>
-    /// Get top performing stations by revenue
+    /// Lấy danh sách các trạm có doanh thu cao nhất.
     /// </summary>
-    /// <param name="year">Year</param>
-    /// <param name="month">Month</param>
-    /// <param name="limit">Number of top stations to return (default: 10)</param>
+    /// <param name="year">Năm.</param>
+    /// <param name="month">Tháng.</param>
+    /// <param name="limit">Số lượng trạm muốn lấy (mặc định 10).</param>
+    /// <returns>Danh sách top trạm theo doanh thu.</returns>
     [HttpGet("top-stations")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetTopStations(
@@ -152,6 +171,7 @@ public class AdminReportsController : BaseApiController
         var currentYear = year ?? DateTime.Now.Year;
         var currentMonth = month ?? DateTime.Now.Month;
 
+        // Lấy báo cáo doanh thu và sắp xếp giảm dần
         var reports = await _reportService.GetRevenueReportsAsync(null, currentYear, currentMonth);
         var topStations = reports.OrderByDescending(r => r.TotalRevenue).Take(limit);
 
@@ -159,8 +179,9 @@ public class AdminReportsController : BaseApiController
     }
 
     /// <summary>
-    /// Get dashboard summary with key metrics
+    /// Lấy dữ liệu tổng quan cho Dashboard Admin.
     /// </summary>
+    /// <returns>Các chỉ số chính cho dashboard.</returns>
     [HttpGet("dashboard")]
     [ProducesResponseType(typeof(ApiResponse<AdminDashboardDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetDashboardSummary()
@@ -170,8 +191,9 @@ public class AdminReportsController : BaseApiController
     }
 
     /// <summary>
-    /// Get payment methods usage statistics
+    /// Lấy thống kê sử dụng các phương thức thanh toán.
     /// </summary>
+    /// <returns>Thống kê phương thức thanh toán.</returns>
     [HttpGet("payment-methods-stats")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetPaymentMethodsStatistics()
@@ -181,8 +203,12 @@ public class AdminReportsController : BaseApiController
     }
 
     /// <summary>
-    /// Export revenue report to CSV
+    /// Xuất báo cáo doanh thu ra file CSV.
     /// </summary>
+    /// <param name="stationId">ID trạm (tùy chọn).</param>
+    /// <param name="year">Năm (tùy chọn).</param>
+    /// <param name="month">Tháng (tùy chọn).</param>
+    /// <returns>File CSV chứa báo cáo doanh thu.</returns>
     [HttpGet("revenue/export")]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
     public async Task<IActionResult> ExportRevenueReport(
@@ -201,8 +227,11 @@ public class AdminReportsController : BaseApiController
     }
 
     /// <summary>
-    /// Get peak hours analysis
+    /// Phân tích giờ cao điểm sử dụng trạm sạc.
     /// </summary>
+    /// <param name="stationId">ID trạm (tùy chọn).</param>
+    /// <param name="dateRange">Khoảng thời gian (mặc định "last30days").</param>
+    /// <returns>Dữ liệu phân tích giờ cao điểm.</returns>
     [HttpGet("peak-hours")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetPeakHoursAnalysis(
@@ -214,8 +243,9 @@ public class AdminReportsController : BaseApiController
     }
 
     /// <summary>
-    /// Get system health metrics
+    /// Lấy các chỉ số sức khỏe hệ thống.
     /// </summary>
+    /// <returns>Thông tin sức khỏe hệ thống.</returns>
     [HttpGet("system-health")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetSystemHealth()
@@ -225,8 +255,10 @@ public class AdminReportsController : BaseApiController
     }
 
     /// <summary>
-    /// Get user growth analytics
+    /// Phân tích sự tăng trưởng người dùng.
     /// </summary>
+    /// <param name="dateRange">Khoảng thời gian (mặc định "last30days").</param>
+    /// <returns>Dữ liệu tăng trưởng người dùng.</returns>
     [HttpGet("user-growth")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetUserGrowth([FromQuery] string? dateRange = "last30days")
@@ -236,11 +268,12 @@ public class AdminReportsController : BaseApiController
     }
 
     /// <summary>
-    /// Get detailed analytics for a specific station with time-series data
+    /// Lấy phân tích chi tiết cho một trạm cụ thể với dữ liệu chuỗi thời gian.
     /// </summary>
-    /// <param name="stationId">Station ID</param>
-    /// <param name="startDate">Start date (optional, defaults to 30 days ago)</param>
-    /// <param name="endDate">End date (optional, defaults to now)</param>
+    /// <param name="stationId">ID trạm.</param>
+    /// <param name="startDate">Ngày bắt đầu (tùy chọn, mặc định 30 ngày trước).</param>
+    /// <param name="endDate">Ngày kết thúc (tùy chọn, mặc định hiện tại).</param>
+    /// <returns>Dữ liệu phân tích chi tiết trạm.</returns>
     [HttpGet("stations/{stationId}/detailed-analytics")]
     [ProducesResponseType(typeof(ApiResponse<StationDetailedAnalyticsDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -254,11 +287,12 @@ public class AdminReportsController : BaseApiController
     }
 
     /// <summary>
-    /// Get daily analytics for a specific station
+    /// Lấy phân tích hàng ngày cho một trạm cụ thể.
     /// </summary>
-    /// <param name="stationId">Station ID</param>
-    /// <param name="startDate">Start date (optional, defaults to 30 days ago)</param>
-    /// <param name="endDate">End date (optional, defaults to now)</param>
+    /// <param name="stationId">ID trạm.</param>
+    /// <param name="startDate">Ngày bắt đầu.</param>
+    /// <param name="endDate">Ngày kết thúc.</param>
+    /// <returns>Danh sách phân tích theo ngày.</returns>
     [HttpGet("stations/{stationId}/daily")]
     [ProducesResponseType(typeof(ApiResponse<List<DailyAnalyticsDto>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -272,11 +306,12 @@ public class AdminReportsController : BaseApiController
     }
 
     /// <summary>
-    /// Get monthly analytics for a specific station
+    /// Lấy phân tích hàng tháng cho một trạm cụ thể.
     /// </summary>
-    /// <param name="stationId">Station ID</param>
-    /// <param name="year">Year</param>
-    /// <param name="month">Month (1-12)</param>
+    /// <param name="stationId">ID trạm.</param>
+    /// <param name="year">Năm.</param>
+    /// <param name="month">Tháng (1-12).</param>
+    /// <returns>Dữ liệu phân tích tháng.</returns>
     [HttpGet("stations/{stationId}/monthly")]
     [ProducesResponseType(typeof(ApiResponse<MonthlyAnalyticsDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -299,10 +334,11 @@ public class AdminReportsController : BaseApiController
     }
 
     /// <summary>
-    /// Get yearly analytics for a specific station
+    /// Lấy phân tích hàng năm cho một trạm cụ thể.
     /// </summary>
-    /// <param name="stationId">Station ID</param>
-    /// <param name="year">Year (optional, defaults to current year)</param>
+    /// <param name="stationId">ID trạm.</param>
+    /// <param name="year">Năm (tùy chọn, mặc định năm hiện tại).</param>
+    /// <returns>Dữ liệu phân tích năm.</returns>
     [HttpGet("stations/{stationId}/yearly")]
     [ProducesResponseType(typeof(ApiResponse<YearlyAnalyticsDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -316,12 +352,13 @@ public class AdminReportsController : BaseApiController
     }
 
     /// <summary>
-    /// Get time-series data for a specific station
+    /// Lấy dữ liệu chuỗi thời gian cho một trạm cụ thể (dùng cho biểu đồ).
     /// </summary>
-    /// <param name="stationId">Station ID</param>
-    /// <param name="granularity">Granularity: daily, monthly, or yearly</param>
-    /// <param name="startDate">Start date (optional)</param>
-    /// <param name="endDate">End date (optional)</param>
+    /// <param name="stationId">ID trạm.</param>
+    /// <param name="granularity">Độ chi tiết: daily (ngày), monthly (tháng), yearly (năm).</param>
+    /// <param name="startDate">Ngày bắt đầu.</param>
+    /// <param name="endDate">Ngày kết thúc.</param>
+    /// <returns>Danh sách điểm dữ liệu chuỗi thời gian.</returns>
     [HttpGet("stations/{stationId}/time-series")]
     [ProducesResponseType(typeof(ApiResponse<List<TimeSeriesDataPointDto>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]

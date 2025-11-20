@@ -8,22 +8,30 @@ using SkaEV.API.Application.Services;
 namespace SkaEV.API.Controllers;
 
 /// <summary>
-/// Controller for user notifications
+/// Controller quản lý thông báo người dùng.
+/// Cung cấp các API để xem, đánh dấu đã đọc, xóa và gửi thông báo.
 /// </summary>
 [Authorize]
 [Route("api/[controller]")]
 public class NotificationsController : BaseApiController
 {
+    // Service xử lý logic thông báo
     private readonly INotificationService _notificationService;
 
+    /// <summary>
+    /// Constructor nhận vào NotificationService thông qua Dependency Injection.
+    /// </summary>
+    /// <param name="notificationService">Service thông báo.</param>
     public NotificationsController(INotificationService notificationService)
     {
         _notificationService = notificationService;
     }
 
     /// <summary>
-    /// Get my notifications
+    /// Lấy danh sách thông báo của người dùng hiện tại.
     /// </summary>
+    /// <param name="unreadOnly">Chỉ lấy thông báo chưa đọc (mặc định false).</param>
+    /// <returns>Danh sách thông báo và tổng số lượng.</returns>
     [HttpGet]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetMyNotifications([FromQuery] bool unreadOnly = false)
@@ -33,8 +41,9 @@ public class NotificationsController : BaseApiController
     }
 
     /// <summary>
-    /// Get unread notification count
+    /// Lấy số lượng thông báo chưa đọc.
     /// </summary>
+    /// <returns>Số lượng thông báo chưa đọc.</returns>
     [HttpGet("unread-count")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetUnreadCount()
@@ -44,8 +53,10 @@ public class NotificationsController : BaseApiController
     }
 
     /// <summary>
-    /// Get notification by ID
+    /// Lấy chi tiết thông báo theo ID.
     /// </summary>
+    /// <param name="id">ID thông báo.</param>
+    /// <returns>Chi tiết thông báo.</returns>
     [HttpGet("{id}")]
     [ProducesResponseType(typeof(ApiResponse<NotificationDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -57,6 +68,7 @@ public class NotificationsController : BaseApiController
         if (notification == null)
             return NotFoundResponse("Notification not found");
 
+        // Kiểm tra quyền sở hữu
         if (notification.UserId != CurrentUserId)
             return ForbiddenResponse();
 
@@ -64,8 +76,10 @@ public class NotificationsController : BaseApiController
     }
 
     /// <summary>
-    /// Mark notification as read
+    /// Đánh dấu một thông báo là đã đọc.
     /// </summary>
+    /// <param name="id">ID thông báo.</param>
+    /// <returns>Kết quả đánh dấu.</returns>
     [HttpPatch("{id}/read")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -81,23 +95,26 @@ public class NotificationsController : BaseApiController
             return ForbiddenResponse();
 
         await _notificationService.MarkAsReadAsync(id);
-        return OkResponse<object>(null, "Notification marked as read");
+        return OkResponse<object>(new { }, "Notification marked as read");
     }
 
     /// <summary>
-    /// Mark all notifications as read
+    /// Đánh dấu tất cả thông báo là đã đọc.
     /// </summary>
+    /// <returns>Kết quả đánh dấu.</returns>
     [HttpPatch("read-all")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> MarkAllAsRead()
     {
         await _notificationService.MarkAllAsReadAsync(CurrentUserId);
-        return OkResponse<object>(null, "All notifications marked as read");
+        return OkResponse<object>(new { }, "All notifications marked as read");
     }
 
     /// <summary>
-    /// Delete a notification
+    /// Xóa một thông báo.
     /// </summary>
+    /// <param name="id">ID thông báo.</param>
+    /// <returns>Kết quả xóa.</returns>
     [HttpDelete("{id}")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -113,23 +130,26 @@ public class NotificationsController : BaseApiController
             return ForbiddenResponse();
 
         await _notificationService.DeleteNotificationAsync(id);
-        return OkResponse<object>(null, "Notification deleted");
+        return OkResponse<object>(new { }, "Notification deleted");
     }
 
     /// <summary>
-    /// Delete all read notifications
+    /// Xóa tất cả thông báo đã đọc.
     /// </summary>
+    /// <returns>Kết quả xóa.</returns>
     [HttpDelete("read")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> DeleteAllRead()
     {
         await _notificationService.DeleteAllReadAsync(CurrentUserId);
-        return OkResponse<object>(null, "All read notifications deleted");
+        return OkResponse<object>(new { }, "All read notifications deleted");
     }
 
     /// <summary>
-    /// Send notification to user (Admin/Staff only)
+    /// Gửi thông báo cho một người dùng cụ thể (Dành cho Admin/Staff).
     /// </summary>
+    /// <param name="createDto">Thông tin thông báo.</param>
+    /// <returns>Thông báo vừa tạo.</returns>
     [HttpPost]
     [Authorize(Roles = Roles.Admin + "," + Roles.Staff)]
     [ProducesResponseType(typeof(ApiResponse<NotificationDto>), StatusCodes.Status201Created)]
@@ -144,8 +164,10 @@ public class NotificationsController : BaseApiController
     }
 
     /// <summary>
-    /// Send notification to all users (Admin only)
+    /// Gửi thông báo cho tất cả người dùng (Broadcast) (Dành cho Admin).
     /// </summary>
+    /// <param name="broadcastDto">Thông tin thông báo broadcast.</param>
+    /// <returns>Số lượng người dùng nhận được thông báo.</returns>
     [HttpPost("broadcast")]
     [Authorize(Roles = Roles.Admin)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]

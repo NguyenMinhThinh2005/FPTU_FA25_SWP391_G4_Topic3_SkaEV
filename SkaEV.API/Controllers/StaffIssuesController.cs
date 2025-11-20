@@ -8,7 +8,7 @@ using SkaEV.API.Application.Services;
 namespace SkaEV.API.Controllers;
 
 /// <summary>
-/// Controller for issue and maintenance tracking (Staff/Admin)
+/// Controller quản lý sự cố và bảo trì (Dành cho Staff/Admin).
 /// </summary>
 [Route("api/[controller]")]
 [Authorize(Roles = Roles.Staff + "," + Roles.Admin)]
@@ -17,6 +17,11 @@ public class StaffIssuesController : BaseApiController
     private readonly IIssueService _issueService;
     private readonly ILogger<StaffIssuesController> _logger;
 
+    /// <summary>
+    /// Constructor nhận vào IssueService và Logger.
+    /// </summary>
+    /// <param name="issueService">Service sự cố.</param>
+    /// <param name="logger">Logger hệ thống.</param>
     public StaffIssuesController(IIssueService issueService, ILogger<StaffIssuesController> logger)
     {
         _issueService = issueService;
@@ -24,8 +29,15 @@ public class StaffIssuesController : BaseApiController
     }
 
     /// <summary>
-    /// Get all issues with filtering
+    /// Lấy danh sách sự cố với các bộ lọc.
     /// </summary>
+    /// <param name="status">Trạng thái sự cố (tùy chọn).</param>
+    /// <param name="priority">Mức độ ưu tiên (tùy chọn).</param>
+    /// <param name="stationId">ID trạm sạc (tùy chọn).</param>
+    /// <param name="assignedToUserId">ID nhân viên được phân công (tùy chọn).</param>
+    /// <param name="page">Trang hiện tại (mặc định: 1).</param>
+    /// <param name="pageSize">Số lượng mỗi trang (mặc định: 20).</param>
+    /// <returns>Danh sách sự cố phân trang.</returns>
     [HttpGet]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAllIssues(
@@ -53,8 +65,10 @@ public class StaffIssuesController : BaseApiController
     }
 
     /// <summary>
-    /// Get my assigned issues
+    /// Lấy danh sách sự cố được phân công cho tôi.
     /// </summary>
+    /// <param name="status">Trạng thái sự cố (tùy chọn).</param>
+    /// <returns>Danh sách sự cố của tôi.</returns>
     [HttpGet("my-issues")]
     [ProducesResponseType(typeof(ApiResponse<IEnumerable<IssueDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetMyIssues([FromQuery] string? status = null)
@@ -64,8 +78,10 @@ public class StaffIssuesController : BaseApiController
     }
 
     /// <summary>
-    /// Get issue by ID
+    /// Lấy chi tiết một sự cố theo ID.
     /// </summary>
+    /// <param name="id">ID sự cố.</param>
+    /// <returns>Chi tiết sự cố.</returns>
     [HttpGet("{id}")]
     [ProducesResponseType(typeof(ApiResponse<IssueDetailDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -80,8 +96,10 @@ public class StaffIssuesController : BaseApiController
     }
 
     /// <summary>
-    /// Create a new issue
+    /// Tạo mới một sự cố.
     /// </summary>
+    /// <param name="createDto">Thông tin sự cố mới.</param>
+    /// <returns>Sự cố vừa tạo.</returns>
     [HttpPost]
     [ProducesResponseType(typeof(ApiResponse<IssueDto>), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -100,8 +118,11 @@ public class StaffIssuesController : BaseApiController
     }
 
     /// <summary>
-    /// Update an issue
+    /// Cập nhật thông tin sự cố.
     /// </summary>
+    /// <param name="id">ID sự cố.</param>
+    /// <param name="updateDto">Thông tin cập nhật.</param>
+    /// <returns>Sự cố sau khi cập nhật.</returns>
     [HttpPut("{id}")]
     [ProducesResponseType(typeof(ApiResponse<IssueDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -124,8 +145,11 @@ public class StaffIssuesController : BaseApiController
     }
 
     /// <summary>
-    /// Assign issue to staff member
+    /// Phân công sự cố cho nhân viên.
     /// </summary>
+    /// <param name="id">ID sự cố.</param>
+    /// <param name="assignDto">Thông tin phân công.</param>
+    /// <returns>Sự cố sau khi phân công.</returns>
     [HttpPatch("{id}/assign")]
     [Authorize(Roles = Roles.Admin + "," + Roles.Staff)]
     [ProducesResponseType(typeof(ApiResponse<IssueDto>), StatusCodes.Status200OK)]
@@ -149,8 +173,11 @@ public class StaffIssuesController : BaseApiController
     }
 
     /// <summary>
-    /// Update issue status
+    /// Cập nhật trạng thái sự cố.
     /// </summary>
+    /// <param name="id">ID sự cố.</param>
+    /// <param name="statusDto">Thông tin trạng thái mới.</param>
+    /// <returns>Sự cố sau khi cập nhật trạng thái.</returns>
     [HttpPatch("{id}/status")]
     [ProducesResponseType(typeof(ApiResponse<IssueDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -173,8 +200,11 @@ public class StaffIssuesController : BaseApiController
     }
 
     /// <summary>
-    /// Add comment to issue
+    /// Thêm bình luận vào sự cố.
     /// </summary>
+    /// <param name="id">ID sự cố.</param>
+    /// <param name="commentDto">Nội dung bình luận.</param>
+    /// <returns>Bình luận vừa thêm.</returns>
     [HttpPost("{id}/comments")]
     [ProducesResponseType(typeof(ApiResponse<IssueCommentDto>), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -190,8 +220,12 @@ public class StaffIssuesController : BaseApiController
     }
 
     /// <summary>
-    /// Upload attachment to issue
+    /// Tải lên tệp đính kèm cho sự cố.
     /// </summary>
+    /// <param name="id">ID sự cố.</param>
+    /// <param name="file">File đính kèm.</param>
+    /// <param name="description">Mô tả file (tùy chọn).</param>
+    /// <returns>Thông tin file đính kèm.</returns>
     [HttpPost("{id}/attachments")]
     [ProducesResponseType(typeof(ApiResponse<IssueAttachmentDto>), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -215,8 +249,10 @@ public class StaffIssuesController : BaseApiController
     }
 
     /// <summary>
-    /// Delete an issue (Admin only)
+    /// Xóa một sự cố (Chỉ Admin).
     /// </summary>
+    /// <param name="id">ID sự cố.</param>
+    /// <returns>Kết quả xóa.</returns>
     [HttpDelete("{id}")]
     [Authorize(Roles = Roles.Admin)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
@@ -233,8 +269,10 @@ public class StaffIssuesController : BaseApiController
     }
 
     /// <summary>
-    /// Get issue statistics
+    /// Lấy thống kê sự cố.
     /// </summary>
+    /// <param name="stationId">ID trạm sạc (tùy chọn).</param>
+    /// <returns>Thống kê sự cố.</returns>
     [HttpGet("statistics")]
     [ProducesResponseType(typeof(ApiResponse<IssueStatisticsDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetIssueStatistics([FromQuery] int? stationId = null)
@@ -244,8 +282,12 @@ public class StaffIssuesController : BaseApiController
     }
 
     /// <summary>
-    /// Get maintenance schedule
+    /// Lấy lịch bảo trì.
     /// </summary>
+    /// <param name="stationId">ID trạm sạc (tùy chọn).</param>
+    /// <param name="startDate">Ngày bắt đầu (tùy chọn).</param>
+    /// <param name="endDate">Ngày kết thúc (tùy chọn).</param>
+    /// <returns>Lịch bảo trì.</returns>
     [HttpGet("maintenance-schedule")]
     [ProducesResponseType(typeof(ApiResponse<IEnumerable<MaintenanceScheduleDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetMaintenanceSchedule(

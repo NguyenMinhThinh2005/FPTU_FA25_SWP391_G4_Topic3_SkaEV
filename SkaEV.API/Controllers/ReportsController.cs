@@ -8,7 +8,7 @@ using SkaEV.API.Application.Services;
 namespace SkaEV.API.Controllers;
 
 /// <summary>
-/// Controller for customer-facing reports and analytics
+/// Controller cho các báo cáo và phân tích dành cho khách hàng.
 /// </summary>
 [Authorize(Roles = Roles.Customer)]
 [Route("api/[controller]")]
@@ -16,17 +16,21 @@ public class ReportsController : BaseApiController
 {
     private readonly IReportService _reportService;
 
+    /// <summary>
+    /// Constructor nhận vào ReportService.
+    /// </summary>
+    /// <param name="reportService">Service báo cáo.</param>
     public ReportsController(IReportService reportService)
     {
         _reportService = reportService;
     }
 
     /// <summary>
-    /// Get cost reports for the authenticated user
+    /// Lấy báo cáo chi phí của người dùng hiện tại.
     /// </summary>
-    /// <param name="year">Optional year filter</param>
-    /// <param name="month">Optional month filter</param>
-    /// <returns>User's cost reports grouped by month</returns>
+    /// <param name="year">Năm lọc (tùy chọn).</param>
+    /// <param name="month">Tháng lọc (tùy chọn).</param>
+    /// <returns>Báo cáo chi phí theo tháng.</returns>
     [HttpGet("my-costs")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetMyCostReports([FromQuery] int? year = null, [FromQuery] int? month = null)
@@ -49,9 +53,9 @@ public class ReportsController : BaseApiController
     }
 
     /// <summary>
-    /// Get charging habits and patterns for the authenticated user
+    /// Lấy phân tích thói quen sạc của người dùng hiện tại.
     /// </summary>
-    /// <returns>User's charging habits analysis</returns>
+    /// <returns>Phân tích thói quen sạc.</returns>
     [HttpGet("my-habits")]
     [ProducesResponseType(typeof(ApiResponse<ChargingHabitsDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -66,10 +70,11 @@ public class ReportsController : BaseApiController
     }
 
     /// <summary>
-    /// Get monthly summary for the authenticated user
+    /// Lấy tóm tắt hoạt động hàng tháng của người dùng hiện tại.
     /// </summary>
-    /// <param name="year">Year</param>
-    /// <param name="month">Month</param>
+    /// <param name="year">Năm.</param>
+    /// <param name="month">Tháng.</param>
+    /// <returns>Tóm tắt hoạt động tháng.</returns>
     [HttpGet("monthly-summary")]
     [ProducesResponseType(typeof(ApiResponse<MonthlySummaryDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetMonthlySummary([FromQuery] int? year = null, [FromQuery] int? month = null)
@@ -82,8 +87,10 @@ public class ReportsController : BaseApiController
     }
 
     /// <summary>
-    /// Get year-to-date summary for the authenticated user
+    /// Lấy tóm tắt hoạt động từ đầu năm đến nay của người dùng hiện tại.
     /// </summary>
+    /// <param name="year">Năm (mặc định là năm hiện tại).</param>
+    /// <returns>Tóm tắt hoạt động từ đầu năm.</returns>
     [HttpGet("ytd-summary")]
     [ProducesResponseType(typeof(ApiResponse<YearToDateSummaryDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetYearToDateSummary([FromQuery] int? year = null)

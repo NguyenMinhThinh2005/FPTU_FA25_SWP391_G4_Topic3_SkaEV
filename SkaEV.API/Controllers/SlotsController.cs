@@ -9,7 +9,7 @@ using SkaEV.API.Infrastructure.Data;
 namespace SkaEV.API.Controllers;
 
 /// <summary>
-/// Controller for charging slot management
+/// Controller quản lý các slot sạc.
 /// </summary>
 [Route("api/[controller]")]
 public class SlotsController : BaseApiController
@@ -17,6 +17,11 @@ public class SlotsController : BaseApiController
     private readonly ISlotService _slotService;
     private readonly ILogger<SlotsController> _logger;
 
+    /// <summary>
+    /// Constructor nhận vào SlotService và Logger.
+    /// </summary>
+    /// <param name="slotService">Service slot sạc.</param>
+    /// <param name="logger">Logger hệ thống.</param>
     public SlotsController(ISlotService slotService, ILogger<SlotsController> logger)
     {
         _slotService = slotService;
@@ -24,8 +29,10 @@ public class SlotsController : BaseApiController
     }
 
     /// <summary>
-    /// Get all slots for a charging post
+    /// Lấy danh sách tất cả slot của một trụ sạc.
     /// </summary>
+    /// <param name="postId">ID trụ sạc.</param>
+    /// <returns>Danh sách slot.</returns>
     [HttpGet("post/{postId}")]
     [AllowAnonymous]
     [ProducesResponseType(typeof(ApiResponse<IEnumerable<SlotDto>>), StatusCodes.Status200OK)]
@@ -36,8 +43,12 @@ public class SlotsController : BaseApiController
     }
 
     /// <summary>
-    /// Get available slots for a date range
+    /// Lấy danh sách slot khả dụng trong khoảng thời gian.
     /// </summary>
+    /// <param name="postId">ID trụ sạc.</param>
+    /// <param name="startDate">Thời gian bắt đầu.</param>
+    /// <param name="endDate">Thời gian kết thúc.</param>
+    /// <returns>Danh sách slot khả dụng.</returns>
     [HttpGet("available")]
     [AllowAnonymous]
     [ProducesResponseType(typeof(ApiResponse<IEnumerable<SlotDto>>), StatusCodes.Status200OK)]
@@ -51,8 +62,10 @@ public class SlotsController : BaseApiController
     }
 
     /// <summary>
-    /// Get slot by ID
+    /// Lấy thông tin slot theo ID.
     /// </summary>
+    /// <param name="id">ID slot.</param>
+    /// <returns>Chi tiết slot.</returns>
     [HttpGet("{id}")]
     [AllowAnonymous]
     [ProducesResponseType(typeof(ApiResponse<SlotDto>), StatusCodes.Status200OK)]
@@ -68,8 +81,10 @@ public class SlotsController : BaseApiController
     }
 
     /// <summary>
-    /// Create charging slots (Admin/Staff only)
+    /// Tạo mới các slot sạc (Chỉ Admin/Staff).
     /// </summary>
+    /// <param name="createDto">Thông tin tạo slot.</param>
+    /// <returns>Danh sách slot vừa tạo.</returns>
     [HttpPost]
     [Authorize(Roles = Roles.Admin + "," + Roles.Staff)]
     [ProducesResponseType(typeof(ApiResponse<IEnumerable<SlotDto>>), StatusCodes.Status201Created)]
@@ -88,8 +103,11 @@ public class SlotsController : BaseApiController
     }
 
     /// <summary>
-    /// Update a slot (Admin/Staff only)
+    /// Cập nhật thông tin slot (Chỉ Admin/Staff).
     /// </summary>
+    /// <param name="id">ID slot.</param>
+    /// <param name="updateDto">Thông tin cập nhật.</param>
+    /// <returns>Slot sau khi cập nhật.</returns>
     [HttpPut("{id}")]
     [Authorize(Roles = Roles.Admin + "," + Roles.Staff)]
     [ProducesResponseType(typeof(ApiResponse<SlotDto>), StatusCodes.Status200OK)]
@@ -113,8 +131,10 @@ public class SlotsController : BaseApiController
     }
 
     /// <summary>
-    /// Delete a slot (Admin only)
+    /// Xóa một slot (Chỉ Admin).
     /// </summary>
+    /// <param name="id">ID slot.</param>
+    /// <returns>Kết quả xóa.</returns>
     [HttpDelete("{id}")]
     [Authorize(Roles = Roles.Admin)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
@@ -139,8 +159,11 @@ public class SlotsController : BaseApiController
     }
 
     /// <summary>
-    /// Block/unblock a slot (Staff only)
+    /// Chặn/Bỏ chặn một slot (Chỉ Staff/Admin).
     /// </summary>
+    /// <param name="id">ID slot.</param>
+    /// <param name="blockDto">Thông tin chặn.</param>
+    /// <returns>Slot sau khi cập nhật trạng thái chặn.</returns>
     [HttpPatch("{id}/block")]
     [Authorize(Roles = Roles.Staff + "," + Roles.Admin)]
     [ProducesResponseType(typeof(ApiResponse<SlotDto>), StatusCodes.Status200OK)]
@@ -157,8 +180,12 @@ public class SlotsController : BaseApiController
     }
 
     /// <summary>
-    /// Get slot availability calendar
+    /// Lấy lịch khả dụng của slot.
     /// </summary>
+    /// <param name="postId">ID trụ sạc.</param>
+    /// <param name="startDate">Ngày bắt đầu.</param>
+    /// <param name="endDate">Ngày kết thúc.</param>
+    /// <returns>Lịch khả dụng.</returns>
     [HttpGet("post/{postId}/calendar")]
     [AllowAnonymous]
     [ProducesResponseType(typeof(ApiResponse<SlotCalendarDto>), StatusCodes.Status200OK)]
@@ -172,8 +199,10 @@ public class SlotsController : BaseApiController
     }
 
     /// <summary>
-    /// Bulk create slots for date range (Admin/Staff only)
+    /// Tạo hàng loạt slot cho khoảng thời gian (Chỉ Admin/Staff).
     /// </summary>
+    /// <param name="bulkDto">Thông tin tạo hàng loạt.</param>
+    /// <returns>Danh sách slot vừa tạo.</returns>
     [HttpPost("bulk")]
     [Authorize(Roles = Roles.Admin + "," + Roles.Staff)]
     [ProducesResponseType(typeof(ApiResponse<IEnumerable<SlotDto>>), StatusCodes.Status201Created)]

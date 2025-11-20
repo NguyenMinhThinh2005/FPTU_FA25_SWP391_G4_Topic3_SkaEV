@@ -6,17 +6,29 @@ using SkaEV.API.Application.Constants;
 
 namespace SkaEV.API.Controllers;
 
+/// <summary>
+/// Controller quản lý nhân viên trạm sạc.
+/// </summary>
 public class StationStaffController : BaseApiController
 {
     private readonly SkaEVDbContext _context;
     private readonly ILogger<StationStaffController> _logger;
 
+    /// <summary>
+    /// Constructor nhận vào DbContext và Logger.
+    /// </summary>
+    /// <param name="context">Database context.</param>
+    /// <param name="logger">Logger hệ thống.</param>
     public StationStaffController(SkaEVDbContext context, ILogger<StationStaffController> logger)
     {
         _context = context;
         _logger = logger;
     }
 
+    /// <summary>
+    /// Lấy danh sách nhân viên khả dụng (Role Staff và đang hoạt động).
+    /// </summary>
+    /// <returns>Danh sách nhân viên.</returns>
     // GET: api/StationStaff/available-staff
     [HttpGet("available-staff")]
     public async Task<IActionResult> GetAvailableStaff()
@@ -52,6 +64,11 @@ public class StationStaffController : BaseApiController
         }
     }
 
+    /// <summary>
+    /// Lấy danh sách nhân viên được phân công cho một trạm.
+    /// </summary>
+    /// <param name="stationId">ID trạm sạc.</param>
+    /// <returns>Danh sách nhân viên của trạm.</returns>
     // GET: api/StationStaff/station/{stationId}
     [HttpGet("station/{stationId}")]
     public async Task<IActionResult> GetStationStaff(int stationId)
@@ -83,6 +100,11 @@ public class StationStaffController : BaseApiController
         }
     }
 
+    /// <summary>
+    /// Phân công nhân viên vào trạm.
+    /// </summary>
+    /// <param name="request">Thông tin phân công.</param>
+    /// <returns>Kết quả phân công.</returns>
     // POST: api/StationStaff/assign
     [HttpPost("assign")]
     public async Task<IActionResult> AssignStaff([FromBody] AssignStaffRequest request)
@@ -148,6 +170,11 @@ public class StationStaffController : BaseApiController
         }
     }
 
+    /// <summary>
+    /// Hủy phân công nhân viên khỏi trạm.
+    /// </summary>
+    /// <param name="assignmentId">ID phân công.</param>
+    /// <returns>Kết quả hủy phân công.</returns>
     // DELETE: api/StationStaff/unassign/{assignmentId}
     [HttpDelete("unassign/{assignmentId}")]
     public async Task<IActionResult> UnassignStaff(int assignmentId)
@@ -178,6 +205,9 @@ public class StationStaffController : BaseApiController
     }
 }
 
+/// <summary>
+/// Model yêu cầu phân công nhân viên.
+/// </summary>
 public class AssignStaffRequest
 {
     public int StaffUserId { get; set; }

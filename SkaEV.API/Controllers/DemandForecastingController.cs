@@ -6,20 +6,33 @@ using SkaEV.API.Application.Services;
 
 namespace SkaEV.API.Controllers;
 
+/// <summary>
+/// Controller dự báo nhu cầu sử dụng trạm sạc.
+/// Sử dụng các thuật toán để dự đoán nhu cầu trong tương lai và giờ cao điểm.
+/// </summary>
 [Authorize]
 [Route("api/[controller]")]
 public class DemandForecastingController : BaseApiController
 {
+    // Service xử lý logic dự báo
     private readonly IDemandForecastingService _forecastingService;
 
+    /// <summary>
+    /// Constructor nhận vào DemandForecastingService thông qua Dependency Injection.
+    /// </summary>
+    /// <param name="forecastingService">Service dự báo nhu cầu.</param>
     public DemandForecastingController(IDemandForecastingService forecastingService)
     {
         _forecastingService = forecastingService;
     }
 
     /// <summary>
-    /// Get demand forecast for a specific station
+    /// Lấy dự báo nhu cầu cho một trạm sạc cụ thể trong khoảng thời gian.
     /// </summary>
+    /// <param name="stationId">ID trạm sạc.</param>
+    /// <param name="startDate">Ngày bắt đầu dự báo (mặc định là hiện tại).</param>
+    /// <param name="endDate">Ngày kết thúc dự báo (mặc định là 7 ngày sau).</param>
+    /// <returns>Dữ liệu dự báo nhu cầu.</returns>
     [HttpGet("station/{stationId}")]
     [Authorize(Roles = Roles.Admin + "," + Roles.Staff)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
@@ -33,8 +46,11 @@ public class DemandForecastingController : BaseApiController
     }
 
     /// <summary>
-    /// Predict peak hours for a station on a given date
+    /// Dự đoán các giờ cao điểm cho một trạm vào một ngày cụ thể.
     /// </summary>
+    /// <param name="stationId">ID trạm sạc.</param>
+    /// <param name="date">Ngày cần dự đoán (mặc định là hiện tại).</param>
+    /// <returns>Dữ liệu dự đoán giờ cao điểm.</returns>
     [HttpGet("station/{stationId}/peak-hours")]
     [Authorize(Roles = Roles.Admin + "," + Roles.Staff)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
@@ -46,8 +62,10 @@ public class DemandForecastingController : BaseApiController
     }
 
     /// <summary>
-    /// Get demand scores for all stations
+    /// Lấy điểm số nhu cầu (Demand Scores) cho tất cả các trạm.
+    /// Điểm số này phản ánh mức độ "hot" của trạm.
     /// </summary>
+    /// <returns>Danh sách điểm số nhu cầu của các trạm.</returns>
     [HttpGet("demand-scores")]
     [Authorize(Roles = Roles.Admin + "," + Roles.Staff)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]

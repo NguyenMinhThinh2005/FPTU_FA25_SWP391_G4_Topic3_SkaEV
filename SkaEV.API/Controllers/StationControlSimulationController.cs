@@ -8,8 +8,8 @@ using SkaEV.API.Infrastructure.Data;
 namespace SkaEV.API.Controllers;
 
 /// <summary>
-/// Controller mô phỏng điều khiển trụ sạc từ xa
-/// Không cần phần cứng thật - chỉ cập nhật database
+/// Controller mô phỏng điều khiển trụ sạc từ xa.
+/// Không cần phần cứng thật - chỉ cập nhật database.
 /// </summary>
 [Route("api/admin/station-control")]
 [Authorize(Roles = Roles.Admin + "," + Roles.Staff)]
@@ -18,6 +18,11 @@ public class StationControlSimulationController : BaseApiController
     private readonly SkaEVDbContext _context;
     private readonly ILogger<StationControlSimulationController> _logger;
 
+    /// <summary>
+    /// Constructor nhận vào DbContext và Logger.
+    /// </summary>
+    /// <param name="context">Database context.</param>
+    /// <param name="logger">Logger hệ thống.</param>
     public StationControlSimulationController(
         SkaEVDbContext context,
         ILogger<StationControlSimulationController> logger)
@@ -27,10 +32,11 @@ public class StationControlSimulationController : BaseApiController
     }
 
     /// <summary>
-    /// Điều khiển trạng thái của một trụ sạc (post)
+    /// Điều khiển trạng thái của một trụ sạc (post).
     /// </summary>
-    /// <param name="postId">Post ID</param>
-    /// <param name="request">Control request</param>
+    /// <param name="postId">ID trụ sạc.</param>
+    /// <param name="request">Yêu cầu điều khiển.</param>
+    /// <returns>Kết quả điều khiển.</returns>
     [HttpPost("posts/{postId}/control")]
     public async Task<IActionResult> ControlPost(int postId, [FromBody] ControlRequest request)
     {
@@ -61,7 +67,7 @@ public class StationControlSimulationController : BaseApiController
 
             case "emergency_stop":
                 post.Status = "Error";
-                // Also stop any active charging sessions on slots of this post
+                // Cũng dừng mọi phiên sạc đang diễn ra trên các slot của trụ này
                 var activeBookings = await _context.Bookings
                     .Include(b => b.ChargingSlot)
                     .Where(b => b.ChargingSlot.PostId == postId && b.Status == "in_progress")
@@ -100,8 +106,10 @@ public class StationControlSimulationController : BaseApiController
     }
 
     /// <summary>
-    /// Điều khiển nhiều trụ sạc cùng lúc
+    /// Điều khiển nhiều trụ sạc cùng lúc.
     /// </summary>
+    /// <param name="request">Yêu cầu điều khiển hàng loạt.</param>
+    /// <returns>Kết quả điều khiển hàng loạt.</returns>
     [HttpPost("posts/batch-control")]
     public async Task<IActionResult> BatchControlPosts([FromBody] BatchControlRequest request)
     {
@@ -152,8 +160,11 @@ public class StationControlSimulationController : BaseApiController
     }
 
     /// <summary>
-    /// Điều chỉnh giá điện của một trạm (cập nhật PricingRule mặc định)
+    /// Điều chỉnh giá điện của một trạm (cập nhật PricingRule mặc định).
     /// </summary>
+    /// <param name="stationId">ID trạm sạc.</param>
+    /// <param name="request">Yêu cầu cập nhật giá.</param>
+    /// <returns>Kết quả cập nhật giá.</returns>
     [HttpPost("stations/{stationId}/pricing")]
     public async Task<IActionResult> UpdatePricing(int stationId, [FromBody] PricingRequest request)
     {
@@ -164,7 +175,7 @@ public class StationControlSimulationController : BaseApiController
             return NotFoundResponse("Station not found");
         }
 
-        // Find or create default pricing rule for this station
+        // Tìm hoặc tạo quy tắc giá mặc định cho trạm này
         var defaultRule = await _context.PricingRules
             .Where(r => r.StationId == stationId && r.VehicleType == null)
             .FirstOrDefaultAsync();
@@ -173,11 +184,11 @@ public class StationControlSimulationController : BaseApiController
 
         if (defaultRule == null)
         {
-            // Create new default pricing rule
+            // Tạo quy tắc giá mặc định mới
             defaultRule = new SkaEV.API.Domain.Entities.PricingRule
             {
                 StationId = stationId,
-                VehicleType = null, // Default for all vehicles
+                VehicleType = null, // Mặc định cho tất cả xe
                 BasePrice = request.BasePrice,
                 IsActive = true
             };
@@ -211,8 +222,11 @@ public class StationControlSimulationController : BaseApiController
     }
 
     /// <summary>
-    /// Đặt lịch bảo trì cho trạm
+    /// Đặt lịch bảo trì cho trạm.
     /// </summary>
+    /// <param name="stationId">ID trạm sạc.</param>
+    /// <param name="request">Yêu cầu bảo trì.</param>
+    /// <returns>Kết quả đặt lịch bảo trì.</returns>
     [HttpPost("stations/{stationId}/maintenance")]
     public async Task<IActionResult> ScheduleMaintenance(int stationId, [FromBody] MaintenanceRequest request)
     {
@@ -254,8 +268,9 @@ public class StationControlSimulationController : BaseApiController
     }
 
     /// <summary>
-    /// Lấy trạng thái thời gian thực của tất cả trụ sạc
+    /// Lấy trạng thái thời gian thực của tất cả trụ sạc.
     /// </summary>
+    /// <returns>Trạng thái thời gian thực.</returns>
     [HttpGet("status")]
     public async Task<IActionResult> GetRealTimeStatus()
     {
@@ -314,23 +329,34 @@ public class StationControlSimulationController : BaseApiController
     }
 }
 
-// Request models
+/// <summary>
+/// Model yêu cầu điều khiển.
+/// </summary>
 public class ControlRequest
 {
     public string Action { get; set; } = "";
 }
 
+/// <summary>
+/// Model yêu cầu điều khiển hàng loạt.
+/// </summary>
 public class BatchControlRequest
 {
     public List<int> PostIds { get; set; } = new();
     public string Action { get; set; } = "";
 }
 
+/// <summary>
+/// Model yêu cầu cập nhật giá.
+/// </summary>
 public class PricingRequest
 {
     public decimal BasePrice { get; set; }
 }
 
+/// <summary>
+/// Model yêu cầu bảo trì.
+/// </summary>
 public class MaintenanceRequest
 {
     public DateTime StartTime { get; set; }

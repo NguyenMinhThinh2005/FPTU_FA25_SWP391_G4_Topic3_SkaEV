@@ -8,7 +8,7 @@ using SkaEV.API.Application.Services;
 namespace SkaEV.API.Controllers;
 
 /// <summary>
-/// Controller for user vehicle management
+/// Controller quản lý phương tiện của người dùng
 /// </summary>
 [Authorize(Roles = Roles.Customer)]
 public class VehiclesController : BaseApiController
@@ -21,8 +21,13 @@ public class VehiclesController : BaseApiController
     }
 
     /// <summary>
-    /// Get all vehicles for the authenticated user
+    /// Lấy danh sách phương tiện của tôi
     /// </summary>
+    /// <remarks>
+    /// API này trả về danh sách tất cả các phương tiện đã đăng ký của người dùng hiện tại.
+    /// </remarks>
+    /// <returns>Danh sách phương tiện</returns>
+    /// <response code="200">Trả về danh sách thành công</response>
     [HttpGet]
     [ProducesResponseType(typeof(ApiResponse<IEnumerable<VehicleDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetMyVehicles()
@@ -32,8 +37,17 @@ public class VehiclesController : BaseApiController
     }
 
     /// <summary>
-    /// Get vehicle by ID
+    /// Lấy thông tin phương tiện theo ID
     /// </summary>
+    /// <remarks>
+    /// API này trả về chi tiết một phương tiện cụ thể.
+    /// Chỉ chủ sở hữu mới có thể xem thông tin.
+    /// </remarks>
+    /// <param name="id">ID của phương tiện</param>
+    /// <returns>Thông tin chi tiết phương tiện</returns>
+    /// <response code="200">Trả về thông tin thành công</response>
+    /// <response code="403">Không có quyền truy cập (Không phải chủ sở hữu)</response>
+    /// <response code="404">Không tìm thấy phương tiện</response>
     [HttpGet("{id}")]
     [ProducesResponseType(typeof(ApiResponse<VehicleDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -52,8 +66,15 @@ public class VehiclesController : BaseApiController
     }
 
     /// <summary>
-    /// Add a new vehicle
+    /// Thêm phương tiện mới
     /// </summary>
+    /// <remarks>
+    /// API này cho phép người dùng thêm một phương tiện mới vào tài khoản.
+    /// </remarks>
+    /// <param name="createDto">Thông tin phương tiện mới</param>
+    /// <returns>Phương tiện vừa tạo</returns>
+    /// <response code="201">Tạo thành công</response>
+    /// <response code="400">Dữ liệu không hợp lệ</response>
     [HttpPost]
     [ProducesResponseType(typeof(ApiResponse<VehicleDto>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
@@ -70,8 +91,17 @@ public class VehiclesController : BaseApiController
     }
 
     /// <summary>
-    /// Update an existing vehicle
+    /// Cập nhật phương tiện
     /// </summary>
+    /// <remarks>
+    /// API này cho phép cập nhật thông tin của một phương tiện hiện có.
+    /// </remarks>
+    /// <param name="id">ID của phương tiện</param>
+    /// <param name="updateDto">Thông tin cập nhật</param>
+    /// <returns>Phương tiện sau khi cập nhật</returns>
+    /// <response code="200">Cập nhật thành công</response>
+    /// <response code="403">Không có quyền truy cập</response>
+    /// <response code="404">Không tìm thấy phương tiện</response>
     [HttpPut("{id}")]
     [ProducesResponseType(typeof(ApiResponse<VehicleDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -91,8 +121,16 @@ public class VehiclesController : BaseApiController
     }
 
     /// <summary>
-    /// Delete a vehicle
+    /// Xóa phương tiện
     /// </summary>
+    /// <remarks>
+    /// API này cho phép xóa một phương tiện khỏi tài khoản.
+    /// </remarks>
+    /// <param name="id">ID của phương tiện cần xóa</param>
+    /// <returns>Kết quả xóa</returns>
+    /// <response code="200">Xóa thành công</response>
+    /// <response code="403">Không có quyền truy cập</response>
+    /// <response code="404">Không tìm thấy phương tiện</response>
     [HttpDelete("{id}")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -108,12 +146,19 @@ public class VehiclesController : BaseApiController
             return ForbiddenResponse();
 
         await _vehicleService.DeleteVehicleAsync(id);
-        return OkResponse<object>(null, "Vehicle deleted successfully");
+        return OkResponse<object>(new { }, "Vehicle deleted successfully");
     }
 
     /// <summary>
-    /// Set a vehicle as default
+    /// Đặt phương tiện mặc định
     /// </summary>
+    /// <remarks>
+    /// API này đặt một phương tiện làm phương tiện mặc định cho người dùng.
+    /// </remarks>
+    /// <param name="id">ID của phương tiện</param>
+    /// <returns>Phương tiện được đặt làm mặc định</returns>
+    /// <response code="200">Thành công</response>
+    /// <response code="404">Không tìm thấy phương tiện</response>
     [HttpPatch("{id}/set-default")]
     [ProducesResponseType(typeof(ApiResponse<VehicleDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]

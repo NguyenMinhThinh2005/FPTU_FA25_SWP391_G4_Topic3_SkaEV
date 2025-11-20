@@ -8,21 +8,28 @@ using SkaEV.API.Application.Services;
 namespace SkaEV.API.Controllers;
 
 /// <summary>
-/// Controller for QR code generation and validation
+/// Controller quản lý mã QR.
+/// Xử lý tạo, xác thực và sử dụng mã QR cho việc sạc nhanh.
 /// </summary>
 [Route("api/[controller]")]
 public class QRCodesController : BaseApiController
 {
     private readonly IQRCodeService _qrCodeService;
 
+    /// <summary>
+    /// Constructor nhận vào QRCodeService.
+    /// </summary>
+    /// <param name="qrCodeService">Service mã QR.</param>
     public QRCodesController(IQRCodeService qrCodeService)
     {
         _qrCodeService = qrCodeService;
     }
 
     /// <summary>
-    /// Generate QR code for instant charging
+    /// Tạo mã QR để sạc ngay lập tức.
     /// </summary>
+    /// <param name="generateDto">Thông tin tạo mã QR.</param>
+    /// <returns>Mã QR vừa tạo.</returns>
     [HttpPost("generate")]
     [Authorize(Roles = Roles.Customer)]
     [ProducesResponseType(typeof(ApiResponse<QRCodeDto>), StatusCodes.Status201Created)]
@@ -39,8 +46,10 @@ public class QRCodesController : BaseApiController
     }
 
     /// <summary>
-    /// Get QR code by ID
+    /// Lấy thông tin mã QR theo ID.
     /// </summary>
+    /// <param name="id">ID mã QR.</param>
+    /// <returns>Chi tiết mã QR.</returns>
     [HttpGet("{id}")]
     [Authorize(Roles = Roles.Customer + "," + Roles.Staff + "," + Roles.Admin)]
     [ProducesResponseType(typeof(ApiResponse<QRCodeDto>), StatusCodes.Status200OK)]
@@ -53,7 +62,7 @@ public class QRCodesController : BaseApiController
         if (qrCode == null)
             return NotFoundResponse("QR code not found");
 
-        // Only owner or staff can view
+        // Chỉ chủ sở hữu hoặc nhân viên/admin mới có thể xem
         if (CurrentUserRole != Roles.Staff && CurrentUserRole != Roles.Admin && qrCode.UserId != CurrentUserId)
             return ForbiddenResponse();
 
@@ -61,8 +70,9 @@ public class QRCodesController : BaseApiController
     }
 
     /// <summary>
-    /// Get my active QR codes
+    /// Lấy danh sách mã QR đang hoạt động của người dùng hiện tại.
     /// </summary>
+    /// <returns>Danh sách mã QR.</returns>
     [HttpGet("my-qrcodes")]
     [Authorize(Roles = Roles.Customer)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
@@ -73,8 +83,10 @@ public class QRCodesController : BaseApiController
     }
 
     /// <summary>
-    /// Validate QR code (Staff only)
+    /// Xác thực mã QR (Chỉ Staff/Admin).
     /// </summary>
+    /// <param name="validateDto">Dữ liệu mã QR cần xác thực.</param>
+    /// <returns>Kết quả xác thực.</returns>
     [HttpPost("validate")]
     [Authorize(Roles = Roles.Staff + "," + Roles.Admin)]
     [ProducesResponseType(typeof(ApiResponse<QRCodeValidationResultDto>), StatusCodes.Status200OK)]
@@ -86,8 +98,11 @@ public class QRCodesController : BaseApiController
     }
 
     /// <summary>
-    /// Use QR code to start charging (Staff only)
+    /// Sử dụng mã QR để bắt đầu sạc (Chỉ Staff/Admin).
     /// </summary>
+    /// <param name="id">ID mã QR.</param>
+    /// <param name="useDto">Thông tin sử dụng.</param>
+    /// <returns>Mã QR sau khi sử dụng.</returns>
     [HttpPost("{id}/use")]
     [Authorize(Roles = Roles.Staff + "," + Roles.Admin)]
     [ProducesResponseType(typeof(ApiResponse<QRCodeDto>), StatusCodes.Status200OK)]
@@ -105,8 +120,10 @@ public class QRCodesController : BaseApiController
     }
 
     /// <summary>
-    /// Cancel/revoke QR code
+    /// Hủy/Thu hồi mã QR.
     /// </summary>
+    /// <param name="id">ID mã QR.</param>
+    /// <returns>Kết quả hủy.</returns>
     [HttpDelete("{id}")]
     [Authorize(Roles = Roles.Customer + "," + Roles.Staff + "," + Roles.Admin)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
@@ -119,7 +136,7 @@ public class QRCodesController : BaseApiController
         if (qrCode == null)
             return NotFoundResponse("QR code not found");
 
-        // Only owner or staff/admin can cancel
+        // Chỉ chủ sở hữu hoặc nhân viên/admin mới có thể hủy
         if (CurrentUserRole != Roles.Staff && CurrentUserRole != Roles.Admin && qrCode.UserId != CurrentUserId)
             return ForbiddenResponse();
 
@@ -128,8 +145,10 @@ public class QRCodesController : BaseApiController
     }
 
     /// <summary>
-    /// Get QR code image (Staff only)
+    /// Lấy hình ảnh mã QR (Chỉ Staff/Admin hoặc chủ sở hữu).
     /// </summary>
+    /// <param name="id">ID mã QR.</param>
+    /// <returns>File hình ảnh QR code.</returns>
     [HttpGet("{id}/image")]
     [Authorize(Roles = Roles.Customer + "," + Roles.Staff + "," + Roles.Admin)]
     [ProducesResponseType(typeof(FileResult), StatusCodes.Status200OK)]
@@ -142,7 +161,7 @@ public class QRCodesController : BaseApiController
         if (qrCode == null)
             return NotFoundResponse("QR code not found");
 
-        // Only owner or staff can view image
+        // Chỉ chủ sở hữu hoặc nhân viên/admin mới có thể xem ảnh
         if (CurrentUserRole != Roles.Staff && CurrentUserRole != Roles.Admin && qrCode.UserId != CurrentUserId)
             return ForbiddenResponse();
 

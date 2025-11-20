@@ -20,6 +20,17 @@ public class VNPayController : BaseApiController
         _logger = logger;
     }
 
+    /// <summary>
+    /// Tạo URL thanh toán VNPay
+    /// </summary>
+    /// <remarks>
+    /// API này tạo URL để chuyển hướng người dùng đến cổng thanh toán VNPay.
+    /// </remarks>
+    /// <param name="request">Thông tin yêu cầu thanh toán</param>
+    /// <param name="cancellationToken">Token hủy tác vụ</param>
+    /// <returns>URL thanh toán</returns>
+    /// <response code="200">Tạo URL thành công</response>
+    /// <response code="401">Chưa xác thực</response>
     [HttpPost("create-payment-url")]
     [Authorize(Roles = Roles.Customer)]
     public async Task<IActionResult> CreatePaymentUrl([FromBody] VnpayCreatePaymentRequestDto request, CancellationToken cancellationToken)
@@ -29,6 +40,16 @@ public class VNPayController : BaseApiController
         return OkResponse(result);
     }
 
+    /// <summary>
+    /// Xác minh kết quả trả về từ VNPay (Return URL)
+    /// </summary>
+    /// <remarks>
+    /// API này được gọi khi người dùng được chuyển hướng từ VNPay về lại ứng dụng sau khi thanh toán.
+    /// Nó xác minh chữ ký và trạng thái giao dịch.
+    /// </remarks>
+    /// <param name="cancellationToken">Token hủy tác vụ</param>
+    /// <returns>Kết quả xác minh giao dịch</returns>
+    /// <response code="200">Xác minh thành công</response>
     [HttpGet("verify-return")]
     [AllowAnonymous]
     public async Task<IActionResult> VerifyReturn(CancellationToken cancellationToken)
@@ -37,11 +58,29 @@ public class VNPayController : BaseApiController
         return OkResponse(verification);
     }
 
+    /// <summary>
+    /// Nhận thông báo IPN từ VNPay (GET)
+    /// </summary>
+    /// <remarks>
+    /// API này nhận thông báo Instant Payment Notification (IPN) từ VNPay qua phương thức GET.
+    /// Dùng để cập nhật trạng thái giao dịch ở phía server.
+    /// </remarks>
+    /// <param name="cancellationToken">Token hủy tác vụ</param>
+    /// <returns>Mã phản hồi cho VNPay</returns>
     [HttpGet("ipn")]
     [AllowAnonymous]
     public Task<IActionResult> ReceiveIpnGet(CancellationToken cancellationToken)
         => HandleIpnAsync(Request.Query, cancellationToken);
 
+    /// <summary>
+    /// Nhận thông báo IPN từ VNPay (POST)
+    /// </summary>
+    /// <remarks>
+    /// API này nhận thông báo Instant Payment Notification (IPN) từ VNPay qua phương thức POST.
+    /// Dùng để cập nhật trạng thái giao dịch ở phía server.
+    /// </remarks>
+    /// <param name="cancellationToken">Token hủy tác vụ</param>
+    /// <returns>Mã phản hồi cho VNPay</returns>
     [HttpPost("ipn")]
     [AllowAnonymous]
     public async Task<IActionResult> ReceiveIpnPost(CancellationToken cancellationToken)

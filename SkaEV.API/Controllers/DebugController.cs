@@ -5,15 +5,27 @@ using SkaEV.API.Domain.Entities;
 
 namespace SkaEV.API.Controllers;
 
+/// <summary>
+/// Controller dùng cho mục đích debug và kiểm thử.
+/// Chứa các endpoint để tạo dữ liệu mẫu và kiểm tra trạng thái hệ thống.
+/// </summary>
 public class DebugController : BaseApiController
 {
     private readonly SkaEVDbContext _context;
 
+    /// <summary>
+    /// Constructor nhận vào DbContext.
+    /// </summary>
+    /// <param name="context">Database context.</param>
     public DebugController(SkaEVDbContext context)
     {
         _context = context;
     }
 
+    /// <summary>
+    /// Tạo một trụ sạc thử nghiệm.
+    /// </summary>
+    /// <returns>Thông tin trụ sạc vừa tạo.</returns>
     [HttpPost("create-test-post")]
     public async Task<IActionResult> CreateTestPost()
     {
@@ -37,6 +49,10 @@ public class DebugController : BaseApiController
         return OkResponse(new { message = "Test post created", postId = testPost.PostId });
     }
 
+    /// <summary>
+    /// Kiểm tra các trụ sạc thử nghiệm đã tạo.
+    /// </summary>
+    /// <returns>Danh sách các trụ sạc thử nghiệm.</returns>
     [HttpGet("verify-test-post")]
     public async Task<IActionResult> VerifyTestPost()
     {
@@ -57,6 +73,10 @@ public class DebugController : BaseApiController
         });
     }
 
+    /// <summary>
+    /// Lấy danh sách tất cả trụ sạc (raw data).
+    /// </summary>
+    /// <returns>Danh sách trụ sạc.</returns>
     [HttpGet("all-posts-raw")]
     public async Task<IActionResult> GetAllPostsRaw()
     {

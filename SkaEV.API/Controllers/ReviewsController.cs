@@ -8,20 +8,28 @@ using SkaEV.API.Application.Services;
 namespace SkaEV.API.Controllers;
 
 /// <summary>
-/// Controller for station reviews and ratings
+/// Controller quản lý đánh giá và xếp hạng trạm sạc.
 /// </summary>
 public class ReviewsController : BaseApiController
 {
     private readonly IReviewService _reviewService;
 
+    /// <summary>
+    /// Constructor nhận vào ReviewService.
+    /// </summary>
+    /// <param name="reviewService">Service đánh giá.</param>
     public ReviewsController(IReviewService reviewService)
     {
         _reviewService = reviewService;
     }
 
     /// <summary>
-    /// Get all reviews for a station
+    /// Lấy danh sách đánh giá của một trạm sạc.
     /// </summary>
+    /// <param name="stationId">ID trạm sạc.</param>
+    /// <param name="page">Trang hiện tại (mặc định: 1).</param>
+    /// <param name="pageSize">Số lượng đánh giá mỗi trang (mặc định: 10).</param>
+    /// <returns>Danh sách đánh giá phân trang.</returns>
     [HttpGet("station/{stationId}")]
     [AllowAnonymous]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
@@ -44,8 +52,9 @@ public class ReviewsController : BaseApiController
     }
 
     /// <summary>
-    /// Get my reviews
+    /// Lấy danh sách đánh giá của người dùng hiện tại.
     /// </summary>
+    /// <returns>Danh sách đánh giá của tôi.</returns>
     [HttpGet("my-reviews")]
     [Authorize(Roles = Roles.Customer)]
     [ProducesResponseType(typeof(ApiResponse<IEnumerable<ReviewDto>>), StatusCodes.Status200OK)]
@@ -56,8 +65,10 @@ public class ReviewsController : BaseApiController
     }
 
     /// <summary>
-    /// Get review by ID
+    /// Lấy chi tiết một đánh giá theo ID.
     /// </summary>
+    /// <param name="id">ID đánh giá.</param>
+    /// <returns>Chi tiết đánh giá.</returns>
     [HttpGet("{id}")]
     [AllowAnonymous]
     [ProducesResponseType(typeof(ApiResponse<ReviewDto>), StatusCodes.Status200OK)]
@@ -73,8 +84,10 @@ public class ReviewsController : BaseApiController
     }
 
     /// <summary>
-    /// Create a new review
+    /// Tạo mới một đánh giá.
     /// </summary>
+    /// <param name="createDto">Thông tin đánh giá mới.</param>
+    /// <returns>Đánh giá vừa tạo.</returns>
     [HttpPost]
     [Authorize(Roles = Roles.Customer)]
     [ProducesResponseType(typeof(ApiResponse<ReviewDto>), StatusCodes.Status201Created)]
@@ -92,8 +105,11 @@ public class ReviewsController : BaseApiController
     }
 
     /// <summary>
-    /// Update a review
+    /// Cập nhật một đánh giá.
     /// </summary>
+    /// <param name="id">ID đánh giá.</param>
+    /// <param name="updateDto">Thông tin cập nhật.</param>
+    /// <returns>Đánh giá sau khi cập nhật.</returns>
     [HttpPut("{id}")]
     [Authorize(Roles = Roles.Customer)]
     [ProducesResponseType(typeof(ApiResponse<ReviewDto>), StatusCodes.Status200OK)]
@@ -114,8 +130,10 @@ public class ReviewsController : BaseApiController
     }
 
     /// <summary>
-    /// Delete a review
+    /// Xóa một đánh giá.
     /// </summary>
+    /// <param name="id">ID đánh giá.</param>
+    /// <returns>Kết quả xóa.</returns>
     [HttpDelete("{id}")]
     [Authorize(Roles = Roles.Customer + "," + Roles.Admin)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
@@ -128,7 +146,7 @@ public class ReviewsController : BaseApiController
         if (existingReview == null)
             return NotFoundResponse("Review not found");
 
-        // Only allow owner or admin to delete
+        // Chỉ cho phép chủ sở hữu hoặc admin xóa
         if (CurrentUserRole != Roles.Admin && existingReview.UserId != CurrentUserId)
             return ForbiddenResponse();
 
@@ -137,8 +155,10 @@ public class ReviewsController : BaseApiController
     }
 
     /// <summary>
-    /// Get station rating summary
+    /// Lấy tóm tắt xếp hạng của một trạm sạc.
     /// </summary>
+    /// <param name="stationId">ID trạm sạc.</param>
+    /// <returns>Tóm tắt xếp hạng.</returns>
     [HttpGet("station/{stationId}/summary")]
     [AllowAnonymous]
     [ProducesResponseType(typeof(ApiResponse<StationRatingSummaryDto>), StatusCodes.Status200OK)]

@@ -9,22 +9,34 @@ using System.Security.Claims;
 namespace SkaEV.API.Controllers;
 
 /// <summary>
-/// Controller for admin user management
+/// Controller quản lý người dùng dành cho Admin.
+/// Bao gồm các chức năng: CRUD người dùng, quản lý vai trò, trạng thái, thông báo, và hỗ trợ khách hàng.
 /// </summary>
 [Authorize(Roles = Roles.Admin)]
 [Route("api/admin/users")]
 public class AdminUsersController : BaseApiController
 {
+    // Service quản lý người dùng admin
     private readonly IAdminUserService _adminUserService;
 
+    /// <summary>
+    /// Constructor nhận vào AdminUserService thông qua Dependency Injection.
+    /// </summary>
+    /// <param name="adminUserService">Service quản lý người dùng.</param>
     public AdminUsersController(IAdminUserService adminUserService)
     {
         _adminUserService = adminUserService;
     }
 
     /// <summary>
-    /// Get all users with pagination and filtering
+    /// Lấy danh sách tất cả người dùng với phân trang và bộ lọc.
     /// </summary>
+    /// <param name="role">Lọc theo vai trò (Admin, Staff, User...).</param>
+    /// <param name="status">Lọc theo trạng thái (Active, Inactive...).</param>
+    /// <param name="search">Tìm kiếm theo tên hoặc email.</param>
+    /// <param name="page">Số trang hiện tại (mặc định 1).</param>
+    /// <param name="pageSize">Số lượng bản ghi trên mỗi trang (mặc định 20).</param>
+    /// <returns>Danh sách người dùng và thông tin phân trang.</returns>
     [HttpGet]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAllUsers(
@@ -51,8 +63,10 @@ public class AdminUsersController : BaseApiController
     }
 
     /// <summary>
-    /// Get user by ID
+    /// Lấy thông tin chi tiết của một người dùng theo ID.
     /// </summary>
+    /// <param name="userId">ID người dùng.</param>
+    /// <returns>Thông tin chi tiết người dùng.</returns>
     [HttpGet("{userId}")]
     [ProducesResponseType(typeof(ApiResponse<AdminUserDetailDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -67,8 +81,10 @@ public class AdminUsersController : BaseApiController
     }
 
     /// <summary>
-    /// Create a new user
+    /// Tạo mới một người dùng.
     /// </summary>
+    /// <param name="createDto">Thông tin người dùng mới.</param>
+    /// <returns>Thông tin người dùng vừa tạo.</returns>
     [HttpPost]
     [ProducesResponseType(typeof(ApiResponse<AdminUserDto>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
@@ -84,8 +100,11 @@ public class AdminUsersController : BaseApiController
     }
 
     /// <summary>
-    /// Update user information
+    /// Cập nhật thông tin người dùng.
     /// </summary>
+    /// <param name="userId">ID người dùng.</param>
+    /// <param name="updateDto">Thông tin cập nhật.</param>
+    /// <returns>Thông tin người dùng sau khi cập nhật.</returns>
     [HttpPut("{userId}")]
     [ProducesResponseType(typeof(ApiResponse<AdminUserDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -101,8 +120,11 @@ public class AdminUsersController : BaseApiController
     }
 
     /// <summary>
-    /// Update user role
+    /// Cập nhật vai trò của người dùng.
     /// </summary>
+    /// <param name="userId">ID người dùng.</param>
+    /// <param name="roleDto">Thông tin vai trò mới.</param>
+    /// <returns>Thông tin người dùng sau khi cập nhật vai trò.</returns>
     [HttpPatch("{userId}/role")]
     [ProducesResponseType(typeof(ApiResponse<AdminUserDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -118,8 +140,10 @@ public class AdminUsersController : BaseApiController
     }
 
     /// <summary>
-    /// Activate user account
+    /// Kích hoạt tài khoản người dùng.
     /// </summary>
+    /// <param name="userId">ID người dùng.</param>
+    /// <returns>Thông tin người dùng sau khi kích hoạt.</returns>
     [HttpPatch("{userId}/activate")]
     [ProducesResponseType(typeof(ApiResponse<AdminUserDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -135,8 +159,11 @@ public class AdminUsersController : BaseApiController
     }
 
     /// <summary>
-    /// Deactivate user account
+    /// Vô hiệu hóa tài khoản người dùng.
     /// </summary>
+    /// <param name="userId">ID người dùng.</param>
+    /// <param name="deactivateDto">Lý do vô hiệu hóa.</param>
+    /// <returns>Thông tin người dùng sau khi vô hiệu hóa.</returns>
     [HttpPatch("{userId}/deactivate")]
     [ProducesResponseType(typeof(ApiResponse<AdminUserDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -152,8 +179,10 @@ public class AdminUsersController : BaseApiController
     }
 
     /// <summary>
-    /// Delete user account (soft delete)
+    /// Xóa tài khoản người dùng (xóa mềm).
     /// </summary>
+    /// <param name="userId">ID người dùng.</param>
+    /// <returns>Kết quả xóa.</returns>
     [HttpDelete("{userId}")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -162,7 +191,7 @@ public class AdminUsersController : BaseApiController
     {
         var currentUserId = GetUserId();
 
-        // Prevent self-deletion
+        // Ngăn chặn việc tự xóa tài khoản của chính mình
         if (userId == currentUserId)
             return BadRequestResponse("Cannot delete your own account");
 
@@ -176,8 +205,10 @@ public class AdminUsersController : BaseApiController
     }
 
     /// <summary>
-    /// Reset user password
+    /// Reset mật khẩu người dùng.
     /// </summary>
+    /// <param name="userId">ID người dùng.</param>
+    /// <returns>Kết quả reset mật khẩu.</returns>
     [HttpPost("{userId}/reset-password")]
     [ProducesResponseType(typeof(ApiResponse<ResetPasswordResultDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -193,8 +224,10 @@ public class AdminUsersController : BaseApiController
     }
 
     /// <summary>
-    /// Get user activity summary
+    /// Lấy tóm tắt hoạt động của người dùng.
     /// </summary>
+    /// <param name="userId">ID người dùng.</param>
+    /// <returns>Tóm tắt hoạt động.</returns>
     [HttpGet("{userId}/activity")]
     [ProducesResponseType(typeof(ApiResponse<UserActivitySummaryDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -210,8 +243,9 @@ public class AdminUsersController : BaseApiController
     }
 
     /// <summary>
-    /// Get user statistics summary
+    /// Lấy thống kê tổng quan về người dùng.
     /// </summary>
+    /// <returns>Thống kê người dùng.</returns>
     [HttpGet("statistics")]
     [ProducesResponseType(typeof(ApiResponse<UserStatisticsSummaryDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetUserStatistics()
@@ -223,8 +257,12 @@ public class AdminUsersController : BaseApiController
     // ==================== PHASE 2: EXTENDED USER MANAGEMENT ====================
 
     /// <summary>
-    /// Get user charging history
+    /// Lấy lịch sử sạc của người dùng.
     /// </summary>
+    /// <param name="userId">ID người dùng.</param>
+    /// <param name="page">Trang hiện tại.</param>
+    /// <param name="pageSize">Số lượng bản ghi mỗi trang.</param>
+    /// <returns>Lịch sử sạc.</returns>
     [HttpGet("{userId}/charging-history")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetUserChargingHistory(int userId, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
@@ -234,8 +272,12 @@ public class AdminUsersController : BaseApiController
     }
 
     /// <summary>
-    /// Get user payment history
+    /// Lấy lịch sử thanh toán của người dùng.
     /// </summary>
+    /// <param name="userId">ID người dùng.</param>
+    /// <param name="page">Trang hiện tại.</param>
+    /// <param name="pageSize">Số lượng bản ghi mỗi trang.</param>
+    /// <returns>Lịch sử thanh toán.</returns>
     [HttpGet("{userId}/payment-history")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetUserPaymentHistory(int userId, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
@@ -247,8 +289,14 @@ public class AdminUsersController : BaseApiController
     // ==================== NOTIFICATIONS ====================
 
     /// <summary>
-    /// Get all notifications
+    /// Lấy danh sách thông báo.
     /// </summary>
+    /// <param name="userId">Lọc theo ID người dùng.</param>
+    /// <param name="type">Lọc theo loại thông báo.</param>
+    /// <param name="isRead">Lọc theo trạng thái đã đọc.</param>
+    /// <param name="page">Trang hiện tại.</param>
+    /// <param name="pageSize">Số lượng bản ghi mỗi trang.</param>
+    /// <returns>Danh sách thông báo.</returns>
     [HttpGet("notifications")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetNotifications(
@@ -263,8 +311,10 @@ public class AdminUsersController : BaseApiController
     }
 
     /// <summary>
-    /// Send notification to user(s)
+    /// Gửi thông báo cho người dùng.
     /// </summary>
+    /// <param name="dto">Thông tin thông báo.</param>
+    /// <returns>Số lượng người dùng nhận được thông báo.</returns>
     [HttpPost("notifications")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> SendNotification([FromBody] CreateNotificationDto dto)
@@ -274,8 +324,10 @@ public class AdminUsersController : BaseApiController
     }
 
     /// <summary>
-    /// Send promotion to targeted users
+    /// Gửi khuyến mãi cho nhóm người dùng mục tiêu.
     /// </summary>
+    /// <param name="dto">Thông tin khuyến mãi.</param>
+    /// <returns>Số lượng người dùng nhận được khuyến mãi.</returns>
     [HttpPost("notifications/promotions")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> SendPromotion([FromBody] SendPromotionDto dto)
@@ -285,8 +337,10 @@ public class AdminUsersController : BaseApiController
     }
 
     /// <summary>
-    /// Mark notification as read
+    /// Đánh dấu thông báo là đã đọc.
     /// </summary>
+    /// <param name="notificationId">ID thông báo.</param>
+    /// <returns>Kết quả đánh dấu.</returns>
     [HttpPatch("notifications/{notificationId}/read")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> MarkNotificationAsRead(int notificationId)
@@ -298,8 +352,10 @@ public class AdminUsersController : BaseApiController
     // ==================== SUPPORT REQUESTS ====================
 
     /// <summary>
-    /// Get support requests with filtering
+    /// Lấy danh sách yêu cầu hỗ trợ với bộ lọc.
     /// </summary>
+    /// <param name="filter">Bộ lọc yêu cầu hỗ trợ.</param>
+    /// <returns>Danh sách yêu cầu hỗ trợ.</returns>
     [HttpGet("support-requests")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetSupportRequests([FromQuery] SupportRequestFilterDto filter)
@@ -320,8 +376,10 @@ public class AdminUsersController : BaseApiController
     }
 
     /// <summary>
-    /// Get support request detail
+    /// Lấy chi tiết yêu cầu hỗ trợ.
     /// </summary>
+    /// <param name="requestId">ID yêu cầu.</param>
+    /// <returns>Chi tiết yêu cầu hỗ trợ.</returns>
     [HttpGet("support-requests/{requestId}")]
     [ProducesResponseType(typeof(ApiResponse<SupportRequestDetailDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -336,8 +394,11 @@ public class AdminUsersController : BaseApiController
     }
 
     /// <summary>
-    /// Update support request
+    /// Cập nhật yêu cầu hỗ trợ.
     /// </summary>
+    /// <param name="requestId">ID yêu cầu.</param>
+    /// <param name="dto">Thông tin cập nhật.</param>
+    /// <returns>Kết quả cập nhật.</returns>
     [HttpPatch("support-requests/{requestId}")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -348,12 +409,15 @@ public class AdminUsersController : BaseApiController
         if (!success)
             return NotFoundResponse("Support request not found");
 
-        return OkResponse<object>(null, "Support request updated successfully");
+        return OkResponse(new { }, "Support request updated successfully");
     }
 
     /// <summary>
-    /// Reply to support request
+    /// Phản hồi yêu cầu hỗ trợ.
     /// </summary>
+    /// <param name="requestId">ID yêu cầu.</param>
+    /// <param name="dto">Nội dung phản hồi.</param>
+    /// <returns>Kết quả phản hồi.</returns>
     [HttpPost("support-requests/{requestId}/reply")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -367,12 +431,15 @@ public class AdminUsersController : BaseApiController
         if (!success)
             return NotFoundResponse("Support request not found");
 
-        return OkResponse<object>(null, "Reply sent successfully");
+        return OkResponse(new { }, "Reply sent successfully");
     }
 
     /// <summary>
-    /// Close support request
+    /// Đóng yêu cầu hỗ trợ.
     /// </summary>
+    /// <param name="requestId">ID yêu cầu.</param>
+    /// <param name="resolutionNotes">Ghi chú giải quyết.</param>
+    /// <returns>Kết quả đóng yêu cầu.</returns>
     [HttpPost("support-requests/{requestId}/close")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -383,9 +450,13 @@ public class AdminUsersController : BaseApiController
         if (!success)
             return NotFoundResponse("Support request not found");
 
-        return OkResponse<object>(null, "Support request closed successfully");
+        return OkResponse(new { }, "Support request closed successfully");
     }
 
+    /// <summary>
+    /// Lấy ID người dùng hiện tại từ token.
+    /// </summary>
+    /// <returns>ID người dùng.</returns>
     private int GetUserId()
     {
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;

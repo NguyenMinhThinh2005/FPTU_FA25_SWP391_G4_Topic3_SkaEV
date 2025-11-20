@@ -12,34 +12,42 @@ using Serilog;
 using Serilog.Events;
 using VNPAY.Extensions;
 
+// Create a builder for the web application. This is the starting point for configuring services and the app's request pipeline.
 var builder = WebApplication.CreateBuilder(args);
 
-// Configure Serilog - Simple HTTP logging only
+// Configure Serilog - A structured logging library for .NET
+// This sets up logging to both the console and a rolling file.
 Log.Logger = new LoggerConfiguration()
-    .MinimumLevel.Information()
-    .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
-    .MinimumLevel.Override("Microsoft.EntityFrameworkCore", LogEventLevel.Error)
-    .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
-    .Enrich.FromLogContext()
-    .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}")
-    .WriteTo.File("logs/skaev-.txt", rollingInterval: RollingInterval.Day)
+    .MinimumLevel.Information() // Set the minimum log level to Information
+    .MinimumLevel.Override("Microsoft", LogEventLevel.Warning) // Reduce noise from Microsoft libraries
+    .MinimumLevel.Override("Microsoft.EntityFrameworkCore", LogEventLevel.Error) // Only log EF Core errors to keep logs clean
+    .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning) // Reduce noise from ASP.NET Core
+    .Enrich.FromLogContext() // Include context information in logs
+    .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}") // Format console output
+    .WriteTo.File("logs/skaev-.txt", rollingInterval: RollingInterval.Day) // Write logs to a file, creating a new file each day
     .CreateLogger();
 
+// Tell the host to use Serilog as the logging provider
 builder.Host.UseSerilog();
 
-// Add services to the container
+// Add services to the container (Dependency Injection)
+// Add controllers and configure JSON serialization options
 builder.Services.AddControllers()
     .AddNewtonsoftJson(options =>
     {
+        // Ignore reference loops to prevent errors when serializing related objects (e.g., Station -> Posts -> Station)
         options.SerializerSettings.ReferenceLoopHandling = Newtonsoft.Json.ReferenceLoopHandling.Ignore;
+        // Ignore null values to reduce payload size
         options.SerializerSettings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
     });
 
+// Bind configuration section "GoogleMaps" to the GoogleMapsOptions class for dependency injection
 builder.Services.Configure<GoogleMapsOptions>(builder.Configuration.GetSection(GoogleMapsOptions.SectionName));
 
-// Configure Database
+// Configure Database Context
 builder.Services.AddDbContext<SkaEVDbContext>(options =>
 {
+    // Retrieve the connection string from appsettings.json
     var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 
     if (string.IsNullOrWhiteSpace(connectionString))
@@ -48,20 +56,24 @@ builder.Services.AddDbContext<SkaEVDbContext>(options =>
     }
 
     var normalized = connectionString.Trim();
+    // Check if the connection string indicates SQLite usage
     var isSqlite = normalized.Contains(".db", StringComparison.OrdinalIgnoreCase) ||
                    normalized.StartsWith("Data Source=", StringComparison.OrdinalIgnoreCase);
 
     if (isSqlite)
     {
+        // Use SQLite provider
         options.UseSqlite(connectionString);
     }
     else
     {
+        // Use SQL Server provider with specific options
         options.UseSqlServer(
             connectionString,
             sqlOptions =>
             {
-                sqlOptions.UseNetTopologySuite();
+                sqlOptions.UseNetTopologySuite(); // Enable spatial data support (for maps/locations)
+                // Enable automatic retries for transient failures (e.g., network blips)
                 sqlOptions.EnableRetryOnFailure(
                     maxRetryCount: 5,
                     maxRetryDelay: TimeSpan.FromSeconds(30),
@@ -70,54 +82,58 @@ builder.Services.AddDbContext<SkaEVDbContext>(options =>
     }
 });
 
-// Configure JWT Authentication
+// Configure JWT (JSON Web Token) Authentication
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
+// Get the secret key, falling back to a default if not found (Note: Default should not be used in production)
 var secretKey = jwtSettings["SecretKey"] ?? "SkaEV_Secret_Key_2025_Change_This_In_Production_Environment_12345678";
 var key = Encoding.ASCII.GetBytes(secretKey);
 
+// Add Authentication services
 builder.Services.AddAuthentication(options =>
 {
-    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme; // Use JWT Bearer as default scheme
     options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
 })
 .AddJwtBearer(options =>
 {
-    options.RequireHttpsMetadata = false; // Set to true in production
-    options.SaveToken = true;
+    options.RequireHttpsMetadata = false; // Set to true in production to ensure HTTPS
+    options.SaveToken = true; // Save the token in the AuthenticationProperties
     options.TokenValidationParameters = new TokenValidationParameters
     {
-        ValidateIssuerSigningKey = true,
-        IssuerSigningKey = new SymmetricSecurityKey(key),
-        ValidateIssuer = false,
-        ValidateAudience = false,
-        ValidateLifetime = true,
-        ClockSkew = TimeSpan.Zero
+        ValidateIssuerSigningKey = true, // Validate the key used to sign the token
+        IssuerSigningKey = new SymmetricSecurityKey(key), // The key to validate against
+        ValidateIssuer = false, // Do not validate the issuer (who created the token) - simplify for dev
+        ValidateAudience = false, // Do not validate the audience (who the token is for) - simplify for dev
+        ValidateLifetime = true, // Validate that the token has not expired
+        ClockSkew = TimeSpan.Zero // Remove default 5 min clock skew for strict expiration
     };
 });
 
+// Add Authorization services
 builder.Services.AddAuthorization();
 
-// Configure CORS (with SignalR support)
+// Configure CORS (Cross-Origin Resource Sharing) to allow frontend applications to access the API
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
         policy.WithOrigins(
-            "http://localhost:5173",
-            "http://localhost:3000",
+            "http://localhost:5173", // Vite default
+            "http://localhost:3000", // React default
             "http://localhost:5174",
             "http://localhost:5175",
             "http://localhost:5176",
             "http://localhost:5177"
         )
-        .AllowAnyHeader()
-        .AllowAnyMethod()
-        .AllowCredentials()
-        .SetIsOriginAllowed(_ => true); // For SignalR compatibility
+        .AllowAnyHeader() // Allow any HTTP header
+        .AllowAnyMethod() // Allow any HTTP method (GET, POST, PUT, DELETE, etc.)
+        .AllowCredentials() // Allow cookies/auth headers
+        .SetIsOriginAllowed(_ => true); // Allow any origin (useful for development, restrict in production)
     });
 });
 
-// Register Services
+// Register Application Services (Dependency Injection)
+// Scoped services are created once per client request (connection)
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IStationService, StationService>();
 builder.Services.AddScoped<IBookingService, BookingService>();
@@ -125,7 +141,7 @@ builder.Services.AddScoped<IPaymentMethodService, PaymentMethodService>();
 builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<IStaffDashboardService, StaffDashboardService>();
 
-// New Services
+// New Services for extended functionality
 builder.Services.AddScoped<IInvoiceService, InvoiceService>();
 builder.Services.AddScoped<IVehicleService, VehicleService>();
 builder.Services.AddScoped<IReviewService, ReviewService>();
@@ -143,19 +159,20 @@ builder.Services.AddScoped<IncidentService>(); // Incident management service
 builder.Services.AddScoped<StationAnalyticsService>(); // Station analytics service
 builder.Services.AddScoped<IAdminStationManagementService, AdminStationManagementService>();
 
-// Maps Service with HttpClient
+// Maps Service with HttpClient - Registers HttpClient to be injected into MapsService
 builder.Services.AddHttpClient<IMapsService, MapsService>();
 
+// Register VNPay client with configuration
 builder.Services.AddVnpayClient(options => builder.Configuration.GetSection("VNPay").Bind(options));
 
-// Payment Services
+// Payment Services - Using Simulated Processor for now
 builder.Services.AddScoped<SkaEV.API.Application.Services.Payments.IPaymentProcessor, SkaEV.API.Application.Services.Payments.SimulatedPaymentProcessor>();
 
-// Background Simulation Services (for student project demo)
-builder.Services.AddHostedService<SkaEV.API.Services.ChargingSimulationService>();
-builder.Services.AddHostedService<SkaEV.API.Services.SystemEventsSimulationService>();
+// Background Simulation Services (Hosted Services run in the background for the lifetime of the app)
+builder.Services.AddHostedService<SkaEV.API.Services.ChargingSimulationService>(); // Simulates charging progress
+builder.Services.AddHostedService<SkaEV.API.Services.SystemEventsSimulationService>(); // Simulates system events
 
-// Configure Swagger
+// Configure Swagger/OpenAPI for API documentation
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -171,7 +188,7 @@ builder.Services.AddSwaggerGen(c =>
         }
     });
 
-    // Add JWT Authentication to Swagger
+    // Add JWT Authentication support to Swagger UI
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Description = "JWT Authorization header using the Bearer scheme. Enter 'Bearer' [space] and then your token in the text input below.",
@@ -197,18 +214,19 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-// Add SignalR for real-time updates
+// Add SignalR for real-time updates (WebSockets)
 builder.Services.AddSignalR();
 
-// Add Health Checks
+// Add Health Checks to monitor application status
 builder.Services.AddHealthChecks()
-    .AddDbContextCheck<SkaEVDbContext>();
+    .AddDbContextCheck<SkaEVDbContext>(); // Check if database is accessible
 
+// Build the application
 var app = builder.Build();
 
-// Configure the HTTP request pipeline
+// Configure the HTTP request pipeline (Middleware)
 
-// Global exception handler (must be first)
+// Global exception handler (must be first to catch exceptions from other middleware)
 app.UseExceptionHandler(errorApp =>
 {
     errorApp.Run(async context =>
@@ -232,29 +250,34 @@ app.UseExceptionHandler(errorApp =>
     });
 });
 
+// Configure Swagger UI in Development environment
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "SkaEV API v1");
-        c.RoutePrefix = "swagger"; // Swagger at /swagger
+        c.RoutePrefix = "swagger"; // Swagger UI available at /swagger
     });
 }
 
 // Disable HTTPS redirection in development for easier testing
 // app.UseHttpsRedirection();
 
-// IMPORTANT: CORS must be before Authentication/Authorization
+// IMPORTANT: CORS must be configured before Authentication/Authorization
 app.UseCors("AllowFrontend");
 
+// Enable Serilog request logging
 app.UseSerilogRequestLogging();
 
+// Enable Authentication and Authorization middleware
 app.UseAuthentication();
 app.UseAuthorization();
 
+// Map controller routes
 app.MapControllers();
 
+// Map health check endpoint
 app.MapHealthChecks("/health");
 
 // Map SignalR Hub - Temporarily commented out
@@ -269,10 +292,10 @@ try
 
     Log.Information("Backend is now running. Press ENTER to stop...");
 
-    // Keep console alive
+    // Keep console alive to prevent immediate exit
     Console.ReadLine();
 
-    // Initiate shutdown
+    // Initiate graceful shutdown
     await app.StopAsync();
 }
 catch (Exception ex)

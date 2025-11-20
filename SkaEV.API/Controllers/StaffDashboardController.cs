@@ -8,7 +8,7 @@ using SkaEV.API.Application.Services;
 namespace SkaEV.API.Controllers;
 
 /// <summary>
-/// Provides staff-specific operational dashboard data.
+/// Controller cung cấp dữ liệu dashboard cho nhân viên.
 /// </summary>
 [Route("api/staff/dashboard")]
 [Authorize(Roles = Roles.Staff + "," + Roles.Admin)]
@@ -17,6 +17,11 @@ public class StaffDashboardController : BaseApiController
     private readonly IStaffDashboardService _dashboardService;
     private readonly ILogger<StaffDashboardController> _logger;
 
+    /// <summary>
+    /// Constructor nhận vào StaffDashboardService và Logger.
+    /// </summary>
+    /// <param name="dashboardService">Service dashboard nhân viên.</param>
+    /// <param name="logger">Logger hệ thống.</param>
     public StaffDashboardController(IStaffDashboardService dashboardService, ILogger<StaffDashboardController> logger)
     {
         _dashboardService = dashboardService;
@@ -24,8 +29,10 @@ public class StaffDashboardController : BaseApiController
     }
 
     /// <summary>
-    /// Get real-time dashboard data for the authenticated staff member.
+    /// Lấy dữ liệu dashboard thời gian thực cho nhân viên đang đăng nhập.
     /// </summary>
+    /// <param name="cancellationToken">Token hủy request.</param>
+    /// <returns>Dữ liệu dashboard.</returns>
     [HttpGet]
     [ProducesResponseType(typeof(ApiResponse<StaffDashboardDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetDashboard(CancellationToken cancellationToken)
