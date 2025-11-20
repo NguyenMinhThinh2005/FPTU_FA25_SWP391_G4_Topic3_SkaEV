@@ -1,7 +1,7 @@
 namespace SkaEV.API.Application.Constants;
 
 /// <summary>
-/// Well-known payment status values used across the application.
+/// Các trạng thái thanh toán được sử dụng trong ứng dụng.
 /// </summary>
 public static class PaymentStatuses
 {

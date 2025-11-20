@@ -5,6 +5,9 @@ using NetTopologySuite.Geometries;
 
 namespace SkaEV.API.Infrastructure.Data;
 
+/// <summary>
+/// DbContext chính của ứng dụng SkaEV.
+/// </summary>
 public class SkaEVDbContext : DbContext
 {
     public SkaEVDbContext(DbContextOptions<SkaEVDbContext> options) : base(options)

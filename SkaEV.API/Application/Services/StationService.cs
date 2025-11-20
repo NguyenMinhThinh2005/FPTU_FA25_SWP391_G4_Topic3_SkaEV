@@ -11,19 +11,60 @@ using Newtonsoft.Json;
 
 namespace SkaEV.API.Application.Services;
 
+/// <summary>
+/// Interface định nghĩa các dịch vụ quản lý trạm sạc.
+/// </summary>
 public interface IStationService
 {
+    /// <summary>
+    /// Tìm kiếm trạm sạc theo vị trí địa lý.
+    /// </summary>
     Task<List<StationDto>> SearchStationsByLocationAsync(SearchStationsRequestDto request);
+
+    /// <summary>
+    /// Lấy thông tin chi tiết trạm sạc theo ID.
+    /// </summary>
     Task<StationDto?> GetStationByIdAsync(int stationId);
+
+    /// <summary>
+    /// Lấy danh sách tất cả trạm sạc với bộ lọc tùy chọn.
+    /// </summary>
     Task<List<StationDto>> GetAllStationsAsync(string? city = null, string? status = null);
+
+    /// <summary>
+    /// Tạo trạm sạc mới.
+    /// </summary>
     Task<StationDto> CreateStationAsync(CreateStationDto dto);
+
+    /// <summary>
+    /// Cập nhật thông tin trạm sạc.
+    /// </summary>
     Task<bool> UpdateStationAsync(int stationId, UpdateStationDto dto);
+
+    /// <summary>
+    /// Xóa trạm sạc.
+    /// </summary>
     Task<bool> DeleteStationAsync(int stationId);
+
+    /// <summary>
+    /// Lấy chi tiết các khe sạc của trạm.
+    /// </summary>
     Task<List<SlotDetailDto>> GetStationSlotsDetailsAsync(int stationId);
+
+    /// <summary>
+    /// Lấy danh sách khe sạc khả dụng của trạm.
+    /// </summary>
     Task<List<SlotDetailDto>> GetAvailableSlotsAsync(int stationId);
+
+    /// <summary>
+    /// Lấy danh sách trụ sạc và tình trạng khe sạc.
+    /// </summary>
     Task<List<ChargingPostWithSlotsDto>> GetAvailablePostsAsync(int stationId);
 }
 
+/// <summary>
+/// Record lưu trữ các số liệu tổng hợp của trạm sạc.
+/// </summary>
 internal record StationAggregates(
     int TotalPosts,
     int AvailablePosts,
@@ -35,6 +76,9 @@ internal record StationAggregates(
     decimal CurrentPowerUsageKw,
     decimal UtilizationRate);
 
+/// <summary>
+/// Service thực hiện các chức năng quản lý trạm sạc, trụ sạc và khe sạc.
+/// </summary>
 public class StationService : IStationService
 {
     private readonly SkaEVDbContext _context;
@@ -46,10 +90,9 @@ public class StationService : IStationService
 
     private static readonly StringComparer StatusComparer = StringComparer.OrdinalIgnoreCase;
 
+    // Các hàm helper kiểm tra trạng thái khe sạc
     private static bool IsSlotAvailable(string? status) => StatusComparer.Equals(status, "available");
-
     private static bool IsSlotMaintenance(string? status) => StatusComparer.Equals(status, "maintenance");
-
     private static bool IsSlotOccupied(string? status) =>
         StatusComparer.Equals(status, "occupied") ||
         StatusComparer.Equals(status, "charging") ||
@@ -57,9 +100,11 @@ public class StationService : IStationService
         StatusComparer.Equals(status, "in-progress") ||
         StatusComparer.Equals(status, "in_progress") ||
         StatusComparer.Equals(status, "busy");
-
     private static bool IsSlotReserved(string? status) => StatusComparer.Equals(status, "reserved");
 
+    /// <summary>
+    /// Phân tích chuỗi tiện ích (amenities) từ JSON hoặc CSV.
+    /// </summary>
     private static List<string> ParseAmenities(string? rawAmenities)
     {
         if (string.IsNullOrWhiteSpace(rawAmenities))
@@ -92,6 +137,9 @@ public class StationService : IStationService
             .ToList();
     }
 
+    /// <summary>
+    /// Tính toán các số liệu tổng hợp cho trạm sạc dựa trên danh sách trụ và trạng thái.
+    /// </summary>
     private static StationAggregates CalculateAggregates(
         IEnumerable<ChargingPost>? posts,
         int activeSessions,
@@ -108,6 +156,7 @@ public class StationService : IStationService
         var occupiedSlotCount = slotList.Count(slot => IsSlotOccupied(slot.Status));
         var reservedSlotCount = slotList.Count(slot => IsSlotReserved(slot.Status));
 
+        // Điều chỉnh số lượng slot bị chiếm dụng nếu tổng số slot đã biết nhỏ hơn tổng thực tế
         var accountedSlots = availableSlotCount + maintenanceSlotCount + occupiedSlotCount + reservedSlotCount;
         if (accountedSlots < totalSlots)
         {
@@ -116,12 +165,14 @@ public class StationService : IStationService
 
         availableSlotCount = Math.Clamp(availableSlotCount, 0, totalSlots);
 
+        // Nếu trạm không hoạt động, không có slot nào khả dụng
         var statusIsActive = StatusComparer.Equals(stationStatus, "active");
         if (!statusIsActive)
         {
             availableSlotCount = 0;
         }
 
+        // Đếm số trụ khả dụng (trụ active và có ít nhất 1 slot active)
         var availablePosts = postList.Count(post =>
             StatusComparer.Equals(post.Status, "available") &&
             post.ChargingSlots.Any(slot => IsSlotAvailable(slot.Status)));
@@ -131,12 +182,14 @@ public class StationService : IStationService
             availablePosts = 0;
         }
 
+        // Tính công suất tiêu thụ hiện tại và tổng công suất
         var currentPowerUsageKw = postList
             .Where(post => post.ChargingSlots.Any(slot => IsSlotOccupied(slot.Status)))
             .Sum(post => post.PowerOutput);
 
         var totalPowerCapacityKw = postList.Sum(post => post.PowerOutput);
 
+        // Tính tỷ lệ sử dụng
         var utilizationRate = totalSlots > 0
             ? Math.Round(((decimal)(totalSlots - availableSlotCount) / totalSlots) * 100, 2)
             : 0;
@@ -153,6 +206,9 @@ public class StationService : IStationService
             UtilizationRate: utilizationRate);
     }
 
+    /// <summary>
+    /// Tạo đối tượng StationDto từ các thành phần dữ liệu.
+    /// </summary>
     private static StationDto ComposeStationDto(
         ChargingStation station,
         StationAggregates aggregates,
@@ -193,12 +249,16 @@ public class StationService : IStationService
         };
     }
 
+    /// <summary>
+    /// Tìm kiếm trạm sạc theo vị trí địa lý (bán kính).
+    /// </summary>
     public async Task<List<StationDto>> SearchStationsByLocationAsync(SearchStationsRequestDto request)
     {
         var latParam = new SqlParameter("@latitude", request.Latitude);
         var lonParam = new SqlParameter("@longitude", request.Longitude);
         var radiusParam = new SqlParameter("@radius_km", request.RadiusKm);
 
+        // Sử dụng Stored Procedure để tìm kiếm hiệu quả
         var sql = "EXEC sp_search_stations_by_location @latitude, @longitude, @radius_km";
 
         var stationsRaw = await _context.ChargingStations
@@ -213,7 +273,7 @@ public class StationService : IStationService
 
         var stationIds = stationsRaw.Select(s => s.StationId).Distinct().ToList();
 
-        // Load posts and pricing and manager assignments in batch to avoid N+1
+        // Tải trước dữ liệu liên quan (Posts, Pricing, Managers) để tránh lỗi N+1
         var postsLookup = await _context.ChargingPosts
             .Where(post => stationIds.Contains(post.StationId))
             .Include(post => post.ChargingSlots)
@@ -234,6 +294,7 @@ public class StationService : IStationService
 
         var pricingLookup = await BuildPricingLookupAsync(stationIds);
 
+        // Tổng hợp dữ liệu cho từng trạm
         var stations = stationsRaw.Select(station =>
         {
             managerAssignments.TryGetValue(station.StationId, out var assignment);
@@ -270,6 +331,9 @@ public class StationService : IStationService
         return stations;
     }
 
+    /// <summary>
+    /// Lấy thông tin chi tiết trạm sạc theo ID.
+    /// </summary>
     public async Task<StationDto?> GetStationByIdAsync(int stationId)
     {
         var stationEntity = await _context.ChargingStations
@@ -320,6 +384,9 @@ public class StationService : IStationService
         return ComposeStationDto(stationEntity, aggregates, manager, pricing, postsDto);
     }
 
+    /// <summary>
+    /// Lấy danh sách tất cả trạm sạc với bộ lọc tùy chọn.
+    /// </summary>
     public async Task<List<StationDto>> GetAllStationsAsync(string? city = null, string? status = null)
     {
         var query = _context.ChargingStations.AsQueryable();
@@ -352,7 +419,7 @@ public class StationService : IStationService
 
         var pricingLookup = await BuildPricingLookupAsync(stationIds);
 
-        // Load charging posts and slots for all stations
+        // Tải danh sách trụ và khe sạc
         var chargingPosts = await _context.ChargingPosts
             .Where(p => stationIds.Contains(p.StationId))
             .Include(p => p.ChargingSlots)
@@ -397,6 +464,9 @@ public class StationService : IStationService
         return stations;
     }
 
+    /// <summary>
+    /// Lấy danh sách quản lý trạm đang hoạt động.
+    /// </summary>
     private async Task<Dictionary<int, StationStaff>> GetActiveManagerAssignmentsAsync(IEnumerable<int> stationIds)
     {
         var stationIdList = stationIds?.Distinct().ToList() ?? new List<int>();
@@ -414,28 +484,31 @@ public class StationService : IStationService
             .ToDictionary(g => g.Key, g => g.First());
     }
 
+    /// <summary>
+    /// Tạo danh sách trụ sạc giả lập (nếu chưa có dữ liệu thật).
+    /// </summary>
     private List<ChargingPostDto> CreateDefaultChargingPosts(int totalPosts, int availablePosts)
     {
         var posts = new List<ChargingPostDto>();
         
-        // Distribute posts between AC and DC (60% AC, 40% DC)
+        // Phân bổ trụ giữa AC và DC (60% AC, 40% DC)
         int acPosts = (int)Math.Ceiling(totalPosts * 0.6);
         int dcPosts = totalPosts - acPosts;
         
         int availableAC = (int)Math.Ceiling(availablePosts * 0.6);
         int availableDC = availablePosts - availableAC;
         
-        // Create AC posts
+        // Tạo AC posts
         for (int i = 1; i <= acPosts; i++)
         {
             var slots = new List<ChargingSlotSimpleDto>();
-            // Each AC post has 2 slots (Type 2)
+            // Mỗi trụ AC có 2 khe (Type 2)
             for (int j = 1; j <= 2; j++)
             {
                 bool isAvailable = availableAC > 0;
                 slots.Add(new ChargingSlotSimpleDto
                 {
-                    SlotId = (i * 100) + j, // Virtual ID
+                    SlotId = (i * 100) + j, // ID ảo
                     SlotNumber = j,
                     ConnectorType = "Type 2",
                     MaxPower = 22,
@@ -454,15 +527,15 @@ public class StationService : IStationService
             });
         }
         
-        // Create DC posts
+        // Tạo DC posts
         for (int i = 1; i <= dcPosts; i++)
         {
             var slots = new List<ChargingSlotSimpleDto>();
-            // Each DC post has 1 CCS2 slot
+            // Mỗi trụ DC có 1 khe CCS2
             bool isAvailable = availableDC > 0;
             slots.Add(new ChargingSlotSimpleDto
             {
-                SlotId = ((acPosts + i) * 100) + 1, // Virtual ID
+                SlotId = ((acPosts + i) * 100) + 1, // ID ảo
                 SlotNumber = 1,
                 ConnectorType = "CCS2",
                 MaxPower = 50,
@@ -483,6 +556,9 @@ public class StationService : IStationService
         return posts;
     }
 
+    /// <summary>
+    /// Tạo trạm sạc mới.
+    /// </summary>
     public async Task<StationDto> CreateStationAsync(CreateStationDto dto)
     {
         var station = new Domain.Entities.ChargingStation
@@ -529,6 +605,9 @@ public class StationService : IStationService
         };
     }
 
+    /// <summary>
+    /// Cập nhật thông tin trạm sạc.
+    /// </summary>
     public async Task<bool> UpdateStationAsync(int stationId, UpdateStationDto dto)
     {
         var station = await _context.ChargingStations.FindAsync(stationId);
@@ -558,6 +637,9 @@ public class StationService : IStationService
         return true;
     }
 
+    /// <summary>
+    /// Xóa trạm sạc.
+    /// </summary>
     public async Task<bool> DeleteStationAsync(int stationId)
     {
         var station = await _context.ChargingStations.FindAsync(stationId);
@@ -568,6 +650,9 @@ public class StationService : IStationService
         return true;
     }
 
+    /// <summary>
+    /// Lấy chi tiết các khe sạc của trạm.
+    /// </summary>
     public async Task<List<SlotDetailDto>> GetStationSlotsDetailsAsync(int stationId)
     {
         var slotsQuery = from slot in _context.ChargingSlots
@@ -600,12 +685,18 @@ public class StationService : IStationService
         return await slotsQuery.ToListAsync();
     }
 
+    /// <summary>
+    /// Lấy danh sách khe sạc khả dụng của trạm.
+    /// </summary>
     public async Task<List<SlotDetailDto>> GetAvailableSlotsAsync(int stationId)
     {
-        // Return all slots (same as GetStationSlotsDetailsAsync)
+        // Trả về tất cả slot (giống GetStationSlotsDetailsAsync) để frontend tự lọc
         return await GetStationSlotsDetailsAsync(stationId);
     }
 
+    /// <summary>
+    /// Lấy danh sách trụ sạc và tình trạng khe sạc.
+    /// </summary>
     public async Task<List<ChargingPostWithSlotsDto>> GetAvailablePostsAsync(int stationId)
     {
         var posts = await _context.ChargingPosts
@@ -614,7 +705,7 @@ public class StationService : IStationService
             .Where(post => post.StationId == stationId)
             .ToListAsync();
 
-        // Build per-post summaries with slot breakdown so the frontend can render availability without extra joins
+        // Xây dựng tóm tắt từng trụ với chi tiết slot để frontend hiển thị mà không cần join thêm
         var result = posts.Select(post =>
         {
             var slotDtos = (post.ChargingSlots ?? new List<Domain.Entities.ChargingSlot>())
@@ -656,6 +747,9 @@ public class StationService : IStationService
         return result;
     }
 
+    /// <summary>
+    /// Xây dựng bảng tra cứu giá cho danh sách trạm.
+    /// </summary>
     private async Task<Dictionary<int, StationPricingInfo>> BuildPricingLookupAsync(IEnumerable<int> stationIds)
     {
         var ids = stationIds?.Distinct().ToList() ?? new List<int>();
@@ -690,6 +784,9 @@ public class StationService : IStationService
         return lookup;
     }
 
+    /// <summary>
+    /// Lớp nội bộ lưu trữ thông tin giá của trạm.
+    /// </summary>
     private sealed class StationPricingInfo
     {
         public decimal? AcRate { get; private set; }

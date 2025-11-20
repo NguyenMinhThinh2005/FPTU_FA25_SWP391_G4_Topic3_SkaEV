@@ -5,13 +5,30 @@ using Microsoft.EntityFrameworkCore;
 
 namespace SkaEV.API.Application.Services
 {
+    /// <summary>
+    /// Giao diện dịch vụ giám sát thời gian thực.
+    /// </summary>
     public interface IMonitoringService
     {
+        /// <summary>
+        /// Phát sóng trạng thái trạm sạc.
+        /// </summary>
         Task BroadcastStationStatusAsync(int stationId);
+
+        /// <summary>
+        /// Phát sóng trạng thái slot sạc.
+        /// </summary>
         Task BroadcastSlotStatusAsync(int slotId);
+
+        /// <summary>
+        /// Phát sóng cảnh báo hệ thống.
+        /// </summary>
         Task BroadcastSystemAlertAsync(string message, string severity);
     }
 
+    /// <summary>
+    /// Dịch vụ giám sát thời gian thực sử dụng SignalR.
+    /// </summary>
     public class MonitoringService : IMonitoringService
     {
         private readonly IHubContext<StationMonitoringHub> _hubContext;
@@ -23,6 +40,10 @@ namespace SkaEV.API.Application.Services
             _context = context;
         }
 
+        /// <summary>
+        /// Phát sóng trạng thái trạm sạc tới các client.
+        /// </summary>
+        /// <param name="stationId">ID trạm sạc.</param>
         public async Task BroadcastStationStatusAsync(int stationId)
         {
             var station = await _context.ChargingStations
@@ -51,6 +72,10 @@ namespace SkaEV.API.Application.Services
             }
         }
 
+        /// <summary>
+        /// Phát sóng trạng thái slot sạc tới các client.
+        /// </summary>
+        /// <param name="slotId">ID slot sạc.</param>
         public async Task BroadcastSlotStatusAsync(int slotId)
         {
             var slot = await _context.ChargingSlots
@@ -79,6 +104,11 @@ namespace SkaEV.API.Application.Services
             }
         }
 
+        /// <summary>
+        /// Phát sóng cảnh báo hệ thống tới tất cả client.
+        /// </summary>
+        /// <param name="message">Nội dung cảnh báo.</param>
+        /// <param name="severity">Mức độ nghiêm trọng.</param>
         public async Task BroadcastSystemAlertAsync(string message, string severity)
         {
             var alert = new

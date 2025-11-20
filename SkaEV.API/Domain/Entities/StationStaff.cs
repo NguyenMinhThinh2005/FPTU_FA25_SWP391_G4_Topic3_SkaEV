@@ -1,5 +1,8 @@
 namespace SkaEV.API.Domain.Entities;
 
+/// <summary>
+/// Thực thể phân công nhân viên trạm.
+/// </summary>
 public class StationStaff
 {
     public int AssignmentId { get; set; }

@@ -7,6 +7,9 @@ using System.Text;
 
 namespace SkaEV.API.Application.Services;
 
+/// <summary>
+/// Dịch vụ quản lý mã QR.
+/// </summary>
 public class QRCodeService : IQRCodeService
 {
     private readonly SkaEVDbContext _context;
@@ -18,6 +21,12 @@ public class QRCodeService : IQRCodeService
         _logger = logger;
     }
 
+    /// <summary>
+    /// Tạo mã QR mới cho người dùng.
+    /// </summary>
+    /// <param name="userId">ID người dùng.</param>
+    /// <param name="generateDto">Thông tin tạo mã QR.</param>
+    /// <returns>Thông tin mã QR vừa tạo.</returns>
     public async Task<QRCodeDto> GenerateQRCodeAsync(int userId, GenerateQRCodeDto generateDto)
     {
         // Verify station exists
@@ -76,6 +85,11 @@ public class QRCodeService : IQRCodeService
         return MapToDto(qrCode, userId);
     }
 
+    /// <summary>
+    /// Lấy thông tin mã QR theo ID.
+    /// </summary>
+    /// <param name="qrCodeId">ID mã QR.</param>
+    /// <returns>Thông tin mã QR.</returns>
     public async Task<QRCodeDto?> GetQRCodeByIdAsync(int qrCodeId)
     {
         var qrCode = await _context.QRCodes
@@ -91,6 +105,11 @@ public class QRCodeService : IQRCodeService
         return MapToDto(qrCode, userId);
     }
 
+    /// <summary>
+    /// Lấy danh sách mã QR đang hoạt động của người dùng.
+    /// </summary>
+    /// <param name="userId">ID người dùng.</param>
+    /// <returns>Danh sách mã QR.</returns>
     public async Task<IEnumerable<QRCodeDto>> GetUserActiveQRCodesAsync(int userId)
     {
         // Note: Current schema doesn't store userId in QRCode table
@@ -107,6 +126,11 @@ public class QRCodeService : IQRCodeService
         return qrCodes.Select(q => MapToDto(q, userId)).ToList();
     }
 
+    /// <summary>
+    /// Xác thực mã QR.
+    /// </summary>
+    /// <param name="qrCodeData">Dữ liệu mã QR.</param>
+    /// <returns>Kết quả xác thực.</returns>
     public async Task<QRCodeValidationResultDto> ValidateQRCodeAsync(string qrCodeData)
     {
         var qrCode = await _context.QRCodes
@@ -166,6 +190,12 @@ public class QRCodeService : IQRCodeService
         };
     }
 
+    /// <summary>
+    /// Sử dụng mã QR để đặt chỗ.
+    /// </summary>
+    /// <param name="qrCodeId">ID mã QR.</param>
+    /// <param name="useDto">Thông tin sử dụng.</param>
+    /// <returns>Thông tin mã QR sau khi sử dụng.</returns>
     public async Task<QRCodeDto> UseQRCodeAsync(int qrCodeId, UseQRCodeDto useDto)
     {
         var qrCode = await _context.QRCodes
@@ -204,6 +234,10 @@ public class QRCodeService : IQRCodeService
         return MapToDto(qrCode, 0);
     }
 
+    /// <summary>
+    /// Hủy mã QR.
+    /// </summary>
+    /// <param name="qrCodeId">ID mã QR.</param>
     public async Task CancelQRCodeAsync(int qrCodeId)
     {
         var qrCode = await _context.QRCodes
@@ -220,6 +254,11 @@ public class QRCodeService : IQRCodeService
         _logger.LogInformation("Cancelled QR code {QRCodeId}", qrCodeId);
     }
 
+    /// <summary>
+    /// Tạo hình ảnh mã QR.
+    /// </summary>
+    /// <param name="qrCodeId">ID mã QR.</param>
+    /// <returns>Mảng byte của hình ảnh mã QR.</returns>
     public async Task<byte[]> GenerateQRCodeImageAsync(int qrCodeId)
     {
         var qrCode = await _context.QRCodes

@@ -8,6 +8,9 @@ using System.Text;
 
 namespace SkaEV.API.Application.Services;
 
+/// <summary>
+/// Dịch vụ quản lý hóa đơn và thanh toán.
+/// </summary>
 public class InvoiceService : IInvoiceService
 {
     private readonly SkaEVDbContext _context;
@@ -21,6 +24,11 @@ public class InvoiceService : IInvoiceService
         _paymentProcessor = paymentProcessor;
     }
 
+    /// <summary>
+    /// Lấy danh sách hóa đơn của người dùng.
+    /// </summary>
+    /// <param name="userId">ID người dùng.</param>
+    /// <returns>Danh sách hóa đơn.</returns>
     public async Task<IEnumerable<InvoiceDto>> GetUserInvoicesAsync(int userId)
     {
         var invoices = await _context.Invoices
@@ -34,6 +42,11 @@ public class InvoiceService : IInvoiceService
         return invoices.Select(i => MapToDto(i)).ToList();
     }
 
+    /// <summary>
+    /// Lấy chi tiết hóa đơn theo ID.
+    /// </summary>
+    /// <param name="invoiceId">ID hóa đơn.</param>
+    /// <returns>Thông tin hóa đơn hoặc null nếu không tìm thấy.</returns>
     public async Task<InvoiceDto?> GetInvoiceByIdAsync(int invoiceId)
     {
         var invoice = await _context.Invoices
@@ -44,6 +57,11 @@ public class InvoiceService : IInvoiceService
         return invoice == null ? null : MapToDto(invoice);
     }
 
+    /// <summary>
+    /// Lấy hóa đơn theo ID đặt chỗ.
+    /// </summary>
+    /// <param name="bookingId">ID đặt chỗ.</param>
+    /// <returns>Thông tin hóa đơn hoặc null nếu không tìm thấy.</returns>
     public async Task<InvoiceDto?> GetInvoiceByBookingIdAsync(int bookingId)
     {
         var invoice = await _context.Invoices
@@ -54,6 +72,13 @@ public class InvoiceService : IInvoiceService
         return invoice == null ? null : MapToDto(invoice);
     }
 
+    /// <summary>
+    /// Xử lý thanh toán cho hóa đơn.
+    /// </summary>
+    /// <param name="invoiceId">ID hóa đơn.</param>
+    /// <param name="processDto">Thông tin thanh toán.</param>
+    /// <param name="processedByUserId">ID người xử lý (nhân viên).</param>
+    /// <returns>Thông tin hóa đơn sau khi xử lý.</returns>
     public async Task<InvoiceDto> ProcessPaymentAsync(int invoiceId, ProcessPaymentDto processDto, int processedByUserId)
     {
         var invoice = await _context.Invoices
@@ -158,6 +183,12 @@ public class InvoiceService : IInvoiceService
         return MapToDto(invoice);
     }
 
+    /// <summary>
+    /// Cập nhật trạng thái thanh toán thủ công.
+    /// </summary>
+    /// <param name="invoiceId">ID hóa đơn.</param>
+    /// <param name="statusDto">Thông tin trạng thái mới.</param>
+    /// <returns>Thông tin hóa đơn sau khi cập nhật.</returns>
     public async Task<InvoiceDto> UpdatePaymentStatusAsync(int invoiceId, UpdatePaymentStatusDto statusDto)
     {
         var invoice = await _context.Invoices
@@ -195,9 +226,14 @@ public class InvoiceService : IInvoiceService
         return MapToDto(invoice);
     }
 
+    /// <summary>
+    /// Lấy lịch sử thanh toán của một hóa đơn.
+    /// </summary>
+    /// <param name="invoiceId">ID hóa đơn.</param>
+    /// <returns>Danh sách lịch sử thanh toán.</returns>
     public async Task<IEnumerable<PaymentHistoryDto>> GetPaymentHistoryAsync(int invoiceId)
     {
-        // Check if Payments table exists
+        // Kiểm tra nếu bảng Payments tồn tại
         if (_context.Payments == null)
             return new List<PaymentHistoryDto>();
 
@@ -221,6 +257,10 @@ public class InvoiceService : IInvoiceService
             .ToListAsync();
     }
 
+    /// <summary>
+    /// Lấy danh sách các hóa đơn chưa thanh toán.
+    /// </summary>
+    /// <returns>Danh sách hóa đơn chưa thanh toán.</returns>
     public async Task<IEnumerable<InvoiceDto>> GetUnpaidInvoicesAsync()
     {
         return await _context.Invoices
@@ -232,6 +272,11 @@ public class InvoiceService : IInvoiceService
             .ToListAsync();
     }
 
+    /// <summary>
+    /// Tạo file PDF cho hóa đơn.
+    /// </summary>
+    /// <param name="invoiceId">ID hóa đơn.</param>
+    /// <returns>Mảng byte chứa nội dung PDF.</returns>
     public async Task<byte[]> GenerateInvoicePdfAsync(int invoiceId)
     {
         var invoice = await _context.Invoices
@@ -243,7 +288,7 @@ public class InvoiceService : IInvoiceService
         if (invoice == null)
             throw new ArgumentException("Invoice not found");
 
-        // Simple text-based PDF (would use a PDF library in production)
+        // Tạo PDF dạng text đơn giản (trong thực tế sẽ dùng thư viện PDF chuyên dụng)
         var sb = new StringBuilder();
         sb.AppendLine("========================================");
         sb.AppendLine("           SKAEV INVOICE");
@@ -289,17 +334,17 @@ public class InvoiceService : IInvoiceService
             UserName = invoice.User?.FullName ?? "Unknown",
             TotalAmount = invoice.TotalAmount,
             TaxAmount = invoice.TaxAmount,
-            DiscountAmount = null, // Not in current schema
+            DiscountAmount = null, // Chưa có trong schema hiện tại
             FinalAmount = invoice.TotalAmount,
             PaymentStatus = invoice.PaymentStatus,
-            PaymentMethodId = null, // Not directly stored
+            PaymentMethodId = null, // Không lưu trực tiếp
             PaymentMethodName = invoice.PaymentMethod,
             PaidAt = invoice.PaidAt,
             CreatedAt = invoice.CreatedAt,
-            DueDate = invoice.CreatedAt.AddDays(7), // 7 days from creation
+            DueDate = invoice.CreatedAt.AddDays(7), // Hạn thanh toán 7 ngày sau khi tạo
             Notes = null,
             
-            // Booking details for payment history
+            // Thông tin booking cho lịch sử thanh toán
             StationName = invoice.Booking?.ChargingStation?.StationName,
             EnergyDelivered = invoice.TotalEnergyKwh,
             ChargingDuration = invoice.Booking?.ActualEndTime != null && invoice.Booking?.ActualStartTime != null 

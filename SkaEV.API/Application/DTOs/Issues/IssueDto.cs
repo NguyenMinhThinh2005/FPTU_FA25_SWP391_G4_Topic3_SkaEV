@@ -1,5 +1,8 @@
 namespace SkaEV.API.Application.DTOs.Issues;
 
+/// <summary>
+/// DTO thông tin vấn đề (issue).
+/// </summary>
 public class IssueDto
 {
     public int IssueId { get; set; }
@@ -20,6 +23,9 @@ public class IssueDto
     public DateTime? ResolvedAt { get; set; }
 }
 
+/// <summary>
+/// DTO chi tiết vấn đề (bao gồm bình luận và tệp đính kèm).
+/// </summary>
 public class IssueDetailDto : IssueDto
 {
     public string? Resolution { get; set; }
@@ -27,6 +33,9 @@ public class IssueDetailDto : IssueDto
     public List<IssueAttachmentDto> Attachments { get; set; } = new();
 }
 
+/// <summary>
+/// DTO tạo vấn đề mới.
+/// </summary>
 public class CreateIssueDto
 {
     public int StationId { get; set; }
@@ -36,6 +45,9 @@ public class CreateIssueDto
     public string Priority { get; set; } = "medium";
 }
 
+/// <summary>
+/// DTO cập nhật thông tin vấn đề.
+/// </summary>
 public class UpdateIssueDto
 {
     public string? Title { get; set; }
@@ -43,17 +55,26 @@ public class UpdateIssueDto
     public string? Priority { get; set; }
 }
 
+/// <summary>
+/// DTO phân công vấn đề cho nhân viên.
+/// </summary>
 public class AssignIssueDto
 {
     public int AssignedToUserId { get; set; }
 }
 
+/// <summary>
+/// DTO cập nhật trạng thái vấn đề.
+/// </summary>
 public class UpdateIssueStatusDto
 {
     public string Status { get; set; } = string.Empty;
     public string? Resolution { get; set; }
 }
 
+/// <summary>
+/// DTO bình luận về vấn đề.
+/// </summary>
 public class IssueCommentDto
 {
     public int CommentId { get; set; }
@@ -64,11 +85,17 @@ public class IssueCommentDto
     public DateTime CreatedAt { get; set; }
 }
 
+/// <summary>
+/// DTO thêm bình luận mới.
+/// </summary>
 public class AddIssueCommentDto
 {
     public string Comment { get; set; } = string.Empty;
 }
 
+/// <summary>
+/// DTO tệp đính kèm của vấn đề.
+/// </summary>
 public class IssueAttachmentDto
 {
     public int AttachmentId { get; set; }
@@ -81,6 +108,9 @@ public class IssueAttachmentDto
     public DateTime UploadedAt { get; set; }
 }
 
+/// <summary>
+/// DTO thống kê vấn đề.
+/// </summary>
 public class IssueStatisticsDto
 {
     public int TotalIssues { get; set; }
@@ -94,6 +124,9 @@ public class IssueStatisticsDto
     public decimal AverageResolutionTimeHours { get; set; }
 }
 
+/// <summary>
+/// DTO lịch bảo trì.
+/// </summary>
 public class MaintenanceScheduleDto
 {
     public int ScheduleId { get; set; }

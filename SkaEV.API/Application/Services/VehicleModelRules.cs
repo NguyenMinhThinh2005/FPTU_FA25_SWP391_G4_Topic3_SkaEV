@@ -1,7 +1,7 @@
 namespace SkaEV.API.Application.Services;
 
 /// <summary>
-/// Legacy placeholder maintained for backwards compatibility. VIN rules have been removed.
+/// Lớp giữ chỗ cũ được duy trì để tương thích ngược. Các quy tắc VIN đã bị loại bỏ.
 /// </summary>
 public static class VehicleModelRules
 {

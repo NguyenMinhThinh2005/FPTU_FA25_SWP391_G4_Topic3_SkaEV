@@ -7,6 +7,9 @@ using System.Text.Json;
 
 namespace SkaEV.API.Application.Services;
 
+/// <summary>
+/// Dịch vụ quản lý hồ sơ người dùng và các thông tin cá nhân.
+/// </summary>
 public class UserProfileService : IUserProfileService
 {
     private readonly SkaEVDbContext _context;
@@ -18,6 +21,11 @@ public class UserProfileService : IUserProfileService
         _logger = logger;
     }
 
+    /// <summary>
+    /// Lấy thông tin hồ sơ người dùng theo ID.
+    /// </summary>
+    /// <param name="userId">ID người dùng.</param>
+    /// <returns>Thông tin hồ sơ hoặc null nếu không tìm thấy.</returns>
     public async Task<UserProfileDto?> GetUserProfileAsync(int userId)
     {
         var user = await _context.Users
@@ -30,6 +38,12 @@ public class UserProfileService : IUserProfileService
         return MapToDto(user);
     }
 
+    /// <summary>
+    /// Cập nhật thông tin hồ sơ người dùng.
+    /// </summary>
+    /// <param name="userId">ID người dùng.</param>
+    /// <param name="updateDto">Thông tin cập nhật.</param>
+    /// <returns>Thông tin hồ sơ sau khi cập nhật.</returns>
     public async Task<UserProfileDto> UpdateUserProfileAsync(int userId, UpdateProfileDto updateDto)
     {
         _logger.LogInformation("Received profile update for user {UserId}: {@UpdateDto}", userId, updateDto);
@@ -47,7 +61,7 @@ public class UserProfileService : IUserProfileService
         if (updateDto.PhoneNumber != null)
             user.PhoneNumber = updateDto.PhoneNumber;
 
-        // Ensure the user profile entity exists before updating profile-specific fields
+        // Đảm bảo entity UserProfile tồn tại trước khi cập nhật các trường chi tiết
         var profile = user.UserProfile;
         if (profile == null)
         {
@@ -87,6 +101,12 @@ public class UserProfileService : IUserProfileService
         return MapToDto(user);
     }
 
+    /// <summary>
+    /// Tải lên ảnh đại diện cho người dùng.
+    /// </summary>
+    /// <param name="userId">ID người dùng.</param>
+    /// <param name="avatar">File ảnh tải lên.</param>
+    /// <returns>Thông tin hồ sơ với URL ảnh đại diện mới.</returns>
     public async Task<UserProfileDto> UploadAvatarAsync(int userId, IFormFile avatar)
     {
         var user = await _context.Users
@@ -96,21 +116,21 @@ public class UserProfileService : IUserProfileService
         if (user == null)
             throw new ArgumentException("User not found");
 
-        // Create uploads directory if it doesn't exist
+        // Tạo thư mục uploads nếu chưa tồn tại
         var uploadsPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "avatars");
         Directory.CreateDirectory(uploadsPath);
 
-        // Generate unique filename
+        // Tạo tên file duy nhất
         var fileName = $"{userId}_{Guid.NewGuid()}{Path.GetExtension(avatar.FileName)}";
         var filePath = Path.Combine(uploadsPath, fileName);
 
-        // Save file
+        // Lưu file
         using (var stream = new FileStream(filePath, FileMode.Create))
         {
             await avatar.CopyToAsync(stream);
         }
 
-        // Update user profile
+        // Cập nhật thông tin trong DB
         if (user.UserProfile == null)
         {
             user.UserProfile = new UserProfile
@@ -124,7 +144,7 @@ public class UserProfileService : IUserProfileService
         }
         else
         {
-            // Delete old avatar if exists
+            // Xóa ảnh cũ nếu có
             if (!string.IsNullOrEmpty(user.UserProfile.AvatarUrl))
             {
                 var oldFilePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", user.UserProfile.AvatarUrl.TrimStart('/'));
@@ -143,6 +163,11 @@ public class UserProfileService : IUserProfileService
         return MapToDto(user);
     }
 
+    /// <summary>
+    /// Xóa ảnh đại diện của người dùng.
+    /// </summary>
+    /// <param name="userId">ID người dùng.</param>
+    /// <returns>Thông tin hồ sơ sau khi xóa ảnh.</returns>
     public async Task<UserProfileDto> DeleteAvatarAsync(int userId)
     {
         var user = await _context.Users
@@ -154,7 +179,7 @@ public class UserProfileService : IUserProfileService
 
         if (user.UserProfile?.AvatarUrl != null)
         {
-            // Delete file
+            // Xóa file vật lý
             var filePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", user.UserProfile.AvatarUrl.TrimStart('/'));
             if (File.Exists(filePath))
                 File.Delete(filePath);
@@ -170,6 +195,11 @@ public class UserProfileService : IUserProfileService
         return MapToDto(user);
     }
 
+    /// <summary>
+    /// Đổi mật khẩu người dùng.
+    /// </summary>
+    /// <param name="userId">ID người dùng.</param>
+    /// <param name="changePasswordDto">Thông tin đổi mật khẩu.</param>
     public async Task ChangePasswordAsync(int userId, ChangePasswordDto changePasswordDto)
     {
         if (changePasswordDto.NewPassword != changePasswordDto.ConfirmPassword)
@@ -181,8 +211,8 @@ public class UserProfileService : IUserProfileService
         if (user == null)
             throw new ArgumentException("User not found");
 
-    // Verify current password (would use proper hashing in production)
-    // For now, skip verification as we store plain passwords in this environment
+    // Xác thực mật khẩu hiện tại (trong thực tế cần hash, ở đây tạm bỏ qua vì môi trường dev lưu plain text)
+    // TODO: Implement password hashing verification
 
     user.PasswordHash = changePasswordDto.NewPassword;
         user.UpdatedAt = DateTime.UtcNow;
@@ -192,6 +222,12 @@ public class UserProfileService : IUserProfileService
         _logger.LogInformation("Changed password for user {UserId}", userId);
     }
 
+    /// <summary>
+    /// Cập nhật tùy chọn thông báo.
+    /// </summary>
+    /// <param name="userId">ID người dùng.</param>
+    /// <param name="preferencesDto">Thông tin tùy chọn thông báo.</param>
+    /// <returns>Thông tin hồ sơ sau khi cập nhật.</returns>
     public async Task<UserProfileDto> UpdateNotificationPreferencesAsync(int userId, NotificationPreferencesDto preferencesDto)
     {
         var user = await _context.Users
@@ -223,6 +259,11 @@ public class UserProfileService : IUserProfileService
         return MapToDto(user);
     }
 
+    /// <summary>
+    /// Lấy thống kê hoạt động của người dùng.
+    /// </summary>
+    /// <param name="userId">ID người dùng.</param>
+    /// <returns>Thông tin thống kê (số booking, chi tiêu, v.v.).</returns>
     public async Task<UserStatisticsDto> GetUserStatisticsAsync(int userId)
     {
         var bookings = await _context.Bookings
@@ -247,13 +288,18 @@ public class UserProfileService : IUserProfileService
             CancelledBookings = bookings.Count(b => b.Status == "cancelled"),
             TotalSpent = invoices.Sum(i => i.TotalAmount),
             TotalEnergyCharged = invoices.Sum(i => i.TotalEnergyKwh),
-            FavoriteStationsCount = 0, // Would need favorites table
+            FavoriteStationsCount = 0, // Cần bảng favorites để tính chính xác
             VehiclesCount = vehicles,
             LastBookingDate = bookings.OrderByDescending(b => b.CreatedAt).FirstOrDefault()?.CreatedAt,
             MemberSince = user?.CreatedAt ?? DateTime.UtcNow
         };
     }
 
+    /// <summary>
+    /// Vô hiệu hóa tài khoản người dùng.
+    /// </summary>
+    /// <param name="userId">ID người dùng.</param>
+    /// <param name="reason">Lý do vô hiệu hóa.</param>
     public async Task DeactivateAccountAsync(int userId, string reason)
     {
         var user = await _context.Users

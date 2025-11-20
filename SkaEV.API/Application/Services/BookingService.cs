@@ -6,17 +6,70 @@ using SkaEV.API.Application.DTOs.Bookings;
 
 namespace SkaEV.API.Application.Services;
 
+/// <summary>
+/// Interface định nghĩa các dịch vụ liên quan đến đặt chỗ sạc.
+/// </summary>
 public interface IBookingService
 {
+    /// <summary>
+    /// Tạo mới một đơn đặt chỗ sạc.
+    /// </summary>
+    /// <param name="dto">Thông tin đặt chỗ.</param>
+    /// <returns>ID của đơn đặt chỗ vừa tạo.</returns>
     Task<int> CreateBookingAsync(CreateBookingDto dto);
+
+    /// <summary>
+    /// Lấy thông tin chi tiết của một đơn đặt chỗ theo ID.
+    /// </summary>
+    /// <param name="bookingId">ID đơn đặt chỗ.</param>
+    /// <returns>Thông tin chi tiết đơn đặt chỗ hoặc null nếu không tìm thấy.</returns>
     Task<BookingDto?> GetBookingByIdAsync(int bookingId);
+
+    /// <summary>
+    /// Lấy danh sách lịch sử đặt chỗ của một người dùng.
+    /// </summary>
+    /// <param name="userId">ID người dùng.</param>
+    /// <param name="limit">Số lượng bản ghi tối đa (mặc định 50).</param>
+    /// <param name="offset">Vị trí bắt đầu lấy dữ liệu (mặc định 0).</param>
+    /// <returns>Danh sách các đơn đặt chỗ.</returns>
     Task<List<BookingDto>> GetUserBookingsAsync(int userId, int limit = 50, int offset = 0);
+
+    /// <summary>
+    /// Hủy một đơn đặt chỗ.
+    /// </summary>
+    /// <param name="bookingId">ID đơn đặt chỗ cần hủy.</param>
+    /// <param name="reason">Lý do hủy (tùy chọn).</param>
+    /// <returns>True nếu hủy thành công, False nếu thất bại.</returns>
     Task<bool> CancelBookingAsync(int bookingId, string? reason);
+
+    /// <summary>
+    /// Bắt đầu phiên sạc cho một đơn đặt chỗ.
+    /// </summary>
+    /// <param name="bookingId">ID đơn đặt chỗ.</param>
+    /// <returns>True nếu bắt đầu thành công, False nếu thất bại.</returns>
     Task<bool> StartChargingAsync(int bookingId);
+
+    /// <summary>
+    /// Hoàn thành phiên sạc và cập nhật thông tin thanh toán.
+    /// </summary>
+    /// <param name="bookingId">ID đơn đặt chỗ.</param>
+    /// <param name="finalSoc">Mức pin cuối cùng (%).</param>
+    /// <param name="totalEnergyKwh">Tổng năng lượng đã sạc (kWh).</param>
+    /// <param name="unitPrice">Đơn giá áp dụng.</param>
+    /// <returns>True nếu hoàn thành thành công, False nếu thất bại.</returns>
     Task<bool> CompleteChargingAsync(int bookingId, decimal finalSoc, decimal totalEnergyKwh, decimal unitPrice);
+
+    /// <summary>
+    /// Xử lý quét mã QR để đặt chỗ nhanh.
+    /// </summary>
+    /// <param name="dto">Thông tin quét QR.</param>
+    /// <returns>ID của đơn đặt chỗ vừa tạo.</returns>
     Task<int> ScanQRCodeAsync(ScanQRCodeDto dto);
 }
 
+/// <summary>
+/// Dịch vụ xử lý logic nghiệp vụ cho việc đặt chỗ và quản lý phiên sạc.
+/// </summary>
 public class BookingService : IBookingService
 {
     private readonly SkaEVDbContext _context;
@@ -26,9 +79,10 @@ public class BookingService : IBookingService
         _context = context;
     }
 
+    /// <inheritdoc />
     public async Task<int> CreateBookingAsync(CreateBookingDto dto)
     {
-        // Validate: Only allow bookings for today (UTC+7 Vietnam timezone)
+        // Validate: Chỉ cho phép đặt chỗ trong ngày hôm nay (theo múi giờ Việt Nam UTC+7)
         if (dto.ScheduledStartTime.HasValue)
         {
             var vietnamTimeZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
@@ -39,13 +93,13 @@ public class BookingService : IBookingService
             var scheduledTimeInVietnam = TimeZoneInfo.ConvertTimeFromUtc(scheduledTimeUtc, vietnamTimeZone);
             var scheduledDate = scheduledTimeInVietnam.Date;
             
-            // Check if scheduled date is not today
+            // Kiểm tra nếu ngày đặt không phải là hôm nay
             if (scheduledDate != todayInVietnam)
             {
                 throw new InvalidOperationException("Chỉ cho phép đặt trạm sạc trong ngày hôm nay. Không thể đặt trước cho ngày khác.");
             }
             
-            // Check if scheduled time is at least 30 minutes in the future
+            // Kiểm tra thời gian đặt phải ít nhất 30 phút tính từ hiện tại
             var minimumTime = nowInVietnam.AddMinutes(30);
             if (scheduledTimeInVietnam < minimumTime)
             {
@@ -53,7 +107,7 @@ public class BookingService : IBookingService
             }
         }
         
-        // Use stored procedure sp_create_booking
+        // Sử dụng stored procedure sp_create_booking để đảm bảo tính toàn vẹn dữ liệu và hiệu năng
         var userIdParam = new SqlParameter("@user_id", dto.UserId);
         var vehicleIdParam = new SqlParameter("@vehicle_id", dto.VehicleId);
         var slotIdParam = new SqlParameter("@slot_id", dto.SlotId);
@@ -74,7 +128,7 @@ public class BookingService : IBookingService
             schedulingTypeParam, scheduledStartParam, estimatedArrivalParam,
             targetSocParam, estimatedDurationParam);
 
-        // Get the last inserted booking ID
+        // Lấy ID của booking vừa được tạo (giả định là booking mới nhất)
         var lastBooking = await _context.Bookings
             .OrderByDescending(b => b.BookingId)
             .FirstOrDefaultAsync();
@@ -82,6 +136,7 @@ public class BookingService : IBookingService
         return lastBooking?.BookingId ?? 0;
     }
 
+    /// <inheritdoc />
     public async Task<BookingDto?> GetBookingByIdAsync(int bookingId)
     {
         var booking = await _context.Bookings
@@ -132,6 +187,7 @@ public class BookingService : IBookingService
         return booking;
     }
 
+    /// <inheritdoc />
     public async Task<List<BookingDto>> GetUserBookingsAsync(int userId, int limit = 50, int offset = 0)
     {
         var bookings = await _context.Bookings
@@ -184,9 +240,10 @@ public class BookingService : IBookingService
         return bookings;
     }
 
+    /// <inheritdoc />
     public async Task<bool> CancelBookingAsync(int bookingId, string? reason)
     {
-        // Use stored procedure sp_cancel_booking
+        // Sử dụng stored procedure sp_cancel_booking để xử lý logic hủy và hoàn tiền (nếu có)
         var bookingIdParam = new SqlParameter("@booking_id", bookingId);
         var reasonParam = new SqlParameter("@cancellation_reason", (object?)reason ?? DBNull.Value);
 
@@ -203,9 +260,10 @@ public class BookingService : IBookingService
         }
     }
 
+    /// <inheritdoc />
     public async Task<bool> StartChargingAsync(int bookingId)
     {
-        // Use stored procedure sp_start_charging
+        // Sử dụng stored procedure sp_start_charging để cập nhật trạng thái và thời gian bắt đầu
         var bookingIdParam = new SqlParameter("@booking_id", bookingId);
         var sql = "EXEC sp_start_charging @booking_id";
 
@@ -220,9 +278,10 @@ public class BookingService : IBookingService
         }
     }
 
+    /// <inheritdoc />
     public async Task<bool> CompleteChargingAsync(int bookingId, decimal finalSoc, decimal totalEnergyKwh, decimal unitPrice)
     {
-        // Use stored procedure sp_complete_charging
+        // Sử dụng stored procedure sp_complete_charging để tính toán hóa đơn và cập nhật trạng thái hoàn thành
         var bookingIdParam = new SqlParameter("@booking_id", bookingId);
         var finalSocParam = new SqlParameter("@final_soc", finalSoc);
         var energyParam = new SqlParameter("@total_energy_kwh", totalEnergyKwh);
@@ -241,9 +300,10 @@ public class BookingService : IBookingService
         }
     }
 
+    /// <inheritdoc />
     public async Task<int> ScanQRCodeAsync(ScanQRCodeDto dto)
     {
-        // Use stored procedure sp_scan_qr_code
+        // Sử dụng stored procedure sp_scan_qr_code để xác thực và tạo booking nhanh
         var qrDataParam = new SqlParameter("@qr_data", dto.QrData);
         var userIdParam = new SqlParameter("@user_id", dto.UserId);
         var vehicleIdParam = new SqlParameter("@vehicle_id", dto.VehicleId);
@@ -252,7 +312,7 @@ public class BookingService : IBookingService
 
         await _context.Database.ExecuteSqlRawAsync(sql, qrDataParam, userIdParam, vehicleIdParam);
 
-        // Get the last created booking
+        // Lấy booking vừa được tạo (loại qr_immediate)
         var lastBooking = await _context.Bookings
             .Where(b => b.UserId == dto.UserId && b.SchedulingType == "qr_immediate")
             .OrderByDescending(b => b.BookingId)

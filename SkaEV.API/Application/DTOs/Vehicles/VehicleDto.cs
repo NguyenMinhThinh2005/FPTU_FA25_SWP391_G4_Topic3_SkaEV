@@ -1,5 +1,8 @@
 namespace SkaEV.API.Application.DTOs.Vehicles;
 
+/// <summary>
+/// DTO thông tin phương tiện.
+/// </summary>
 public class VehicleDto
 {
     public int VehicleId { get; set; }
@@ -21,6 +24,9 @@ public class VehicleDto
     public DateTime? UpdatedAt { get; set; }
 }
 
+/// <summary>
+/// DTO tạo phương tiện mới.
+/// </summary>
 public class CreateVehicleDto
 {
     public string VehicleName { get; set; } = string.Empty;
@@ -38,6 +44,9 @@ public class CreateVehicleDto
     public bool IsDefault { get; set; }
 }
 
+/// <summary>
+/// DTO cập nhật thông tin phương tiện.
+/// </summary>
 public class UpdateVehicleDto
 {
     public string? VehicleName { get; set; }

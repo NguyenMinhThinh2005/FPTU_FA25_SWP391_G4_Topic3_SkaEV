@@ -1,5 +1,8 @@
 namespace SkaEV.API.Domain.Entities;
 
+/// <summary>
+/// Thực thể mã QR.
+/// </summary>
 public class QRCode
 {
     public int QrId { get; set; }

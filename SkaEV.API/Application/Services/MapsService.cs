@@ -5,6 +5,9 @@ using SkaEV.API.Application.Options;
 
 namespace SkaEV.API.Application.Services;
 
+/// <summary>
+/// Dịch vụ bản đồ và chỉ đường.
+/// </summary>
 public class MapsService : IMapsService
 {
     private readonly HttpClient _httpClient;
@@ -24,6 +27,12 @@ public class MapsService : IMapsService
         _logger = logger;
     }
 
+    /// <summary>
+    /// Lấy chỉ đường lái xe giữa hai điểm.
+    /// </summary>
+    /// <param name="request">Thông tin yêu cầu chỉ đường.</param>
+    /// <param name="cancellationToken">Token hủy tác vụ.</param>
+    /// <returns>Kết quả chỉ đường.</returns>
     public async Task<DirectionsResponseDto> GetDrivingDirectionsAsync(DirectionsRequestDto request, CancellationToken cancellationToken = default)
     {
         if (request == null)

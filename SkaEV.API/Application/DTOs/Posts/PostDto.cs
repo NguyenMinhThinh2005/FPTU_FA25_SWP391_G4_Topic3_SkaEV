@@ -1,5 +1,8 @@
 namespace SkaEV.API.Application.DTOs.Posts;
 
+/// <summary>
+/// DTO thông tin trụ sạc.
+/// </summary>
 public class PostDto
 {
     public int PostId { get; set; }
@@ -15,6 +18,9 @@ public class PostDto
     public DateTime? UpdatedAt { get; set; }
 }
 
+/// <summary>
+/// DTO tạo trụ sạc mới.
+/// </summary>
 public class CreatePostDto
 {
     public int StationId { get; set; }
@@ -24,6 +30,9 @@ public class CreatePostDto
     public decimal? PricePerKwh { get; set; }
 }
 
+/// <summary>
+/// DTO cập nhật thông tin trụ sạc.
+/// </summary>
 public class UpdatePostDto
 {
     public string? PostName { get; set; }
@@ -33,11 +42,17 @@ public class UpdatePostDto
     public decimal? PricePerKwh { get; set; }
 }
 
+/// <summary>
+/// DTO cập nhật trạng thái trụ sạc.
+/// </summary>
 public class UpdatePostStatusDto
 {
     public string Status { get; set; } = string.Empty;
 }
 
+/// <summary>
+/// DTO tóm tắt tình trạng sẵn sàng của các trụ sạc tại trạm.
+/// </summary>
 public class PostAvailabilitySummaryDto
 {
     public int StationId { get; set; }

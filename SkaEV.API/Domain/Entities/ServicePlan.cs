@@ -4,7 +4,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 namespace SkaEV.API.Domain.Entities;
 
 /// <summary>
-/// Service plan entity for prepaid, postpaid, and VIP plans
+/// Thực thể gói dịch vụ cho các gói trả trước, trả sau và VIP.
 /// </summary>
 [Table("service_plans")]
 public class ServicePlan

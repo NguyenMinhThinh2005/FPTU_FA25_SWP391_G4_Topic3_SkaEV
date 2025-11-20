@@ -1,5 +1,8 @@
 ﻿namespace SkaEV.API.Application.DTOs.Stations;
 
+/// <summary>
+/// DTO thông tin trạm sạc.
+/// </summary>
 public class StationDto
 {
     public int StationId { get; set; }
@@ -39,6 +42,9 @@ public class StationDto
     public List<ChargingPostDto>? ChargingPosts { get; set; }
 }
 
+/// <summary>
+/// DTO thông tin trụ sạc.
+/// </summary>
 public class ChargingPostDto
 {
     public int PostId { get; set; }
@@ -47,6 +53,9 @@ public class ChargingPostDto
     public List<ChargingSlotSimpleDto> Slots { get; set; } = new();
 }
 
+/// <summary>
+/// DTO thông tin khe sạc đơn giản.
+/// </summary>
 public class ChargingSlotSimpleDto
 {
     public int SlotId { get; set; }
@@ -57,6 +66,9 @@ public class ChargingSlotSimpleDto
     public int? CurrentBookingId { get; set; }
 }
 
+/// <summary>
+/// DTO yêu cầu tìm kiếm trạm sạc.
+/// </summary>
 public class SearchStationsRequestDto
 {
     public decimal Latitude { get; set; }
@@ -66,6 +78,9 @@ public class SearchStationsRequestDto
     public string? Status { get; set; }
 }
 
+/// <summary>
+/// DTO tạo trạm sạc mới.
+/// </summary>
 public class CreateStationDto
 {
     public string StationName { get; set; } = string.Empty;
@@ -78,6 +93,9 @@ public class CreateStationDto
     public string? StationImageUrl { get; set; }
 }
 
+/// <summary>
+/// DTO cập nhật thông tin trạm sạc.
+/// </summary>
 public class UpdateStationDto
 {
     public string? StationName { get; set; }

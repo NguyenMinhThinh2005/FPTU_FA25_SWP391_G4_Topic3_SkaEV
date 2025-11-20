@@ -1,5 +1,8 @@
 namespace SkaEV.API.Domain.Entities;
 
+/// <summary>
+/// Thực thể đại diện cho một lượt đặt chỗ sạc.
+/// </summary>
 public class Booking
 {
     public int BookingId { get; set; }

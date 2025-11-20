@@ -1,5 +1,8 @@
 namespace SkaEV.API.Application.DTOs.Stations;
 
+/// <summary>
+/// DTO thông tin khe sạc.
+/// </summary>
 public class ChargingSlotDto
 {
     public int SlotId { get; set; }

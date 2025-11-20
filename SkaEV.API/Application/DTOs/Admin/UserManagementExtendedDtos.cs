@@ -3,7 +3,7 @@ namespace SkaEV.API.Application.DTOs.Admin;
 // ==================== USER HISTORY & STATISTICS ====================
 
 /// <summary>
-/// User charging history details
+/// DTO chi tiết lịch sử sạc của người dùng.
 /// </summary>
 public class UserChargingHistoryDto
 {
@@ -23,7 +23,7 @@ public class UserChargingHistoryDto
 }
 
 /// <summary>
-/// User payment history details
+/// DTO chi tiết lịch sử thanh toán của người dùng.
 /// </summary>
 public class UserPaymentHistoryDto
 {
@@ -39,7 +39,7 @@ public class UserPaymentHistoryDto
 }
 
 /// <summary>
-/// User statistics for admin dashboard
+/// DTO thống kê người dùng cho bảng điều khiển Admin.
 /// </summary>
 public class UserStatisticsDto
 {
@@ -59,7 +59,7 @@ public class UserStatisticsDto
 // ==================== NOTIFICATIONS ====================
 
 /// <summary>
-/// Notification DTO for list display
+/// DTO hiển thị danh sách thông báo.
 /// </summary>
 public class NotificationDto
 {
@@ -78,7 +78,7 @@ public class NotificationDto
 }
 
 /// <summary>
-/// Create notification DTO
+/// DTO tạo thông báo mới.
 /// </summary>
 public class CreateNotificationDto
 {
@@ -91,7 +91,7 @@ public class CreateNotificationDto
 }
 
 /// <summary>
-/// Send promotion DTO
+/// DTO gửi khuyến mãi.
 /// </summary>
 public class SendPromotionDto
 {
@@ -107,7 +107,7 @@ public class SendPromotionDto
 // ==================== SUPPORT REQUESTS ====================
 
 /// <summary>
-/// Support request DTO for list
+/// DTO danh sách yêu cầu hỗ trợ.
 /// </summary>
 public class SupportRequestDto
 {
@@ -131,7 +131,7 @@ public class SupportRequestDto
 }
 
 /// <summary>
-/// Support request detail DTO
+/// DTO chi tiết yêu cầu hỗ trợ.
 /// </summary>
 public class SupportRequestDetailDto : SupportRequestDto
 {
@@ -141,7 +141,7 @@ public class SupportRequestDetailDto : SupportRequestDto
 }
 
 /// <summary>
-/// Support request message DTO
+/// DTO tin nhắn trong yêu cầu hỗ trợ.
 /// </summary>
 public class SupportRequestMessageDto
 {
@@ -156,7 +156,7 @@ public class SupportRequestMessageDto
 }
 
 /// <summary>
-/// Create support request DTO (from user)
+/// DTO tạo yêu cầu hỗ trợ (từ người dùng).
 /// </summary>
 public class CreateSupportRequestDto
 {
@@ -171,7 +171,7 @@ public class CreateSupportRequestDto
 }
 
 /// <summary>
-/// Update support request DTO (admin action)
+/// DTO cập nhật yêu cầu hỗ trợ (hành động của Admin).
 /// </summary>
 public class UpdateSupportRequestDto
 {
@@ -182,7 +182,7 @@ public class UpdateSupportRequestDto
 }
 
 /// <summary>
-/// Reply to support request DTO
+/// DTO trả lời yêu cầu hỗ trợ.
 /// </summary>
 public class ReplySupportRequestDto
 {
@@ -193,7 +193,7 @@ public class ReplySupportRequestDto
 }
 
 /// <summary>
-/// Support request filter DTO
+/// DTO bộ lọc yêu cầu hỗ trợ.
 /// </summary>
 public class SupportRequestFilterDto
 {
@@ -211,7 +211,7 @@ public class SupportRequestFilterDto
 // ==================== SERVICE PLANS (Optional for Phase 2) ====================
 
 /// <summary>
-/// Service plan DTO
+/// DTO gói dịch vụ.
 /// </summary>
 public class ServicePlanDto
 {
@@ -228,7 +228,7 @@ public class ServicePlanDto
 }
 
 /// <summary>
-/// User subscription DTO
+/// DTO đăng ký gói dịch vụ của người dùng.
 /// </summary>
 public class UserSubscriptionDto
 {

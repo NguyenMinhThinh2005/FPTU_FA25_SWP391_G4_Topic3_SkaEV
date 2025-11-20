@@ -13,18 +13,42 @@ using VNPAY.Models.Exceptions;
 
 namespace SkaEV.API.Application.Services.Payments;
 
+/// <summary>
+/// Nguồn callback từ VNPay (Return URL hoặc IPN).
+/// </summary>
 public enum VnpayCallbackSource
 {
     Return,
     Ipn
 }
 
+/// <summary>
+/// Giao diện dịch vụ tích hợp thanh toán VNPay.
+/// </summary>
 public interface IVNPayService
 {
+    /// <summary>
+    /// Tạo URL thanh toán VNPay.
+    /// </summary>
+    /// <param name="request">Thông tin yêu cầu thanh toán.</param>
+    /// <param name="userId">ID người dùng thực hiện thanh toán.</param>
+    /// <param name="cancellationToken">Token hủy tác vụ.</param>
+    /// <returns>Thông tin URL thanh toán.</returns>
     Task<VnpayPaymentUrlDto> CreatePaymentUrlAsync(VnpayCreatePaymentRequestDto request, int userId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Xác thực kết quả thanh toán từ VNPay.
+    /// </summary>
+    /// <param name="parameters">Các tham số trả về từ VNPay.</param>
+    /// <param name="source">Nguồn callback (Return hoặc IPN).</param>
+    /// <param name="cancellationToken">Token hủy tác vụ.</param>
+    /// <returns>Kết quả xác thực giao dịch.</returns>
     Task<VnpayVerificationResultDto> VerifyAsync(IQueryCollection parameters, VnpayCallbackSource source, CancellationToken cancellationToken = default);
 }
 
+/// <summary>
+/// Dịch vụ xử lý tích hợp thanh toán VNPay.
+/// </summary>
 public class VNPayService : IVNPayService
 {
     private readonly SkaEVDbContext _context;
@@ -38,6 +62,13 @@ public class VNPayService : IVNPayService
         _logger = logger;
     }
 
+    /// <summary>
+    /// Tạo URL thanh toán VNPay cho một hóa đơn.
+    /// </summary>
+    /// <param name="request">Thông tin yêu cầu thanh toán.</param>
+    /// <param name="userId">ID người dùng.</param>
+    /// <param name="cancellationToken">Token hủy tác vụ.</param>
+    /// <returns>DTO chứa URL thanh toán.</returns>
     public async Task<VnpayPaymentUrlDto> CreatePaymentUrlAsync(VnpayCreatePaymentRequestDto request, int userId, CancellationToken cancellationToken = default)
     {
         var invoice = await _context.Invoices.FirstOrDefaultAsync(i => i.InvoiceId == request.InvoiceId, cancellationToken)
@@ -94,6 +125,13 @@ public class VNPayService : IVNPayService
         };
     }
 
+    /// <summary>
+    /// Xác thực và xử lý kết quả thanh toán từ VNPay (IPN hoặc Return URL).
+    /// </summary>
+    /// <param name="parameters">Tham số từ query string.</param>
+    /// <param name="source">Nguồn gọi (Return/IPN).</param>
+    /// <param name="cancellationToken">Token hủy tác vụ.</param>
+    /// <returns>Kết quả xác thực.</returns>
     public async Task<VnpayVerificationResultDto> VerifyAsync(IQueryCollection parameters, VnpayCallbackSource source, CancellationToken cancellationToken = default)
     {
         if (parameters == null || parameters.Count == 0)
@@ -152,6 +190,9 @@ public class VNPayService : IVNPayService
         }
     }
 
+    /// <summary>
+    /// Helper: Đánh dấu thanh toán thành công trong CSDL.
+    /// </summary>
     private async Task MarkPaymentSuccessfulAsync(VnpayPaymentResult paymentResult, VnpayCallbackSource source, CancellationToken cancellationToken)
     {
         var transactionRef = paymentResult.PaymentId.ToString();
@@ -187,6 +228,9 @@ public class VNPayService : IVNPayService
         await _context.SaveChangesAsync(cancellationToken);
     }
 
+    /// <summary>
+    /// Helper: Đánh dấu thanh toán thất bại trong CSDL.
+    /// </summary>
     private async Task MarkPaymentFailedAsync(string? transactionRef, string? reason, string? responseCode, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(transactionRef))

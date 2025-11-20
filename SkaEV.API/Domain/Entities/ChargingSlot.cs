@@ -1,5 +1,8 @@
 namespace SkaEV.API.Domain.Entities;
 
+/// <summary>
+/// Thực thể đại diện cho một khe sạc (đầu sạc).
+/// </summary>
 public class ChargingSlot
 {
     public int SlotId { get; set; }

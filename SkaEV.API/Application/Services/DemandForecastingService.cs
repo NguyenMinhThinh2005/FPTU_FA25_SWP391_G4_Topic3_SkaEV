@@ -3,13 +3,30 @@ using Microsoft.EntityFrameworkCore;
 
 namespace SkaEV.API.Application.Services
 {
+    /// <summary>
+    /// Giao diện dịch vụ dự báo nhu cầu.
+    /// </summary>
     public interface IDemandForecastingService
     {
+        /// <summary>
+        /// Dự báo nhu cầu cho trạm sạc.
+        /// </summary>
         Task<DemandForecast> ForecastDemandAsync(int stationId, DateTime startDate, DateTime endDate);
+
+        /// <summary>
+        /// Dự đoán giờ cao điểm.
+        /// </summary>
         Task<List<PeakHourPrediction>> PredictPeakHoursAsync(int stationId, DateTime date);
+
+        /// <summary>
+        /// Lấy điểm nhu cầu của các trạm sạc.
+        /// </summary>
         Task<List<StationDemandScore>> GetStationDemandScoresAsync();
     }
 
+    /// <summary>
+    /// Dịch vụ dự báo nhu cầu sử dụng trạm sạc.
+    /// </summary>
     public class DemandForecastingService : IDemandForecastingService
     {
         private readonly SkaEVDbContext _context;
@@ -20,18 +37,23 @@ namespace SkaEV.API.Application.Services
         }
 
         /// <summary>
-        /// Forecast demand for a station based on historical data
-        /// Uses simple moving average and trend analysis
+        /// Dự báo nhu cầu cho một trạm sạc dựa trên dữ liệu lịch sử.
+        /// Sử dụng trung bình động và phân tích xu hướng.
         /// </summary>
+        /// <param name="stationId">ID trạm sạc.</param>
+        /// <param name="startDate">Ngày bắt đầu dự báo.</param>
+        /// <param name="endDate">Ngày kết thúc dự báo.</param>
+        /// <returns>Kết quả dự báo nhu cầu.</returns>
         public async Task<DemandForecast> ForecastDemandAsync(int stationId, DateTime startDate, DateTime endDate)
         {
             // Get historical booking data with invoice energy
             var historicalData = await _context.Bookings
                 .Where(b => b.StationId == stationId &&
+                           b.ActualStartTime != null &&
                            b.ActualStartTime >= startDate.AddDays(-30) &&
                            b.ActualStartTime <= startDate &&
                            b.DeletedAt == null)
-                .GroupBy(b => b.ActualStartTime.Value.Date)
+                .GroupBy(b => b.ActualStartTime!.Value.Date)
                 .Select(g => new
                 {
                     Date = g.Key,
@@ -88,8 +110,11 @@ namespace SkaEV.API.Application.Services
         }
 
         /// <summary>
-        /// Predict peak hours for a station on a given date
+        /// Dự đoán giờ cao điểm cho một trạm sạc vào một ngày cụ thể.
         /// </summary>
+        /// <param name="stationId">ID trạm sạc.</param>
+        /// <param name="date">Ngày dự đoán.</param>
+        /// <returns>Danh sách dự đoán giờ cao điểm.</returns>
         public async Task<List<PeakHourPrediction>> PredictPeakHoursAsync(int stationId, DateTime date)
         {
             // Get historical data for same day of week
@@ -101,7 +126,7 @@ namespace SkaEV.API.Application.Services
                            b.ActualStartTime >= date.AddDays(-60) &&
                            b.ActualStartTime < date &&
                            b.DeletedAt == null)
-                .Select(b => new { Hour = b.ActualStartTime.Value.Hour, b.BookingId })
+                .Select(b => new { Hour = b.ActualStartTime!.Value.Hour, b.BookingId })
                 .ToListAsync();
 
             var hourlyDistribution = historicalData
@@ -130,8 +155,9 @@ namespace SkaEV.API.Application.Services
         }
 
         /// <summary>
-        /// Get demand scores for all stations
+        /// Lấy điểm nhu cầu cho tất cả các trạm sạc.
         /// </summary>
+        /// <returns>Danh sách điểm nhu cầu của các trạm.</returns>
         public async Task<List<StationDemandScore>> GetStationDemandScoresAsync()
         {
             var stations = await _context.ChargingStations

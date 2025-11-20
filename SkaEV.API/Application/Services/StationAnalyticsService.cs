@@ -3,6 +3,9 @@ using SkaEV.API.Infrastructure.Data;
 
 namespace SkaEV.API.Application.Services;
 
+/// <summary>
+/// Dịch vụ phân tích dữ liệu trạm sạc.
+/// </summary>
 public class StationAnalyticsService
 {
     private readonly SkaEVDbContext _context;
@@ -12,7 +15,11 @@ public class StationAnalyticsService
         _context = context;
     }
 
-    // Power usage trends (last 30 days)
+    /// <summary>
+    /// Lấy xu hướng sử dụng năng lượng trong 30 ngày qua.
+    /// </summary>
+    /// <param name="stationId">ID trạm sạc.</param>
+    /// <returns>Dữ liệu xu hướng sử dụng năng lượng.</returns>
     public async Task<object> GetPowerUsageTrendsAsync(int stationId)
     {
         var thirtyDaysAgo = DateTime.UtcNow.AddDays(-30);
@@ -57,7 +64,11 @@ public class StationAnalyticsService
         };
     }
 
-    // Slot utilization (last 30 days)
+    /// <summary>
+    /// Lấy tỷ lệ sử dụng slot sạc trong 30 ngày qua.
+    /// </summary>
+    /// <param name="stationId">ID trạm sạc.</param>
+    /// <returns>Dữ liệu tỷ lệ sử dụng slot.</returns>
     public async Task<object> GetSlotUtilizationAsync(int stationId)
     {
         var thirtyDaysAgo = DateTime.UtcNow.AddDays(-30);
@@ -102,7 +113,11 @@ public class StationAnalyticsService
         };
     }
 
-    // Revenue breakdown (last 30 days)
+    /// <summary>
+    /// Lấy phân tích doanh thu theo phương thức thanh toán trong 30 ngày qua.
+    /// </summary>
+    /// <param name="stationId">ID trạm sạc.</param>
+    /// <returns>Dữ liệu phân tích doanh thu.</returns>
     public async Task<object> GetRevenueBreakdownAsync(int stationId)
     {
         var thirtyDaysAgo = DateTime.UtcNow.AddDays(-30);
@@ -144,7 +159,11 @@ public class StationAnalyticsService
         };
     }
 
-    // Session patterns (hourly distribution)
+    /// <summary>
+    /// Lấy mô hình phiên sạc theo giờ trong ngày (30 ngày qua).
+    /// </summary>
+    /// <param name="stationId">ID trạm sạc.</param>
+    /// <returns>Dữ liệu mô hình phiên sạc.</returns>
     public async Task<object> GetSessionPatternsAsync(int stationId)
     {
         var thirtyDaysAgo = DateTime.UtcNow.AddDays(-30);
@@ -198,7 +217,11 @@ public class StationAnalyticsService
         };
     }
 
-    // Overall station analytics summary
+    /// <summary>
+    /// Lấy tóm tắt phân tích tổng thể trạm sạc.
+    /// </summary>
+    /// <param name="stationId">ID trạm sạc.</param>
+    /// <returns>Dữ liệu tóm tắt phân tích.</returns>
     public async Task<object> GetStationAnalyticsSummaryAsync(int stationId)
     {
         var thirtyDaysAgo = DateTime.UtcNow.AddDays(-30);

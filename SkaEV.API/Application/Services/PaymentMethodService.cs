@@ -6,7 +6,7 @@ using SkaEV.API.Infrastructure.Data;
 namespace SkaEV.API.Application.Services;
 
 /// <summary>
-/// Service for payment method operations
+/// Dịch vụ quản lý các phương thức thanh toán của người dùng.
 /// </summary>
 public class PaymentMethodService : IPaymentMethodService
 {
@@ -19,6 +19,11 @@ public class PaymentMethodService : IPaymentMethodService
         _logger = logger;
     }
 
+    /// <summary>
+    /// Lấy danh sách phương thức thanh toán của người dùng.
+    /// </summary>
+    /// <param name="userId">ID người dùng.</param>
+    /// <returns>Danh sách các phương thức thanh toán.</returns>
     public async Task<IEnumerable<PaymentMethodDto>> GetUserPaymentMethodsAsync(int userId)
     {
         var methods = await _context.PaymentMethods
@@ -30,6 +35,11 @@ public class PaymentMethodService : IPaymentMethodService
         return methods.Select(MapToDto);
     }
 
+    /// <summary>
+    /// Lấy chi tiết một phương thức thanh toán theo ID.
+    /// </summary>
+    /// <param name="paymentMethodId">ID phương thức thanh toán.</param>
+    /// <returns>Thông tin chi tiết hoặc null nếu không tìm thấy.</returns>
     public async Task<PaymentMethodDto?> GetPaymentMethodByIdAsync(int paymentMethodId)
     {
         var method = await _context.PaymentMethods
@@ -38,16 +48,22 @@ public class PaymentMethodService : IPaymentMethodService
         return method != null ? MapToDto(method) : null;
     }
 
+    /// <summary>
+    /// Thêm mới một phương thức thanh toán cho người dùng.
+    /// </summary>
+    /// <param name="userId">ID người dùng.</param>
+    /// <param name="createDto">Thông tin phương thức thanh toán mới.</param>
+    /// <returns>Thông tin phương thức thanh toán vừa tạo.</returns>
     public async Task<PaymentMethodDto> CreatePaymentMethodAsync(int userId, CreatePaymentMethodDto createDto)
     {
-        // Validate card expiry if credit/debit card
+        // Validate: Yêu cầu tháng/năm hết hạn nếu là thẻ tín dụng/ghi nợ
         if ((createDto.Type == "credit_card" || createDto.Type == "debit_card") &&
             (createDto.ExpiryMonth == null || createDto.ExpiryYear == null))
         {
             throw new ArgumentException("Expiry month and year are required for card payments");
         }
 
-        // Extract last 4 digits of card number if provided
+        // Trích xuất 4 số cuối của thẻ nếu có
         string? last4 = null;
         if (!string.IsNullOrEmpty(createDto.CardNumber) && createDto.CardNumber.Length >= 4)
         {
@@ -69,7 +85,7 @@ public class PaymentMethodService : IPaymentMethodService
             UpdatedAt = DateTime.UtcNow
         };
 
-        // If set as default, unset other default methods
+        // Nếu đặt làm mặc định, bỏ mặc định các phương thức khác
         if (createDto.SetAsDefault)
         {
             await UnsetOtherDefaultMethodsAsync(userId);
@@ -84,6 +100,12 @@ public class PaymentMethodService : IPaymentMethodService
         return MapToDto(paymentMethod);
     }
 
+    /// <summary>
+    /// Cập nhật thông tin phương thức thanh toán.
+    /// </summary>
+    /// <param name="paymentMethodId">ID phương thức thanh toán.</param>
+    /// <param name="updateDto">Thông tin cập nhật.</param>
+    /// <returns>Thông tin phương thức thanh toán sau khi cập nhật.</returns>
     public async Task<PaymentMethodDto> UpdatePaymentMethodAsync(int paymentMethodId, UpdatePaymentMethodDto updateDto)
     {
         var method = await _context.PaymentMethods
@@ -113,6 +135,10 @@ public class PaymentMethodService : IPaymentMethodService
         return MapToDto(method);
     }
 
+    /// <summary>
+    /// Xóa (soft delete) một phương thức thanh toán.
+    /// </summary>
+    /// <param name="paymentMethodId">ID phương thức thanh toán.</param>
     public async Task DeletePaymentMethodAsync(int paymentMethodId)
     {
         var method = await _context.PaymentMethods
@@ -121,7 +147,7 @@ public class PaymentMethodService : IPaymentMethodService
         if (method == null)
             throw new KeyNotFoundException($"Payment method {paymentMethodId} not found");
 
-        // Soft delete
+        // Soft delete: Đánh dấu không hoạt động thay vì xóa vật lý
         method.IsActive = false;
         method.UpdatedAt = DateTime.UtcNow;
 
@@ -130,6 +156,12 @@ public class PaymentMethodService : IPaymentMethodService
         _logger.LogInformation("Deleted payment method {Id}", paymentMethodId);
     }
 
+    /// <summary>
+    /// Đặt một phương thức thanh toán làm mặc định.
+    /// </summary>
+    /// <param name="userId">ID người dùng.</param>
+    /// <param name="paymentMethodId">ID phương thức thanh toán.</param>
+    /// <returns>Thông tin phương thức thanh toán được đặt làm mặc định.</returns>
     public async Task<PaymentMethodDto> SetDefaultPaymentMethodAsync(int userId, int paymentMethodId)
     {
         var method = await _context.PaymentMethods
@@ -138,10 +170,10 @@ public class PaymentMethodService : IPaymentMethodService
         if (method == null)
             throw new KeyNotFoundException($"Payment method {paymentMethodId} not found");
 
-        // Unset other default methods
+        // Bỏ mặc định các phương thức khác
         await UnsetOtherDefaultMethodsAsync(userId);
 
-        // Set this as default
+        // Đặt phương thức này làm mặc định
         method.IsDefault = true;
         method.UpdatedAt = DateTime.UtcNow;
 
@@ -153,6 +185,11 @@ public class PaymentMethodService : IPaymentMethodService
         return MapToDto(method);
     }
 
+    /// <summary>
+    /// Lấy phương thức thanh toán mặc định của người dùng.
+    /// </summary>
+    /// <param name="userId">ID người dùng.</param>
+    /// <returns>Thông tin phương thức thanh toán mặc định hoặc null.</returns>
     public async Task<PaymentMethodDto?> GetDefaultPaymentMethodAsync(int userId)
     {
         var method = await _context.PaymentMethods
@@ -161,6 +198,9 @@ public class PaymentMethodService : IPaymentMethodService
         return method != null ? MapToDto(method) : null;
     }
 
+    /// <summary>
+    /// Helper: Bỏ đánh dấu mặc định cho tất cả phương thức thanh toán của người dùng.
+    /// </summary>
     private async Task UnsetOtherDefaultMethodsAsync(int userId)
     {
         var defaultMethods = await _context.PaymentMethods

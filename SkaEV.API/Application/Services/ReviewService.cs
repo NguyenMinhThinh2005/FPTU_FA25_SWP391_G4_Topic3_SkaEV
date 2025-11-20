@@ -6,6 +6,9 @@ using SkaEV.API.Infrastructure.Data;
 
 namespace SkaEV.API.Application.Services;
 
+/// <summary>
+/// Dịch vụ quản lý đánh giá và phản hồi từ người dùng.
+/// </summary>
 public class ReviewService : IReviewService
 {
     private readonly SkaEVDbContext _context;
@@ -17,6 +20,13 @@ public class ReviewService : IReviewService
         _logger = logger;
     }
 
+    /// <summary>
+    /// Lấy danh sách đánh giá của một trạm sạc.
+    /// </summary>
+    /// <param name="stationId">ID trạm sạc.</param>
+    /// <param name="page">Trang hiện tại.</param>
+    /// <param name="pageSize">Số lượng đánh giá mỗi trang.</param>
+    /// <returns>Danh sách đánh giá.</returns>
     public async Task<IEnumerable<ReviewDto>> GetStationReviewsAsync(int stationId, int page, int pageSize)
     {
         return await _context.Reviews
@@ -29,6 +39,11 @@ public class ReviewService : IReviewService
             .ToListAsync();
     }
 
+    /// <summary>
+    /// Đếm tổng số đánh giá của một trạm sạc.
+    /// </summary>
+    /// <param name="stationId">ID trạm sạc.</param>
+    /// <returns>Số lượng đánh giá.</returns>
     public async Task<int> GetStationReviewCountAsync(int stationId)
     {
         return await _context.Reviews
@@ -36,6 +51,11 @@ public class ReviewService : IReviewService
             .CountAsync();
     }
 
+    /// <summary>
+    /// Lấy danh sách đánh giá của một người dùng.
+    /// </summary>
+    /// <param name="userId">ID người dùng.</param>
+    /// <returns>Danh sách đánh giá.</returns>
     public async Task<IEnumerable<ReviewDto>> GetUserReviewsAsync(int userId)
     {
         return await _context.Reviews
@@ -46,6 +66,11 @@ public class ReviewService : IReviewService
             .ToListAsync();
     }
 
+    /// <summary>
+    /// Lấy chi tiết một đánh giá theo ID.
+    /// </summary>
+    /// <param name="reviewId">ID đánh giá.</param>
+    /// <returns>Thông tin đánh giá hoặc null nếu không tìm thấy.</returns>
     public async Task<ReviewDto?> GetReviewByIdAsync(int reviewId)
     {
         var review = await _context.Reviews
@@ -57,13 +82,19 @@ public class ReviewService : IReviewService
         return review;
     }
 
+    /// <summary>
+    /// Tạo mới một đánh giá.
+    /// </summary>
+    /// <param name="userId">ID người dùng.</param>
+    /// <param name="createDto">Thông tin đánh giá mới.</param>
+    /// <returns>Thông tin đánh giá vừa tạo.</returns>
     public async Task<ReviewDto> CreateReviewAsync(int userId, CreateReviewDto createDto)
     {
         // Validate rating
         if (createDto.Rating < 1 || createDto.Rating > 5)
             throw new ArgumentException("Rating must be between 1 and 5");
 
-        // Find a booking for this user and station to link the review
+        // Tìm booking đã hoàn thành của user tại trạm này để liên kết đánh giá
         var booking = await _context.Bookings
             .Where(b => b.UserId == userId && b.StationId == createDto.StationId && b.Status == "completed")
             .OrderByDescending(b => b.CreatedAt)
@@ -72,7 +103,7 @@ public class ReviewService : IReviewService
         if (booking == null)
             throw new ArgumentException("You must complete a booking at this station before reviewing");
 
-        // Check if user has already reviewed THIS SPECIFIC BOOKING
+        // Kiểm tra xem user đã đánh giá booking này chưa
         var existingReview = await _context.Reviews
             .FirstOrDefaultAsync(r => r.BookingId == booking.BookingId);
 
@@ -93,7 +124,7 @@ public class ReviewService : IReviewService
         _context.Reviews.Add(reviewEntity);
         await _context.SaveChangesAsync();
 
-        // Reload with navigation properties
+        // Reload để lấy thông tin navigation properties
         var reviewDto = await _context.Reviews
             .AsNoTracking()
             .Where(r => r.ReviewId == reviewEntity.ReviewId)
@@ -106,6 +137,12 @@ public class ReviewService : IReviewService
         return reviewDto;
     }
 
+    /// <summary>
+    /// Cập nhật nội dung đánh giá.
+    /// </summary>
+    /// <param name="reviewId">ID đánh giá.</param>
+    /// <param name="updateDto">Thông tin cập nhật.</param>
+    /// <returns>Thông tin đánh giá sau khi cập nhật.</returns>
     public async Task<ReviewDto> UpdateReviewAsync(int reviewId, UpdateReviewDto updateDto)
     {
         var review = await _context.Reviews
@@ -140,6 +177,10 @@ public class ReviewService : IReviewService
             .FirstAsync();
     }
 
+    /// <summary>
+    /// Xóa đánh giá.
+    /// </summary>
+    /// <param name="reviewId">ID đánh giá.</param>
     public async Task DeleteReviewAsync(int reviewId)
     {
         var review = await _context.Reviews
@@ -154,6 +195,11 @@ public class ReviewService : IReviewService
         _logger.LogInformation("Deleted review {ReviewId}", reviewId);
     }
 
+    /// <summary>
+    /// Lấy tóm tắt đánh giá của trạm sạc (số sao trung bình, số lượng đánh giá theo sao).
+    /// </summary>
+    /// <param name="stationId">ID trạm sạc.</param>
+    /// <returns>Thông tin tóm tắt đánh giá.</returns>
     public async Task<StationRatingSummaryDto> GetStationRatingSummaryAsync(int stationId)
     {
         var summary = await _context.Reviews

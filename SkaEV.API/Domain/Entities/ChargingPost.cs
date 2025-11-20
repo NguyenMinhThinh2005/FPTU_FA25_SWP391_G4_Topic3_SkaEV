@@ -1,5 +1,8 @@
 namespace SkaEV.API.Domain.Entities;
 
+/// <summary>
+/// Thực thể đại diện cho một trụ sạc.
+/// </summary>
 public class ChargingPost
 {
     public int PostId { get; set; }

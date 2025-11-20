@@ -1,5 +1,8 @@
 ﻿namespace SkaEV.API.Domain.Entities;
 
+/// <summary>
+/// Thực thể đại diện cho một sự cố.
+/// </summary>
 public class Incident
 {
     public int IncidentId { get; set; }

@@ -1,5 +1,8 @@
 namespace SkaEV.API.Domain.Entities;
 
+/// <summary>
+/// Thực thể đại diện cho một thông báo.
+/// </summary>
 public class Notification
 {
     public int NotificationId { get; set; }

@@ -6,6 +6,9 @@ using BCrypt.Net;
 
 namespace SkaEV.API.Application.Services;
 
+/// <summary>
+/// Service quản lý người dùng dành cho Admin.
+/// </summary>
 public partial class AdminUserService : IAdminUserService
 {
     private readonly SkaEVDbContext _context;
@@ -17,6 +20,9 @@ public partial class AdminUserService : IAdminUserService
         _logger = logger;
     }
 
+    /// <summary>
+    /// Lấy danh sách tất cả người dùng với bộ lọc và phân trang.
+    /// </summary>
     public async Task<IEnumerable<AdminUserDto>> GetAllUsersAsync(string? role, string? status, string? search, int page, int pageSize)
     {
         var query = _context.Users.AsQueryable();
@@ -57,6 +63,9 @@ public partial class AdminUserService : IAdminUserService
             .ToListAsync();
     }
 
+    /// <summary>
+    /// Đếm tổng số người dùng thỏa mãn điều kiện lọc.
+    /// </summary>
     public async Task<int> GetUserCountAsync(string? role, string? status, string? search)
     {
         var query = _context.Users.AsQueryable();
@@ -81,6 +90,9 @@ public partial class AdminUserService : IAdminUserService
         return await query.CountAsync();
     }
 
+    /// <summary>
+    /// Lấy thông tin chi tiết người dùng.
+    /// </summary>
     public async Task<AdminUserDetailDto?> GetUserDetailAsync(int userId)
     {
         var user = await _context.Users
@@ -103,23 +115,26 @@ public partial class AdminUserService : IAdminUserService
             Status = user.IsActive ? "active" : "inactive",
             CreatedAt = user.CreatedAt,
             UpdatedAt = user.UpdatedAt,
-            LastLoginAt = null, // Not tracked in current schema
+            LastLoginAt = null, // Chưa theo dõi trong schema hiện tại
             AvatarUrl = user.UserProfile?.AvatarUrl,
             TotalBookings = user.Bookings.Count,
             TotalSpent = user.Invoices.Sum(i => i.TotalAmount),
             VehiclesCount = user.Vehicles.Count,
-            DeactivationReason = null, // Not in current schema
+            DeactivationReason = null, // Chưa có trong schema
             DeactivatedAt = user.IsActive ? null : user.UpdatedAt
         };
     }
 
+    /// <summary>
+    /// Tạo người dùng mới.
+    /// </summary>
     public async Task<AdminUserDto> CreateUserAsync(CreateUserDto createDto)
     {
         try
         {
             _logger.LogInformation("Creating user with email: {Email}, role: {Role}", createDto.Email, createDto.Role);
 
-            // Check if email already exists
+            // Kiểm tra email đã tồn tại chưa
             var existingUser = await _context.Users
                 .FirstOrDefaultAsync(u => u.Email == createDto.Email);
 
@@ -157,7 +172,7 @@ public partial class AdminUserService : IAdminUserService
 
             _logger.LogInformation("User created with ID: {UserId}, creating profile...", user.UserId);
 
-            // Create user profile
+            // Tạo hồ sơ người dùng
             var profile = new UserProfile
             {
                 UserId = user.UserId,
@@ -173,7 +188,7 @@ public partial class AdminUserService : IAdminUserService
         }
         catch (ArgumentException)
         {
-            throw; // Re-throw ArgumentException to be caught by controller
+            throw; // Ném lại ArgumentException để controller xử lý
         }
         catch (Exception ex)
         {
@@ -182,6 +197,9 @@ public partial class AdminUserService : IAdminUserService
         }
     }
 
+    /// <summary>
+    /// Cập nhật thông tin người dùng.
+    /// </summary>
     public async Task<AdminUserDto> UpdateUserAsync(int userId, UpdateUserDto updateDto)
     {
         var user = await _context.Users
@@ -198,7 +216,7 @@ public partial class AdminUserService : IAdminUserService
         
         if (updateDto.Email != null)
         {
-            // Check if new email is already in use
+            // Kiểm tra email mới có bị trùng không
             var emailExists = await _context.Users
                 .AnyAsync(u => u.Email == updateDto.Email && u.UserId != userId);
             
@@ -216,6 +234,9 @@ public partial class AdminUserService : IAdminUserService
         return MapToDto(user);
     }
 
+    /// <summary>
+    /// Cập nhật vai trò người dùng.
+    /// </summary>
     public async Task<AdminUserDto> UpdateUserRoleAsync(int userId, string role)
     {
         var user = await _context.Users
@@ -237,6 +258,9 @@ public partial class AdminUserService : IAdminUserService
         return MapToDto(user);
     }
 
+    /// <summary>
+    /// Kích hoạt tài khoản người dùng.
+    /// </summary>
     public async Task<AdminUserDto> ActivateUserAsync(int userId)
     {
         var user = await _context.Users
@@ -254,6 +278,9 @@ public partial class AdminUserService : IAdminUserService
         return MapToDto(user);
     }
 
+    /// <summary>
+    /// Vô hiệu hóa tài khoản người dùng.
+    /// </summary>
     public async Task<AdminUserDto> DeactivateUserAsync(int userId, string reason)
     {
         var user = await _context.Users
@@ -271,6 +298,9 @@ public partial class AdminUserService : IAdminUserService
         return MapToDto(user);
     }
 
+    /// <summary>
+    /// Xóa người dùng (xóa mềm).
+    /// </summary>
     public async Task DeleteUserAsync(int userId)
     {
         var user = await _context.Users
@@ -279,14 +309,14 @@ public partial class AdminUserService : IAdminUserService
         if (user == null)
             throw new ArgumentException("User not found");
 
-        // Check if user has active bookings
+        // Kiểm tra xem người dùng có đặt chỗ đang hoạt động không
         var hasActiveBookings = await _context.Bookings
             .AnyAsync(b => b.UserId == userId && (b.Status == "scheduled" || b.Status == "in_progress"));
 
         if (hasActiveBookings)
             throw new ArgumentException("Cannot delete user with active bookings");
 
-        // Soft delete - mark as deleted with timestamp
+        // Xóa mềm - đánh dấu là đã xóa và lưu thời gian
         user.IsActive = false;
         user.DeletedAt = DateTime.UtcNow;
         user.UpdatedAt = DateTime.UtcNow;
@@ -296,6 +326,9 @@ public partial class AdminUserService : IAdminUserService
         _logger.LogInformation("Deleted (soft) user {UserId} at {DeletedAt}", userId, user.DeletedAt);
     }
 
+    /// <summary>
+    /// Reset mật khẩu người dùng.
+    /// </summary>
     public async Task<ResetPasswordResultDto> ResetUserPasswordAsync(int userId)
     {
         var user = await _context.Users
@@ -304,9 +337,9 @@ public partial class AdminUserService : IAdminUserService
         if (user == null)
             throw new ArgumentException("User not found");
 
-        // Generate temporary password
+        // Tạo mật khẩu tạm thời
         var tempPassword = GenerateTemporaryPassword();
-        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(tempPassword, 11); // Hash password with BCrypt
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(tempPassword, 11); // Hash mật khẩu bằng BCrypt
         user.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();        _logger.LogInformation("Reset password for user {UserId}", userId);
@@ -318,6 +351,9 @@ public partial class AdminUserService : IAdminUserService
         };
     }
 
+    /// <summary>
+    /// Lấy tóm tắt hoạt động của người dùng.
+    /// </summary>
     public async Task<UserActivitySummaryDto> GetUserActivitySummaryAsync(int userId)
     {
         var user = await _context.Users
@@ -340,11 +376,14 @@ public partial class AdminUserService : IAdminUserService
             TotalRevenue = user.Invoices.Sum(i => i.TotalAmount),
             LastMonthRevenue = lastMonthRevenue,
             LastBookingDate = user.Bookings.OrderByDescending(b => b.CreatedAt).FirstOrDefault()?.CreatedAt,
-            LastLoginDate = null, // Not tracked
+            LastLoginDate = null, // Chưa theo dõi
             RecentActivities = new List<string>()
         };
     }
 
+    /// <summary>
+    /// Lấy thống kê tổng quan về người dùng.
+    /// </summary>
     public async Task<UserStatisticsSummaryDto> GetUserStatisticsSummaryAsync()
     {
         var users = await _context.Users.ToListAsync();
@@ -383,7 +422,7 @@ public partial class AdminUserService : IAdminUserService
             Status = user.IsActive ? "active" : "inactive",
             CreatedAt = user.CreatedAt,
             UpdatedAt = user.UpdatedAt,
-            LastLoginAt = null // Not tracked in current schema
+            LastLoginAt = null // Chưa theo dõi trong schema hiện tại
         };
     }
 }

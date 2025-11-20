@@ -2,6 +2,9 @@ using NetTopologySuite.Geometries;
 
 namespace SkaEV.API.Domain.Entities;
 
+/// <summary>
+/// Thực thể đại diện cho một trạm sạc.
+/// </summary>
 public class ChargingStation
 {
     public int StationId { get; set; }

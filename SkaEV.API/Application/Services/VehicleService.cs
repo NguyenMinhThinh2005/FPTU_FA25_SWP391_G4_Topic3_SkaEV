@@ -6,6 +6,9 @@ using SkaEV.API.Infrastructure.Data;
 
 namespace SkaEV.API.Application.Services;
 
+/// <summary>
+/// Dịch vụ quản lý phương tiện của người dùng.
+/// </summary>
 public class VehicleService : IVehicleService
 {
     private readonly SkaEVDbContext _context;
@@ -19,6 +22,11 @@ public class VehicleService : IVehicleService
         _logger = logger;
     }
 
+    /// <summary>
+    /// Lấy danh sách phương tiện của một người dùng.
+    /// </summary>
+    /// <param name="userId">ID người dùng.</param>
+    /// <returns>Danh sách phương tiện.</returns>
     public async Task<IEnumerable<VehicleDto>> GetUserVehiclesAsync(int userId)
     {
         var vehicles = await _context.Vehicles
@@ -30,12 +38,23 @@ public class VehicleService : IVehicleService
         return vehicles.Select(MapToDto).ToList();
     }
 
+    /// <summary>
+    /// Lấy thông tin chi tiết một phương tiện theo ID.
+    /// </summary>
+    /// <param name="vehicleId">ID phương tiện.</param>
+    /// <returns>Thông tin phương tiện hoặc null nếu không tìm thấy.</returns>
     public async Task<VehicleDto?> GetVehicleByIdAsync(int vehicleId)
     {
         var vehicle = await _context.Vehicles.FirstOrDefaultAsync(v => v.VehicleId == vehicleId);
         return vehicle == null ? null : MapToDto(vehicle);
     }
 
+    /// <summary>
+    /// Thêm mới một phương tiện cho người dùng.
+    /// </summary>
+    /// <param name="userId">ID người dùng.</param>
+    /// <param name="createDto">Thông tin phương tiện mới.</param>
+    /// <returns>Thông tin phương tiện vừa tạo.</returns>
     public async Task<VehicleDto> CreateVehicleAsync(int userId, CreateVehicleDto createDto)
     {
         ValidateCreateRequest(createDto);
@@ -78,6 +97,12 @@ public class VehicleService : IVehicleService
         return MapToDto(vehicle);
     }
 
+    /// <summary>
+    /// Cập nhật thông tin phương tiện.
+    /// </summary>
+    /// <param name="vehicleId">ID phương tiện.</param>
+    /// <param name="updateDto">Thông tin cập nhật.</param>
+    /// <returns>Thông tin phương tiện sau khi cập nhật.</returns>
     public async Task<VehicleDto> UpdateVehicleAsync(int vehicleId, UpdateVehicleDto updateDto)
     {
         var vehicle = await _context.Vehicles.FirstOrDefaultAsync(v => v.VehicleId == vehicleId)
@@ -134,6 +159,10 @@ public class VehicleService : IVehicleService
         return MapToDto(vehicle);
     }
 
+    /// <summary>
+    /// Xóa phương tiện.
+    /// </summary>
+    /// <param name="vehicleId">ID phương tiện.</param>
     public async Task DeleteVehicleAsync(int vehicleId)
     {
         var vehicle = await _context.Vehicles.FirstOrDefaultAsync(v => v.VehicleId == vehicleId)
@@ -145,6 +174,12 @@ public class VehicleService : IVehicleService
         _logger.LogInformation("Deleted vehicle {VehicleId}", vehicleId);
     }
 
+    /// <summary>
+    /// Đặt phương tiện làm mặc định cho người dùng.
+    /// </summary>
+    /// <param name="userId">ID người dùng.</param>
+    /// <param name="vehicleId">ID phương tiện.</param>
+    /// <returns>Thông tin phương tiện được đặt làm mặc định.</returns>
     public async Task<VehicleDto> SetDefaultVehicleAsync(int userId, int vehicleId)
     {
         var vehicle = await _context.Vehicles.FirstOrDefaultAsync(v => v.VehicleId == vehicleId && v.UserId == userId)
@@ -161,6 +196,9 @@ public class VehicleService : IVehicleService
         return MapToDto(vehicle);
     }
 
+    /// <summary>
+    /// Helper: Bỏ đánh dấu mặc định cho tất cả phương tiện của người dùng.
+    /// </summary>
     private async Task UnsetDefaultVehiclesAsync(int userId, bool saveChanges = true)
     {
         var vehicles = await _context.Vehicles
@@ -184,6 +222,9 @@ public class VehicleService : IVehicleService
         }
     }
 
+    /// <summary>
+    /// Helper: Kiểm tra tính duy nhất của VIN và biển số xe.
+    /// </summary>
     private async Task EnsureVehicleUniquenessAsync(string? normalizedVin, string? normalizedPlate, int? ignoreVehicleId = null)
     {
         var query = _context.Vehicles.AsQueryable();
@@ -270,6 +311,7 @@ public class VehicleService : IVehicleService
         var normalized = combined
             .Select(c => c?.Trim())
             .Where(c => !string.IsNullOrWhiteSpace(c))
+            .Select(c => c!) // Force non-null
             .Distinct(OrdinalIgnoreCase)
             .ToList();
 

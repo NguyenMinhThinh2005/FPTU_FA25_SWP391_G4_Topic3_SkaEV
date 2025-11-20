@@ -1,5 +1,8 @@
 namespace SkaEV.API.Domain.Entities;
 
+/// <summary>
+/// Thực thể hồ sơ người dùng.
+/// </summary>
 public class UserProfile
 {
     public int ProfileId { get; set; }

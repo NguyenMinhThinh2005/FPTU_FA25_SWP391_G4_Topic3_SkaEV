@@ -1,5 +1,8 @@
 namespace SkaEV.API.Application.Options;
 
+/// <summary>
+/// Cấu hình cho dịch vụ Google Maps.
+/// </summary>
 public class GoogleMapsOptions
 {
     public const string SectionName = "GoogleMaps";

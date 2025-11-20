@@ -1,5 +1,8 @@
 namespace SkaEV.API.Domain.Entities;
 
+/// <summary>
+/// Thực thể phương tiện.
+/// </summary>
 public class Vehicle
 {
     public int VehicleId { get; set; }

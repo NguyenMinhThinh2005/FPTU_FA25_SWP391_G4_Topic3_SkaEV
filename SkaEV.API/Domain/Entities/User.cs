@@ -1,5 +1,8 @@
 namespace SkaEV.API.Domain.Entities;
 
+/// <summary>
+/// Thực thể người dùng.
+/// </summary>
 public class User
 {
     public int UserId { get; set; }

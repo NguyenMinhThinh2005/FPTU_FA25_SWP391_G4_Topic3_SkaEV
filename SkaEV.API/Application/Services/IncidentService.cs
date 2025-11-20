@@ -5,6 +5,9 @@ using SkaEV.API.Infrastructure.Data;
 
 namespace SkaEV.API.Application.Services;
 
+/// <summary>
+/// Dịch vụ quản lý sự cố.
+/// </summary>
 public class IncidentService
 {
     private readonly SkaEVDbContext _context;
@@ -14,6 +17,13 @@ public class IncidentService
         _context = context;
     }
 
+    /// <summary>
+    /// Lấy danh sách tất cả sự cố với bộ lọc.
+    /// </summary>
+    /// <param name="status">Trạng thái sự cố.</param>
+    /// <param name="severity">Mức độ nghiêm trọng.</param>
+    /// <param name="stationId">ID trạm sạc.</param>
+    /// <returns>Danh sách sự cố.</returns>
     public async Task<List<IncidentListDto>> GetAllIncidentsAsync(string? status = null, string? severity = null, int? stationId = null)
     {
         var query = _context.Incidents
@@ -51,6 +61,11 @@ public class IncidentService
         }).ToList();
     }
 
+    /// <summary>
+    /// Lấy chi tiết sự cố theo ID.
+    /// </summary>
+    /// <param name="incidentId">ID sự cố.</param>
+    /// <returns>Chi tiết sự cố.</returns>
     public async Task<IncidentDto?> GetIncidentByIdAsync(int incidentId)
     {
         var incident = await _context.Incidents
@@ -92,6 +107,11 @@ public class IncidentService
         };
     }
 
+    /// <summary>
+    /// Lấy danh sách sự cố theo trạm sạc.
+    /// </summary>
+    /// <param name="stationId">ID trạm sạc.</param>
+    /// <returns>Danh sách sự cố.</returns>
     public async Task<List<IncidentListDto>> GetIncidentsByStationAsync(int stationId)
     {
         var incidents = await _context.Incidents
@@ -115,6 +135,11 @@ public class IncidentService
         }).ToList();
     }
 
+    /// <summary>
+    /// Tạo mới sự cố.
+    /// </summary>
+    /// <param name="createDto">Thông tin sự cố mới.</param>
+    /// <returns>Chi tiết sự cố vừa tạo.</returns>
     public async Task<IncidentDto> CreateIncidentAsync(CreateIncidentDto createDto)
     {
         var incident = new Incident
@@ -139,6 +164,12 @@ public class IncidentService
         return createdIncident!;
     }
 
+    /// <summary>
+    /// Cập nhật thông tin sự cố.
+    /// </summary>
+    /// <param name="incidentId">ID sự cố.</param>
+    /// <param name="updateDto">Thông tin cập nhật.</param>
+    /// <returns>Chi tiết sự cố sau khi cập nhật.</returns>
     public async Task<IncidentDto?> UpdateIncidentAsync(int incidentId, UpdateIncidentDto updateDto)
     {
         var incident = await _context.Incidents.FindAsync(incidentId);
@@ -169,6 +200,11 @@ public class IncidentService
         return await GetIncidentByIdAsync(incidentId);
     }
 
+    /// <summary>
+    /// Lấy thống kê sự cố.
+    /// </summary>
+    /// <param name="stationId">ID trạm sạc (tùy chọn).</param>
+    /// <returns>Thống kê sự cố.</returns>
     public async Task<IncidentStatsDto> GetIncidentStatsAsync(int? stationId = null)
     {
         var query = _context.Incidents.AsQueryable();

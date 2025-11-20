@@ -1,5 +1,8 @@
 namespace SkaEV.API.Application.DTOs.Stations;
 
+/// <summary>
+/// DTO trụ sạc kèm danh sách khe sạc.
+/// </summary>
 public class ChargingPostWithSlotsDto
 {
     public int PostId { get; set; }

@@ -1,7 +1,7 @@
 namespace SkaEV.API.Application.DTOs.Reports;
 
 /// <summary>
-/// User cost report DTO
+/// DTO báo cáo chi phí người dùng.
 /// </summary>
 public class UserCostReportDto
 {
@@ -22,7 +22,7 @@ public class UserCostReportDto
 }
 
 /// <summary>
-/// User charging habits DTO
+/// DTO thói quen sạc của người dùng.
 /// </summary>
 public class ChargingHabitsDto
 {
@@ -41,7 +41,7 @@ public class ChargingHabitsDto
 }
 
 /// <summary>
-/// Revenue report DTO for admin
+/// DTO báo cáo doanh thu cho Admin.
 /// </summary>
 public class RevenueReportDto
 {
@@ -60,7 +60,7 @@ public class RevenueReportDto
 }
 
 /// <summary>
-/// Usage report DTO for admin
+/// DTO báo cáo sử dụng cho Admin.
 /// </summary>
 public class UsageReportDto
 {
@@ -79,7 +79,7 @@ public class UsageReportDto
 }
 
 /// <summary>
-/// Real-time station performance DTO
+/// DTO hiệu suất trạm thời gian thực.
 /// </summary>
 public class StationPerformanceDto
 {
@@ -110,7 +110,7 @@ public class StationPerformanceDto
 }
 
 /// <summary>
-/// Monthly summary for customer
+/// DTO tóm tắt hàng tháng cho khách hàng.
 /// </summary>
 public class MonthlySummaryDto
 {
@@ -125,7 +125,7 @@ public class MonthlySummaryDto
 }
 
 /// <summary>
-/// Year-to-date summary for customer
+/// DTO tóm tắt từ đầu năm đến nay cho khách hàng.
 /// </summary>
 public class YearToDateSummaryDto
 {
@@ -139,7 +139,7 @@ public class YearToDateSummaryDto
 }
 
 /// <summary>
-/// Admin dashboard summary
+/// DTO tóm tắt bảng điều khiển Admin.
 /// </summary>
 public class AdminDashboardDto
 {
@@ -157,7 +157,7 @@ public class AdminDashboardDto
 }
 
 /// <summary>
-/// Payment methods statistics
+/// DTO thống kê phương thức thanh toán.
 /// </summary>
 public class PaymentMethodStatsDto
 {
@@ -169,7 +169,7 @@ public class PaymentMethodStatsDto
 }
 
 /// <summary>
-/// Detailed station analytics with time-series data
+/// DTO phân tích chi tiết trạm với dữ liệu chuỗi thời gian.
 /// </summary>
 public class StationDetailedAnalyticsDto
 {
@@ -208,7 +208,7 @@ public class StationDetailedAnalyticsDto
 }
 
 /// <summary>
-/// Time-series data point for charts
+/// Điểm dữ liệu chuỗi thời gian cho biểu đồ.
 /// </summary>
 public class TimeSeriesDataPointDto
 {
@@ -225,7 +225,7 @@ public class TimeSeriesDataPointDto
 }
 
 /// <summary>
-/// Hourly usage distribution
+/// Phân bố sử dụng theo giờ.
 /// </summary>
 public class HourlyUsageDto
 {
@@ -237,7 +237,7 @@ public class HourlyUsageDto
 }
 
 /// <summary>
-/// Daily analytics for a specific station
+/// Phân tích hàng ngày cho một trạm cụ thể.
 /// </summary>
 public class DailyAnalyticsDto
 {
@@ -258,7 +258,7 @@ public class DailyAnalyticsDto
 }
 
 /// <summary>
-/// Monthly analytics for a specific station
+/// Phân tích hàng tháng cho một trạm cụ thể.
 /// </summary>
 public class MonthlyAnalyticsDto
 {
@@ -282,7 +282,7 @@ public class MonthlyAnalyticsDto
 }
 
 /// <summary>
-/// Yearly analytics for a specific station
+/// Phân tích hàng năm cho một trạm cụ thể.
 /// </summary>
 public class YearlyAnalyticsDto
 {
@@ -306,7 +306,7 @@ public class YearlyAnalyticsDto
 }
 
 /// <summary>
-/// Monthly summary within yearly breakdown
+/// Tóm tắt hàng tháng trong phân tích hàng năm.
 /// </summary>
 public class MonthlyAnalyticsSummaryDto
 {

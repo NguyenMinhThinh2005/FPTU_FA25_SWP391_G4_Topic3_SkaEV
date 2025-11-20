@@ -1,5 +1,8 @@
 namespace SkaEV.API.Application.DTOs.Notifications;
 
+/// <summary>
+/// DTO thông tin thông báo.
+/// </summary>
 public class NotificationDto
 {
     public int NotificationId { get; set; }
@@ -14,6 +17,9 @@ public class NotificationDto
     public int? RelatedEntityId { get; set; }
 }
 
+/// <summary>
+/// DTO tạo thông báo mới.
+/// </summary>
 public class CreateNotificationDto
 {
     public int UserId { get; set; }
@@ -24,6 +30,9 @@ public class CreateNotificationDto
     public int? RelatedEntityId { get; set; }
 }
 
+/// <summary>
+/// DTO gửi thông báo hàng loạt (broadcast).
+/// </summary>
 public class BroadcastNotificationDto
 {
     public string Title { get; set; } = string.Empty;

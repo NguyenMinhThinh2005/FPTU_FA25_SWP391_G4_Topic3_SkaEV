@@ -1,5 +1,8 @@
 namespace SkaEV.API.Domain.Entities;
 
+/// <summary>
+/// Thực thể theo dõi trạng thái sạc (SOC).
+/// </summary>
 public class SocTracking
 {
     public int TrackingId { get; set; }

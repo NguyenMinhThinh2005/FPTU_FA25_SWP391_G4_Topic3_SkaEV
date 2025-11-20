@@ -1,5 +1,8 @@
 namespace SkaEV.API.Domain.Entities;
 
+/// <summary>
+/// Thực thể đánh giá.
+/// </summary>
 public class Review
 {
     public int ReviewId { get; set; }
