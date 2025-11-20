@@ -1,13 +1,15 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SkaEV.API.Application.DTOs.Stations;
+using SkaEV.API.Application.DTOs.Slots;
 using SkaEV.API.Application.Services;
+using SkaEV.API.Application.Constants;
+using SkaEV.API.Application.Common;
 
 namespace SkaEV.API.Controllers;
 
-[ApiController]
 [Route("api/[controller]")]
-public class StationsController : ControllerBase
+public class StationsController : BaseApiController
 {
     private readonly IStationService _stationService;
     private readonly ILogger<StationsController> _logger;
@@ -23,18 +25,11 @@ public class StationsController : ControllerBase
     /// </summary>
     [HttpGet]
     [AllowAnonymous]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetStations([FromQuery] string? city = null, [FromQuery] string? status = null)
     {
-        try
-        {
-            var stations = await _stationService.GetAllStationsAsync(city, status);
-            return Ok(new { data = stations, count = stations.Count });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting stations");
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        var stations = await _stationService.GetAllStationsAsync(city, status);
+        return OkResponse(new { data = stations, count = stations.Count });
     }
 
     /// <summary>
@@ -42,23 +37,17 @@ public class StationsController : ControllerBase
     /// </summary>
     [HttpGet("{id}")]
     [AllowAnonymous]
+    [ProducesResponseType(typeof(ApiResponse<StationDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetStation(int id)
     {
-        try
+        var station = await _stationService.GetStationByIdAsync(id);
+        if (station == null)
         {
-            var station = await _stationService.GetStationByIdAsync(id);
-            if (station == null)
-            {
-                return NotFound(new { message = "Station not found" });
-            }
+            return NotFoundResponse("Station not found");
+        }
 
-            return Ok(station);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting station {StationId}", id);
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        return OkResponse(station);
     }
 
     /// <summary>
@@ -66,37 +55,23 @@ public class StationsController : ControllerBase
     /// </summary>
     [HttpGet("nearby")]
     [AllowAnonymous]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetNearbyStations([FromQuery] SearchStationsRequestDto request)
     {
-        try
-        {
-            var stations = await _stationService.SearchStationsByLocationAsync(request);
-            return Ok(new { data = stations, count = stations.Count });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error searching stations");
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        var stations = await _stationService.SearchStationsByLocationAsync(request);
+        return OkResponse(new { data = stations, count = stations.Count });
     }
 
     /// <summary>
     /// Create new station (Admin only)
     /// </summary>
     [HttpPost]
-    [Authorize(Roles = "admin")]
+    [Authorize(Roles = Roles.Admin)]
+    [ProducesResponseType(typeof(ApiResponse<StationDto>), StatusCodes.Status201Created)]
     public async Task<IActionResult> CreateStation([FromBody] CreateStationDto dto)
     {
-        try
-        {
-            var station = await _stationService.CreateStationAsync(dto);
-            return CreatedAtAction(nameof(GetStation), new { id = station.StationId }, station);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error creating station");
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        var station = await _stationService.CreateStationAsync(dto);
+        return CreatedResponse(nameof(GetStation), new { id = station.StationId }, station);
     }
 
     /// <summary>
@@ -104,18 +79,11 @@ public class StationsController : ControllerBase
     /// </summary>
     [HttpGet("{stationId}/slots")]
     [AllowAnonymous]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAvailableSlots(int stationId)
     {
-        try
-        {
-            var slots = await _stationService.GetAvailableSlotsAsync(stationId);
-            return Ok(new { data = slots, count = slots.Count });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting slots for station {StationId}", stationId);
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        var slots = await _stationService.GetAvailableSlotsAsync(stationId);
+        return OkResponse(new { data = slots, count = slots.Count });
     }
 
     /// <summary>
@@ -123,84 +91,58 @@ public class StationsController : ControllerBase
     /// </summary>
     [HttpGet("{stationId}/posts")]
     [AllowAnonymous]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAvailablePosts(int stationId)
     {
-        try
-        {
-            var posts = await _stationService.GetAvailablePostsAsync(stationId);
-            return Ok(new { data = posts, count = posts.Count });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting posts for station {StationId}", stationId);
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        var posts = await _stationService.GetAvailablePostsAsync(stationId);
+        return OkResponse(new { data = posts, count = posts.Count });
     }
 
     /// <summary>
     /// Update station (Admin/Staff only)
     /// </summary>
     [HttpPut("{id}")]
-    [Authorize(Roles = "admin,staff")]
+    [Authorize(Roles = Roles.Admin + "," + Roles.Staff)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateStation(int id, [FromBody] UpdateStationDto dto)
     {
-        try
+        var success = await _stationService.UpdateStationAsync(id, dto);
+        if (!success)
         {
-            var success = await _stationService.UpdateStationAsync(id, dto);
-            if (!success)
-            {
-                return NotFound(new { message = "Station not found" });
-            }
+            return NotFoundResponse("Station not found");
+        }
 
-            return Ok(new { message = "Station updated successfully" });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error updating station {StationId}", id);
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        return OkResponse<object>(new { }, "Station updated successfully");
     }
 
     /// <summary>
     /// Get station slots details with power and status
     /// </summary>
     [HttpGet("{stationId}/slots/details")]
-    [Authorize(Roles = "admin,staff")]
+    [Authorize(Roles = Roles.Admin + "," + Roles.Staff)]
+    [ProducesResponseType(typeof(ApiResponse<IEnumerable<SlotDetailDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetStationSlots(int stationId)
     {
-        try
-        {
-            var slots = await _stationService.GetStationSlotsDetailsAsync(stationId);
-            return Ok(new { success = true, data = slots });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting station slots {StationId}", stationId);
-            return StatusCode(500, new { success = false, message = "An error occurred" });
-        }
+        var slots = await _stationService.GetStationSlotsDetailsAsync(stationId);
+        return OkResponse(slots);
     }
 
     /// <summary>
     /// Delete station (Admin only)
     /// </summary>
     [HttpDelete("{id}")]
-    [Authorize(Roles = "admin")]
+    [Authorize(Roles = Roles.Admin)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteStation(int id)
     {
-        try
+        var success = await _stationService.DeleteStationAsync(id);
+        if (!success)
         {
-            var success = await _stationService.DeleteStationAsync(id);
-            if (!success)
-            {
-                return NotFound(new { message = "Station not found" });
-            }
+            return NotFoundResponse("Station not found");
+        }
 
-            return Ok(new { message = "Station deleted successfully" });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error deleting station {StationId}", id);
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        return OkResponse<object>(new { }, "Station deleted successfully");
     }
 }

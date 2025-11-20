@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SkaEV.API.Application.Common;
+using SkaEV.API.Application.Constants;
 using SkaEV.API.Application.DTOs.Admin;
 using SkaEV.API.Application.Services;
 using System.Security.Claims;
@@ -9,25 +11,22 @@ namespace SkaEV.API.Controllers;
 /// <summary>
 /// Controller for admin user management
 /// </summary>
-[ApiController]
-[Route("api/admin/[controller]")]
-[Authorize(Roles = "admin")]
-public class AdminUsersController : ControllerBase
+[Authorize(Roles = Roles.Admin)]
+[Route("api/admin/users")]
+public class AdminUsersController : BaseApiController
 {
     private readonly IAdminUserService _adminUserService;
-    private readonly ILogger<AdminUsersController> _logger;
 
-    public AdminUsersController(IAdminUserService adminUserService, ILogger<AdminUsersController> logger)
+    public AdminUsersController(IAdminUserService adminUserService)
     {
         _adminUserService = adminUserService;
-        _logger = logger;
     }
 
     /// <summary>
     /// Get all users with pagination and filtering
     /// </summary>
     [HttpGet]
-    [ProducesResponseType(typeof(IEnumerable<AdminUserDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAllUsers(
         [FromQuery] string? role = null,
         [FromQuery] string? status = null,
@@ -35,294 +34,190 @@ public class AdminUsersController : ControllerBase
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
-        try
-        {
-            var users = await _adminUserService.GetAllUsersAsync(role, status, search, page, pageSize);
-            var totalCount = await _adminUserService.GetUserCountAsync(role, status, search);
+        var users = await _adminUserService.GetAllUsersAsync(role, status, search, page, pageSize);
+        var totalCount = await _adminUserService.GetUserCountAsync(role, status, search);
 
-            return Ok(new
-            {
-                data = users,
-                pagination = new
-                {
-                    page,
-                    pageSize,
-                    totalCount,
-                    totalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
-                }
-            });
-        }
-        catch (Exception ex)
+        return OkResponse(new
         {
-            _logger.LogError(ex, "Error getting all users");
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+            data = users,
+            pagination = new
+            {
+                page,
+                pageSize,
+                totalCount,
+                totalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
+            }
+        });
     }
 
     /// <summary>
     /// Get user by ID
     /// </summary>
     [HttpGet("{userId}")]
-    [ProducesResponseType(typeof(AdminUserDetailDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<AdminUserDetailDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetUser(int userId)
     {
-        try
-        {
-            var user = await _adminUserService.GetUserDetailAsync(userId);
+        var user = await _adminUserService.GetUserDetailAsync(userId);
 
-            if (user == null)
-                return NotFound(new { message = "User not found" });
+        if (user == null)
+            return NotFoundResponse("User not found");
 
-            return Ok(user);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting user {UserId}", userId);
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        return OkResponse(user);
     }
 
     /// <summary>
     /// Create a new user
     /// </summary>
     [HttpPost]
-    [ProducesResponseType(typeof(AdminUserDto), StatusCodes.Status201Created)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<AdminUserDto>), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> CreateUser([FromBody] CreateUserDto createDto)
     {
-        try
-        {
-            var user = await _adminUserService.CreateUserAsync(createDto);
+        var user = await _adminUserService.CreateUserAsync(createDto);
 
-            return CreatedAtAction(
-                nameof(GetUser),
-                new { userId = user.UserId },
-                user
-            );
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error creating user");
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        return CreatedResponse(
+            nameof(GetUser),
+            new { userId = user.UserId },
+            user
+        );
     }
 
     /// <summary>
     /// Update user information
     /// </summary>
     [HttpPut("{userId}")]
-    [ProducesResponseType(typeof(AdminUserDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<AdminUserDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateUser(int userId, [FromBody] UpdateUserDto updateDto)
     {
-        try
-        {
-            var existingUser = await _adminUserService.GetUserDetailAsync(userId);
+        var existingUser = await _adminUserService.GetUserDetailAsync(userId);
 
-            if (existingUser == null)
-                return NotFound(new { message = "User not found" });
+        if (existingUser == null)
+            return NotFoundResponse("User not found");
 
-            var updated = await _adminUserService.UpdateUserAsync(userId, updateDto);
-            return Ok(updated);
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error updating user {UserId}", userId);
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        var updated = await _adminUserService.UpdateUserAsync(userId, updateDto);
+        return OkResponse(updated);
     }
 
     /// <summary>
     /// Update user role
     /// </summary>
     [HttpPatch("{userId}/role")]
-    [ProducesResponseType(typeof(AdminUserDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<AdminUserDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateUserRole(int userId, [FromBody] UpdateUserRoleDto roleDto)
     {
-        try
-        {
-            var existingUser = await _adminUserService.GetUserDetailAsync(userId);
+        var existingUser = await _adminUserService.GetUserDetailAsync(userId);
 
-            if (existingUser == null)
-                return NotFound(new { message = "User not found" });
+        if (existingUser == null)
+            return NotFoundResponse("User not found");
 
-            var updated = await _adminUserService.UpdateUserRoleAsync(userId, roleDto.Role);
-            return Ok(updated);
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error updating user role {UserId}", userId);
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        var updated = await _adminUserService.UpdateUserRoleAsync(userId, roleDto.Role);
+        return OkResponse(updated);
     }
 
     /// <summary>
     /// Activate user account
     /// </summary>
     [HttpPatch("{userId}/activate")]
-    [ProducesResponseType(typeof(AdminUserDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<AdminUserDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> ActivateUser(int userId)
     {
-        try
-        {
-            var existingUser = await _adminUserService.GetUserDetailAsync(userId);
+        var existingUser = await _adminUserService.GetUserDetailAsync(userId);
 
-            if (existingUser == null)
-                return NotFound(new { message = "User not found" });
+        if (existingUser == null)
+            return NotFoundResponse("User not found");
 
-            var updated = await _adminUserService.ActivateUserAsync(userId);
-            return Ok(updated);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error activating user {UserId}", userId);
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        var updated = await _adminUserService.ActivateUserAsync(userId);
+        return OkResponse(updated);
     }
 
     /// <summary>
     /// Deactivate user account
     /// </summary>
     [HttpPatch("{userId}/deactivate")]
-    [ProducesResponseType(typeof(AdminUserDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<AdminUserDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeactivateUser(int userId, [FromBody] DeactivateUserDto deactivateDto)
     {
-        try
-        {
-            var existingUser = await _adminUserService.GetUserDetailAsync(userId);
+        var existingUser = await _adminUserService.GetUserDetailAsync(userId);
 
-            if (existingUser == null)
-                return NotFound(new { message = "User not found" });
+        if (existingUser == null)
+            return NotFoundResponse("User not found");
 
-            var updated = await _adminUserService.DeactivateUserAsync(userId, deactivateDto.Reason);
-            return Ok(updated);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error deactivating user {UserId}", userId);
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        var updated = await _adminUserService.DeactivateUserAsync(userId, deactivateDto.Reason);
+        return OkResponse(updated);
     }
 
     /// <summary>
     /// Delete user account (soft delete)
     /// </summary>
     [HttpDelete("{userId}")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> DeleteUser(int userId)
     {
-        try
-        {
-            var currentUserId = GetUserId();
+        var currentUserId = GetUserId();
 
-            // Prevent self-deletion
-            if (userId == currentUserId)
-                return BadRequest(new { message = "Cannot delete your own account" });
+        // Prevent self-deletion
+        if (userId == currentUserId)
+            return BadRequestResponse("Cannot delete your own account");
 
-            var existingUser = await _adminUserService.GetUserDetailAsync(userId);
+        var existingUser = await _adminUserService.GetUserDetailAsync(userId);
 
-            if (existingUser == null)
-                return NotFound(new { message = "User not found" });
+        if (existingUser == null)
+            return NotFoundResponse("User not found");
 
-            await _adminUserService.DeleteUserAsync(userId);
-            return NoContent();
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error deleting user {UserId}", userId);
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        await _adminUserService.DeleteUserAsync(userId);
+        return OkResponse<object>(new { }, "User deleted successfully");
     }
 
     /// <summary>
     /// Reset user password
     /// </summary>
     [HttpPost("{userId}/reset-password")]
-    [ProducesResponseType(typeof(ResetPasswordResultDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<ResetPasswordResultDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> ResetUserPassword(int userId)
     {
-        try
-        {
-            var existingUser = await _adminUserService.GetUserDetailAsync(userId);
+        var existingUser = await _adminUserService.GetUserDetailAsync(userId);
 
-            if (existingUser == null)
-                return NotFound(new { message = "User not found" });
+        if (existingUser == null)
+            return NotFoundResponse("User not found");
 
-            var result = await _adminUserService.ResetUserPasswordAsync(userId);
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error resetting password for user {UserId}", userId);
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        var result = await _adminUserService.ResetUserPasswordAsync(userId);
+        return OkResponse(result);
     }
 
     /// <summary>
     /// Get user activity summary
     /// </summary>
     [HttpGet("{userId}/activity")]
-    [ProducesResponseType(typeof(UserActivitySummaryDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<UserActivitySummaryDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetUserActivity(int userId)
     {
-        try
-        {
-            var existingUser = await _adminUserService.GetUserDetailAsync(userId);
+        var existingUser = await _adminUserService.GetUserDetailAsync(userId);
 
-            if (existingUser == null)
-                return NotFound(new { message = "User not found" });
+        if (existingUser == null)
+            return NotFoundResponse("User not found");
 
-            var activity = await _adminUserService.GetUserActivitySummaryAsync(userId);
-            return Ok(activity);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting user activity {UserId}", userId);
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        var activity = await _adminUserService.GetUserActivitySummaryAsync(userId);
+        return OkResponse(activity);
     }
 
     /// <summary>
     /// Get user statistics summary
     /// </summary>
     [HttpGet("statistics")]
-    [ProducesResponseType(typeof(UserStatisticsSummaryDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<UserStatisticsSummaryDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetUserStatistics()
     {
-        try
-        {
-            var statistics = await _adminUserService.GetUserStatisticsSummaryAsync();
-            return Ok(statistics);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting user statistics");
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        var statistics = await _adminUserService.GetUserStatisticsSummaryAsync();
+        return OkResponse(statistics);
     }
 
     // ==================== PHASE 2: EXTENDED USER MANAGEMENT ====================
@@ -331,57 +226,22 @@ public class AdminUsersController : ControllerBase
     /// Get user charging history
     /// </summary>
     [HttpGet("{userId}/charging-history")]
-    [ProducesResponseType(typeof(IEnumerable<UserChargingHistoryDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetUserChargingHistory(int userId, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
     {
-        try
-        {
-            var history = await _adminUserService.GetUserChargingHistoryAsync(userId, page, pageSize);
-            return Ok(new { success = true, data = history });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting user charging history {UserId}", userId);
-            return StatusCode(500, new { success = false, message = "An error occurred" });
-        }
+        var history = await _adminUserService.GetUserChargingHistoryAsync(userId, page, pageSize);
+        return OkResponse(new { data = history });
     }
 
     /// <summary>
     /// Get user payment history
     /// </summary>
     [HttpGet("{userId}/payment-history")]
-    [ProducesResponseType(typeof(IEnumerable<UserPaymentHistoryDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetUserPaymentHistory(int userId, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
     {
-        try
-        {
-            var history = await _adminUserService.GetUserPaymentHistoryAsync(userId, page, pageSize);
-            return Ok(new { success = true, data = history });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting user payment history {UserId}", userId);
-            return StatusCode(500, new { success = false, message = "An error occurred" });
-        }
-    }
-
-    /// <summary>
-    /// Get user statistics
-    /// </summary>
-    [HttpGet("{userId}/statistics")]
-    [ProducesResponseType(typeof(UserStatisticsDto), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetUserStatistics(int userId)
-    {
-        try
-        {
-            var stats = await _adminUserService.GetUserStatisticsAsync(userId);
-            return Ok(new { success = true, data = stats });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting user statistics {UserId}", userId);
-            return StatusCode(500, new { success = false, message = "An error occurred" });
-        }
+        var history = await _adminUserService.GetUserPaymentHistoryAsync(userId, page, pageSize);
+        return OkResponse(new { data = history });
     }
 
     // ==================== NOTIFICATIONS ====================
@@ -390,7 +250,7 @@ public class AdminUsersController : ControllerBase
     /// Get all notifications
     /// </summary>
     [HttpGet("notifications")]
-    [ProducesResponseType(typeof(IEnumerable<NotificationDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetNotifications(
         [FromQuery] int? userId = null,
         [FromQuery] string? type = null,
@@ -398,73 +258,41 @@ public class AdminUsersController : ControllerBase
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 50)
     {
-        try
-        {
-            var notifications = await _adminUserService.GetAllNotificationsAsync(userId, type, isRead, page, pageSize);
-            return Ok(new { success = true, data = notifications });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting notifications");
-            return StatusCode(500, new { success = false, message = "An error occurred" });
-        }
+        var notifications = await _adminUserService.GetAllNotificationsAsync(userId, type, isRead, page, pageSize);
+        return OkResponse(new { data = notifications });
     }
 
     /// <summary>
     /// Send notification to user(s)
     /// </summary>
     [HttpPost("notifications")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> SendNotification([FromBody] CreateNotificationDto dto)
     {
-        try
-        {
-            var count = await _adminUserService.SendNotificationAsync(dto);
-            return Ok(new { success = true, message = $"Notification sent to {count} user(s)", data = count });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error sending notification");
-            return StatusCode(500, new { success = false, message = "An error occurred" });
-        }
+        var count = await _adminUserService.SendNotificationAsync(dto);
+        return OkResponse<object>(new { count }, $"Notification sent to {count} user(s)");
     }
 
     /// <summary>
     /// Send promotion to targeted users
     /// </summary>
     [HttpPost("notifications/promotions")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> SendPromotion([FromBody] SendPromotionDto dto)
     {
-        try
-        {
-            var count = await _adminUserService.SendPromotionAsync(dto);
-            return Ok(new { success = true, message = $"Promotion sent to {count} user(s)", data = count });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error sending promotion");
-            return StatusCode(500, new { success = false, message = "An error occurred" });
-        }
+        var count = await _adminUserService.SendPromotionAsync(dto);
+        return OkResponse<object>(new { count }, $"Promotion sent to {count} user(s)");
     }
 
     /// <summary>
     /// Mark notification as read
     /// </summary>
     [HttpPatch("notifications/{notificationId}/read")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> MarkNotificationAsRead(int notificationId)
     {
-        try
-        {
-            var success = await _adminUserService.MarkNotificationAsReadAsync(notificationId);
-            return Ok(new { success, message = success ? "Notification marked as read" : "Notification not found" });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error marking notification as read");
-            return StatusCode(500, new { success = false, message = "An error occurred" });
-        }
+        var success = await _adminUserService.MarkNotificationAsReadAsync(notificationId);
+        return OkResponse<object>(new { success }, success ? "Notification marked as read" : "Notification not found");
     }
 
     // ==================== SUPPORT REQUESTS ====================
@@ -473,126 +301,89 @@ public class AdminUsersController : ControllerBase
     /// Get support requests with filtering
     /// </summary>
     [HttpGet("support-requests")]
-    [ProducesResponseType(typeof(IEnumerable<SupportRequestDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetSupportRequests([FromQuery] SupportRequestFilterDto filter)
     {
-        try
-        {
-            var (requests, totalCount) = await _adminUserService.GetSupportRequestsAsync(filter);
+        var (requests, totalCount) = await _adminUserService.GetSupportRequestsAsync(filter);
 
-            return Ok(new
-            {
-                success = true,
-                data = requests,
-                pagination = new
-                {
-                    page = filter.PageNumber,
-                    pageSize = filter.PageSize,
-                    totalCount,
-                    totalPages = (int)Math.Ceiling(totalCount / (double)filter.PageSize)
-                }
-            });
-        }
-        catch (Exception ex)
+        return OkResponse(new
         {
-            _logger.LogError(ex, "Error getting support requests");
-            return StatusCode(500, new { success = false, message = "An error occurred" });
-        }
+            data = requests,
+            pagination = new
+            {
+                page = filter.PageNumber,
+                pageSize = filter.PageSize,
+                totalCount,
+                totalPages = (int)Math.Ceiling(totalCount / (double)filter.PageSize)
+            }
+        });
     }
 
     /// <summary>
     /// Get support request detail
     /// </summary>
     [HttpGet("support-requests/{requestId}")]
-    [ProducesResponseType(typeof(SupportRequestDetailDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<SupportRequestDetailDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetSupportRequestDetail(int requestId)
     {
-        try
-        {
-            var request = await _adminUserService.GetSupportRequestDetailAsync(requestId);
+        var request = await _adminUserService.GetSupportRequestDetailAsync(requestId);
 
-            if (request == null)
-                return NotFound(new { success = false, message = "Support request not found" });
+        if (request == null)
+            return NotFoundResponse("Support request not found");
 
-            return Ok(new { success = true, data = request });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting support request detail");
-            return StatusCode(500, new { success = false, message = "An error occurred" });
-        }
+        return OkResponse(request);
     }
 
     /// <summary>
     /// Update support request
     /// </summary>
     [HttpPatch("support-requests/{requestId}")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateSupportRequest(int requestId, [FromBody] UpdateSupportRequestDto dto)
     {
-        try
-        {
-            var success = await _adminUserService.UpdateSupportRequestAsync(requestId, dto);
+        var success = await _adminUserService.UpdateSupportRequestAsync(requestId, dto);
 
-            if (!success)
-                return NotFound(new { success = false, message = "Support request not found" });
+        if (!success)
+            return NotFoundResponse("Support request not found");
 
-            return Ok(new { success = true, message = "Support request updated successfully" });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error updating support request");
-            return StatusCode(500, new { success = false, message = "An error occurred" });
-        }
+        return OkResponse<object>(null, "Support request updated successfully");
     }
 
     /// <summary>
     /// Reply to support request
     /// </summary>
     [HttpPost("support-requests/{requestId}/reply")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> ReplySupportRequest(int requestId, [FromBody] ReplySupportRequestDto dto)
     {
-        try
-        {
-            dto.RequestId = requestId;
-            dto.StaffId = GetUserId();
+        dto.RequestId = requestId;
+        dto.StaffId = GetUserId();
 
-            var success = await _adminUserService.ReplySupportRequestAsync(dto);
+        var success = await _adminUserService.ReplySupportRequestAsync(dto);
 
-            if (!success)
-                return NotFound(new { success = false, message = "Support request not found" });
+        if (!success)
+            return NotFoundResponse("Support request not found");
 
-            return Ok(new { success = true, message = "Reply sent successfully" });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error replying to support request");
-            return StatusCode(500, new { success = false, message = "An error occurred" });
-        }
+        return OkResponse<object>(null, "Reply sent successfully");
     }
 
     /// <summary>
     /// Close support request
     /// </summary>
     [HttpPost("support-requests/{requestId}/close")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> CloseSupportRequest(int requestId, [FromBody] string resolutionNotes)
     {
-        try
-        {
-            var success = await _adminUserService.CloseSupportRequestAsync(requestId, resolutionNotes);
+        var success = await _adminUserService.CloseSupportRequestAsync(requestId, resolutionNotes);
 
-            if (!success)
-                return NotFound(new { success = false, message = "Support request not found" });
+        if (!success)
+            return NotFoundResponse("Support request not found");
 
-            return Ok(new { success = true, message = "Support request closed successfully" });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error closing support request");
-            return StatusCode(500, new { success = false, message = "An error occurred" });
-        }
+        return OkResponse<object>(null, "Support request closed successfully");
     }
 
     private int GetUserId()

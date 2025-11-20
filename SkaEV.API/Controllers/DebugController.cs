@@ -5,9 +5,7 @@ using SkaEV.API.Domain.Entities;
 
 namespace SkaEV.API.Controllers;
 
-[ApiController]
-[Route("api/[controller]")]
-public class DebugController : ControllerBase
+public class DebugController : BaseApiController
 {
     private readonly SkaEVDbContext _context;
 
@@ -36,7 +34,7 @@ public class DebugController : ControllerBase
         _context.ChargingPosts.Add(testPost);
         await _context.SaveChangesAsync();
 
-        return Ok(new { message = "Test post created", postId = testPost.PostId });
+        return OkResponse(new { message = "Test post created", postId = testPost.PostId });
     }
 
     [HttpGet("verify-test-post")]
@@ -46,7 +44,7 @@ public class DebugController : ControllerBase
             .Where(p => p.PostNumber.StartsWith("TEST-"))
             .ToListAsync();
 
-        return Ok(new
+        return OkResponse(new
         {
             count = testPosts.Count,
             posts = testPosts.Select(p => new
@@ -70,7 +68,7 @@ public class DebugController : ControllerBase
             .Take(20)
             .ToListAsync();
 
-        return Ok(new
+        return OkResponse(new
         {
             count = posts.Count,
             posts = posts.Select(p => new

@@ -34,8 +34,18 @@ axiosInstance.interceptors.request.use(
 // Response interceptor - Handle errors globally
 axiosInstance.interceptors.response.use(
   (response) => {
-    // Return data directly
-    return response.data;
+    const data = response.data;
+    // Check if it's our ApiResponse format (has success and data properties)
+    if (data && typeof data === 'object' && 'success' in data && 'data' in data) {
+        if (data.success) {
+            return data.data;
+        } else {
+            // It's a failure but with 200 OK (shouldn't happen often with current setup)
+            return Promise.reject(new Error(data.message || 'Operation failed'));
+        }
+    }
+    // Return data directly (legacy behavior)
+    return data;
   },
   async (error) => {
     const originalRequest = error.config;

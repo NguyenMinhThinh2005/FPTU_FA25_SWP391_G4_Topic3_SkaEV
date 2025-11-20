@@ -2,12 +2,11 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SkaEV.API.Infrastructure.Data;
 using SkaEV.API.Domain.Entities;
+using SkaEV.API.Application.Constants;
 
 namespace SkaEV.API.Controllers;
 
-[ApiController]
-[Route("api/[controller]")]
-public class StationStaffController : ControllerBase
+public class StationStaffController : BaseApiController
 {
     private readonly SkaEVDbContext _context;
     private readonly ILogger<StationStaffController> _logger;
@@ -25,7 +24,7 @@ public class StationStaffController : ControllerBase
         try
         {
             var staffUsers = await _context.Users
-                .Where(u => u.Role == "staff" && u.IsActive)
+                .Where(u => u.Role == Roles.Staff && u.IsActive)
                 .Select(u => new
                 {
                     u.UserId,
@@ -44,12 +43,12 @@ public class StationStaffController : ControllerBase
                 .OrderBy(u => u.FullName)
                 .ToListAsync();
 
-            return Ok(staffUsers);
+            return OkResponse(staffUsers);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error fetching available staff");
-            return StatusCode(500, new { message = "Error fetching staff list" });
+            return ServerErrorResponse("Error fetching staff list");
         }
     }
 
@@ -75,12 +74,12 @@ public class StationStaffController : ControllerBase
                 .OrderBy(ss => ss.StaffName)
                 .ToListAsync();
 
-            return Ok(assignments);
+            return OkResponse(assignments);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error fetching station staff for station {StationId}", stationId);
-            return StatusCode(500, new { message = "Error fetching station staff" });
+            return ServerErrorResponse("Error fetching station staff");
         }
     }
 
@@ -92,11 +91,11 @@ public class StationStaffController : ControllerBase
         {
             // Validate staff user exists and has staff role
             var staffUser = await _context.Users
-                .FirstOrDefaultAsync(u => u.UserId == request.StaffUserId && u.Role == "staff" && u.IsActive);
+                .FirstOrDefaultAsync(u => u.UserId == request.StaffUserId && u.Role == Roles.Staff && u.IsActive);
 
             if (staffUser == null)
             {
-                return BadRequest(new { message = "Invalid staff user or user is not active" });
+                return BadRequestResponse("Invalid staff user or user is not active");
             }
 
             // Validate station exists
@@ -105,7 +104,7 @@ public class StationStaffController : ControllerBase
 
             if (station == null)
             {
-                return NotFound(new { message = "Station not found" });
+                return NotFoundResponse("Station not found");
             }
 
             // Check if assignment already exists
@@ -116,7 +115,7 @@ public class StationStaffController : ControllerBase
 
             if (existingAssignment != null)
             {
-                return BadRequest(new { message = "Staff is already assigned to this station" });
+                return BadRequestResponse("Staff is already assigned to this station");
             }
 
             // Create new assignment
@@ -134,7 +133,7 @@ public class StationStaffController : ControllerBase
             _logger.LogInformation("Staff {StaffUserId} assigned to station {StationId}",
                 request.StaffUserId, request.StationId);
 
-            return Ok(new
+            return OkResponse(new
             {
                 message = "Staff assigned successfully",
                 assignmentId = assignment.AssignmentId,
@@ -145,7 +144,7 @@ public class StationStaffController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error assigning staff");
-            return StatusCode(500, new { message = "Error assigning staff" });
+            return ServerErrorResponse("Error assigning staff");
         }
     }
 
@@ -160,7 +159,7 @@ public class StationStaffController : ControllerBase
 
             if (assignment == null)
             {
-                return NotFound(new { message = "Assignment not found" });
+                return NotFoundResponse("Assignment not found");
             }
 
             // Soft delete - set IsActive to false
@@ -169,12 +168,12 @@ public class StationStaffController : ControllerBase
 
             _logger.LogInformation("Staff assignment {AssignmentId} deactivated", assignmentId);
 
-            return Ok(new { message = "Staff unassigned successfully" });
+            return OkResponse(new { message = "Staff unassigned successfully" });
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error unassigning staff");
-            return StatusCode(500, new { message = "Error unassigning staff" });
+            return ServerErrorResponse("Error unassigning staff");
         }
     }
 }

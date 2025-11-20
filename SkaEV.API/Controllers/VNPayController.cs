@@ -5,12 +5,11 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Primitives;
 using SkaEV.API.Application.DTOs.Payments;
 using SkaEV.API.Application.Services.Payments;
+using SkaEV.API.Application.Constants;
 
 namespace SkaEV.API.Controllers;
 
-[ApiController]
-[Route("api/[controller]")]
-public class VNPayController : ControllerBase
+public class VNPayController : BaseApiController
 {
     private readonly IVNPayService _vnpayService;
     private readonly ILogger<VNPayController> _logger;
@@ -22,12 +21,12 @@ public class VNPayController : ControllerBase
     }
 
     [HttpPost("create-payment-url")]
-    [Authorize(Roles = "customer")]
+    [Authorize(Roles = Roles.Customer)]
     public async Task<IActionResult> CreatePaymentUrl([FromBody] VnpayCreatePaymentRequestDto request, CancellationToken cancellationToken)
     {
-        var userId = GetUserId();
+        var userId = CurrentUserId;
         var result = await _vnpayService.CreatePaymentUrlAsync(request, userId, cancellationToken);
-        return Ok(result);
+        return OkResponse(result);
     }
 
     [HttpGet("verify-return")]
@@ -35,7 +34,7 @@ public class VNPayController : ControllerBase
     public async Task<IActionResult> VerifyReturn(CancellationToken cancellationToken)
     {
         var verification = await _vnpayService.VerifyAsync(Request.Query, VnpayCallbackSource.Return, cancellationToken);
-        return Ok(verification);
+        return OkResponse(verification);
     }
 
     [HttpGet("ipn")]
@@ -60,16 +59,5 @@ public class VNPayController : ControllerBase
         var rspCode = verification.Success ? "00" : verification.ResponseCode ?? "99";
         var message = verification.Success ? "Confirm Success" : verification.Message;
         return Ok(new { RspCode = rspCode, Message = message });
-    }
-
-    private int GetUserId()
-    {
-        var claim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (int.TryParse(claim, out var userId))
-        {
-            return userId;
-        }
-
-        throw new InvalidOperationException("Missing authenticated user identifier");
     }
 }

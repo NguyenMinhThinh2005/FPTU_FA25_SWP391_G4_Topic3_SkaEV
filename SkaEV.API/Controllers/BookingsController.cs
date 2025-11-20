@@ -2,27 +2,22 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SkaEV.API.Application.DTOs.Bookings;
 using SkaEV.API.Application.Services;
-using Microsoft.AspNetCore.Hosting;
-using System.Security.Claims;
+using SkaEV.API.Application.Constants;
+using SkaEV.API.Application.Common;
 
 namespace SkaEV.API.Controllers;
 
-[ApiController]
-[Route("api/[controller]")]
 [Authorize]
-public class BookingsController : ControllerBase
+public class BookingsController : BaseApiController
 {
     private readonly IBookingService _bookingService;
     private readonly ILogger<BookingsController> _logger;
-    private readonly IWebHostEnvironment _env;
 
-    public BookingsController(IBookingService bookingService, ILogger<BookingsController> logger, IWebHostEnvironment env)
+    public BookingsController(IBookingService bookingService, ILogger<BookingsController> logger)
     {
         _bookingService = bookingService;
         _logger = logger;
-        _env = env;
     }
-
 
     /// <summary>
     /// Get user's bookings
@@ -30,17 +25,8 @@ public class BookingsController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetBookings([FromQuery] int limit = 50, [FromQuery] int offset = 0)
     {
-        try
-        {
-            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-            var bookings = await _bookingService.GetUserBookingsAsync(userId, limit, offset);
-            return Ok(new { data = bookings, count = bookings.Count });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting bookings");
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        var bookings = await _bookingService.GetUserBookingsAsync(CurrentUserId, limit, offset);
+        return OkResponse(new { data = bookings, count = bookings.Count });
     }
 
     /// <summary>
@@ -49,30 +35,18 @@ public class BookingsController : ControllerBase
     [HttpGet("{id}")]
     public async Task<IActionResult> GetBooking(int id)
     {
-        try
+        var booking = await _bookingService.GetBookingByIdAsync(id);
+        if (booking == null)
         {
-            var booking = await _bookingService.GetBookingByIdAsync(id);
-            if (booking == null)
-            {
-                return NotFound(new { message = "Booking not found" });
-            }
-
-            // Check if user owns this booking or is staff/admin
-            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-            var userRole = User.FindFirst(ClaimTypes.Role)!.Value;
-
-            if (booking.UserId != userId && userRole != "admin" && userRole != "staff")
-            {
-                return Forbid();
-            }
-
-            return Ok(booking);
+            return NotFoundResponse("Booking not found");
         }
-        catch (Exception ex)
+
+        if (booking.UserId != CurrentUserId && CurrentUserRole != Roles.Admin && CurrentUserRole != Roles.Staff)
         {
-            _logger.LogError(ex, "Error getting booking {BookingId}", id);
-            return StatusCode(500, new { message = "An error occurred" });
+            return ForbiddenResponse();
         }
+
+        return OkResponse(booking);
     }
 
     /// <summary>
@@ -81,28 +55,12 @@ public class BookingsController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> CreateBooking([FromBody] CreateBookingDto dto)
     {
-        try
-        {
-            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-            dto.UserId = userId; // Override with authenticated user ID
+        dto.UserId = CurrentUserId; // Override with authenticated user ID
 
-            var bookingId = await _bookingService.CreateBookingAsync(dto);
-            var booking = await _bookingService.GetBookingByIdAsync(bookingId);
+        var bookingId = await _bookingService.CreateBookingAsync(dto);
+        var booking = await _bookingService.GetBookingByIdAsync(bookingId);
 
-            return CreatedAtAction(nameof(GetBooking), new { id = bookingId }, booking);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error creating booking");
-
-            if (_env != null && _env.IsDevelopment())
-            {
-                // In development return detailed error to help debugging
-                return StatusCode(500, new { message = "An error occurred creating booking", detail = ex.Message, stack = ex.StackTrace });
-            }
-
-            return StatusCode(500, new { message = "An error occurred creating booking" });
-        }
+        return CreatedResponse(nameof(GetBooking), new { id = bookingId }, booking);
     }
 
     /// <summary>
@@ -111,35 +69,26 @@ public class BookingsController : ControllerBase
     [HttpDelete("{id}/cancel")]
     public async Task<IActionResult> CancelBooking(int id, [FromBody] UpdateBookingStatusDto? dto = null)
     {
-        try
+        var booking = await _bookingService.GetBookingByIdAsync(id);
+
+        if (booking == null)
         {
-            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-            var booking = await _bookingService.GetBookingByIdAsync(id);
-
-            if (booking == null)
-            {
-                return NotFound(new { message = "Booking not found" });
-            }
-
-            // Check if user owns this booking
-            if (booking.UserId != userId)
-            {
-                return Forbid();
-            }
-
-            var success = await _bookingService.CancelBookingAsync(id, dto?.CancellationReason);
-            if (!success)
-            {
-                return BadRequest(new { message = "Failed to cancel booking" });
-            }
-
-            return Ok(new { message = "Booking cancelled successfully" });
+            return NotFoundResponse("Booking not found");
         }
-        catch (Exception ex)
+
+        // Check if user owns this booking
+        if (booking.UserId != CurrentUserId)
         {
-            _logger.LogError(ex, "Error cancelling booking {BookingId}", id);
-            return StatusCode(500, new { message = "An error occurred" });
+            return ForbiddenResponse();
         }
+
+        var success = await _bookingService.CancelBookingAsync(id, dto?.CancellationReason);
+        if (!success)
+        {
+            return BadRequestResponse("Failed to cancel booking");
+        }
+
+        return OkResponse(new { message = "Booking cancelled successfully" });
     }
 
     /// <summary>
@@ -148,21 +97,12 @@ public class BookingsController : ControllerBase
     [HttpPost("qr-scan")]
     public async Task<IActionResult> ScanQRCode([FromBody] ScanQRCodeDto dto)
     {
-        try
-        {
-            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-            dto.UserId = userId; // Override with authenticated user ID
+        dto.UserId = CurrentUserId; // Override with authenticated user ID
 
-            var bookingId = await _bookingService.ScanQRCodeAsync(dto);
-            var booking = await _bookingService.GetBookingByIdAsync(bookingId);
+        var bookingId = await _bookingService.ScanQRCodeAsync(dto);
+        var booking = await _bookingService.GetBookingByIdAsync(bookingId);
 
-            return CreatedAtAction(nameof(GetBooking), new { id = bookingId }, booking);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error scanning QR code");
-            return StatusCode(500, new { message = "An error occurred scanning QR code" });
-        }
+        return CreatedResponse(nameof(GetBooking), new { id = bookingId }, booking);
     }
 
     /// <summary>
@@ -172,73 +112,33 @@ public class BookingsController : ControllerBase
     [Authorize]
     public async Task<IActionResult> StartCharging(string id)
     {
-        try
+        if (!TryParseBookingId(id, out int bookingId))
         {
-            _logger.LogInformation("StartCharging called with ID: {Id} (length: {Length})", id, id.Length);
-            
-            // Parse booking ID - handle both "BOOK123" format and numeric "123" format
-            // Use long to support timestamp-based IDs (13 digits)
-            long bookingIdLong;
-            if (id.StartsWith("BOOK", StringComparison.OrdinalIgnoreCase))
-            {
-                string numericPart = id.Substring(4);
-                _logger.LogInformation("Extracting numeric part: {NumericPart}", numericPart);
-                
-                // Extract numeric part from "BOOK123" format
-                if (!long.TryParse(numericPart, out bookingIdLong))
-                {
-                    _logger.LogWarning("Failed to parse numeric part: {NumericPart}", numericPart);
-                    return BadRequest(new { message = "Invalid booking ID format" });
-                }
-                
-                _logger.LogInformation("Successfully parsed booking ID: {BookingId}", bookingIdLong);
-            }
-            else if (!long.TryParse(id, out bookingIdLong))
-            {
-                _logger.LogWarning("Failed to parse ID as long: {Id}", id);
-                return BadRequest(new { message = "Invalid booking ID format" });
-            }
-            
-            // Convert to int for service layer (database uses INT)
-            if (bookingIdLong > int.MaxValue || bookingIdLong < int.MinValue)
-            {
-                _logger.LogWarning("Booking ID out of INT range: {BookingId}", bookingIdLong);
-                return BadRequest(new { message = "Booking ID out of valid range" });
-            }
-            
-            int bookingId = (int)bookingIdLong;
-
-            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-            var userRole = User.FindFirst(ClaimTypes.Role)!.Value;
-            
-            // Check if user owns this booking (unless they are staff/admin)
-            if (userRole != "admin" && userRole != "staff")
-            {
-                var booking = await _bookingService.GetBookingByIdAsync(bookingId);
-                if (booking == null)
-                {
-                    return NotFound(new { message = "Booking not found" });
-                }
-                
-                if (booking.UserId != userId)
-                {
-                    return Forbid();
-                }
-            }
-            
-            var success = await _bookingService.StartChargingAsync(bookingId);
-            if (!success)
-            {
-                return BadRequest(new { message = "Failed to start charging" });
-            }
-
-            return Ok(new { message = "Charging started successfully" });
+            return BadRequestResponse("Invalid booking ID format");
         }
-        catch (Exception ex)
+        
+        // Check if user owns this booking (unless they are staff/admin)
+        if (CurrentUserRole != Roles.Admin && CurrentUserRole != Roles.Staff)
         {
-            _logger.LogError(ex, "Error starting charging for booking {BookingId}", id);
-            return StatusCode(500, new { message = "An error occurred" });
+            var booking = await _bookingService.GetBookingByIdAsync(bookingId);
+            if (booking == null)
+            {
+                return NotFoundResponse("Booking not found");
+            }
+            
+            if (booking.UserId != CurrentUserId)
+            {
+                return ForbiddenResponse();
+            }
         }
+        
+        var success = await _bookingService.StartChargingAsync(bookingId);
+        if (!success)
+        {
+            return BadRequestResponse("Failed to start charging");
+        }
+
+        return OkResponse(new { message = "Charging started successfully" });
     }
 
     /// <summary>
@@ -248,79 +148,54 @@ public class BookingsController : ControllerBase
     [Authorize]
     public async Task<IActionResult> CompleteCharging(string id, [FromBody] CompleteChargingDto dto)
     {
-        try
+        if (!TryParseBookingId(id, out int bookingId))
         {
-            _logger.LogInformation("CompleteCharging called with ID: {Id} (length: {Length})", id, id.Length);
-            
-            // Parse booking ID - handle both "BOOK123" format and numeric "123" format
-            // Use long to support timestamp-based IDs (13 digits)
-            long bookingIdLong;
-            if (id.StartsWith("BOOK", StringComparison.OrdinalIgnoreCase))
-            {
-                string numericPart = id.Substring(4);
-                _logger.LogInformation("Extracting numeric part: {NumericPart}", numericPart);
-                
-                // Extract numeric part from "BOOK123" format
-                if (!long.TryParse(numericPart, out bookingIdLong))
-                {
-                    _logger.LogWarning("Failed to parse numeric part: {NumericPart}", numericPart);
-                    return BadRequest(new { message = "Invalid booking ID format" });
-                }
-                
-                _logger.LogInformation("Successfully parsed booking ID: {BookingId}", bookingIdLong);
-            }
-            else if (!long.TryParse(id, out bookingIdLong))
-            {
-                _logger.LogWarning("Failed to parse ID as long: {Id}", id);
-                return BadRequest(new { message = "Invalid booking ID format" });
-            }
-            
-            // Convert to int for service layer (database uses INT)
-            if (bookingIdLong > int.MaxValue || bookingIdLong < int.MinValue)
-            {
-                _logger.LogWarning("Booking ID out of INT range: {BookingId}", bookingIdLong);
-                return BadRequest(new { message = "Booking ID out of valid range" });
-            }
-            
-            int bookingId = (int)bookingIdLong;
-
-            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-            var userRole = User.FindFirst(ClaimTypes.Role)!.Value;
-            
-            // Check if user owns this booking (unless they are staff/admin)
-            if (userRole != "admin" && userRole != "staff")
-            {
-                var booking = await _bookingService.GetBookingByIdAsync(bookingId);
-                if (booking == null)
-                {
-                    return NotFound(new { message = "Booking not found" });
-                }
-                
-                if (booking.UserId != userId)
-                {
-                    return Forbid();
-                }
-            }
-            
-            var success = await _bookingService.CompleteChargingAsync(bookingId, dto.FinalSoc, dto.TotalEnergyKwh, dto.UnitPrice);
-            if (!success)
-            {
-                return BadRequest(new { message = "Failed to complete charging" });
-            }
-
-            return Ok(new { message = "Charging completed successfully" });
+            return BadRequestResponse("Invalid booking ID format");
         }
-        catch (Exception ex)
+
+        // Check if user owns this booking (unless they are staff/admin)
+        if (CurrentUserRole != Roles.Admin && CurrentUserRole != Roles.Staff)
         {
-            _logger.LogError(ex, "Error completing charging for booking {BookingId}", id);
-            return StatusCode(500, new { message = "An error occurred" });
+            var booking = await _bookingService.GetBookingByIdAsync(bookingId);
+            if (booking == null)
+            {
+                return NotFoundResponse("Booking not found");
+            }
+            
+            if (booking.UserId != CurrentUserId)
+            {
+                return ForbiddenResponse();
+            }
         }
+        
+        var success = await _bookingService.CompleteChargingAsync(bookingId, dto.FinalSoc, dto.TotalEnergyKwh, dto.UnitPrice);
+        if (!success)
+        {
+            return BadRequestResponse("Failed to complete charging");
+        }
+
+        return OkResponse(new { message = "Charging completed successfully" });
+    }
+
+    private bool TryParseBookingId(string id, out int bookingId)
+    {
+        bookingId = 0;
+        long bookingIdLong;
+        
+        if (id.StartsWith("BOOK", StringComparison.OrdinalIgnoreCase))
+        {
+            string numericPart = id.Substring(4);
+            if (!long.TryParse(numericPart, out bookingIdLong)) return false;
+        }
+        else if (!long.TryParse(id, out bookingIdLong))
+        {
+            return false;
+        }
+        
+        if (bookingIdLong > int.MaxValue || bookingIdLong < int.MinValue) return false;
+        
+        bookingId = (int)bookingIdLong;
+        return true;
     }
 }
 
-public class CompleteChargingDto
-{
-    public decimal FinalSoc { get; set; }
-    public decimal TotalEnergyKwh { get; set; }
-    public decimal UnitPrice { get; set; }
-}

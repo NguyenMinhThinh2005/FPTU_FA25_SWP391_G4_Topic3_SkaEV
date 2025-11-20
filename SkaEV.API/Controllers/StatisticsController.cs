@@ -2,12 +2,11 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SkaEV.API.Infrastructure.Data;
+using SkaEV.API.Application.Constants;
 
 namespace SkaEV.API.Controllers;
 
-[ApiController]
-[Route("api/[controller]")]
-public class StatisticsController : ControllerBase
+public class StatisticsController : BaseApiController
 {
     private readonly SkaEVDbContext _context;
     private readonly ILogger<StatisticsController> _logger;
@@ -33,7 +32,7 @@ public class StatisticsController : ControllerBase
 
             // Count total registered users (customers only)
             var registeredUsers = await _context.Users
-                .CountAsync(u => u.Role == "customer" && u.DeletedAt == null);
+                .CountAsync(u => u.Role == Roles.Customer && u.DeletedAt == null);
 
             // Count successful charging sessions (completed bookings)
             var successfulSessions = await _context.Bookings
@@ -45,22 +44,18 @@ public class StatisticsController : ControllerBase
                 ? Math.Round((double)successfulSessions / totalBookings * 100, 1)
                 : 99.8; // Default value if no bookings yet
 
-            return Ok(new
+            return OkResponse(new
             {
-                success = true,
-                data = new
-                {
-                    activeStations = activeStations,
-                    registeredUsers = registeredUsers,
-                    successfulSessions = successfulSessions,
-                    systemReliability = reliability
-                }
+                activeStations = activeStations,
+                registeredUsers = registeredUsers,
+                successfulSessions = successfulSessions,
+                systemReliability = reliability
             });
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting home statistics");
-            return StatusCode(500, new { success = false, message = "An error occurred while fetching statistics" });
+            return ServerErrorResponse("An error occurred while fetching statistics");
         }
     }
 
@@ -68,7 +63,7 @@ public class StatisticsController : ControllerBase
     /// Get detailed statistics for dashboard
     /// </summary>
     [HttpGet("dashboard")]
-    [Authorize(Roles = "admin")]
+    [Authorize(Roles = Roles.Admin)]
     public async Task<IActionResult> GetDashboardStatistics()
     {
         try
@@ -84,9 +79,9 @@ public class StatisticsController : ControllerBase
                 users = new
                 {
                     total = await _context.Users.CountAsync(u => u.DeletedAt == null),
-                    customers = await _context.Users.CountAsync(u => u.Role == "customer" && u.DeletedAt == null),
-                    admins = await _context.Users.CountAsync(u => u.Role == "admin" && u.DeletedAt == null),
-                    staff = await _context.Users.CountAsync(u => u.Role == "staff" && u.DeletedAt == null)
+                    customers = await _context.Users.CountAsync(u => u.Role == Roles.Customer && u.DeletedAt == null),
+                    admins = await _context.Users.CountAsync(u => u.Role == Roles.Admin && u.DeletedAt == null),
+                    staff = await _context.Users.CountAsync(u => u.Role == Roles.Staff && u.DeletedAt == null)
                 },
                 bookings = new
                 {
@@ -105,12 +100,12 @@ public class StatisticsController : ControllerBase
                 }
             };
 
-            return Ok(new { success = true, data = stats });
+            return OkResponse(stats);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting dashboard statistics");
-            return StatusCode(500, new { success = false, message = "An error occurred while fetching dashboard statistics" });
+            return ServerErrorResponse("An error occurred while fetching dashboard statistics");
         }
     }
 }

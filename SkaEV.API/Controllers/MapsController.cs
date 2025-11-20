@@ -1,54 +1,40 @@
 using Microsoft.AspNetCore.Mvc;
+using SkaEV.API.Application.Common;
 using SkaEV.API.Application.DTOs.Maps;
 using SkaEV.API.Application.Services;
 
 namespace SkaEV.API.Controllers;
 
-[ApiController]
 [Route("api/[controller]")]
-public class MapsController : ControllerBase
+public class MapsController : BaseApiController
 {
     private readonly IMapsService _mapsService;
-    private readonly ILogger<MapsController> _logger;
 
-    public MapsController(IMapsService mapsService, ILogger<MapsController> logger)
+    public MapsController(IMapsService mapsService)
     {
         _mapsService = mapsService;
-        _logger = logger;
     }
 
     [HttpGet("directions")]
-    [ProducesResponseType(typeof(DirectionsResponseDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(DirectionsResponseDto), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<DirectionsResponseDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GetDirections([FromQuery] DirectionsRequestDto request, CancellationToken cancellationToken)
     {
         if (!ModelState.IsValid)
-        {
-            return BadRequest(new DirectionsResponseDto
-            {
-                Success = false,
-                Error = "Invalid request parameters."
-            });
-        }
+            return BadRequestResponse("Invalid request parameters.");
 
         if (!IsValidCoordinate(request.OriginLat, request.OriginLng) ||
             !IsValidCoordinate(request.DestinationLat, request.DestinationLng))
         {
-            return BadRequest(new DirectionsResponseDto
-            {
-                Success = false,
-                Error = "Origin and destination coordinates are required and must be valid."
-            });
+            return BadRequestResponse("Origin and destination coordinates are required and must be valid.");
         }
 
         var result = await _mapsService.GetDrivingDirectionsAsync(request, cancellationToken);
 
         if (!result.Success)
-        {
-            _logger.LogWarning("Failed to fetch directions: {Error}", result.Error);
-        }
+            return OkResponse(result, result.Error); // Or BadRequestResponse if it's a client error, but service returns success=false
 
-        return Ok(result);
+        return OkResponse(result);
     }
 
     private static bool IsValidCoordinate(double lat, double lng)

@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SkaEV.API.Application.Common;
+using SkaEV.API.Application.Constants;
 using SkaEV.API.Application.DTOs.Reports;
 using SkaEV.API.Application.Services;
 
@@ -8,10 +10,8 @@ namespace SkaEV.API.Controllers;
 /// <summary>
 /// Controller for admin analytics and reporting
 /// </summary>
-[ApiController]
-[Route("api/admin/[controller]")]
-[Authorize(Roles = "admin,staff")]
-public class AdminReportsController : ControllerBase
+[Authorize(Roles = Roles.Admin + "," + Roles.Staff)]
+public class AdminReportsController : BaseApiController
 {
     private readonly IReportService _reportService;
     private readonly ILogger<AdminReportsController> _logger;
@@ -29,37 +29,29 @@ public class AdminReportsController : ControllerBase
     /// <param name="year">Optional year filter</param>
     /// <param name="month">Optional month filter</param>
     [HttpGet("revenue")]
-    [ProducesResponseType(typeof(IEnumerable<RevenueReportDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetRevenueReports(
         [FromQuery] int? stationId = null,
         [FromQuery] int? year = null,
         [FromQuery] int? month = null)
     {
-        try
+        var reports = await _reportService.GetRevenueReportsAsync(stationId, year, month);
+
+        var totalRevenue = reports.Sum(r => r.TotalRevenue);
+        var totalEnergy = reports.Sum(r => r.TotalEnergySoldKwh);
+        var totalTransactions = reports.Sum(r => r.TotalTransactions);
+
+        return OkResponse(new
         {
-            var reports = await _reportService.GetRevenueReportsAsync(stationId, year, month);
-
-            var totalRevenue = reports.Sum(r => r.TotalRevenue);
-            var totalEnergy = reports.Sum(r => r.TotalEnergySoldKwh);
-            var totalTransactions = reports.Sum(r => r.TotalTransactions);
-
-            return Ok(new
+            data = reports,
+            summary = new
             {
-                data = reports,
-                summary = new
-                {
-                    totalRevenue,
-                    totalEnergySold = totalEnergy,
-                    totalTransactions,
-                    averageTransactionValue = totalTransactions > 0 ? totalRevenue / totalTransactions : 0
-                }
-            });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting revenue reports");
-            return StatusCode(500, new { message = "An error occurred while retrieving revenue reports" });
-        }
+                totalRevenue,
+                totalEnergySold = totalEnergy,
+                totalTransactions,
+                averageTransactionValue = totalTransactions > 0 ? totalRevenue / totalTransactions : 0
+            }
+        });
     }
 
     /// <summary>
@@ -69,37 +61,29 @@ public class AdminReportsController : ControllerBase
     /// <param name="year">Optional year filter</param>
     /// <param name="month">Optional month filter</param>
     [HttpGet("usage")]
-    [ProducesResponseType(typeof(IEnumerable<UsageReportDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetUsageReports(
         [FromQuery] int? stationId = null,
         [FromQuery] int? year = null,
         [FromQuery] int? month = null)
     {
-        try
+        var reports = await _reportService.GetUsageReportsAsync(stationId, year, month);
+
+        var totalBookings = reports.Sum(r => r.TotalBookings);
+        var totalCompleted = reports.Sum(r => r.CompletedSessions);
+        var avgUtilization = reports.Any() ? reports.Average(r => r.UtilizationRatePercent ?? 0) : 0;
+
+        return OkResponse(new
         {
-            var reports = await _reportService.GetUsageReportsAsync(stationId, year, month);
-
-            var totalBookings = reports.Sum(r => r.TotalBookings);
-            var totalCompleted = reports.Sum(r => r.CompletedSessions);
-            var avgUtilization = reports.Any() ? reports.Average(r => r.UtilizationRatePercent ?? 0) : 0;
-
-            return Ok(new
+            data = reports,
+            summary = new
             {
-                data = reports,
-                summary = new
-                {
-                    totalBookings,
-                    completedSessions = totalCompleted,
-                    averageUtilizationRate = avgUtilization,
-                    completionRate = totalBookings > 0 ? (decimal)totalCompleted / totalBookings * 100 : 0
-                }
-            });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting usage reports");
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+                totalBookings,
+                completedSessions = totalCompleted,
+                averageUtilizationRate = avgUtilization,
+                completionRate = totalBookings > 0 ? (decimal)totalCompleted / totalBookings * 100 : 0
+            }
+        });
     }
 
     /// <summary>
@@ -126,7 +110,7 @@ public class AdminReportsController : ControllerBase
             var serviceResult = await _reportService.GetUsageReportsAsync();
             _logger.LogInformation($"Service returned {serviceResult.Count()} records");
 
-            return Ok(new
+            return OkResponse(new
             {
                 directSqlCount = count,
                 serviceCount = serviceResult.Count(),
@@ -136,7 +120,7 @@ public class AdminReportsController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Test endpoint failed");
-            return Ok(new { message = "Test failed", error = ex.Message, stack = ex.StackTrace });
+            return OkResponse(new { message = "Test failed", error = ex.Message, stack = ex.StackTrace });
         }
     }
 
@@ -145,19 +129,11 @@ public class AdminReportsController : ControllerBase
     /// </summary>
     /// <param name="stationId">Optional station ID filter</param>
     [HttpGet("station-performance")]
-    [ProducesResponseType(typeof(IEnumerable<StationPerformanceDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetStationPerformance([FromQuery] int? stationId = null)
     {
-        try
-        {
-            var performance = await _reportService.GetStationPerformanceAsync(stationId);
-            return Ok(new { data = performance, timestamp = DateTime.UtcNow });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting station performance");
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        var performance = await _reportService.GetStationPerformanceAsync(stationId);
+        return OkResponse(new { data = performance, timestamp = DateTime.UtcNow });
     }
 
     /// <summary>
@@ -167,65 +143,41 @@ public class AdminReportsController : ControllerBase
     /// <param name="month">Month</param>
     /// <param name="limit">Number of top stations to return (default: 10)</param>
     [HttpGet("top-stations")]
-    [ProducesResponseType(typeof(IEnumerable<RevenueReportDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetTopStations(
         [FromQuery] int? year = null,
         [FromQuery] int? month = null,
         [FromQuery] int limit = 10)
     {
-        try
-        {
-            var currentYear = year ?? DateTime.Now.Year;
-            var currentMonth = month ?? DateTime.Now.Month;
+        var currentYear = year ?? DateTime.Now.Year;
+        var currentMonth = month ?? DateTime.Now.Month;
 
-            var reports = await _reportService.GetRevenueReportsAsync(null, currentYear, currentMonth);
-            var topStations = reports.OrderByDescending(r => r.TotalRevenue).Take(limit);
+        var reports = await _reportService.GetRevenueReportsAsync(null, currentYear, currentMonth);
+        var topStations = reports.OrderByDescending(r => r.TotalRevenue).Take(limit);
 
-            return Ok(new { data = topStations, year = currentYear, month = currentMonth });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting top stations");
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        return OkResponse(new { data = topStations, year = currentYear, month = currentMonth });
     }
 
     /// <summary>
     /// Get dashboard summary with key metrics
     /// </summary>
     [HttpGet("dashboard")]
-    [ProducesResponseType(typeof(AdminDashboardDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<AdminDashboardDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetDashboardSummary()
     {
-        try
-        {
-            var dashboard = await _reportService.GetAdminDashboardAsync();
-            return Ok(dashboard);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting dashboard summary");
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        var dashboard = await _reportService.GetAdminDashboardAsync();
+        return OkResponse(dashboard);
     }
 
     /// <summary>
     /// Get payment methods usage statistics
     /// </summary>
     [HttpGet("payment-methods-stats")]
-    [ProducesResponseType(typeof(IEnumerable<PaymentMethodStatsDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetPaymentMethodsStatistics()
     {
-        try
-        {
-            var stats = await _reportService.GetPaymentMethodsStatsAsync();
-            return Ok(new { data = stats });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting payment methods statistics");
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        var stats = await _reportService.GetPaymentMethodsStatsAsync();
+        return OkResponse(new { data = stats });
     }
 
     /// <summary>
@@ -238,78 +190,49 @@ public class AdminReportsController : ControllerBase
         [FromQuery] int? year = null,
         [FromQuery] int? month = null)
     {
-        try
-        {
-            var csvContent = await _reportService.ExportRevenueReportToCsvAsync(stationId, year, month);
-            var fileName = $"revenue_report_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
+        var csvContent = await _reportService.ExportRevenueReportToCsvAsync(stationId, year, month);
+        var fileName = $"revenue_report_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
 
-            return File(
-                System.Text.Encoding.UTF8.GetBytes(csvContent),
-                "text/csv",
-                fileName
-            );
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error exporting revenue report");
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        return File(
+            System.Text.Encoding.UTF8.GetBytes(csvContent),
+            "text/csv",
+            fileName
+        );
     }
 
     /// <summary>
     /// Get peak hours analysis
     /// </summary>
     [HttpGet("peak-hours")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetPeakHoursAnalysis(
         [FromQuery] int? stationId = null,
         [FromQuery] string? dateRange = "last30days")
     {
-        try
-        {
-            var peakHours = await _reportService.GetPeakHoursAnalysisAsync(stationId, dateRange);
-            return Ok(new { success = true, data = peakHours });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting peak hours analysis");
-            return StatusCode(500, new { success = false, message = "An error occurred" });
-        }
+        var peakHours = await _reportService.GetPeakHoursAnalysisAsync(stationId, dateRange);
+        return OkResponse(peakHours);
     }
 
     /// <summary>
     /// Get system health metrics
     /// </summary>
     [HttpGet("system-health")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetSystemHealth()
     {
-        try
-        {
-            var health = await _reportService.GetSystemHealthAsync();
-            return Ok(new { success = true, data = health });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting system health");
-            return StatusCode(500, new { success = false, message = "An error occurred" });
-        }
+        var health = await _reportService.GetSystemHealthAsync();
+        return OkResponse(health);
     }
 
     /// <summary>
     /// Get user growth analytics
     /// </summary>
     [HttpGet("user-growth")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetUserGrowth([FromQuery] string? dateRange = "last30days")
     {
-        try
-        {
-            var growth = await _reportService.GetUserGrowthAsync(dateRange);
-            return Ok(new { success = true, data = growth });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting user growth");
-            return StatusCode(500, new { success = false, message = "An error occurred" });
-        }
+        var growth = await _reportService.GetUserGrowthAsync(dateRange);
+        return OkResponse(growth);
     }
 
     /// <summary>
@@ -319,28 +242,15 @@ public class AdminReportsController : ControllerBase
     /// <param name="startDate">Start date (optional, defaults to 30 days ago)</param>
     /// <param name="endDate">End date (optional, defaults to now)</param>
     [HttpGet("stations/{stationId}/detailed-analytics")]
-    [ProducesResponseType(typeof(StationDetailedAnalyticsDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<StationDetailedAnalyticsDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetStationDetailedAnalytics(
         int stationId,
         [FromQuery] DateTime? startDate = null,
         [FromQuery] DateTime? endDate = null)
     {
-        try
-        {
-            var analytics = await _reportService.GetStationDetailedAnalyticsAsync(stationId, startDate, endDate);
-            return Ok(new { success = true, data = analytics });
-        }
-        catch (KeyNotFoundException ex)
-        {
-            _logger.LogWarning(ex, "Station not found: {StationId}", stationId);
-            return NotFound(new { success = false, message = ex.Message });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting detailed analytics for station {StationId}", stationId);
-            return StatusCode(500, new { success = false, message = "An error occurred while retrieving station analytics" });
-        }
+        var analytics = await _reportService.GetStationDetailedAnalyticsAsync(stationId, startDate, endDate);
+        return OkResponse(analytics);
     }
 
     /// <summary>
@@ -350,28 +260,15 @@ public class AdminReportsController : ControllerBase
     /// <param name="startDate">Start date (optional, defaults to 30 days ago)</param>
     /// <param name="endDate">End date (optional, defaults to now)</param>
     [HttpGet("stations/{stationId}/daily")]
-    [ProducesResponseType(typeof(List<DailyAnalyticsDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<List<DailyAnalyticsDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetStationDailyAnalytics(
         int stationId,
         [FromQuery] DateTime? startDate = null,
         [FromQuery] DateTime? endDate = null)
     {
-        try
-        {
-            var analytics = await _reportService.GetStationDailyAnalyticsAsync(stationId, startDate, endDate);
-            return Ok(new { success = true, data = analytics, count = analytics.Count });
-        }
-        catch (KeyNotFoundException ex)
-        {
-            _logger.LogWarning(ex, "Station not found: {StationId}", stationId);
-            return NotFound(new { success = false, message = ex.Message });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting daily analytics for station {StationId}", stationId);
-            return StatusCode(500, new { success = false, message = "An error occurred" });
-        }
+        var analytics = await _reportService.GetStationDailyAnalyticsAsync(stationId, startDate, endDate);
+        return OkResponse(analytics);
     }
 
     /// <summary>
@@ -381,37 +278,24 @@ public class AdminReportsController : ControllerBase
     /// <param name="year">Year</param>
     /// <param name="month">Month (1-12)</param>
     [HttpGet("stations/{stationId}/monthly")]
-    [ProducesResponseType(typeof(MonthlyAnalyticsDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<MonthlyAnalyticsDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GetStationMonthlyAnalytics(
         int stationId,
         [FromQuery] int? year = null,
         [FromQuery] int? month = null)
     {
-        try
-        {
-            var currentYear = year ?? DateTime.Now.Year;
-            var currentMonth = month ?? DateTime.Now.Month;
+        var currentYear = year ?? DateTime.Now.Year;
+        var currentMonth = month ?? DateTime.Now.Month;
 
-            if (currentMonth < 1 || currentMonth > 12)
-            {
-                return BadRequest(new { success = false, message = "Month must be between 1 and 12" });
-            }
+        if (currentMonth < 1 || currentMonth > 12)
+        {
+            return BadRequestResponse("Month must be between 1 and 12");
+        }
 
-            var analytics = await _reportService.GetStationMonthlyAnalyticsAsync(stationId, currentYear, currentMonth);
-            return Ok(new { success = true, data = analytics });
-        }
-        catch (KeyNotFoundException ex)
-        {
-            _logger.LogWarning(ex, "Station not found: {StationId}", stationId);
-            return NotFound(new { success = false, message = ex.Message });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting monthly analytics for station {StationId}", stationId);
-            return StatusCode(500, new { success = false, message = "An error occurred" });
-        }
+        var analytics = await _reportService.GetStationMonthlyAnalyticsAsync(stationId, currentYear, currentMonth);
+        return OkResponse(analytics);
     }
 
     /// <summary>
@@ -420,28 +304,15 @@ public class AdminReportsController : ControllerBase
     /// <param name="stationId">Station ID</param>
     /// <param name="year">Year (optional, defaults to current year)</param>
     [HttpGet("stations/{stationId}/yearly")]
-    [ProducesResponseType(typeof(YearlyAnalyticsDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<YearlyAnalyticsDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetStationYearlyAnalytics(
         int stationId,
         [FromQuery] int? year = null)
     {
-        try
-        {
-            var currentYear = year ?? DateTime.Now.Year;
-            var analytics = await _reportService.GetStationYearlyAnalyticsAsync(stationId, currentYear);
-            return Ok(new { success = true, data = analytics });
-        }
-        catch (KeyNotFoundException ex)
-        {
-            _logger.LogWarning(ex, "Station not found: {StationId}", stationId);
-            return NotFound(new { success = false, message = ex.Message });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting yearly analytics for station {StationId}", stationId);
-            return StatusCode(500, new { success = false, message = "An error occurred" });
-        }
+        var currentYear = year ?? DateTime.Now.Year;
+        var analytics = await _reportService.GetStationYearlyAnalyticsAsync(stationId, currentYear);
+        return OkResponse(analytics);
     }
 
     /// <summary>
@@ -452,39 +323,22 @@ public class AdminReportsController : ControllerBase
     /// <param name="startDate">Start date (optional)</param>
     /// <param name="endDate">End date (optional)</param>
     [HttpGet("stations/{stationId}/time-series")]
-    [ProducesResponseType(typeof(List<TimeSeriesDataPointDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<List<TimeSeriesDataPointDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GetStationTimeSeries(
         int stationId,
         [FromQuery] string granularity = "daily",
         [FromQuery] DateTime? startDate = null,
         [FromQuery] DateTime? endDate = null)
     {
-        try
+        var validGranularities = new[] { "daily", "monthly", "yearly" };
+        if (!validGranularities.Contains(granularity.ToLower()))
         {
-            var validGranularities = new[] { "daily", "monthly", "yearly" };
-            if (!validGranularities.Contains(granularity.ToLower()))
-            {
-                return BadRequest(new
-                {
-                    success = false,
-                    message = "Granularity must be one of: daily, monthly, yearly"
-                });
-            }
+            return BadRequestResponse("Granularity must be one of: daily, monthly, yearly");
+        }
 
-            var timeSeries = await _reportService.GetStationTimeSeriesAsync(stationId, granularity, startDate, endDate);
-            return Ok(new { success = true, data = timeSeries, granularity, count = timeSeries.Count });
-        }
-        catch (KeyNotFoundException ex)
-        {
-            _logger.LogWarning(ex, "Station not found: {StationId}", stationId);
-            return NotFound(new { success = false, message = ex.Message });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting time-series for station {StationId}", stationId);
-            return StatusCode(500, new { success = false, message = "An error occurred" });
-        }
+        var timeSeries = await _reportService.GetStationTimeSeriesAsync(stationId, granularity, startDate, endDate);
+        return OkResponse(timeSeries);
     }
 }

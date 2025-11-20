@@ -1,241 +1,152 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SkaEV.API.Application.Common;
+using SkaEV.API.Application.Constants;
 using SkaEV.API.Application.DTOs.QRCodes;
 using SkaEV.API.Application.Services;
-using System.Security.Claims;
 
 namespace SkaEV.API.Controllers;
 
 /// <summary>
 /// Controller for QR code generation and validation
 /// </summary>
-[ApiController]
 [Route("api/[controller]")]
-public class QRCodesController : ControllerBase
+public class QRCodesController : BaseApiController
 {
     private readonly IQRCodeService _qrCodeService;
-    private readonly ILogger<QRCodesController> _logger;
 
-    public QRCodesController(IQRCodeService qrCodeService, ILogger<QRCodesController> logger)
+    public QRCodesController(IQRCodeService qrCodeService)
     {
         _qrCodeService = qrCodeService;
-        _logger = logger;
     }
 
     /// <summary>
     /// Generate QR code for instant charging
     /// </summary>
     [HttpPost("generate")]
-    [Authorize(Roles = "customer")]
-    [ProducesResponseType(typeof(QRCodeDto), StatusCodes.Status201Created)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [Authorize(Roles = Roles.Customer)]
+    [ProducesResponseType(typeof(ApiResponse<QRCodeDto>), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GenerateQRCode([FromBody] GenerateQRCodeDto generateDto)
     {
-        try
-        {
-            var userId = GetUserId();
-            var qrCode = await _qrCodeService.GenerateQRCodeAsync(userId, generateDto);
-            
-            return CreatedAtAction(
-                nameof(GetQRCode),
-                new { id = qrCode.QRCodeId },
-                qrCode
-            );
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error generating QR code");
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        var qrCode = await _qrCodeService.GenerateQRCodeAsync(CurrentUserId, generateDto);
+        
+        return CreatedResponse(
+            nameof(GetQRCode),
+            new { id = qrCode.QRCodeId },
+            qrCode
+        );
     }
 
     /// <summary>
     /// Get QR code by ID
     /// </summary>
     [HttpGet("{id}")]
-    [Authorize(Roles = "customer,staff")]
-    [ProducesResponseType(typeof(QRCodeDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [Authorize(Roles = Roles.Customer + "," + Roles.Staff + "," + Roles.Admin)]
+    [ProducesResponseType(typeof(ApiResponse<QRCodeDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> GetQRCode(int id)
     {
-        try
-        {
-            var userId = GetUserId();
-            var userRole = GetUserRole();
-            var qrCode = await _qrCodeService.GetQRCodeByIdAsync(id);
+        var qrCode = await _qrCodeService.GetQRCodeByIdAsync(id);
 
-            if (qrCode == null)
-                return NotFound(new { message = "QR code not found" });
+        if (qrCode == null)
+            return NotFoundResponse("QR code not found");
 
-            // Only owner or staff can view
-            if (userRole != "staff" && userRole != "admin" && qrCode.UserId != userId)
-                return Forbid();
+        // Only owner or staff can view
+        if (CurrentUserRole != Roles.Staff && CurrentUserRole != Roles.Admin && qrCode.UserId != CurrentUserId)
+            return ForbiddenResponse();
 
-            return Ok(qrCode);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting QR code {Id}", id);
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        return OkResponse(qrCode);
     }
 
     /// <summary>
     /// Get my active QR codes
     /// </summary>
     [HttpGet("my-qrcodes")]
-    [Authorize(Roles = "customer")]
-    [ProducesResponseType(typeof(IEnumerable<QRCodeDto>), StatusCodes.Status200OK)]
+    [Authorize(Roles = Roles.Customer)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetMyQRCodes()
     {
-        try
-        {
-            var userId = GetUserId();
-            var qrCodes = await _qrCodeService.GetUserActiveQRCodesAsync(userId);
-            return Ok(new { data = qrCodes, count = qrCodes.Count() });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting user QR codes");
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        var qrCodes = await _qrCodeService.GetUserActiveQRCodesAsync(CurrentUserId);
+        return OkResponse(new { data = qrCodes, count = qrCodes.Count() });
     }
 
     /// <summary>
     /// Validate QR code (Staff only)
     /// </summary>
     [HttpPost("validate")]
-    [Authorize(Roles = "staff,admin")]
-    [ProducesResponseType(typeof(QRCodeValidationResultDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [Authorize(Roles = Roles.Staff + "," + Roles.Admin)]
+    [ProducesResponseType(typeof(ApiResponse<QRCodeValidationResultDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> ValidateQRCode([FromBody] ValidateQRCodeDto validateDto)
     {
-        try
-        {
-            var result = await _qrCodeService.ValidateQRCodeAsync(validateDto.QRCodeData);
-            return Ok(result);
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error validating QR code");
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        var result = await _qrCodeService.ValidateQRCodeAsync(validateDto.QRCodeData);
+        return OkResponse(result);
     }
 
     /// <summary>
     /// Use QR code to start charging (Staff only)
     /// </summary>
     [HttpPost("{id}/use")]
-    [Authorize(Roles = "staff,admin")]
-    [ProducesResponseType(typeof(QRCodeDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [Authorize(Roles = Roles.Staff + "," + Roles.Admin)]
+    [ProducesResponseType(typeof(ApiResponse<QRCodeDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UseQRCode(int id, [FromBody] UseQRCodeDto useDto)
     {
-        try
-        {
-            var qrCode = await _qrCodeService.GetQRCodeByIdAsync(id);
+        var qrCode = await _qrCodeService.GetQRCodeByIdAsync(id);
 
-            if (qrCode == null)
-                return NotFound(new { message = "QR code not found" });
+        if (qrCode == null)
+            return NotFoundResponse("QR code not found");
 
-            var updatedQRCode = await _qrCodeService.UseQRCodeAsync(id, useDto);
-            return Ok(updatedQRCode);
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error using QR code {Id}", id);
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        var updatedQRCode = await _qrCodeService.UseQRCodeAsync(id, useDto);
+        return OkResponse(updatedQRCode);
     }
 
     /// <summary>
     /// Cancel/revoke QR code
     /// </summary>
     [HttpDelete("{id}")]
-    [Authorize(Roles = "customer,staff,admin")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [Authorize(Roles = Roles.Customer + "," + Roles.Staff + "," + Roles.Admin)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> CancelQRCode(int id)
     {
-        try
-        {
-            var userId = GetUserId();
-            var userRole = GetUserRole();
-            var qrCode = await _qrCodeService.GetQRCodeByIdAsync(id);
+        var qrCode = await _qrCodeService.GetQRCodeByIdAsync(id);
 
-            if (qrCode == null)
-                return NotFound(new { message = "QR code not found" });
+        if (qrCode == null)
+            return NotFoundResponse("QR code not found");
 
-            // Only owner or staff/admin can cancel
-            if (userRole != "staff" && userRole != "admin" && qrCode.UserId != userId)
-                return Forbid();
+        // Only owner or staff/admin can cancel
+        if (CurrentUserRole != Roles.Staff && CurrentUserRole != Roles.Admin && qrCode.UserId != CurrentUserId)
+            return ForbiddenResponse();
 
-            await _qrCodeService.CancelQRCodeAsync(id);
-            return NoContent();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error canceling QR code {Id}", id);
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        await _qrCodeService.CancelQRCodeAsync(id);
+        return OkResponse<object>(new { }, "QR code cancelled");
     }
 
     /// <summary>
     /// Get QR code image (Staff only)
     /// </summary>
     [HttpGet("{id}/image")]
-    [Authorize(Roles = "customer,staff,admin")]
+    [Authorize(Roles = Roles.Customer + "," + Roles.Staff + "," + Roles.Admin)]
     [ProducesResponseType(typeof(FileResult), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> GetQRCodeImage(int id)
     {
-        try
-        {
-            var userId = GetUserId();
-            var userRole = GetUserRole();
-            var qrCode = await _qrCodeService.GetQRCodeByIdAsync(id);
+        var qrCode = await _qrCodeService.GetQRCodeByIdAsync(id);
 
-            if (qrCode == null)
-                return NotFound(new { message = "QR code not found" });
+        if (qrCode == null)
+            return NotFoundResponse("QR code not found");
 
-            // Only owner or staff can view image
-            if (userRole != "staff" && userRole != "admin" && qrCode.UserId != userId)
-                return Forbid();
+        // Only owner or staff can view image
+        if (CurrentUserRole != Roles.Staff && CurrentUserRole != Roles.Admin && qrCode.UserId != CurrentUserId)
+            return ForbiddenResponse();
 
-            var imageBytes = await _qrCodeService.GenerateQRCodeImageAsync(id);
-            return File(imageBytes, "image/png");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting QR code image {Id}", id);
-            return StatusCode(500, new { message = "An error occurred" });
-        }
-    }
-
-    private int GetUserId()
-    {
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        return int.Parse(userIdClaim ?? "0");
-    }
-
-    private string GetUserRole()
-    {
-        return User.FindFirst(ClaimTypes.Role)?.Value ?? "customer";
+        var imageBytes = await _qrCodeService.GenerateQRCodeImageAsync(id);
+        return File(imageBytes, "image/png");
     }
 }

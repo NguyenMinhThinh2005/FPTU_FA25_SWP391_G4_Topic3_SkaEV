@@ -5,9 +5,7 @@ using SkaEV.API.Infrastructure.Data;
 
 namespace SkaEV.API.Controllers;
 
-[ApiController]
-[Route("api/[controller]")]
-public class DiagnosticController : ControllerBase
+public class DiagnosticController : BaseApiController
 {
     private readonly SkaEVDbContext _context;
 
@@ -24,7 +22,7 @@ public class DiagnosticController : ControllerBase
         // Parse to hide sensitive info
         var builder = new SqlConnectionStringBuilder(connectionString ?? "");
 
-        return Ok(new
+        return OkResponse(new
         {
             dataSource = builder.DataSource,
             initialCatalog = builder.InitialCatalog,
@@ -42,7 +40,7 @@ public class DiagnosticController : ControllerBase
         var station1Posts = await _context.ChargingPosts.AsNoTracking().CountAsync(p => p.StationId == 1);
         var station2Posts = await _context.ChargingPosts.AsNoTracking().CountAsync(p => p.StationId == 2);
 
-        return Ok(new
+        return OkResponse(new
         {
             totalPosts,
             station1Posts,
@@ -58,7 +56,7 @@ public class DiagnosticController : ControllerBase
             stationId
         ).ToListAsync();
 
-        return Ok(new
+        return OkResponse(new
         {
             stationId,
             count = posts.Count,

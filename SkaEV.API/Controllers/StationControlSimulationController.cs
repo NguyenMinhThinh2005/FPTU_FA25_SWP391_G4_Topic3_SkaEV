@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using SkaEV.API.Application.Common;
+using SkaEV.API.Application.Constants;
 using SkaEV.API.Infrastructure.Data;
 
 namespace SkaEV.API.Controllers;
@@ -9,10 +11,9 @@ namespace SkaEV.API.Controllers;
 /// Controller mô phỏng điều khiển trụ sạc từ xa
 /// Không cần phần cứng thật - chỉ cập nhật database
 /// </summary>
-[ApiController]
 [Route("api/admin/station-control")]
-[Authorize(Roles = "Admin,Staff")]
-public class StationControlSimulationController : ControllerBase
+[Authorize(Roles = Roles.Admin + "," + Roles.Staff)]
+public class StationControlSimulationController : BaseApiController
 {
     private readonly SkaEVDbContext _context;
     private readonly ILogger<StationControlSimulationController> _logger;
@@ -29,9 +30,9 @@ public class StationControlSimulationController : ControllerBase
     /// Điều khiển trạng thái của một trụ sạc (post)
     /// </summary>
     /// <param name="postId">Post ID</param>
-    /// <param name="action">Action: "activate", "deactivate", "maintenance", "emergency_stop"</param>
+    /// <param name="request">Control request</param>
     [HttpPost("posts/{postId}/control")]
-    public async Task<ActionResult<object>> ControlPost(int postId, [FromBody] ControlRequest request)
+    public async Task<IActionResult> ControlPost(int postId, [FromBody] ControlRequest request)
     {
         var post = await _context.ChargingPosts
             .Include(p => p.ChargingStation)
@@ -39,7 +40,7 @@ public class StationControlSimulationController : ControllerBase
 
         if (post == null)
         {
-            return NotFound(new { message = "Post not found" });
+            return NotFoundResponse("Post not found");
         }
 
         var oldStatus = post.Status;
@@ -75,7 +76,7 @@ public class StationControlSimulationController : ControllerBase
                 break;
 
             default:
-                return BadRequest(new { message = "Invalid action. Use: activate, deactivate, maintenance, emergency_stop" });
+                return BadRequestResponse("Invalid action. Use: activate, deactivate, maintenance, emergency_stop");
         }
 
         await _context.SaveChangesAsync();
@@ -87,27 +88,22 @@ public class StationControlSimulationController : ControllerBase
             post.Status
         );
 
-        return Ok(new
+        return OkResponse<object>(new
         {
-            success = true,
-            message = $"Post status changed from {oldStatus} to {post.Status}",
-            data = new
-            {
-                postId = post.PostId,
-                postName = post.PostNumber,
-                stationName = post.ChargingStation?.StationName,
-                oldStatus,
-                newStatus = post.Status,
-                timestamp = DateTime.UtcNow
-            }
-        });
+            postId = post.PostId,
+            postName = post.PostNumber,
+            stationName = post.ChargingStation?.StationName,
+            oldStatus,
+            newStatus = post.Status,
+            timestamp = DateTime.UtcNow
+        }, $"Post status changed from {oldStatus} to {post.Status}");
     }
 
     /// <summary>
     /// Điều khiển nhiều trụ sạc cùng lúc
     /// </summary>
     [HttpPost("posts/batch-control")]
-    public async Task<ActionResult<object>> BatchControlPosts([FromBody] BatchControlRequest request)
+    public async Task<IActionResult> BatchControlPosts([FromBody] BatchControlRequest request)
     {
         var posts = await _context.ChargingPosts
             .Where(p => request.PostIds.Contains(p.PostId))
@@ -116,7 +112,7 @@ public class StationControlSimulationController : ControllerBase
 
         if (!posts.Any())
         {
-            return NotFound(new { message = "No posts found" });
+            return NotFoundResponse("No posts found");
         }
 
         var results = new List<object>();
@@ -152,26 +148,20 @@ public class StationControlSimulationController : ControllerBase
 
         await _context.SaveChangesAsync();
 
-        return Ok(new
-        {
-            success = true,
-            message = $"Updated {results.Count} posts",
-            data = results,
-            timestamp = DateTime.UtcNow
-        });
+        return OkResponse<object>(results, $"Updated {results.Count} posts");
     }
 
     /// <summary>
     /// Điều chỉnh giá điện của một trạm (cập nhật PricingRule mặc định)
     /// </summary>
     [HttpPost("stations/{stationId}/pricing")]
-    public async Task<ActionResult<object>> UpdatePricing(int stationId, [FromBody] PricingRequest request)
+    public async Task<IActionResult> UpdatePricing(int stationId, [FromBody] PricingRequest request)
     {
         var station = await _context.ChargingStations.FindAsync(stationId);
 
         if (station == null)
         {
-            return NotFound(new { message = "Station not found" });
+            return NotFoundResponse("Station not found");
         }
 
         // Find or create default pricing rule for this station
@@ -209,33 +199,28 @@ public class StationControlSimulationController : ControllerBase
             request.BasePrice
         );
 
-        return Ok(new
+        return OkResponse<object>(new
         {
-            success = true,
-            message = "Pricing updated successfully",
-            data = new
-            {
-                stationId = station.StationId,
-                stationName = station.StationName,
-                ruleId = defaultRule.RuleId,
-                oldPrice,
-                newPrice = request.BasePrice,
-                timestamp = DateTime.UtcNow
-            }
-        });
+            stationId = station.StationId,
+            stationName = station.StationName,
+            ruleId = defaultRule.RuleId,
+            oldPrice,
+            newPrice = request.BasePrice,
+            timestamp = DateTime.UtcNow
+        }, "Pricing updated successfully");
     }
 
     /// <summary>
     /// Đặt lịch bảo trì cho trạm
     /// </summary>
     [HttpPost("stations/{stationId}/maintenance")]
-    public async Task<ActionResult<object>> ScheduleMaintenance(int stationId, [FromBody] MaintenanceRequest request)
+    public async Task<IActionResult> ScheduleMaintenance(int stationId, [FromBody] MaintenanceRequest request)
     {
         var station = await _context.ChargingStations.FindAsync(stationId);
 
         if (station == null)
         {
-            return NotFound(new { message = "Station not found" });
+            return NotFoundResponse("Station not found");
         }
 
         // Tắt tất cả các trụ sạc trong trạm
@@ -257,27 +242,22 @@ public class StationControlSimulationController : ControllerBase
             request.EndTime
         );
 
-        return Ok(new
+        return OkResponse<object>(new
         {
-            success = true,
-            message = $"Maintenance scheduled for {station.StationName}",
-            data = new
-            {
-                stationId = station.StationId,
-                stationName = station.StationName,
-                affectedPosts = posts.Count,
-                startTime = request.StartTime,
-                endTime = request.EndTime,
-                reason = request.Reason
-            }
-        });
+            stationId = station.StationId,
+            stationName = station.StationName,
+            affectedPosts = posts.Count,
+            startTime = request.StartTime,
+            endTime = request.EndTime,
+            reason = request.Reason
+        }, $"Maintenance scheduled for {station.StationName}");
     }
 
     /// <summary>
     /// Lấy trạng thái thời gian thực của tất cả trụ sạc
     /// </summary>
     [HttpGet("status")]
-    public async Task<ActionResult<object>> GetRealTimeStatus()
+    public async Task<IActionResult> GetRealTimeStatus()
     {
         var posts = await _context.ChargingPosts
             .Include(p => p.ChargingStation)
@@ -326,10 +306,8 @@ public class StationControlSimulationController : ControllerBase
             occupied = postsData.Count(p => p.status == "occupied")
         };
 
-        return Ok(new
+        return OkResponse<object>(new
         {
-            success = true,
-            timestamp = DateTime.UtcNow,
             summary,
             posts = postsData
         });

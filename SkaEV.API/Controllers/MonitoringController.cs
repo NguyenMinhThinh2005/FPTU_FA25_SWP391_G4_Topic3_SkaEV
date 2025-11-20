@@ -1,79 +1,61 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SkaEV.API.Application.Common;
+using SkaEV.API.Application.Constants;
 using SkaEV.API.Application.Services;
 
-namespace SkaEV.API.Controllers
+namespace SkaEV.API.Controllers;
+
+[Authorize]
+[Route("api/[controller]")]
+public class MonitoringController : BaseApiController
 {
-    [ApiController]
-    [Route("api/[controller]")]
-    [Authorize]
-    public class MonitoringController : ControllerBase
+    private readonly IMonitoringService _monitoringService;
+
+    public MonitoringController(IMonitoringService monitoringService)
     {
-        private readonly IMonitoringService _monitoringService;
-
-        public MonitoringController(IMonitoringService monitoringService)
-        {
-            _monitoringService = monitoringService;
-        }
-
-        /// <summary>
-        /// Broadcast station status update to all connected clients
-        /// </summary>
-        [HttpPost("broadcast/station/{stationId}")]
-        [Authorize(Roles = "Admin,Staff")]
-        public async Task<IActionResult> BroadcastStationStatus(int stationId)
-        {
-            try
-            {
-                await _monitoringService.BroadcastStationStatusAsync(stationId);
-                return Ok(new { message = "Station status broadcasted successfully" });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { message = "Error broadcasting station status", error = ex.Message });
-            }
-        }
-
-        /// <summary>
-        /// Broadcast slot status update to all connected clients
-        /// </summary>
-        [HttpPost("broadcast/slot/{slotId}")]
-        [Authorize(Roles = "Admin,Staff")]
-        public async Task<IActionResult> BroadcastSlotStatus(int slotId)
-        {
-            try
-            {
-                await _monitoringService.BroadcastSlotStatusAsync(slotId);
-                return Ok(new { message = "Slot status broadcasted successfully" });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { message = "Error broadcasting slot status", error = ex.Message });
-            }
-        }
-
-        /// <summary>
-        /// Broadcast system alert to all connected clients
-        /// </summary>
-        [HttpPost("broadcast/alert")]
-        [Authorize(Roles = "Admin")]
-        public async Task<IActionResult> BroadcastAlert([FromBody] AlertRequest request)
-        {
-            try
-            {
-                await _monitoringService.BroadcastSystemAlertAsync(request.Message, request.Severity);
-                return Ok(new { message = "Alert broadcasted successfully" });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { message = "Error broadcasting alert", error = ex.Message });
-            }
-        }
+        _monitoringService = monitoringService;
     }
 
-    public class AlertRequest
+    /// <summary>
+    /// Broadcast station status update to all connected clients
+    /// </summary>
+    [HttpPost("broadcast/station/{stationId}")]
+    [Authorize(Roles = Roles.Admin + "," + Roles.Staff)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> BroadcastStationStatus(int stationId)
     {
-        public string Message { get; set; } = string.Empty;
-        public string Severity { get; set; } = "info"; // info, warning, error, success
+        await _monitoringService.BroadcastStationStatusAsync(stationId);
+        return OkResponse<object>(null, "Station status broadcasted successfully");
     }
+
+    /// <summary>
+    /// Broadcast slot status update to all connected clients
+    /// </summary>
+    [HttpPost("broadcast/slot/{slotId}")]
+    [Authorize(Roles = Roles.Admin + "," + Roles.Staff)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> BroadcastSlotStatus(int slotId)
+    {
+        await _monitoringService.BroadcastSlotStatusAsync(slotId);
+        return OkResponse<object>(null, "Slot status broadcasted successfully");
+    }
+
+    /// <summary>
+    /// Broadcast system alert to all connected clients
+    /// </summary>
+    [HttpPost("broadcast/alert")]
+    [Authorize(Roles = Roles.Admin)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> BroadcastAlert([FromBody] AlertRequest request)
+    {
+        await _monitoringService.BroadcastSystemAlertAsync(request.Message, request.Severity);
+        return OkResponse<object>(null, "Alert broadcasted successfully");
+    }
+}
+
+public class AlertRequest
+{
+    public string Message { get; set; } = string.Empty;
+    public string Severity { get; set; } = "info"; // info, warning, error, success
 }
