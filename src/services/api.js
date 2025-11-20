@@ -436,6 +436,84 @@ export const reviewsAPI = {
   },
 };
 
+export const incidentsAPI = {
+  getAll: (params) => {
+    return axiosInstance.get("/StaffIssues", { params });
+  },
+
+  getMyIssues: (params) => {
+    return axiosInstance.get("/StaffIssues/my-issues", { params });
+  },
+
+  getById: (id) => {
+    return axiosInstance.get(`/StaffIssues/${id}`);
+  },
+
+  create: (issueData) => {
+    return axiosInstance.post("/StaffIssues", issueData);
+  },
+
+  update: (id, issueData) => {
+    return axiosInstance.put(`/StaffIssues/${id}`, issueData);
+  },
+
+  assign: (id, assignData) => {
+    return axiosInstance.patch(`/StaffIssues/${id}/assign`, assignData);
+  },
+
+  updateStatus: (id, statusData) => {
+    return axiosInstance.patch(`/StaffIssues/${id}/status`, statusData);
+  },
+
+  addComment: (id, commentData) => {
+    return axiosInstance.post(`/StaffIssues/${id}/comments`, commentData);
+  },
+
+  uploadAttachment: (id, formData) => {
+    return axiosInstance.post(`/StaffIssues/${id}/attachments`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
+
+  delete: (id) => {
+    return axiosInstance.delete(`/StaffIssues/${id}`);
+  },
+
+  getStatistics: (params) => {
+    return axiosInstance.get("/StaffIssues/statistics", { params });
+  },
+
+  getMaintenanceSchedule: (params) => {
+    return axiosInstance.get("/StaffIssues/maintenance-schedule", { params });
+  },
+};
+
+export const plansAPI = {
+  getAll: (params) => {
+    return axiosInstance.get("/ServicePlans", { params });
+  },
+
+  getById: (id) => {
+    return axiosInstance.get(`/ServicePlans/${id}`);
+  },
+
+  create: (planData) => {
+    return axiosInstance.post("/ServicePlans", planData);
+  },
+
+  update: (id, planData) => {
+    return axiosInstance.put(`/ServicePlans/${id}`, planData);
+  },
+
+  delete: (id) => {
+    return axiosInstance.delete(`/ServicePlans/${id}`);
+  },
+
+  toggleStatus: (id) => {
+    return axiosInstance.patch(`/ServicePlans/${id}/toggle-status`);
+  },
+};
+
 // QR Code API
 export const qrCodesAPI = {
   // Generate QR code for instant charging

@@ -1,19 +1,6 @@
 import { create } from "zustand";
-import axiosInstance, * as api from "../services/api";
+import { reviewsAPI } from "../services/api";
 import useAuthStore from "./authStore";
-
-const reviewsAPI =
-  api.reviewsAPI && typeof api.reviewsAPI === "object"
-    ? api.reviewsAPI
-    : {
-        getStationReviews: (stationId, params = {}) =>
-          axiosInstance.get(`/reviews/station/${stationId}`, { params }),
-        getStationSummary: (stationId) =>
-          axiosInstance.get(`/reviews/station/${stationId}/summary`),
-        create: (payload) => axiosInstance.post("/reviews", payload),
-        update: (reviewId, payload) =>
-          axiosInstance.put(`/reviews/${reviewId}`, payload),
-      };
 
 const normalizeReview = (review) => {
   if (!review) {

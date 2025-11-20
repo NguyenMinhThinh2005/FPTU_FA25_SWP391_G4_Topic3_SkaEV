@@ -1,7 +1,5 @@
 import { create } from 'zustand';
-import axios from 'axios';
-
-const API_URL = 'http://localhost:5000/api';
+import { incidentsAPI } from '../services/api';
 
 const incidentStore = create((set, get) => ({
   incidents: [],
@@ -11,7 +9,7 @@ const incidentStore = create((set, get) => ({
   error: null,
   filters: {
     status: null,
-    severity: null,
+    priority: null,
     stationId: null
   },
 
@@ -19,14 +17,15 @@ const incidentStore = create((set, get) => ({
   fetchIncidents: async () => {
     set({ isLoading: true, error: null });
     try {
-      const { status, severity, stationId } = get().filters;
-      const params = new URLSearchParams();
-      if (status) params.append('status', status);
-      if (severity) params.append('severity', severity);
-      if (stationId) params.append('stationId', stationId);
+      const { status, priority, stationId } = get().filters;
+      const params = {};
+      if (status) params.status = status;
+      if (priority) params.priority = priority;
+      if (stationId) params.stationId = stationId;
 
-      const response = await axios.get(`${API_URL}/incident?${params.toString()}`);
-      set({ incidents: response.data, isLoading: false });
+      const response = await incidentsAPI.getAll(params);
+      // Backend returns { data: [], pagination: {} }
+      set({ incidents: response.data || [], isLoading: false });
     } catch (error) {
       set({ error: error.message, isLoading: false });
       console.error('Error fetching incidents:', error);
@@ -37,8 +36,8 @@ const incidentStore = create((set, get) => ({
   fetchIncidentById: async (id) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await axios.get(`${API_URL}/incident/${id}`);
-      set({ selectedIncident: response.data, isLoading: false });
+      const response = await incidentsAPI.getById(id);
+      set({ selectedIncident: response, isLoading: false });
     } catch (error) {
       set({ error: error.message, isLoading: false });
       console.error('Error fetching incident:', error);
@@ -49,8 +48,8 @@ const incidentStore = create((set, get) => ({
   fetchIncidentsByStation: async (stationId) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await axios.get(`${API_URL}/incident/station/${stationId}`);
-      set({ incidents: response.data, isLoading: false });
+      const response = await incidentsAPI.getAll({ stationId });
+      set({ incidents: response.data || [], isLoading: false });
     } catch (error) {
       set({ error: error.message, isLoading: false });
       console.error('Error fetching station incidents:', error);
@@ -61,10 +60,10 @@ const incidentStore = create((set, get) => ({
   createIncident: async (incidentData) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await axios.post(`${API_URL}/incident`, incidentData);
+      const response = await incidentsAPI.create(incidentData);
       await get().fetchIncidents(); // Refresh list
       set({ isLoading: false });
-      return response.data;
+      return response;
     } catch (error) {
       set({ error: error.message, isLoading: false });
       console.error('Error creating incident:', error);
@@ -76,10 +75,10 @@ const incidentStore = create((set, get) => ({
   updateIncident: async (id, updateData) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await axios.put(`${API_URL}/incident/${id}`, updateData);
+      const response = await incidentsAPI.update(id, updateData);
       await get().fetchIncidents(); // Refresh list
-      set({ selectedIncident: response.data, isLoading: false });
-      return response.data;
+      set({ selectedIncident: response, isLoading: false });
+      return response;
     } catch (error) {
       set({ error: error.message, isLoading: false });
       console.error('Error updating incident:', error);
@@ -91,9 +90,9 @@ const incidentStore = create((set, get) => ({
   fetchStats: async (stationId = null) => {
     set({ isLoading: true, error: null });
     try {
-      const params = stationId ? `?stationId=${stationId}` : '';
-      const response = await axios.get(`${API_URL}/incident/stats${params}`);
-      set({ stats: response.data, isLoading: false });
+      const params = stationId ? { stationId } : {};
+      const response = await incidentsAPI.getStatistics(params);
+      set({ stats: response, isLoading: false });
     } catch (error) {
       set({ error: error.message, isLoading: false });
       console.error('Error fetching stats:', error);
@@ -108,7 +107,7 @@ const incidentStore = create((set, get) => ({
 
   // Clear filters
   clearFilters: () => {
-    set({ filters: { status: null, severity: null, stationId: null } });
+    set({ filters: { status: null, priority: null, stationId: null } });
     get().fetchIncidents();
   },
 

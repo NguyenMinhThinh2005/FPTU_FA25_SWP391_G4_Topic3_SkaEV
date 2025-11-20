@@ -24,10 +24,10 @@ const HomePage = () => {
   const navigate = useNavigate();
   const { isAuthenticated, user } = useAuthStore();
   const [stats, setStats] = useState([
-    { label: "Trạm sạc đang hoạt động", value: "30", color: "primary" },
-    { label: "Khách hàng đăng ký", value: "1,000+", color: "success" },
-    { label: "Lượt sạc thành công", value: "20,000+", color: "warning" },
-    { label: "Độ tin cậy hệ thống", value: "99.8%", color: "secondary" },
+    { label: "Trạm sạc đang hoạt động", value: "0", color: "primary" },
+    { label: "Khách hàng đăng ký", value: "0", color: "success" },
+    { label: "Lượt sạc thành công", value: "0", color: "warning" },
+    { label: "Độ tin cậy hệ thống", value: "0%", color: "secondary" },
   ]);
 
   // Fetch real statistics from API

@@ -22,9 +22,6 @@ import ForgotPassword from "./pages/auth/ForgotPassword";
 
 // Public Pages
 import HomePage from "./pages/public/Home";
-// Test and Demo Pages
-import TestPage from "./pages/TestPage";
-import DateTimePickerDemo from "./pages/DateTimePickerDemo";
 import CUSTOMER_ROUTES, { PAYMENT_ROUTES } from "./routes/customerRoutes";
 
 // Staff Pages
@@ -112,8 +109,6 @@ function App() {
             <Routes>
               {/* Public Routes */}
               <Route path="/" element={<HomePage />} />
-              <Route path="/test" element={<TestPage />} />
-              <Route path="/datetime-demo" element={<DateTimePickerDemo />} />
               <Route
                 path="/login"
                 element={
