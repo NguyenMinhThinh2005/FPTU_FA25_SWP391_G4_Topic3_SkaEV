@@ -131,12 +131,14 @@ export const useAdminDashboard = () => {
       setIsRefreshing(true);
       setError(null);
       
-      // Simulate refresh delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Refetch all data
+      const [usersResponse, bookingsResponse] = await Promise.all([
+        adminAPI.getAllUsers().catch(() => ({ data: [] })),
+        staffAPI.getBookingsHistory().catch(() => ({ data: [] }))
+      ]);
       
-      // In real app, this would refetch data from API
-      // await refetchStations();
-      // await refetchBookings();
+      setUsers(usersResponse.data || []);
+      setBookings(bookingsResponse.data || []);
       
       console.log('Dashboard data refreshed');
     } catch (err) {
