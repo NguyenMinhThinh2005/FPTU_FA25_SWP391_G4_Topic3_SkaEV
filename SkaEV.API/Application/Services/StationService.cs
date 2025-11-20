@@ -262,10 +262,27 @@ public class StationService : IStationService
             var existingSlots = existingPosts.SelectMany(post => post.ChargingSlots).ToList();
             if (existingSlots.Count > 0)
             {
-                _context.ChargingSlots.RemoveRange(existingSlots);
+                // Soft-delete existing slots instead of hard removing them
+                var now = DateTime.UtcNow;
+                foreach (var slot in existingSlots)
+                {
+                    slot.DeletedAt = now;
+                    slot.Status = "inactive";
+                    slot.UpdatedAt = now;
+                }
             }
 
-            _context.ChargingPosts.RemoveRange(existingPosts);
+            // Soft-delete existing posts
+            var nowPosts = DateTime.UtcNow;
+            foreach (var post in existingPosts)
+            {
+                post.DeletedAt = nowPosts;
+                post.Status = "inactive";
+                post.UpdatedAt = nowPosts;
+                // mark child slots as inactive as well (already done above for slots)
+            }
+
+            // Clear navigation collection so new posts can be added to station.ChargingPosts
             station.ChargingPosts.Clear();
             await _context.SaveChangesAsync();
         }
@@ -729,7 +746,10 @@ public class StationService : IStationService
         var station = await _context.ChargingStations.FindAsync(stationId);
         if (station == null) return false;
 
-        _context.ChargingStations.Remove(station);
+        // Use soft-delete to preserve related data (bookings, invoices, etc.)
+        // and to avoid referential integrity exceptions when bookings exist.
+        station.DeletedAt = DateTime.UtcNow;
+        station.Status = "inactive";
         await _context.SaveChangesAsync();
         return true;
     }

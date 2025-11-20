@@ -57,7 +57,7 @@ public class SlotService : ISlotService
             throw new ArgumentException("Post not found");
 
         var slots = new List<ChargingSlot>();
-        
+
         // Create a single slot (current schema doesn't support time-based scheduling)
         var slot = new ChargingSlot
         {
@@ -72,11 +72,11 @@ public class SlotService : ISlotService
 
         slots.Add(slot);
         _context.ChargingSlots.AddRange(slots);
-        
+
         // Update post slot counts
         post.TotalSlots += slots.Count;
         post.AvailableSlots += slots.Count;
-        
+
         await _context.SaveChangesAsync();
 
         _logger.LogInformation("Created {Count} slots for post {PostId}", slots.Count, createDto.PostId);
@@ -106,7 +106,7 @@ public class SlotService : ISlotService
             var validStatuses = new[] { "available", "occupied", "reserved", "maintenance" };
             if (!validStatuses.Contains(updateDto.Status))
                 throw new ArgumentException("Invalid status");
-            
+
             slot.Status = updateDto.Status;
         }
 
@@ -131,18 +131,35 @@ public class SlotService : ISlotService
         if (slot.Status == "occupied" || slot.Status == "reserved")
             throw new ArgumentException("Cannot delete slot that is in use");
 
+        // Prevent deleting a slot with any bookings (preserve historical bookings)
+        var hasBookings = await _context.Bookings
+            .Where(b => b.SlotId == slotId)
+            .AnyAsync();
+
+        if (hasBookings)
+            throw new ArgumentException("Cannot delete slot that has bookings. Archive slot or remove bookings first.");
+
         var post = slot.ChargingPost;
-        
-        _context.ChargingSlots.Remove(slot);
-        
+
+        // Soft-delete slot instead of hard removing
+        var utcNow = DateTime.UtcNow;
+        slot.DeletedAt = utcNow;
+        var wasAvailable = slot.Status == "available";
+        slot.Status = "inactive";
+        slot.UpdatedAt = utcNow;
+
         // Update post slot counts
-        post.TotalSlots--;
-        if (slot.Status == "available")
-            post.AvailableSlots--;
-        
+        if (post != null)
+        {
+            post.TotalSlots = Math.Max(0, post.TotalSlots - 1);
+            if (wasAvailable)
+                post.AvailableSlots = Math.Max(0, post.AvailableSlots - 1);
+            post.UpdatedAt = utcNow;
+        }
+
         await _context.SaveChangesAsync();
 
-        _logger.LogInformation("Deleted slot {SlotId}", slotId);
+        _logger.LogInformation("Soft-deleted slot {SlotId}", slotId);
     }
 
     public async Task<SlotDto> ToggleSlotBlockAsync(int slotId, bool isBlocked, string? reason)
@@ -182,7 +199,7 @@ public class SlotService : ISlotService
             .ToListAsync();
 
         var availabilityByDate = new Dictionary<string, int>();
-        
+
         // Current schema doesn't support time-based scheduling
         // Return current availability
         var currentDate = DateTime.UtcNow.Date;
@@ -208,7 +225,7 @@ public class SlotService : ISlotService
 
         var slots = new List<ChargingSlot>();
         var currentDate = bulkDto.StartDate.Date;
-        
+
         // Create slots for each day in the range
         while (currentDate <= bulkDto.EndDate.Date)
         {
@@ -222,17 +239,17 @@ public class SlotService : ISlotService
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
-            
+
             slots.Add(slot);
             currentDate = currentDate.AddDays(1);
         }
 
         _context.ChargingSlots.AddRange(slots);
-        
+
         // Update post slot counts
         post.TotalSlots += slots.Count;
         post.AvailableSlots += slots.Count;
-        
+
         await _context.SaveChangesAsync();
 
         _logger.LogInformation("Bulk created {Count} slots for post {PostId}", slots.Count, bulkDto.PostId);

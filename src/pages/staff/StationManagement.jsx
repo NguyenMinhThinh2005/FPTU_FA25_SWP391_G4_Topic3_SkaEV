@@ -554,13 +554,13 @@ const StationManagement = () => {
         >
           <DialogTitle>Xác nhận xóa</DialogTitle>
           <DialogContent>
-            <Alert severity="warning" sx={{ mb: 2 }}>
-              Hành động này không thể hoàn tác!
-            </Alert>
-            <Typography>
-              Bạn có chắc chắn muốn xóa trạm{" "}
-              <strong>{deleteDialog.station?.name}</strong>?
-            </Typography>
+              <Alert severity="warning" sx={{ mb: 2 }}>
+                Hành động này sẽ đưa trạm vào trạng thái đã xóa (lưu trữ) — có thể khôi phục được từ trang quản trị.
+              </Alert>
+              <Typography>
+                Bạn có chắc chắn muốn xóa (lưu trữ) trạm{" "}
+                <strong>{deleteDialog.station?.name}</strong>?
+              </Typography>
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setDeleteDialog({ open: false, station: null })}>

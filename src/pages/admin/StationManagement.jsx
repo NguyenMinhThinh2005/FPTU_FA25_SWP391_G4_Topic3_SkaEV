@@ -791,8 +791,8 @@ const StationManagement = () => {
       {/* Delete Confirmation Dialog */}
       <ConfirmDialog
         open={deleteDialog.open}
-        title="Xác nhận xóa"
-        message={`Bạn có chắc chắn muốn xóa trạm sạc "${deleteDialog.stationName}"? Hành động này không thể hoàn tác.`}
+        title="Xác nhận xóa (lưu trữ)"
+        message={`Hành động này sẽ lưu trữ trạm sạc "${deleteDialog.stationName}" (soft-delete). Trạm có thể được khôi phục từ trang quản trị nếu cần.`}
         onConfirm={handleDeleteConfirm}
         onCancel={() => setDeleteDialog({ open: false, stationId: null, stationName: "" })}
       />

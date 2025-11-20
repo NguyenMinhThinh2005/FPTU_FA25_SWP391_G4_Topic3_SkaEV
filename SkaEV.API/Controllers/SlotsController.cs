@@ -171,7 +171,8 @@ public class SlotsController : ControllerBase
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(new { message = ex.Message });
+            // Business rule prevented deletion (e.g., has bookings) -> Conflict
+            return Conflict(new { message = ex.Message });
         }
         catch (Exception ex)
         {

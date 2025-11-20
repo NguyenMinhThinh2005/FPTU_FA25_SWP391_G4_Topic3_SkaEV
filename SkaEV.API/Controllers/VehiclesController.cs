@@ -84,7 +84,7 @@ public class VehiclesController : ControllerBase
         {
             var userId = GetUserId();
             var vehicle = await _vehicleService.CreateVehicleAsync(userId, createDto);
-            
+
             return CreatedAtAction(
                 nameof(GetVehicle),
                 new { id = vehicle.VehicleId },
@@ -154,6 +154,10 @@ public class VehiclesController : ControllerBase
 
             await _vehicleService.DeleteVehicleAsync(id);
             return NoContent();
+        }
+        catch (ArgumentException ex)
+        {
+            return Conflict(new { message = ex.Message });
         }
         catch (Exception ex)
         {

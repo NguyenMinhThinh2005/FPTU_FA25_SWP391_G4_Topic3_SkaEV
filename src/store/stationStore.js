@@ -688,27 +688,27 @@ const useStationStore = create((set, get) => ({
     }
   },
 
-  // Delete station (Admin only)
+  // Delete station (Admin only) — use admin API to perform a soft-delete
   deleteStation: async (stationId) => {
     set({ loading: true, error: null });
     try {
-      const response = await stationsAPI.delete(stationId);
+      // Use admin endpoint to avoid hard-delete foreign key conflicts
+      const response = await adminStationAPI.deleteStation(stationId);
 
-      if (response.success) {
+      if (response && (response.success === true || response === true)) {
         set((state) => ({
-          stations: state.stations.filter(
-            (station) => station.id !== stationId
-          ),
+          stations: state.stations.filter((station) => station.id !== stationId),
           loading: false,
         }));
 
-        console.log("✅ Station deleted:", stationId);
+        console.log("✅ Station soft-deleted via admin API:", stationId);
         return { success: true };
       } else {
-        throw new Error(response.message || "Không thể xóa trạm");
+        throw new Error(response?.message || "Không thể xóa trạm");
       }
     } catch (error) {
-      const errorMessage = error.message || "Đã xảy ra lỗi khi xóa trạm";
+      const errorMessage = error?.message || "Đã xảy ra lỗi khi xóa trạm";
+      console.error("❌ deleteStation error:", error);
       set({ error: errorMessage, loading: false });
       return { success: false, error: errorMessage };
     }

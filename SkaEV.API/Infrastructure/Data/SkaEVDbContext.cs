@@ -183,6 +183,9 @@ public class SkaEVDbContext : DbContext
             entity.Property(e => e.Status).HasColumnName("status").HasMaxLength(50).IsRequired();
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").IsRequired();
             entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").IsRequired();
+            entity.Property(e => e.DeletedAt).HasColumnName("deleted_at");
+
+            entity.HasQueryFilter(e => e.DeletedAt == null); // Global query filter for soft delete
 
             entity.HasOne(e => e.ChargingStation)
                 .WithMany(s => s.ChargingPosts)
@@ -203,6 +206,9 @@ public class SkaEVDbContext : DbContext
             entity.Property(e => e.CurrentBookingId).HasColumnName("current_booking_id");
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").IsRequired();
             entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").IsRequired();
+            entity.Property(e => e.DeletedAt).HasColumnName("deleted_at");
+
+            entity.HasQueryFilter(e => e.DeletedAt == null); // Global query filter for soft delete
 
             entity.HasOne(e => e.ChargingPost)
                 .WithMany(p => p.ChargingSlots)
@@ -350,11 +356,14 @@ public class SkaEVDbContext : DbContext
             entity.Property(e => e.IsRead).HasColumnName("is_read");
             entity.Property(e => e.RelatedBookingId).HasColumnName("related_booking_id");
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").IsRequired();
+            entity.Property(e => e.DeletedAt).HasColumnName("deleted_at");
 
             entity.HasOne(e => e.User)
                 .WithMany(u => u.Notifications)
                 .HasForeignKey(e => e.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasQueryFilter(e => e.DeletedAt == null);
         });
 
         // SystemLog configuration
@@ -389,6 +398,7 @@ public class SkaEVDbContext : DbContext
             entity.Property(e => e.Comment).HasColumnName("comment");
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").IsRequired();
             entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").IsRequired();
+            entity.Property(e => e.DeletedAt).HasColumnName("deleted_at");
 
             entity.HasOne(e => e.Booking)
                 .WithOne(b => b.Review)
@@ -404,6 +414,8 @@ public class SkaEVDbContext : DbContext
                 .WithMany(s => s.Reviews)
                 .HasForeignKey(e => e.StationId)
                 .OnDelete(DeleteBehavior.NoAction);
+
+            entity.HasQueryFilter(e => e.DeletedAt == null);
         });
 
         // PricingRule configuration

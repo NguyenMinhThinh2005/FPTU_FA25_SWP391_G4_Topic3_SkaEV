@@ -100,10 +100,12 @@ public class VehicleService : IVehicleService
         if (vehicle == null)
             throw new ArgumentException("Vehicle not found");
 
-        _context.Vehicles.Remove(vehicle);
+        // Soft-delete vehicle to preserve historical bookings
+        vehicle.DeletedAt = DateTime.UtcNow;
+        vehicle.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
 
-        _logger.LogInformation("Deleted vehicle {VehicleId}", vehicleId);
+        _logger.LogInformation("Soft-deleted vehicle {VehicleId}", vehicleId);
     }
 
     public async Task<VehicleDto> SetDefaultVehicleAsync(int vehicleId, int userId)

@@ -139,10 +139,12 @@ public class ReviewService : IReviewService
         if (review == null)
             throw new ArgumentException("Review not found");
 
-        _context.Reviews.Remove(review);
+        // Soft-delete instead of hard remove to preserve history
+        review.DeletedAt = DateTime.UtcNow;
+        review.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
 
-        _logger.LogInformation("Deleted review {ReviewId}", reviewId);
+        _logger.LogInformation("Soft-deleted review {ReviewId}", reviewId);
     }
 
     public async Task<StationRatingSummaryDto> GetStationRatingSummaryAsync(int stationId)

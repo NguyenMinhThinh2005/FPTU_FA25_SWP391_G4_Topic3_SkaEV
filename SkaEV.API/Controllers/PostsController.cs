@@ -99,7 +99,7 @@ public class PostsController : ControllerBase
         try
         {
             var post = await _postService.CreatePostAsync(createDto);
-            
+
             return CreatedAtAction(
                 nameof(GetPost),
                 new { id = post.PostId },
@@ -165,6 +165,11 @@ public class PostsController : ControllerBase
 
             await _postService.DeletePostAsync(id);
             return NoContent();
+        }
+        catch (ArgumentException ex)
+        {
+            // Business rule prevented deletion (e.g., has bookings) -> Conflict
+            return Conflict(new { message = ex.Message });
         }
         catch (Exception ex)
         {
