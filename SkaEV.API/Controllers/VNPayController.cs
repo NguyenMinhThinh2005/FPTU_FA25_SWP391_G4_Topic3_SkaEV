@@ -1,5 +1,8 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Primitives;
 using SkaEV.API.Application.DTOs.Payments;
 using SkaEV.API.Application.Services.Payments;
 
@@ -19,79 +22,54 @@ public class VNPayController : ControllerBase
     }
 
     [HttpPost("create-payment-url")]
-    [Authorize]
-    public async Task<IActionResult> CreatePaymentUrl([FromBody] VNPayCreatePaymentDto request)
+    [Authorize(Roles = "customer")]
+    public async Task<IActionResult> CreatePaymentUrl([FromBody] VnpayCreatePaymentRequestDto request, CancellationToken cancellationToken)
     {
-        try
-        {
-            var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "127.0.0.1";
-            var result = await _vnpayService.CreatePaymentUrlAsync(request, ipAddress);
-            return Ok(new { success = true, data = result });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error creating VNPay payment URL");
-            return BadRequest(new { success = false, message = ex.Message });
-        }
+        var userId = GetUserId();
+        var result = await _vnpayService.CreatePaymentUrlAsync(request, userId, cancellationToken);
+        return Ok(result);
     }
 
-    [HttpGet("vnpay-return")]
-    [AllowAnonymous]
-    public async Task<IActionResult> VNPayReturn()
-    {
-        try
-        {
-            var vnpayData = Request.Query.ToDictionary(q => q.Key, q => q.Value.ToString());
-            var result = await _vnpayService.ProcessReturnUrlCallbackAsync(vnpayData);
-
-            var frontendUrl = result.Success
-                ? $"http://localhost:5173/payment/success?txnRef={result.TransactionRef}"
-                : $"http://localhost:5173/payment/failed?message={result.ResponseMessage}";
-
-            return Redirect(frontendUrl);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error processing VNPay callback");
-            return Redirect("http://localhost:5173/payment/failed?message=Error");
-        }
-    }
-
-    /// <summary>
-    /// Verify VNPay payment return (for frontend verification)
-    /// Returns JSON result instead of redirect
-    /// </summary>
     [HttpGet("verify-return")]
     [AllowAnonymous]
-    public async Task<IActionResult> VerifyReturn()
+    public async Task<IActionResult> VerifyReturn(CancellationToken cancellationToken)
     {
-        try
-        {
-            var vnpayData = Request.Query.ToDictionary(q => q.Key, q => q.Value.ToString());
-            
-            _logger.LogInformation("Verifying VNPay return with {Count} parameters", vnpayData.Count);
-            
-            var result = await _vnpayService.ProcessReturnUrlCallbackAsync(vnpayData);
+        var verification = await _vnpayService.VerifyAsync(Request.Query, VnpayCallbackSource.Return, cancellationToken);
+        return Ok(verification);
+    }
 
-            return Ok(new
-            {
-                success = result.Success,
-                transactionRef = result.TransactionRef,
-                transactionNo = result.TransactionNo,
-                amount = result.Amount,
-                bankCode = result.BankCode,
-                responseCode = result.ResponseCode,
-                message = result.ResponseMessage
-            });
-        }
-        catch (Exception ex)
+    [HttpGet("ipn")]
+    [AllowAnonymous]
+    public Task<IActionResult> ReceiveIpnGet(CancellationToken cancellationToken)
+        => HandleIpnAsync(Request.Query, cancellationToken);
+
+    [HttpPost("ipn")]
+    [AllowAnonymous]
+    public async Task<IActionResult> ReceiveIpnPost(CancellationToken cancellationToken)
+    {
+        IQueryCollection payload = Request.HasFormContentType && Request.Form.Count > 0
+            ? new QueryCollection(Request.Form.ToDictionary(kvp => kvp.Key, kvp => kvp.Value))
+            : Request.Query;
+
+        return await HandleIpnAsync(payload, cancellationToken);
+    }
+
+    private async Task<IActionResult> HandleIpnAsync(IQueryCollection parameters, CancellationToken cancellationToken)
+    {
+        var verification = await _vnpayService.VerifyAsync(parameters, VnpayCallbackSource.Ipn, cancellationToken);
+        var rspCode = verification.Success ? "00" : verification.ResponseCode ?? "99";
+        var message = verification.Success ? "Confirm Success" : verification.Message;
+        return Ok(new { RspCode = rspCode, Message = message });
+    }
+
+    private int GetUserId()
+    {
+        var claim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (int.TryParse(claim, out var userId))
         {
-            _logger.LogError(ex, "Error verifying VNPay return");
-            return Ok(new
-            {
-                success = false,
-                message = ex.Message
-            });
+            return userId;
         }
+
+        throw new InvalidOperationException("Missing authenticated user identifier");
     }
 }

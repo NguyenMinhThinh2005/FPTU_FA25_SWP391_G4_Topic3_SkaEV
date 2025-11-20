@@ -10,6 +10,7 @@ using SkaEV.API.Application.Services.Payments;
 // using SkaEV.API.Hubs; // Temporarily commented out
 using Serilog;
 using Serilog.Events;
+using VNPAY.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -135,6 +136,7 @@ builder.Services.AddScoped<ISlotService, SlotService>();
 builder.Services.AddScoped<IUserProfileService, UserProfileService>();
 builder.Services.AddScoped<IAdminUserService, AdminUserService>();
 builder.Services.AddScoped<IIssueService, IssueService>(); // Optional - requires 08_ADD_ISSUES_TABLE.sql
+builder.Services.AddScoped<IVNPayService, VNPayService>();
 
 // Additional admin and analytics services
 builder.Services.AddScoped<IncidentService>(); // Incident management service
@@ -144,9 +146,10 @@ builder.Services.AddScoped<IAdminStationManagementService, AdminStationManagemen
 // Maps Service with HttpClient
 builder.Services.AddHttpClient<IMapsService, MapsService>();
 
+builder.Services.AddVnpayClient(options => builder.Configuration.GetSection("VNPay").Bind(options));
+
 // Payment Services
 builder.Services.AddScoped<SkaEV.API.Application.Services.Payments.IPaymentProcessor, SkaEV.API.Application.Services.Payments.SimulatedPaymentProcessor>();
-builder.Services.AddScoped<SkaEV.API.Application.Services.Payments.IVNPayService, SkaEV.API.Application.Services.Payments.VNPayService>();
 
 // Background Simulation Services (for student project demo)
 builder.Services.AddHostedService<SkaEV.API.Services.ChargingSimulationService>();

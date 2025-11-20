@@ -1,195 +1,300 @@
 using System.Globalization;
-using System.Security.Cryptography;
 using System.Text;
-using System.Web;
-using SkaEV.API.Application.DTOs.Payments;
-using SkaEV.API.Infrastructure.Data;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using SkaEV.API.Application.Constants;
+using SkaEV.API.Application.DTOs.Payments;
+using SkaEV.API.Domain.Entities;
+using SkaEV.API.Infrastructure.Data;
+using VNPAY;
+using VNPAY.Models;
+using VNPAY.Models.Enums;
+using VNPAY.Models.Exceptions;
 
 namespace SkaEV.API.Application.Services.Payments;
 
+public enum VnpayCallbackSource
+{
+    Return,
+    Ipn
+}
+
 public interface IVNPayService
 {
-    Task<VNPayPaymentUrlDto> CreatePaymentUrlAsync(VNPayCreatePaymentDto request, string ipAddress);
-    Task<VNPayPaymentResultDto> ProcessReturnUrlCallbackAsync(Dictionary<string, string> vnpayData);
-    bool ValidateSignature(Dictionary<string, string> vnpayData, string secureHash);
+    Task<VnpayPaymentUrlDto> CreatePaymentUrlAsync(VnpayCreatePaymentRequestDto request, int userId, CancellationToken cancellationToken = default);
+    Task<VnpayVerificationResultDto> VerifyAsync(IQueryCollection parameters, VnpayCallbackSource source, CancellationToken cancellationToken = default);
 }
 
 public class VNPayService : IVNPayService
 {
-    private readonly IConfiguration _configuration;
-    private readonly ILogger<VNPayService> _logger;
     private readonly SkaEVDbContext _context;
+    private readonly IVnpayClient _vnpayClient;
+    private readonly ILogger<VNPayService> _logger;
 
-    private string VnpTmnCode => _configuration["VNPay:TmnCode"] ?? "DEMO_TMN";
-    private string VnpHashSecret => _configuration["VNPay:HashSecret"] ?? "DEMO_HASH_SECRET";
-    private string VnpUrl => _configuration["VNPay:Url"] ?? "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html";
-    private string VnpReturnUrl => _configuration["VNPay:ReturnUrl"] ?? "http://localhost:5173/payment/vnpay-return";
-
-    public VNPayService(IConfiguration configuration, ILogger<VNPayService> logger, SkaEVDbContext context)
+    public VNPayService(SkaEVDbContext context, IVnpayClient vnpayClient, ILogger<VNPayService> logger)
     {
-        _configuration = configuration;
-        _logger = logger;
         _context = context;
+        _vnpayClient = vnpayClient;
+        _logger = logger;
     }
 
-    public async Task<VNPayPaymentUrlDto> CreatePaymentUrlAsync(VNPayCreatePaymentDto request, string ipAddress)
+    public async Task<VnpayPaymentUrlDto> CreatePaymentUrlAsync(VnpayCreatePaymentRequestDto request, int userId, CancellationToken cancellationToken = default)
     {
-        var invoice = await _context.Invoices.FindAsync(request.InvoiceId);
-        if (invoice == null)
-            throw new ArgumentException($"Invoice {request.InvoiceId} not found");
+        var invoice = await _context.Invoices.FirstOrDefaultAsync(i => i.InvoiceId == request.InvoiceId, cancellationToken)
+            ?? throw new KeyNotFoundException("Invoice not found");
 
-        if (invoice.PaymentStatus == "paid")
-            throw new InvalidOperationException($"Invoice {request.InvoiceId} is already paid");
-
-        var txnRef = $"INV{request.InvoiceId}_{DateTime.Now:yyyyMMddHHmmss}";
-        
-        // Ensure minimum amount for VNPay Sandbox (5,000 VND)
-        // Note: This is ONLY for VNPay gateway requirement. Invoice amount remains unchanged in database.
-        var actualAmount = request.Amount;
-        var vnpayMinAmount = actualAmount < 5000 ? 5000 : actualAmount;
-        var vnpayAmount = ((long)(vnpayMinAmount * 100)).ToString();
-        
-        _logger.LogInformation("Invoice {InvoiceId}: Actual amount = {ActualAmount} VND, VNPay amount = {VNPayAmount} VND", 
-            request.InvoiceId, actualAmount, vnpayMinAmount);
-
-        var vnpayData = new SortedDictionary<string, string>
+        if (invoice.UserId != userId)
         {
-            { "vnp_Version", "2.1.0" },
-            { "vnp_Command", "pay" },
-            { "vnp_TmnCode", VnpTmnCode },
-            { "vnp_Amount", vnpayAmount },
-            { "vnp_CurrCode", "VND" },
-            { "vnp_TxnRef", txnRef },
-            { "vnp_OrderInfo", request.OrderDescription },
-            { "vnp_OrderType", "other" },
-            { "vnp_Locale", "vn" },
-            { "vnp_ReturnUrl", VnpReturnUrl },
-            { "vnp_IpAddr", ipAddress },
-            { "vnp_CreateDate", DateTime.Now.ToString("yyyyMMddHHmmss") }
+            throw new UnauthorizedAccessException("Invoice does not belong to the current user");
+        }
+
+        if (invoice.PaymentStatus.Equals("paid", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Invoice already settled");
+        }
+
+        if (invoice.TotalAmount < 5000)
+        {
+            throw new InvalidOperationException("VNPay requires transactions >= 5,000 VND");
+        }
+
+        var payment = new Payment
+        {
+            InvoiceId = invoice.InvoiceId,
+            Amount = invoice.TotalAmount,
+            PaymentType = "vnpay",
+            Status = PaymentStatuses.Pending,
+            CreatedAt = DateTime.UtcNow
         };
 
-        if (!string.IsNullOrEmpty(request.BankCode))
-            vnpayData.Add("vnp_BankCode", request.BankCode);
+        _context.Payments.Add(payment);
+        await _context.SaveChangesAsync(cancellationToken);
 
-        var signData = string.Join("&", vnpayData.Select(kv => $"{kv.Key}={kv.Value}"));
-        var secureHash = HashHmac(VnpHashSecret, signData);
-        vnpayData.Add("vnp_SecureHash", secureHash);
-
-        var queryString = string.Join("&", vnpayData.Select(kv => $"{kv.Key}={HttpUtility.UrlEncode(kv.Value)}"));
-        var paymentUrl = $"{VnpUrl}?{queryString}";
-
-        _logger.LogInformation("Created VNPay payment URL for invoice {InvoiceId}", request.InvoiceId);
-
-        return new VNPayPaymentUrlDto { PaymentUrl = paymentUrl, TransactionRef = txnRef };
-    }
-
-    public async Task<VNPayPaymentResultDto> ProcessReturnUrlCallbackAsync(Dictionary<string, string> vnpayData)
-    {
-        var secureHash = vnpayData.GetValueOrDefault("vnp_SecureHash", string.Empty);
-        
-        if (!ValidateSignature(vnpayData, secureHash))
-            throw new InvalidOperationException("Invalid signature");
-
-        var result = ParseVNPayResponse(vnpayData);
-
-        if (result.Success)
-            await UpdateInvoicePaymentStatus(result);
-
-        return result;
-    }
-
-    public bool ValidateSignature(Dictionary<string, string> vnpayData, string secureHash)
-    {
-        var dataToHash = new SortedDictionary<string, string>(
-            vnpayData.Where(kv => kv.Key != "vnp_SecureHash" && kv.Key != "vnp_SecureHashType")
-                     .ToDictionary(kv => kv.Key, kv => kv.Value));
-
-        var signData = string.Join("&", dataToHash.Select(kv => $"{kv.Key}={kv.Value}"));
-        var computedHash = HashHmac(VnpHashSecret, signData);
-
-        return secureHash.Equals(computedHash, StringComparison.InvariantCultureIgnoreCase);
-    }
-
-    private VNPayPaymentResultDto ParseVNPayResponse(Dictionary<string, string> vnpayData)
-    {
-        var responseCode = vnpayData.GetValueOrDefault("vnp_ResponseCode", string.Empty);
-        var success = responseCode == "00";
-
-        var payDateStr = vnpayData.GetValueOrDefault("vnp_PayDate", string.Empty);
-        var payDate = DateTime.Now;
-        if (!string.IsNullOrEmpty(payDateStr) && payDateStr.Length == 14)
-            DateTime.TryParseExact(payDateStr, "yyyyMMddHHmmss", CultureInfo.InvariantCulture, DateTimeStyles.None, out payDate);
-
-        var amountStr = vnpayData.GetValueOrDefault("vnp_Amount", "0");
-        var amount = long.TryParse(amountStr, out var amountCents) ? amountCents / 100m : 0m;
-
-        return new VNPayPaymentResultDto
+        var vnpayRequest = new VnpayPaymentRequest
         {
-            Success = success,
-            TransactionRef = vnpayData.GetValueOrDefault("vnp_TxnRef", string.Empty),
-            TransactionNo = vnpayData.GetValueOrDefault("vnp_TransactionNo", string.Empty),
-            Amount = amount,
-            BankCode = vnpayData.GetValueOrDefault("vnp_BankCode", string.Empty),
-            BankTranNo = vnpayData.GetValueOrDefault("vnp_BankTranNo", string.Empty),
-            CardType = vnpayData.GetValueOrDefault("vnp_CardType", string.Empty),
-            PayDate = payDate,
-            ResponseCode = responseCode,
-            ResponseMessage = GetResponseMessage(responseCode)
+            Description = NormalizeDescription(request.Description, invoice),
+            Money = (double)invoice.TotalAmount,
+            BankCode = ParseBankCode(request.BankCode)
+        };
+
+        var paymentUrlDetail = _vnpayClient.CreatePaymentUrl(vnpayRequest);
+
+        payment.TransactionId = paymentUrlDetail.PaymentId.ToString();
+        payment.Notes = $"vnpay:{paymentUrlDetail.PaymentId}:{vnpayRequest.BankCode}";
+        await _context.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation("Generated VNPay URL for invoice {InvoiceId} and payment {PaymentId}", invoice.InvoiceId, payment.PaymentId);
+
+        return new VnpayPaymentUrlDto
+        {
+            InvoiceId = invoice.InvoiceId,
+            Amount = invoice.TotalAmount,
+            PaymentUrl = paymentUrlDetail.Url,
+            TransactionRef = paymentUrlDetail.PaymentId.ToString()
         };
     }
 
-    private async Task UpdateInvoicePaymentStatus(VNPayPaymentResultDto result)
+    public async Task<VnpayVerificationResultDto> VerifyAsync(IQueryCollection parameters, VnpayCallbackSource source, CancellationToken cancellationToken = default)
     {
-        var txnRef = result.TransactionRef;
-        if (string.IsNullOrEmpty(txnRef) || !txnRef.StartsWith("INV"))
-            return;
-
-        var parts = txnRef.Substring(3).Split('_');
-        if (parts.Length < 1 || !int.TryParse(parts[0], out var invoiceId))
-            return;
-
-        var invoice = await _context.Invoices.FindAsync(invoiceId);
-        if (invoice == null || invoice.PaymentStatus == "paid")
-            return;
-
-        invoice.PaymentMethod = $"VNPay - {result.BankCode}";
-        invoice.PaymentStatus = result.Success ? "paid" : "failed";
-        invoice.PaidAt = result.Success ? result.PayDate : null;
-        invoice.UpdatedAt = DateTime.UtcNow;
-
-        await _context.SaveChangesAsync();
-
-        _logger.LogInformation("Updated invoice {InvoiceId} payment status to {Status}", invoiceId, invoice.PaymentStatus);
-    }
-
-    private string HashHmac(string key, string data)
-    {
-        var keyBytes = Encoding.UTF8.GetBytes(key);
-        var dataBytes = Encoding.UTF8.GetBytes(data);
-
-        using var hmac = new HMACSHA512(keyBytes);
-        var hashBytes = hmac.ComputeHash(dataBytes);
-        return BitConverter.ToString(hashBytes).Replace("-", "").ToLower();
-    }
-
-    private string GetResponseMessage(string responseCode)
-    {
-        return responseCode switch
+        if (parameters == null || parameters.Count == 0)
         {
-            "00" => "Giao d?ch th�nh c�ng",
-            "07" => "Tr? ti?n th�nh c�ng. Giao d?ch b? nghi ng?",
-            "09" => "Th? ch?a ??ng k� InternetBanking",
-            "10" => "X�c th?c kh�ng ?�ng qu� 3 l?n",
-            "11" => "?� h?t h?n ch? thanh to�n",
-            "12" => "Th? b? kh�a",
-            "13" => "Sai m?t kh?u OTP",
-            "24" => "Kh�ch h�ng h?y giao d?ch",
-            "51" => "T�i kho?n kh�ng ?? s? d?",
-            "65" => "V??t qu� h?n m?c giao d?ch",
-            "75" => "Ng�n h�ng ?ang b?o tr�",
-            "79" => "Sai m?t kh?u thanh to�n qu� s? l?n quy ??nh",
-            _ => $"L?i kh�ng x�c ??nh: {responseCode}"
-        };
+            return new VnpayVerificationResultDto
+            {
+                Success = false,
+                Message = "Thiếu dữ liệu phản hồi từ VNPay",
+                ResponseCode = "99"
+            };
+        }
+
+        var transactionRef = parameters["vnp_TxnRef"].ToString();
+        var responseCode = parameters["vnp_ResponseCode"].ToString();
+        var amount = ParseAmount(parameters["vnp_Amount"].ToString());
+
+        try
+        {
+            var paymentResult = _vnpayClient.GetPaymentResult(parameters);
+            await MarkPaymentSuccessfulAsync(paymentResult, source, cancellationToken);
+
+            return new VnpayVerificationResultDto
+            {
+                Success = true,
+                Message = "Thanh toán thành công",
+                TransactionRef = transactionRef,
+                TransactionNo = paymentResult.VnpayTransactionId.ToString(),
+                Amount = amount ?? await ResolveAmountAsync(paymentResult.PaymentId.ToString(), cancellationToken),
+                BankCode = paymentResult.BankingInfor?.BankCode,
+                ResponseCode = responseCode
+            };
+        }
+        catch (VnpayException ex)
+        {
+            await MarkPaymentFailedAsync(transactionRef, ex.Message, responseCode, cancellationToken);
+
+            return new VnpayVerificationResultDto
+            {
+                Success = false,
+                Message = ex.Message ?? "Giao dịch không thành công",
+                TransactionRef = transactionRef,
+                ResponseCode = responseCode
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to verify VNPay {Source} callback for transaction {TransactionRef}", source, transactionRef);
+
+            return new VnpayVerificationResultDto
+            {
+                Success = false,
+                Message = "Không thể xác thực giao dịch",
+                TransactionRef = transactionRef,
+                ResponseCode = responseCode ?? "99"
+            };
+        }
+    }
+
+    private async Task MarkPaymentSuccessfulAsync(VnpayPaymentResult paymentResult, VnpayCallbackSource source, CancellationToken cancellationToken)
+    {
+        var transactionRef = paymentResult.PaymentId.ToString();
+        var payment = await _context.Payments
+            .Include(p => p.Invoice)
+            .FirstOrDefaultAsync(p => p.TransactionId == transactionRef, cancellationToken);
+
+        if (payment == null)
+        {
+            _logger.LogWarning("VNPay callback received for unknown transaction {TransactionRef}", transactionRef);
+            return;
+        }
+
+        if (payment.Status == PaymentStatuses.Completed)
+        {
+            _logger.LogInformation("VNPay transaction {TransactionRef} already settled", transactionRef);
+            return;
+        }
+
+        payment.Status = PaymentStatuses.Completed;
+        payment.ProcessedAt = DateTime.UtcNow;
+        payment.Notes = $"vnpay:{source}:{paymentResult.BankingInfor?.BankCode}";
+
+        var invoice = payment.Invoice ?? await _context.Invoices.FirstOrDefaultAsync(i => i.InvoiceId == payment.InvoiceId, cancellationToken);
+        if (invoice != null)
+        {
+            invoice.PaymentStatus = "paid";
+            invoice.PaymentMethod = payment.PaymentType;
+            invoice.PaidAt = paymentResult.Timestamp;
+            invoice.UpdatedAt = DateTime.UtcNow;
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task MarkPaymentFailedAsync(string? transactionRef, string? reason, string? responseCode, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(transactionRef))
+        {
+            return;
+        }
+
+        var payment = await _context.Payments
+            .Include(p => p.Invoice)
+            .FirstOrDefaultAsync(p => p.TransactionId == transactionRef, cancellationToken);
+
+        if (payment == null)
+        {
+            _logger.LogWarning("VNPay reported failure for unknown transaction {TransactionRef}", transactionRef);
+            return;
+        }
+
+        payment.Status = PaymentStatuses.Failed;
+        payment.ProcessedAt = DateTime.UtcNow;
+        payment.Notes = $"vnpay:error:{responseCode}:{reason}";
+
+        if (payment.Invoice != null && !payment.Invoice.PaymentStatus.Equals("paid", StringComparison.OrdinalIgnoreCase))
+        {
+            payment.Invoice.PaymentStatus = "pending";
+            payment.Invoice.UpdatedAt = DateTime.UtcNow;
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    private static BankCode ParseBankCode(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return BankCode.ANY;
+        }
+
+        return Enum.TryParse(value.Trim(), true, out BankCode parsed) ? parsed : BankCode.ANY;
+    }
+
+    private static decimal? ParseAmount(string? rawAmount)
+    {
+        if (string.IsNullOrWhiteSpace(rawAmount))
+        {
+            return null;
+        }
+
+        if (long.TryParse(rawAmount, out var value))
+        {
+            return value / 100m;
+        }
+
+        return null;
+    }
+
+    private async Task<decimal> ResolveAmountAsync(string transactionRef, CancellationToken cancellationToken)
+    {
+        var payment = await _context.Payments.FirstOrDefaultAsync(p => p.TransactionId == transactionRef, cancellationToken);
+        return payment?.Amount ?? 0m;
+    }
+
+    private static string NormalizeDescription(string? description, Invoice invoice)
+    {
+        var baseText = string.IsNullOrWhiteSpace(description)
+            ? $"SkaEV invoice #{invoice.InvoiceId}"
+            : description.Trim();
+
+        var sanitized = RemoveDiacritics(baseText);
+        return sanitized.Length > 250 ? sanitized[..250] : sanitized;
+    }
+
+    private static string RemoveDiacritics(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "SkaEV payment";
+        }
+
+        var normalized = value.Normalize(NormalizationForm.FormD);
+        var builder = new StringBuilder(normalized.Length);
+
+        foreach (var ch in normalized)
+        {
+            var category = CharUnicodeInfo.GetUnicodeCategory(ch);
+            if (category == UnicodeCategory.NonSpacingMark)
+            {
+                continue;
+            }
+
+            if (ch < 128 && !char.IsControl(ch))
+            {
+                builder.Append(ch);
+            }
+            else if (char.IsWhiteSpace(ch))
+            {
+                builder.Append(' ');
+            }
+            else if (char.IsLetterOrDigit(ch))
+            {
+                builder.Append(ch);
+            }
+            else if (ch is '-' or '_' or '.' or '#')
+            {
+                builder.Append(ch);
+            }
+        }
+
+        var result = builder.ToString().Normalize(NormalizationForm.FormC).Trim();
+        return string.IsNullOrWhiteSpace(result) ? "SkaEV payment" : result;
     }
 }
