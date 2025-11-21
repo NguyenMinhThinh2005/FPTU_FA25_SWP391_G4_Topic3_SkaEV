@@ -49,12 +49,12 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
 
   // Debug: log station changes
   React.useEffect(() => {
-    console.log('📋 BookingModal received station:', {
+    console.log("📋 BookingModal received station:", {
       id: station?.id,
       name: station?.name,
       statsAvailable: station?.stats?.available,
       chargingAvailablePorts: station?.charging?.availablePorts,
-      connectorTypes: station?.charging?.connectorTypes
+      connectorTypes: station?.charging?.connectorTypes,
     });
   }, [station]);
 
@@ -146,43 +146,51 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
     }
 
     // Fallback: If no poles data, create types from connector types and stats
-    if (station?.charging?.connectorTypes && station.charging.connectorTypes.length > 0) {
+    if (
+      station?.charging?.connectorTypes &&
+      station.charging.connectorTypes.length > 0
+    ) {
       const types = [];
       const connectorTypes = station.charging.connectorTypes;
-      const availablePorts = station.stats?.available || station.charging?.availablePorts || 0;
-      
-      console.log('🔍 BookingModal - Creating fallback charging types:', {
+      const availablePorts =
+        station.stats?.available || station.charging?.availablePorts || 0;
+
+      console.log("🔍 BookingModal - Creating fallback charging types:", {
         stationId: station.id,
         stationName: station.name,
         connectorTypes,
         statsAvailable: station.stats?.available,
         chargingAvailablePorts: station.charging?.availablePorts,
-        finalAvailablePorts: availablePorts
+        finalAvailablePorts: availablePorts,
       });
-      
+
       // Distribute available ports evenly across connector types
       const portsPerType = Math.floor(availablePorts / connectorTypes.length);
       const remainder = availablePorts % connectorTypes.length;
-      
+
       connectorTypes.forEach((connector, index) => {
         const isDC = connector.includes("CCS") || connector.includes("CHAdeMO");
         const power = isDC ? 60 : 22; // Default DC: 60kW, AC: 22kW
         const portCount = portsPerType + (index < remainder ? 1 : 0);
-        
-        console.log(`  - Connector ${index}: ${connector}, isDC=${isDC}, portCount=${portCount}`);
-        
+
+        console.log(
+          `  - Connector ${index}: ${connector}, isDC=${isDC}, portCount=${portCount}`
+        );
+
         types.push({
           id: `${connector}-${power}`,
           type: isDC ? "DC" : "AC",
           power: power,
           voltage: isDC ? 400 : 230,
           connectorType: connector,
-          name: isDC ? `Sạc nhanh DC (${connector})` : `Sạc chậm AC (${connector})`,
-          rate: isDC ? (pricing.dcRate || 5000) : (pricing.acRate || 3500),
+          name: isDC
+            ? `Sạc nhanh DC (${connector})`
+            : `Sạc chậm AC (${connector})`,
+          rate: isDC ? pricing.dcRate || 5000 : pricing.acRate || 3500,
           availableCount: portCount,
         });
       });
-      
+
       return types;
     }
 
@@ -195,15 +203,18 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
 
     // FALLBACK: If using fallback data (has connectorType), create virtual ports
     if (selectedChargingType.connectorType) {
-      console.log('🔄 Creating virtual ports for fallback type:', selectedChargingType.name);
+      console.log(
+        "🔄 Creating virtual ports for fallback type:",
+        selectedChargingType.name
+      );
       const virtualPorts = [];
       const availableCount = selectedChargingType.availableCount || 0;
-      
+
       for (let i = 1; i <= availableCount; i++) {
         virtualPorts.push({
           id: `virtual-${selectedChargingType.connectorType}-${i}`,
           name: `Port ${i}`,
-          status: 'Available',
+          status: "Available",
           poleName: `Pole ${selectedChargingType.connectorType}`,
           poleId: `virtual-pole-${selectedChargingType.connectorType}`,
           power: selectedChargingType.power,
@@ -211,7 +222,7 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
           connectorType: selectedChargingType.connectorType,
         });
       }
-      
+
       console.log(`✅ Created ${virtualPorts.length} virtual ports`);
       return virtualPorts;
     }
@@ -1026,9 +1037,11 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
                     <Typography variant="body2" paragraph>
                       2. Phương thức Thanh toán
                       <br />
-                      SkaEV sử dụng cổng thanh toán VNPay để xử lý các giao dịch thanh toán.
+                      SkaEV sử dụng cổng thanh toán VNPay để xử lý các giao dịch
+                      thanh toán.
                       <br />
-                      Bạn có thể thanh toán qua các phương thức được hỗ trợ bởi VNPay:
+                      Bạn có thể thanh toán qua các phương thức được hỗ trợ bởi
+                      VNPay:
                       <br />
                       • Thẻ ATM nội địa (có đăng ký Internet Banking)
                       <br />
@@ -1038,35 +1051,43 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
                       <br />
                       • QR Code ngân hàng (VietQR)
                       <br />
-                      <strong>Lưu ý:</strong> Bạn không cần liên kết phương thức thanh toán trước.
-                      Thanh toán sẽ được thực hiện sau khi hoàn thành phiên sạc.
+                      <strong>Lưu ý:</strong> Bạn không cần liên kết phương thức
+                      thanh toán trước. Thanh toán sẽ được thực hiện sau khi
+                      hoàn thành phiên sạc.
                     </Typography>
                     <Typography variant="body2" paragraph>
                       3. Quy trình Thanh toán
                       <br />
-                      <strong>Bước 1:</strong> Sau khi phiên sạc kết thúc, hệ thống sẽ tự động tính toán
-                      tổng chi phí dựa trên lượng điện tiêu thụ thực tế (kWh) và đơn giá.
+                      <strong>Bước 1:</strong> Sau khi phiên sạc kết thúc, hệ
+                      thống sẽ tự động tính toán tổng chi phí dựa trên lượng
+                      điện tiêu thụ thực tế (kWh) và đơn giá.
                       <br />
-                      <strong>Bước 2:</strong> Hệ thống tạo hóa đơn điện tử và hiển thị thông tin thanh toán.
+                      <strong>Bước 2:</strong> Hệ thống tạo hóa đơn điện tử và
+                      hiển thị thông tin thanh toán.
                       <br />
-                      <strong>Bước 3:</strong> Bạn nhấn nút "Thanh toán" để được chuyển đến cổng thanh toán VNPay.
+                      <strong>Bước 3:</strong> Bạn nhấn nút "Thanh toán" để được
+                      chuyển đến cổng thanh toán VNPay.
                       <br />
-                      <strong>Bước 4:</strong> Tại cổng VNPay, chọn phương thức thanh toán phù hợp (thẻ ngân hàng,
-                      ví điện tử, QR Code) và hoàn tất giao dịch.
+                      <strong>Bước 4:</strong> Tại cổng VNPay, chọn phương thức
+                      thanh toán phù hợp (thẻ ngân hàng, ví điện tử, QR Code) và
+                      hoàn tất giao dịch.
                       <br />
-                      <strong>Bước 5:</strong> Sau khi thanh toán thành công, bạn sẽ được chuyển về trang xác nhận.
-                      Hóa đơn chi tiết sẽ được gửi đến email và lưu trong lịch sử giao dịch.
+                      <strong>Bước 5:</strong> Sau khi thanh toán thành công,
+                      bạn sẽ được chuyển về trang xác nhận. Hóa đơn chi tiết sẽ
+                      được gửi đến email và lưu trong lịch sử giao dịch.
                       <br />
                       <br />
-                      <strong>Bảo mật:</strong> Mọi giao dịch được mã hóa và xử lý an toàn qua
-                      cổng thanh toán VNPay. SkaEV không lưu trữ thông tin thẻ ngân hàng của bạn.
+                      <strong>Bảo mật:</strong> Mọi giao dịch được mã hóa và xử
+                      lý an toàn qua cổng thanh toán VNPay. SkaEV không lưu trữ
+                      thông tin thẻ ngân hàng của bạn.
                     </Typography>
                     <Typography variant="body2" paragraph>
                       4. Hoàn tiền
                       <br />
                       Việc hoàn tiền chỉ được xem xét trong các trường hợp sau:
                       <br />
-                      • Phiên sạc không thành công hoặc bị gián đoạn do lỗi từ hệ thống/thiết bị của chúng tôi
+                      • Phiên sạc không thành công hoặc bị gián đoạn do lỗi từ
+                      hệ thống/thiết bị của chúng tôi
                       <br />
                       • Thanh toán bị trừ tiền nhưng không nhận được dịch vụ
                       <br />
@@ -1075,13 +1096,16 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
                       <br />
                       <strong>Quy trình hoàn tiền:</strong>
                       <br />
-                      1. Liên hệ bộ phận chăm sóc khách hàng qua hotline 0917123123
+                      1. Liên hệ bộ phận chăm sóc khách hàng qua hotline
+                      0917123123
                       <br />
                       2. Cung cấp mã giao dịch và thông tin liên quan
                       <br />
-                      3. Yêu cầu hoàn tiền sẽ được xử lý trong vòng 7-14 ngày làm việc
+                      3. Yêu cầu hoàn tiền sẽ được xử lý trong vòng 7-14 ngày
+                      làm việc
                       <br />
-                      4. Tiền sẽ được hoàn về tài khoản/thẻ ngân hàng bạn đã sử dụng để thanh toán
+                      4. Tiền sẽ được hoàn về tài khoản/thẻ ngân hàng bạn đã sử
+                      dụng để thanh toán
                     </Typography>
                     <Typography variant="body2" paragraph>
                       5. Thay đổi Chính sách

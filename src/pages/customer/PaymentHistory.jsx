@@ -77,27 +77,47 @@ const PaymentHistory = () => {
     return {
       id: `PAY-${invoice.invoiceId || invoice.id}`,
       invoiceId: invoice.invoiceId || invoice.id,
-      date: invoice.createdAt || invoice.invoiceDate || new Date().toISOString(),
+      date:
+        invoice.createdAt || invoice.invoiceDate || new Date().toISOString(),
       amount: invoice.totalAmount || invoice.total || 0,
       method: invoice.paymentMethodName || "VNPay",
       methodIcon: <AccountBalanceWallet />,
       methodColor: "primary",
-      status: invoice.paymentStatus === "paid" ? "completed" : invoice.paymentStatus || "pending",
-      description: invoice.stationName ? `Sạc tại ${invoice.stationName}` : `Sạc xe điện`,
+      status:
+        invoice.paymentStatus === "paid"
+          ? "completed"
+          : invoice.paymentStatus || "pending",
+      description: invoice.stationName
+        ? `Sạc tại ${invoice.stationName}`
+        : `Sạc xe điện`,
       session: {
         stationName: invoice.stationName || "Trạm sạc",
         energy: `${invoice.energyDelivered || 0} kWh`,
         duration: `${invoice.chargingDuration || 0} phút`,
         connector: "VNPay",
-        startTime: invoice.startTime ? new Date(invoice.startTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : "--:--",
-        endTime: invoice.endTime ? new Date(invoice.endTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : "--:--",
+        startTime: invoice.startTime
+          ? new Date(invoice.startTime).toLocaleTimeString("vi-VN", {
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          : "--:--",
+        endTime: invoice.endTime
+          ? new Date(invoice.endTime).toLocaleTimeString("vi-VN", {
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          : "--:--",
         energyCost: invoice.totalAmount || 0,
         parkingFee: 0,
       },
       invoiceNumber: `INV-${invoice.invoiceId}`,
       taxInfo: {
-        subtotal: invoice.taxAmount ? invoice.totalAmount - invoice.taxAmount : Math.round((invoice.totalAmount || 0) / 1.1),
-        tax: invoice.taxAmount || Math.round((invoice.totalAmount || 0) * 0.1 / 1.1),
+        subtotal: invoice.taxAmount
+          ? invoice.totalAmount - invoice.taxAmount
+          : Math.round((invoice.totalAmount || 0) / 1.1),
+        tax:
+          invoice.taxAmount ||
+          Math.round(((invoice.totalAmount || 0) * 0.1) / 1.1),
         total: invoice.totalAmount || invoice.total || 0,
       },
     };
@@ -149,17 +169,17 @@ const PaymentHistory = () => {
     try {
       setLoading(true);
       const blob = await invoicesAPI.download(payment.invoiceId);
-      
+
       // Create download link
       const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
+      const link = document.createElement("a");
       link.href = url;
       link.download = `${payment.invoiceNumber}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-      
+
       setSuccessMessage(`Đã tải xuống hóa đơn ${payment.invoiceNumber}`);
     } catch (err) {
       console.error("Error downloading invoice:", err);
@@ -182,15 +202,15 @@ const PaymentHistory = () => {
       {loading && (
         <Box
           sx={{
-            position: 'fixed',
+            position: "fixed",
             top: 0,
             left: 0,
             right: 0,
             bottom: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            bgcolor: 'rgba(0,0,0,0.3)',
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            bgcolor: "rgba(0,0,0,0.3)",
             zIndex: 9999,
           }}
         >
@@ -387,7 +407,11 @@ const PaymentHistory = () => {
                   <TableRow>
                     <TableCell colSpan={6} align="center" sx={{ py: 8 }}>
                       <CircularProgress />
-                      <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ mt: 2 }}
+                      >
                         Đang tải lịch sử thanh toán...
                       </Typography>
                     </TableCell>
@@ -398,7 +422,11 @@ const PaymentHistory = () => {
                       <Typography variant="body1" color="text.secondary">
                         Chưa có lịch sử thanh toán
                       </Typography>
-                      <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ mt: 1 }}
+                      >
                         Các giao dịch của bạn sẽ hiển thị tại đây
                       </Typography>
                     </TableCell>
@@ -420,7 +448,8 @@ const PaymentHistory = () => {
                         </Typography>
                         {payment.session && (
                           <Typography variant="caption" color="text.secondary">
-                            {payment.session.energy} • {payment.session.duration}
+                            {payment.session.energy} •{" "}
+                            {payment.session.duration}
                           </Typography>
                         )}
                         {payment.subscription && (
