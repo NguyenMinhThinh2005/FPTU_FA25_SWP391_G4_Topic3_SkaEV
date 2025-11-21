@@ -899,9 +899,27 @@ const ChargingFlow = () => {
 
   const handleBookingComplete = (booking) => {
     console.log("🎯 Booking completed:", booking);
+    
+    // Store booking data
     setCurrentBookingData(booking);
+    
+    // Store booking in bookingStore for persistence
+    if (booking?.bookingId) {
+      bookingStore.setState({
+        currentBooking: {
+          ...booking,
+          status: 'confirmed'
+        }
+      });
+      console.log("✅ Booking stored in bookingStore:", booking.bookingId);
+    }
+    
+    // Close modal and move to navigation step
     setBookingModalOpen(false);
     setFlowStep(1); // Move to navigation/direction map step
+    
+    console.log("📍 FlowStep updated to: 1 (Navigation)");
+    console.log("🗺️ User should now see the map with directions");
 
     // Initialize session data based on booking
     const energyNeeded = (sessionData.targetSOC - sessionData.startSOC) * 0.6; // 60kWh battery
@@ -969,23 +987,31 @@ const ChargingFlow = () => {
   };
 
   const handleStartCharging = async () => {
-    if (!currentBooking || !scanResult) {
-      console.error("❌ Missing booking data or QR scan result");
-      alert("Thiếu thông tin booking hoặc mã QR");
+    // Robust way to get booking ID from multiple sources
+    const bookingId = 
+      currentBooking?.bookingId || 
+      currentBooking?.id || 
+      bookingStore.currentBooking?.bookingId || 
+      bookingStore.currentBooking?.id ||
+      currentBookingData?.bookingId ||
+      currentBookingData?.id;
+
+    if (!bookingId || !scanResult) {
+      console.error("❌ Missing booking ID or QR scan result", { 
+        currentBooking, 
+        storeBooking: bookingStore.currentBooking,
+        currentBookingData,
+        scanResult,
+        resolvedBookingId: bookingId
+      });
+      alert("Không tìm thấy mã đặt chỗ hoặc mã QR, vui lòng thử lại");
       return;
     }
 
     try {
-      console.log(
-        "🔌 Starting charging session for booking:",
-        currentBooking.id,
-        currentBooking
-      );
+      console.log("🔌 Starting charging session for Booking ID:", bookingId);
 
       // Try to call API to start charging session (may fail with 403 if not Staff)
-      // Use numeric ID from API response, not the BOOK... string
-      const bookingId = currentBooking.id;
-
       try {
         const response = await chargingAPI.startCharging(bookingId);
         console.log("✅ Charging session started via API:", response);
@@ -995,9 +1021,9 @@ const ChargingFlow = () => {
           sessionId: response.sessionId || `SESSION-${Date.now()}`,
           bookingId: bookingId,
           startTime: new Date(),
-          stationId: currentBooking.stationId,
-          stationName: currentBooking.stationName,
-          chargerType: currentBooking.chargerType,
+          stationId: currentBooking?.stationId || currentBookingData?.stationId,
+          stationName: currentBooking?.stationName || currentBookingData?.stationName,
+          chargerType: currentBooking?.chargerType || currentBookingData?.chargerType,
           status: "active",
         };
 
@@ -1014,9 +1040,9 @@ const ChargingFlow = () => {
           sessionId: `DEMO-SESSION-${Date.now()}`,
           bookingId: bookingId,
           startTime: new Date(),
-          stationId: currentBooking.stationId,
-          stationName: currentBooking.stationName,
-          chargerType: currentBooking.chargerType,
+          stationId: currentBooking?.stationId || currentBookingData?.stationId,
+          stationName: currentBooking?.stationName || currentBookingData?.stationName,
+          chargerType: currentBooking?.chargerType || currentBookingData?.chargerType,
           status: "active-demo",
         };
 
@@ -1031,7 +1057,9 @@ const ChargingFlow = () => {
       // Update booking status
       bookingStore.setState({
         currentBooking: {
-          ...currentBooking,
+          ...(currentBooking || currentBookingData || {}),
+          id: bookingId,
+          bookingId: bookingId,
           chargingStarted: true,
           status: "in-progress",
         },
@@ -1048,7 +1076,7 @@ const ChargingFlow = () => {
 
       // Notify charging started
       notificationService.notifyChargingStarted({
-        stationName: currentBooking.stationName || "Trạm sạc",
+        stationName: currentBooking?.stationName || currentBookingData?.stationName || "Trạm sạc",
         currentSOC: 25,
       });
 
@@ -2840,36 +2868,57 @@ const ChargingFlow = () => {
 
                         try {
                           const totalAmount = calculateTotalCost();
+                          
+                          // FIX: Get bookingId from multiple sources including store and session
                           const bookingId =
-                            currentBooking?.id || currentBookingData?.id;
+                            currentBooking?.id ||
+                            currentBookingData?.id ||
+                            currentBookingData?.bookingId ||
+                            bookingStore.currentBooking?.bookingId ||
+                            bookingStore.currentBooking?.id ||
+                            sessionStorage.getItem("currentBookingId");
+
+                          console.log('💳 Payment Booking Info:', { 
+                            currentBooking, 
+                            currentBookingData,
+                            storeBooking: bookingStore.currentBooking,
+                            resolvedBookingId: bookingId 
+                          });
 
                           if (!bookingId) {
-                            throw new Error("Không tìm thấy thông tin đặt chỗ");
+                            throw new Error("Không tìm thấy thông tin đặt chỗ (Booking ID missing)");
                           }
 
-                          // 1. Get invoice for this booking
-                          console.log(
-                            "📋 Fetching invoice for booking:",
-                            bookingId
-                          );
-                          const invoiceResponse =
-                            await invoicesAPI.getByBooking(bookingId);
+                          // 1. Create Invoice first (to ensure it exists)
+                          console.log("📋 Creating invoice for booking:", bookingId);
+                          let invoice;
+                          
+                          try {
+                            // Try to create invoice first
+                            const createRes = await invoicesAPI.createInvoice(bookingId);
+                            invoice = createRes?.data || createRes;
+                            console.log("✅ Invoice created:", invoice);
+                          } catch (createError) {
+                            console.warn("⚠️ Create invoice failed, trying to fetch existing:", createError);
+                            // If create fails, try to get existing
+                            const getRes = await invoicesAPI.getByBooking(bookingId);
+                            invoice = getRes?.data || getRes;
+                          }
 
-                          if (!invoiceResponse || !invoiceResponse.invoiceId) {
+                          if (!invoice || !invoice.invoiceId) {
                             throw new Error(
-                              "Không tìm thấy hóa đơn cho phiên sạc này"
+                              "Không thể tạo hoặc tìm thấy hóa đơn cho phiên sạc này"
                             );
                           }
 
-                          const invoice = invoiceResponse;
-                          console.log("✅ Found invoice:", invoice);
+                          console.log("✅ Invoice ready for payment:", invoice);
 
                           // 2. Create VNPay payment URL
                           console.log("💳 Creating VNPay payment URL...");
                           const vnpayResponse = await vnpayAPI.createPaymentUrl(
                             {
                               invoiceId: invoice.invoiceId,
-                              amount: invoice.totalAmount,
+                              amount: invoice.totalAmount || totalAmount,
                               orderDescription: `Thanh toan hoa don #${
                                 invoice.invoiceId
                               } - Phien sac ${invoice.stationName || "SkaEV"}`,
@@ -2877,15 +2926,25 @@ const ChargingFlow = () => {
                             }
                           );
 
-                          if (!vnpayResponse?.data?.paymentUrl) {
+                          console.log("📥 VNPay API Response:", vnpayResponse);
+
+                          // Robust way to get payment URL (handle different response structures)
+                          const paymentUrl = 
+                            vnpayResponse?.paymentUrl || 
+                            vnpayResponse?.data?.paymentUrl || 
+                            vnpayResponse?.url ||
+                            vnpayResponse?.data;
+
+                          if (!paymentUrl || typeof paymentUrl !== 'string' || !paymentUrl.startsWith('http')) {
+                            console.error("❌ Invalid payment URL:", paymentUrl);
                             throw new Error(
-                              "Không thể tạo liên kết thanh toán"
+                              "Không thể tạo liên kết thanh toán (Invalid URL)"
                             );
                           }
 
                           console.log(
                             "🔗 VNPay payment URL created:",
-                            vnpayResponse.data.paymentUrl
+                            paymentUrl
                           );
 
                           // 3. Save current state before redirecting
@@ -2903,7 +2962,7 @@ const ChargingFlow = () => {
                           );
 
                           // 4. Redirect to VNPay
-                          window.location.href = vnpayResponse.data.paymentUrl;
+                          window.location.href = paymentUrl;
                         } catch (error) {
                           console.error("❌ Payment error:", error);
                           setPaymentError(
