@@ -39,6 +39,9 @@ import {
   Divider,
   CircularProgress,
   Stack,
+  Select,
+  MenuItem,
+  FormControl,
 } from "@mui/material";
 import {
   BoltOutlined as BoltIcon,
@@ -49,7 +52,12 @@ import {
   FlashOn as FastChargeIcon,
   Battery20 as SlowChargeIcon,
 } from "@mui/icons-material";
-import { format, addMinutes, setHours, setMinutes as setMinutesDate } from "date-fns";
+import {
+  format,
+  addMinutes,
+  setHours,
+  setMinutes as setMinutesDate,
+} from "date-fns";
 import { vi } from "date-fns/locale";
 import { bookingsAPI, stationsAPI } from "../../services/api";
 import useVehicleStore from "../../store/vehicleStore";
@@ -66,10 +74,8 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
   const [selectedChargerType, setSelectedChargerType] = useState(null); // 'AC' or 'DC'
   const [selectedPole, setSelectedPole] = useState(null);
   const [selectedPort, setSelectedPort] = useState(null);
-  const [schedulingType, setSchedulingType] = useState("scheduled"); // Always scheduled (today only)
-  const [scheduledDateTime, setScheduledDateTime] = useState(
-    new Date(Date.now() + 35 * 60000)
-  ); // Default to 35 minutes from now
+  const [schedulingType, setSchedulingType] = useState("scheduled"); // Always scheduled
+  const [scheduledDateTime, setScheduledDateTime] = useState(null); // User must select a time slot
   const [selectedVehicle, setSelectedVehicle] = useState(null);
 
   // Get vehicle store
@@ -89,7 +95,7 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
         try {
           // Fetch latest vehicles from API
           await fetchVehicles();
-          
+
           // Check if current selectedVehicle is still valid
           if (selectedVehicle && vehicles.length > 0) {
             const isValidVehicle = vehicles.some(
@@ -136,16 +142,18 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
             };
             const slots = post.Slots || post.slots || [];
             slots.forEach((slot) => {
+              const rawStatus = slot.Status || slot.status || "available";
+              console.log(
+                `🔍 Slot ${slot.SlotId || slot.slotId} raw status:`,
+                rawStatus
+              );
+
               allSlots.push({
                 slotId: slot.SlotId || slot.slotId,
                 postId: postData.postId,
                 postName: postData.postName,
                 postType: postData.postType,
-                status: (
-                  slot.Status ||
-                  slot.status ||
-                  "available"
-                ).toLowerCase(),
+                status: String(rawStatus).trim().toLowerCase(),
                 connectorType: slot.ConnectorType || slot.connectorType,
                 powerKw:
                   slot.MaxPower ||
@@ -158,6 +166,7 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
             });
           });
           console.log("✅ Transformed Slots:", allSlots);
+          // Filter for available slots (case-insensitive and trimmed)
           setSlotsData(allSlots.filter((s) => s.status === "available"));
         } catch (error) {
           console.error("❌ Error fetching posts:", error);
@@ -274,7 +283,7 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
       setSelectedPole(null);
       setSelectedPort(null);
       setSchedulingType("scheduled");
-      setScheduledDateTime(new Date(Date.now() + 35 * 60000)); // Reset to 35 minutes ahead
+      setScheduledDateTime(null); // Reset to null, user must select a time slot
       setError(null);
       setSlotsData([]);
       setAgreedToTerms(false);
@@ -323,12 +332,11 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
     setSelectedPort(port);
   };
 
-  // Generate time slots for TODAY only, starting from NOW + 30 minutes
+  // Generate time slots for next 24 hours, starting from NOW + 30 minutes
   const generateTimeSlots = () => {
     const now = new Date();
     const minTime = new Date(now.getTime() + 30 * 60000); // Now + 30 minutes
-    const today = new Date();
-    today.setHours(23, 59, 59, 999); // End of today
+    const maxTime = new Date(now.getTime() + 24 * 60 * 60000); // Now + 24 hours
 
     const slots = [];
     let currentTime = new Date(minTime);
@@ -342,20 +350,22 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
       currentTime.setMinutes(0, 0, 0);
     }
 
-    // Generate slots until end of day
-    while (currentTime <= today) {
-      const hours = currentTime.getHours();
-      const mins = currentTime.getMinutes();
-      
+    // Generate slots for next 24 hours (max 20 slots to avoid clutter)
+    let slotCount = 0;
+    const maxSlots = 20;
+
+    while (currentTime <= maxTime && slotCount < maxSlots) {
       slots.push({
-        time: format(currentTime, "HH:mm"),
+        time: format(currentTime, "HH:mm"), // Only show time, no date
         datetime: new Date(currentTime),
-        hours,
-        minutes: mins,
+        fullDisplay: format(currentTime, "HH:mm - EEEE, dd/MM/yyyy", {
+          locale: vi,
+        }),
       });
 
       // Increment by 30 minutes
       currentTime = new Date(currentTime.getTime() + 30 * 60000);
+      slotCount++;
     }
 
     return slots;
@@ -363,13 +373,11 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
 
   // Handle time slot selection
   const handleTimeSlotSelect = (slot) => {
-    const today = new Date();
-    const selectedDateTime = setHours(
-      setMinutesDate(today, slot.minutes),
-      slot.hours
+    setScheduledDateTime(slot.datetime);
+    console.log(
+      "🕒 Selected time:",
+      format(slot.datetime, "HH:mm - dd/MM/yyyy", { locale: vi })
     );
-    setScheduledDateTime(selectedDateTime);
-    console.log("🕒 Selected time:", format(selectedDateTime, "HH:mm - dd/MM/yyyy"));
   };
 
   const handleConfirmBooking = async () => {
@@ -377,17 +385,24 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
     setError(null);
 
     try {
-      // Validate scheduled time (must be at least 30 minutes from now)
+      // Validate scheduled time (must be at least 30 minutes from now and within 24 hours)
       if (schedulingType === "scheduled" && scheduledDateTime) {
         const now = new Date();
         const minAllowedTime = new Date(now.getTime() + 30 * 60000); // Now + 30 minutes
-        
+        const maxAllowedTime = new Date(now.getTime() + 24 * 60 * 60000); // Now + 24 hours
+
         if (scheduledDateTime < minAllowedTime) {
           const minutesFromNow = Math.round(
             (scheduledDateTime.getTime() - now.getTime()) / 60000
           );
           throw new Error(
             `Thời gian đặt phải ít nhất 30 phút từ bây giờ. Hiện tại bạn đang chọn ${minutesFromNow} phút. Vui lòng chọn thời gian xa hơn.`
+          );
+        }
+
+        if (scheduledDateTime > maxAllowedTime) {
+          throw new Error(
+            `Chỉ cho phép đặt chỗ trong vòng 24 giờ tới. Vui lòng chọn thời gian sớm hơn.`
           );
         }
       }
@@ -671,12 +686,12 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
         Chọn giờ sạc
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Chọn giờ bắt đầu sạc trong ngày hôm nay
+        Chọn mốc giờ phù hợp (có thể chọn đến 24h tới)
       </Typography>
 
       <Alert severity="info" sx={{ mb: 3 }}>
         <Typography variant="body2">
-          <strong>Lưu ý:</strong> Chỉ có thể đặt lịch sạc trong ngày hôm nay.
+          <strong>Lưu ý:</strong> Bạn có thể đặt lịch sạc trong vòng 24 giờ tới.
           Thời gian đặt phải ít nhất 30 phút từ bây giờ.
         </Typography>
       </Alert>
@@ -684,23 +699,27 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
       {/* Time Slots Selection */}
       <Box sx={{ mt: 2 }}>
         <Typography variant="subtitle2" gutterBottom>
-          Chọn giờ bắt đầu sạc:
+          Giờ đã chọn:
         </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        <Typography
+          variant="h6"
+          color={scheduledDateTime ? "primary" : "text.secondary"}
+          sx={{ mb: 2, fontWeight: "bold" }}
+        >
           {scheduledDateTime
             ? format(scheduledDateTime, "HH:mm - EEEE, dd/MM/yyyy", {
                 locale: vi,
               })
-            : "Chưa chọn giờ"}
+            : "Vui lòng chọn một mốc giờ bên dưới"}
         </Typography>
 
         <Grid container spacing={1}>
-          {generateTimeSlots().map((slot) => {
+          {generateTimeSlots().map((slot, index) => {
             const isSelected =
               scheduledDateTime &&
-              format(scheduledDateTime, "HH:mm") === slot.time;
+              scheduledDateTime.getTime() === slot.datetime.getTime();
             return (
-              <Grid item xs={3} sm={2} key={slot.time}>
+              <Grid item xs={3} sm={2} key={`slot-${index}`}>
                 <Chip
                   label={slot.time}
                   onClick={() => handleTimeSlotSelect(slot)}
@@ -743,6 +762,42 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
       <Card variant="outlined">
         <CardContent>
           <Stack spacing={2}>
+            <Box>
+              <Typography
+                variant="subtitle2"
+                color="text.secondary"
+                gutterBottom
+              >
+                Xe sạc
+              </Typography>
+              {vehicles.length > 0 ? (
+                <FormControl fullWidth size="small">
+                  <Select
+                    value={selectedVehicle?.vehicleId || ""}
+                    onChange={(e) => {
+                      const v = vehicles.find(
+                        (v) => v.vehicleId === e.target.value
+                      );
+                      setSelectedVehicle(v);
+                    }}
+                    displayEmpty
+                  >
+                    {vehicles.map((v) => (
+                      <MenuItem key={v.vehicleId} value={v.vehicleId}>
+                        {v.model || "Xe không tên"} ({v.licensePlate})
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              ) : (
+                <Button variant="outlined" color="warning" fullWidth>
+                  Thêm xe ngay
+                </Button>
+              )}
+            </Box>
+
+            <Divider />
+
             <Box>
               <Typography variant="subtitle2" color="text.secondary">
                 Trạm sạc

@@ -140,8 +140,10 @@ const formatDistanceText = (distance) => {
   }
   if (typeof distance === "object") {
     if (distance.text) return String(distance.text);
-    if (typeof distance.value === "number") return formatDistanceText(distance.value);
-    if (typeof distance.meters === "number") return formatDistanceText(distance.meters);
+    if (typeof distance.value === "number")
+      return formatDistanceText(distance.value);
+    if (typeof distance.meters === "number")
+      return formatDistanceText(distance.meters);
   }
   return "";
 };
@@ -197,8 +199,10 @@ const buildRouteSummary = (route) => {
     if (!leg || processedLegs.has(leg)) return;
     processedLegs.add(leg);
 
-    summary.startAddress = summary.startAddress || leg.start_address || leg.startAddress || "";
-    summary.endAddress = summary.endAddress || leg.end_address || leg.endAddress || "";
+    summary.startAddress =
+      summary.startAddress || leg.start_address || leg.startAddress || "";
+    summary.endAddress =
+      summary.endAddress || leg.end_address || leg.endAddress || "";
     if (summary.distanceMeters == null && leg.distance) {
       summary.distanceMeters =
         typeof leg.distance.value === "number"
@@ -219,8 +223,10 @@ const buildRouteSummary = (route) => {
           ? leg.duration.seconds
           : summary.durationSeconds;
     }
-    summary.distanceText = summary.distanceText || formatDistanceText(leg.distance);
-    summary.durationText = summary.durationText || formatDurationText(leg.duration);
+    summary.distanceText =
+      summary.distanceText || formatDistanceText(leg.distance);
+    summary.durationText =
+      summary.durationText || formatDurationText(leg.duration);
 
     if (Array.isArray(leg.steps)) {
       const baseIndex = summary.steps.length;
@@ -232,7 +238,8 @@ const buildRouteSummary = (route) => {
           step.narrative ||
           step.maneuver ||
           "";
-        const instructionText = stripHtmlTags(instructionHtml) || `Bước ${index + 1}`;
+        const instructionText =
+          stripHtmlTags(instructionHtml) || `Bước ${index + 1}`;
         return {
           index: baseIndex + index,
           instructionHtml,
@@ -252,14 +259,16 @@ const buildRouteSummary = (route) => {
   if (route.data) candidateRoutes.push(route.data);
   if (route.result) candidateRoutes.push(route.result);
   if (Array.isArray(route.routes)) candidateRoutes.push(...route.routes);
-  if (Array.isArray(route.data?.routes)) candidateRoutes.push(...route.data.routes);
+  if (Array.isArray(route.data?.routes))
+    candidateRoutes.push(...route.data.routes);
   candidateRoutes.push(route);
 
   candidateRoutes.forEach((candidate) => {
     if (!candidate) return;
 
     summary.provider = summary.provider || candidate.provider || "google";
-    summary.summary = summary.summary || candidate.summary || candidate.summaryText || "";
+    summary.summary =
+      summary.summary || candidate.summary || candidate.summaryText || "";
     if (!summary.warnings.length && Array.isArray(candidate.warnings)) {
       summary.warnings = candidate.warnings;
     }
@@ -311,11 +320,15 @@ const buildRouteSummary = (route) => {
       const baseIndex = summary.steps.length;
       const directSteps = candidate.steps.map((step, index) => {
         const instructionHtml =
-          step.html_instructions || step.instructionHtml || step.instruction || "";
+          step.html_instructions ||
+          step.instructionHtml ||
+          step.instruction ||
+          "";
         return {
           index: baseIndex + index,
           instructionHtml,
-          instructionText: stripHtmlTags(instructionHtml) || `Bước ${index + 1}`,
+          instructionText:
+            stripHtmlTags(instructionHtml) || `Bước ${index + 1}`,
           distanceText: formatDistanceText(step.distance),
           durationText: formatDurationText(step.duration),
         };
@@ -326,8 +339,10 @@ const buildRouteSummary = (route) => {
     }
   });
 
-  summary.distanceText = summary.distanceText || formatDistanceText(route.distance);
-  summary.durationText = summary.durationText || formatDurationText(route.duration);
+  summary.distanceText =
+    summary.distanceText || formatDistanceText(route.distance);
+  summary.durationText =
+    summary.durationText || formatDurationText(route.duration);
 
   if (summary.distanceMeters == null) {
     if (route.distance && typeof route.distance.value === "number") {
@@ -349,7 +364,10 @@ const buildRouteSummary = (route) => {
     const baseIndex = summary.steps.length;
     const routeSteps = route.steps.map((step, index) => {
       const instructionHtml =
-        step.html_instructions || step.instructionHtml || step.instruction || "";
+        step.html_instructions ||
+        step.instructionHtml ||
+        step.instruction ||
+        "";
       return {
         index: baseIndex + index,
         instructionHtml,
@@ -379,7 +397,7 @@ const buildFallbackSummary = (origin, destination, requestId) => {
     destination.lng
   );
   const durationSeconds = distanceMeters
-    ? Math.round(((distanceMeters / 1000) / 40) * 3600)
+    ? Math.round((distanceMeters / 1000 / 40) * 3600)
     : null; // assume 40 km/h for fallback estimate
 
   return {
@@ -447,8 +465,10 @@ const coerceNumber = (value) => {
   return Number.isFinite(num) ? num : null;
 };
 
-const isValidLat = (value) => typeof value === "number" && value >= -90 && value <= 90;
-const isValidLng = (value) => typeof value === "number" && value >= -180 && value <= 180;
+const isValidLat = (value) =>
+  typeof value === "number" && value >= -90 && value <= 90;
+const isValidLng = (value) =>
+  typeof value === "number" && value >= -180 && value <= 180;
 
 const normalizeLatLngTuple = (lat, lng) => {
   const normalizedLat = coerceNumber(lat);
@@ -556,7 +576,9 @@ const collectCoordsFromSteps = (steps) => {
         return extractCoordsFromArray(step.polyline);
       }
 
-      const start = parsePointToTuple(step.start_location || step.startLocation);
+      const start = parsePointToTuple(
+        step.start_location || step.startLocation
+      );
       const end = parsePointToTuple(step.end_location || step.endLocation);
       if (start && end) {
         return [start, end];
@@ -598,7 +620,11 @@ const extractPolylineFromRoute = (route, origin, destination) => {
       coords = decodePolyline(candidate.polyline);
     }
 
-    if (!coords.length && candidate.polyline && typeof candidate.polyline.points === "string") {
+    if (
+      !coords.length &&
+      candidate.polyline &&
+      typeof candidate.polyline.points === "string"
+    ) {
       coords = decodePolyline(candidate.polyline.points);
     }
 
@@ -630,7 +656,9 @@ const extractPolylineFromRoute = (route, origin, destination) => {
             return stepCoords;
           }
 
-          const start = parsePointToTuple(leg.start_location || leg.startLocation);
+          const start = parsePointToTuple(
+            leg.start_location || leg.startLocation
+          );
           const end = parsePointToTuple(leg.end_location || leg.endLocation);
           const legCoords = [];
           if (start) legCoords.push(start);
@@ -743,31 +771,48 @@ const RouteDrawer = ({
 
     const fetchRoute = async () => {
       try {
-        console.log("🌐 Fetching route from Google Directions API via backend...");
+        console.log(
+          "🌐 Fetching route from Google Directions API via backend..."
+        );
         console.log("Origin:", userLocation);
         console.log("Destination:", destination);
-        
+
         const response = await getDrivingDirections({
           origin: userLocation,
           destination,
         });
-        
-        console.log("📦 Full Backend response:", JSON.stringify(response, null, 2));
-        
+
+        console.log(
+          "📦 Full Backend response:",
+          JSON.stringify(response, null, 2)
+        );
+
         const { success, route, error } = response;
-        
+
         console.log("Success:", success);
         console.log("Route:", route);
         console.log("Error:", error);
         console.log("Route.polyline:", route?.polyline);
 
         // Check if backend returned decoded polyline directly
-        if (success && route?.polyline && Array.isArray(route.polyline) && route.polyline.length >= 2) {
-          console.log("✅ Using decoded polyline from backend, points:", route.polyline.length);
-          
-          // Convert backend polyline format [{lat, lng}] to Leaflet format [[lat, lng]]
-          const coords = route.polyline.map(point => [point.lat, point.lng]);
-          
+        if (
+          success &&
+          route?.polyline &&
+          Array.isArray(route.polyline) &&
+          route.polyline.length >= 2
+        ) {
+          console.log(
+            "✅ Using decoded polyline from backend, points:",
+            route.polyline.length
+          );
+
+          // Convert backend polyline format [{Lat, Lng} or {lat, lng}] to Leaflet format [[lat, lng]]
+          // Backend may return PascalCase (Lat, Lng) or camelCase (lat, lng) depending on serialization
+          const coords = route.polyline.map((point) => [
+            point.Lat || point.lat,
+            point.Lng || point.lng,
+          ]);
+
           const summarySource = {
             provider: "google",
             summary: route.leg?.summary || "",
@@ -799,8 +844,7 @@ const RouteDrawer = ({
 
         if (success && coords.length >= 2 && !usedFallback) {
           console.log("✅ Using extracted polyline, points:", coords.length);
-          const summarySource =
-            buildRouteSummary(route) || {};
+          const summarySource = buildRouteSummary(route) || {};
           summarySource.polyline = coords;
           summarySource.requestId = requestId;
           summarySource.origin = userLocation;
@@ -824,7 +868,7 @@ const RouteDrawer = ({
             summarySource.distanceMeters != null
           ) {
             const estimatedSeconds = Math.round(
-              ((summarySource.distanceMeters / 1000) / 40) * 3600
+              (summarySource.distanceMeters / 1000 / 40) * 3600
             );
             summarySource.durationSeconds = estimatedSeconds;
             summarySource.durationText =
@@ -950,23 +994,39 @@ const getStationCoords = (station) => {
     lng = toNumber(rawCoords[0]);
     lat = toNumber(rawCoords[1]);
   } else if (rawCoords && typeof rawCoords === "object") {
-    lat = toNumber(rawCoords.lat ?? rawCoords.latitude ?? station.latitude ?? station.lat);
-    lng = toNumber(rawCoords.lng ?? rawCoords.longitude ?? station.longitude ?? station.lng);
+    lat = toNumber(
+      rawCoords.lat ?? rawCoords.latitude ?? station.latitude ?? station.lat
+    );
+    lng = toNumber(
+      rawCoords.lng ?? rawCoords.longitude ?? station.longitude ?? station.lng
+    );
   } else {
     lat = toNumber(station.location?.lat ?? station.latitude ?? station.lat);
     lng = toNumber(station.location?.lng ?? station.longitude ?? station.lng);
   }
 
   // Heuristic: if values look swapped (lat outside range but lng looks like lat), swap them
-  if ((!isValidLat(lat) || !isValidLng(lng)) && isValidLat(lng) && isValidLng(lat)) {
-    console.warn("🔁 Swapping lat/lng for station (detected swapped values):", { stationId: station.id, lat, lng });
+  if (
+    (!isValidLat(lat) || !isValidLng(lng)) &&
+    isValidLat(lng) &&
+    isValidLng(lat)
+  ) {
+    console.warn("🔁 Swapping lat/lng for station (detected swapped values):", {
+      stationId: station.id,
+      lat,
+      lng,
+    });
     const tmp = lat;
     lat = lng;
     lng = tmp;
   }
 
   if (!isValidLat(lat) || !isValidLng(lng)) {
-    console.warn("⚠️ Station has invalid coordinates and will be skipped on map:", station.id, { lat, lng });
+    console.warn(
+      "⚠️ Station has invalid coordinates and will be skipped on map:",
+      station.id,
+      { lat, lng }
+    );
     return { lat: null, lng: null };
   }
 
@@ -1173,17 +1233,21 @@ const StationMapLeaflet = ({
   // Handle external showRoute prop and auto-select first station for navigation
   useEffect(() => {
     if (externalShowRoute && stations && stations.length > 0) {
-      console.log("🗺️ External showRoute enabled, auto-selecting first station for navigation");
+      console.log(
+        "🗺️ External showRoute enabled, auto-selecting first station for navigation"
+      );
       setSelectedStation(stations[0]);
       setShowRoute(true);
-      
+
       // Center map on station if requested
       if (centerOnStation && mapRef.current) {
         const coords = getStationCoords(stations[0]);
         if (coords.lat && coords.lng) {
           setTimeout(() => {
             try {
-              mapRef.current.setView([coords.lat, coords.lng], 15, { animate: true });
+              mapRef.current.setView([coords.lat, coords.lng], 15, {
+                animate: true,
+              });
             } catch (err) {
               console.error("Error centering on station:", err);
             }
@@ -1376,7 +1440,11 @@ const StationMapLeaflet = ({
             const coords = getStationCoords(station);
             // Skip markers for stations with invalid coordinates
             if (coords.lat == null || coords.lng == null) {
-              console.warn("Skipping station marker due to invalid coords:", station.id, coords);
+              console.warn(
+                "Skipping station marker due to invalid coords:",
+                station.id,
+                coords
+              );
               return null;
             }
             return (
