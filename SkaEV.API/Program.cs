@@ -320,3 +320,6 @@ finally
     Log.Information("Shutting down...");
     await Log.CloseAndFlushAsync();
 }
+
+    // Expose Program type for integration tests (WebApplicationFactory<Program>)
+    public partial class Program { }
