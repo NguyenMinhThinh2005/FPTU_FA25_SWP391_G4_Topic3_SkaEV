@@ -13,7 +13,7 @@ namespace SkaEV.API.Controllers;
 /// Bao gồm các chức năng: CRUD người dùng, quản lý vai trò, trạng thái, thông báo, và hỗ trợ khách hàng.
 /// </summary>
 [Authorize(Roles = Roles.Admin)]
-[Route("api/admin/users")]
+[Route("api/admin/adminusers")]
 public class AdminUsersController : BaseApiController
 {
     // Service quản lý người dùng admin
@@ -48,20 +48,28 @@ public class AdminUsersController : BaseApiController
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
-        var users = await _adminUserService.GetAllUsersAsync(role, status, search, page, pageSize);
-        var totalCount = await _adminUserService.GetUserCountAsync(role, status, search);
-
-        return OkResponse(new
+        try
         {
-            data = users,
-            pagination = new
+            var users = await _adminUserService.GetAllUsersAsync(role, status, search, page, pageSize);
+            var totalCount = await _adminUserService.GetUserCountAsync(role, status, search);
+
+            return OkResponse(new
             {
-                page,
-                pageSize,
-                totalCount,
-                totalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
-            }
-        });
+                data = users,
+                pagination = new
+                {
+                    page,
+                    pageSize,
+                    totalCount,
+                    totalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting all users. Role: {Role}, Status: {Status}, Search: {Search}", role, status, search);
+            return StatusCode(500, new { message = "An error occurred while retrieving users", error = ex.Message });
+        }
     }
 
     /// <summary>

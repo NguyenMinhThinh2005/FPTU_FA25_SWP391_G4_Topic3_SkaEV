@@ -20,17 +20,21 @@ public class AdminStationsController : BaseApiController
     private readonly IAdminStationManagementService _stationMgmtService;
     // Service trạm sạc admin (phụ/legacy)
     private readonly IAdminStationService? _adminStationService;
+    private readonly ILogger<AdminStationsController> _logger;
 
     /// <summary>
     /// Constructor nhận vào các service cần thiết.
     /// </summary>
     /// <param name="stationMgmtService">Service quản lý trạm sạc.</param>
+    /// <param name="logger">Logger để ghi lại các hoạt động.</param>
     /// <param name="adminStationService">Service trạm sạc admin (tùy chọn).</param>
     public AdminStationsController(
         IAdminStationManagementService stationMgmtService,
+        ILogger<AdminStationsController> logger,
         IAdminStationService? adminStationService = null)
     {
         _stationMgmtService = stationMgmtService;
+        _logger = logger;
         _adminStationService = adminStationService;
     }
 
@@ -45,21 +49,35 @@ public class AdminStationsController : BaseApiController
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetStations([FromQuery] StationFilterDto filter)
     {
-        // Lấy danh sách trạm và tổng số lượng từ service
-        var (stations, totalCount) = await _stationMgmtService.GetStationsAsync(filter);
-
-        // Trả về kết quả kèm thông tin phân trang
-        return OkResponse(new
+        try
         {
-            data = stations,
-            pagination = new
+            // Debug: Log authentication info
+            _logger.LogInformation("GetStations called. User authenticated: {IsAuthenticated}, User: {User}, Roles: {Roles}",
+                User.Identity?.IsAuthenticated ?? false,
+                User.Identity?.Name ?? "Unknown",
+                string.Join(", ", User.Claims.Where(c => c.Type == System.Security.Claims.ClaimTypes.Role).Select(c => c.Value)));
+
+            // Lấy danh sách trạm và tổng số lượng từ service
+            var (stations, totalCount) = await _stationMgmtService.GetStationsAsync(filter);
+
+            // Trả về kết quả kèm thông tin phân trang
+            return OkResponse(new
             {
-                page = filter.Page,
-                pageSize = filter.PageSize,
-                totalCount,
-                totalPages = (int)Math.Ceiling(totalCount / (double)filter.PageSize)
-            }
-        });
+                data = stations,
+                pagination = new
+                {
+                    page = filter.Page,
+                    pageSize = filter.PageSize,
+                    totalCount,
+                    totalPages = (int)Math.Ceiling(totalCount / (double)filter.PageSize)
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting stations. Filter: {@Filter}", filter);
+            return StatusCode(500, new { message = "An error occurred while retrieving stations", error = ex.Message });
+        }
     }
 
     /// <summary>

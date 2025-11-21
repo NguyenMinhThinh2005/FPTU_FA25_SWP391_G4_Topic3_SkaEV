@@ -133,6 +133,45 @@ public partial class Program
                 ValidateLifetime = true, // Ensure token is not expired
                 ClockSkew = TimeSpan.Zero // Remove default 5-minute leeway for expiration
             };
+            
+            // Add event handlers for debugging authentication issues
+            options.Events = new Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerEvents
+            {
+                OnMessageReceived = context =>
+                {
+                    var token = context.Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
+                    if (string.IsNullOrEmpty(token))
+                    {
+                        Log.Warning("JWT Token not found in Authorization header. Path: {Path}", context.Request.Path);
+                    }
+                    else
+                    {
+                        Log.Information("JWT Token received. Path: {Path}, Token length: {Length}", 
+                            context.Request.Path, token.Length);
+                    }
+                    return Task.CompletedTask;
+                },
+                OnAuthenticationFailed = context =>
+                {
+                    Log.Warning("JWT Authentication failed: {Error}. Path: {Path}", 
+                        context.Exception.Message, context.Request.Path);
+                    return Task.CompletedTask;
+                },
+                OnTokenValidated = context =>
+                {
+                    var userId = context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                    var role = context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
+                    Log.Information("JWT Token validated. UserId: {UserId}, Role: {Role}, Path: {Path}", 
+                        userId, role, context.Request.Path);
+                    return Task.CompletedTask;
+                },
+                OnChallenge = context =>
+                {
+                    Log.Warning("JWT Challenge triggered. Error: {Error}, ErrorDescription: {ErrorDescription}, Path: {Path}", 
+                        context.Error, context.ErrorDescription, context.Request.Path);
+                    return Task.CompletedTask;
+                }
+            };
         });
 
         builder.Services.AddAuthorization();

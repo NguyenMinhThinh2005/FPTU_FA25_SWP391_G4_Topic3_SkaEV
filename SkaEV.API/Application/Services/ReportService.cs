@@ -225,9 +225,11 @@ public class ReportService : IReportService
 
             return grouped;
         }
-        catch
+        catch (Exception ex)
         {
-            // Return empty list if no data or error
+            _logger.LogError(ex, "Error getting revenue reports. StationId: {StationId}, Year: {Year}, Month: {Month}", 
+                stationId, year, month);
+            // Return empty list if error occurs, but log it for debugging
             return new List<RevenueReportDto>();
         }
     }
