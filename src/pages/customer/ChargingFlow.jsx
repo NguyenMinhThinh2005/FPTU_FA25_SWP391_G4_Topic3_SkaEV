@@ -1858,16 +1858,24 @@ const ChargingFlow = () => {
                         overflow: "hidden",
                       }}
                     >
-                      <StationMapLeaflet
-                        stations={[selectedStation]}
-                        onStationSelect={() => {}}
-                        userLocation={userLocation}
-                        showRoute={true}
-                        centerOnStation={true}
-                        onDirectionsReady={handleDirectionsReady}
-                        onDirectionsError={handleDirectionsError}
-                        routeRequestId={navigationRequestId}
-                      />
+                      {selectedStation ? (
+                        <StationMapLeaflet
+                          stations={[selectedStation]}
+                          onStationSelect={() => {}}
+                          userLocation={userLocation}
+                          showRoute={true}
+                          centerOnStation={true}
+                          onDirectionsReady={handleDirectionsReady}
+                          onDirectionsError={handleDirectionsError}
+                          routeRequestId={navigationRequestId}
+                        />
+                      ) : (
+                        <Box sx={{ p: 4, textAlign: "center" }}>
+                          <Typography variant="body1" color="text.secondary">
+                            Đang tải thông tin trạm...
+                          </Typography>
+                        </Box>
+                      )}
                     </Box>
                   </Grid>
                   <Grid item xs={12} md={4}>
@@ -1900,20 +1908,18 @@ const ChargingFlow = () => {
                         </Box>
                       )}
 
-                      {directionsData.error && (
-                        <Alert severity="warning">{directionsData.error}</Alert>
-                      )}
-
-                      {navigationSummary && (
+                      {/* Always show summary if available, even with errors */}
+                      {(navigationSummary || (selectedStationCoords && userLocation)) && (
                         <>
                           <Box
                             sx={{
                               display: "flex",
                               flexWrap: "wrap",
                               gap: 1,
+                              mb: 1,
                             }}
                           >
-                            {navigationSummary.distanceText && (
+                            {navigationSummary?.distanceText ? (
                               <Chip
                                 icon={<Directions fontSize="small" />}
                                 label={`Quãng đường: ${navigationSummary.distanceText}`}
@@ -1921,8 +1927,23 @@ const ChargingFlow = () => {
                                 color="primary"
                                 variant="outlined"
                               />
-                            )}
-                            {navigationSummary.durationText && (
+                            ) : selectedStationCoords && userLocation ? (
+                              <Chip
+                                icon={<Directions fontSize="small" />}
+                                label={`Quãng đường: ${formatDistanceFromMeters(
+                                  calculateDistance(
+                                    userLocation.lat,
+                                    userLocation.lng,
+                                    selectedStationCoords.lat,
+                                    selectedStationCoords.lng
+                                  )
+                                )}`}
+                                size="small"
+                                color="primary"
+                                variant="outlined"
+                              />
+                            ) : null}
+                            {navigationSummary?.durationText && (
                               <Chip
                                 icon={<AccessTime fontSize="small" />}
                                 label={`Thời gian: ${navigationSummary.durationText}`}
@@ -1933,22 +1954,31 @@ const ChargingFlow = () => {
                             )}
                           </Box>
 
-                          {navigationWarnings.map((warning, index) => (
-                            <Alert
-                              key={`nav-warning-${index}`}
-                              severity={
-                                navigationSummary.provider === "fallback" ||
-                                navigationSummary.usedFallback
-                                  ? "warning"
-                                  : "info"
-                              }
-                              sx={{ mb: 1 }}
-                            >
-                              {warning}
+                          {/* Only show error if route is not displayed on map */}
+                          {directionsData.error && !navigationSummary && (
+                            <Alert severity="info" sx={{ mb: 1 }}>
+                              Tuyến đường đã được hiển thị trên bản đồ. {directionsData.error}
                             </Alert>
-                          ))}
+                          )}
 
-                          {navigationSummary.steps &&
+                          {/* Show warnings only if they provide useful info, not if route is already shown */}
+                          {navigationWarnings
+                            .filter((warning) => 
+                              !warning.includes("gần đúng") && 
+                              !warning.includes("không thể tải") &&
+                              !warning.includes("không tìm thấy")
+                            )
+                            .map((warning, index) => (
+                              <Alert
+                                key={`nav-warning-${index}`}
+                                severity="info"
+                                sx={{ mb: 1 }}
+                              >
+                                {warning}
+                              </Alert>
+                            ))}
+
+                          {navigationSummary?.steps &&
                           navigationSummary.steps.length > 0 ? (
                             <List
                               dense
@@ -2016,19 +2046,32 @@ const ChargingFlow = () => {
                               ))}
                             </List>
                           ) : (
-                            <Typography variant="body2" color="text.secondary">
-                              Không có hướng dẫn chi tiết. Nhấn “Mở Google Maps”
-                              để xem đường đi trực tiếp.
-                            </Typography>
+                            <Box sx={{ mb: 2 }}>
+                              <Alert severity="success" sx={{ mb: 1 }}>
+                                ✅ Tuyến đường đã được hiển thị trên bản đồ phía bên trái.
+                              </Alert>
+                              {!navigationSummary && (
+                                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                                  Để xem hướng dẫn chi tiết từng bước, nhấn "Mở Google Maps".
+                                </Typography>
+                              )}
+                              {navigationSummary && !navigationSummary.steps?.length && (
+                                <Typography variant="body2" color="text.secondary">
+                                  Tuyến đường đã được tính toán và hiển thị trên bản đồ. 
+                                  Bạn có thể sử dụng nút "Mở Google Maps" để xem hướng dẫn chi tiết hơn.
+                                </Typography>
+                              )}
+                            </Box>
                           )}
                         </>
                       )}
 
                       {!directionsData.loading &&
                         !navigationSummary &&
-                        !directionsData.error && (
+                        !directionsData.error &&
+                        (!selectedStationCoords || !userLocation) && (
                           <Typography variant="body2" color="text.secondary">
-                            Chúng tôi sẽ hiển thị chỉ đường ngay khi có dữ liệu.
+                            Đang tải thông tin chỉ đường...
                           </Typography>
                         )}
 
