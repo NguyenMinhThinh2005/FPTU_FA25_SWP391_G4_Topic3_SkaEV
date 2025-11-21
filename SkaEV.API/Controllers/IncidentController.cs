@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using SkaEV.API.Application.DTOs.Incidents;
 using SkaEV.API.Application.Services;
 
-namespace SkaEV.API.Presentation.Controllers;
+namespace SkaEV.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]

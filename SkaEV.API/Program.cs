@@ -191,8 +191,8 @@ public partial class Program
 
         // Background Services (Hosted)
         // Note: Currently disabled to prevent data noise during development/testing
-        // builder.Services.AddHostedService<SkaEV.API.Services.ChargingSimulationService>();
-        // builder.Services.AddHostedService<SkaEV.API.Services.SystemEventsSimulationService>();
+        // builder.Services.AddHostedService<SkaEV.API.Application.Services.Simulation.ChargingSimulationService>();
+        // builder.Services.AddHostedService<SkaEV.API.Application.Services.Simulation.SystemEventsSimulationService>();
 
         // === Swagger / OpenAPI Documentation ===
         builder.Services.AddEndpointsApiExplorer();

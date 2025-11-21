@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using SkaEV.API.Infrastructure.Data;
 
-namespace SkaEV.API.Services;
+namespace SkaEV.API.Application.Services.Simulation;
 
 /// <summary>
 /// Service mô phỏng các sự kiện hệ thống (alerts, warnings)
