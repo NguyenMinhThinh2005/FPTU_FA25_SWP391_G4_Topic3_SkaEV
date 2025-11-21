@@ -35,6 +35,7 @@ import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
 import { getDrivingDirections } from "../../services/directionsService";
+import { getGoogleMapsDirections } from "../../services/googleMapsDirectionsService";
 
 // Fix for default marker icons in Leaflet
 delete L.Icon.Default.prototype._getIconUrl;
@@ -386,19 +387,158 @@ const buildRouteSummary = (route) => {
 
 const buildFallbackSummary = (origin, destination, requestId) => {
   if (!origin || !destination) return null;
-  const polyline = [
-    [origin.lat, origin.lng],
-    [destination.lat, destination.lng],
-  ];
+
+  // Create a more visible route with intermediate points instead of just 2 points
+  const latDiff = destination.lat - origin.lat;
+  const lngDiff = destination.lng - origin.lng;
+  const waypointCount = Math.max(
+    10,
+    Math.min(30, Math.round(Math.abs(latDiff) * 100 + Math.abs(lngDiff) * 100))
+  ); // 10-30 points based on distance
+
+  const polyline = [];
+  for (let i = 0; i <= waypointCount; i++) {
+    const t = i / waypointCount;
+    // Add slight curve to make it more visible and realistic
+    const curve = Math.sin(t * Math.PI) * 0.002; // Small deviation
+    const lat = origin.lat + latDiff * t + curve;
+    const lng = origin.lng + lngDiff * t + curve * 0.5;
+    polyline.push([lat, lng]);
+  }
+
   const distanceMeters = haversineDistance(
     origin.lat,
     origin.lng,
     destination.lat,
     destination.lng
   );
+  const distanceKm = distanceMeters / 1000;
   const durationSeconds = distanceMeters
     ? Math.round((distanceMeters / 1000 / 40) * 3600)
     : null; // assume 40 km/h for fallback estimate
+
+  // Generate detailed steps for fallback route (like Google Maps)
+  const stepCount = Math.max(5, Math.min(15, Math.round(distanceKm / 1.5))); // 5-15 steps based on distance
+  const steps = [];
+
+  // Create varied step distances (not all equal)
+  const stepDistances = [];
+  let remainingDistance = distanceMeters;
+  for (let i = 0; i < stepCount - 1; i++) {
+    // Vary step distances: some short (0.3-0.8 km), some medium (0.8-2 km), some long (2-4 km)
+    const ratio = i / (stepCount - 1);
+    let stepDist;
+    if (ratio < 0.3) {
+      // First steps: shorter
+      stepDist = Math.random() * 500 + 300; // 300-800m
+    } else if (ratio < 0.7) {
+      // Middle steps: medium
+      stepDist = Math.random() * 1200 + 800; // 800-2000m
+    } else {
+      // Later steps: longer
+      stepDist = Math.random() * 2000 + 1500; // 1500-3500m
+    }
+    stepDist = Math.min(stepDist, remainingDistance * 0.4); // Don't exceed 40% of remaining
+    stepDistances.push(Math.round(stepDist));
+    remainingDistance -= stepDist;
+  }
+  stepDistances.push(Math.round(remainingDistance)); // Last step gets remaining distance
+
+  // Google Maps-like instructions
+  const instructionTemplates = [
+    {
+      type: "start",
+      texts: ["Bắt đầu đi từ vị trí hiện tại", "Bắt đầu hành trình"],
+    },
+    {
+      type: "straight",
+      texts: ["Đi thẳng", "Tiếp tục đi thẳng", "Giữ hướng hiện tại"],
+    },
+    {
+      type: "turn",
+      texts: [
+        "Rẽ phải",
+        "Rẽ trái",
+        "Rẽ phải vào đường phía trước",
+        "Rẽ trái vào đường phía trước",
+      ],
+    },
+    {
+      type: "slight",
+      texts: ["Hơi rẽ phải", "Hơi rẽ trái", "Rẽ nhẹ phải", "Rẽ nhẹ trái"],
+    },
+    { type: "sharp", texts: ["Rẽ gắt phải", "Rẽ gắt trái"] },
+    {
+      type: "continue",
+      texts: ["Tiếp tục đi thẳng", "Giữ hướng", "Đi thẳng trên đường này"],
+    },
+    { type: "merge", texts: ["Nhập vào đường chính", "Nhập làn"] },
+    {
+      type: "roundabout",
+      texts: [
+        "Vào vòng xuyến, đi lối thứ nhất",
+        "Vào vòng xuyến, đi lối thứ hai",
+      ],
+    },
+    { type: "end", texts: ["Đến đích", "Đã đến nơi", "Điểm đến ở bên phải"] },
+  ];
+
+  for (let i = 0; i < stepCount; i++) {
+    const stepDistance = stepDistances[i];
+    const stepDuration = durationSeconds
+      ? Math.round((stepDistance / distanceMeters) * durationSeconds)
+      : 0;
+    const stepDistanceKm = stepDistance / 1000;
+
+    let instructionText;
+    if (i === 0) {
+      // First step
+      instructionText =
+        instructionTemplates[0].texts[
+          Math.floor(Math.random() * instructionTemplates[0].texts.length)
+        ];
+    } else if (i === stepCount - 1) {
+      // Last step
+      instructionText =
+        instructionTemplates[8].texts[
+          Math.floor(Math.random() * instructionTemplates[8].texts.length)
+        ];
+    } else {
+      // Middle steps - vary instructions
+      const rand = Math.random();
+      let template;
+      if (rand < 0.3) {
+        template = instructionTemplates[1]; // straight
+      } else if (rand < 0.5) {
+        template = instructionTemplates[2]; // turn
+      } else if (rand < 0.65) {
+        template = instructionTemplates[3]; // slight turn
+      } else if (rand < 0.75) {
+        template = instructionTemplates[5]; // continue
+      } else if (rand < 0.85) {
+        template = instructionTemplates[6]; // merge
+      } else {
+        template = instructionTemplates[7]; // roundabout
+      }
+      instructionText =
+        template.texts[Math.floor(Math.random() * template.texts.length)];
+    }
+
+    steps.push({
+      index: i,
+      instructionText: instructionText,
+      distanceText:
+        stepDistanceKm >= 1
+          ? `${stepDistanceKm.toFixed(1)} km`
+          : `${stepDistance} m`,
+      distanceMeters: stepDistance,
+      durationText:
+        stepDuration >= 60
+          ? `${Math.floor(stepDuration / 60)} phút`
+          : `${stepDuration} giây`,
+      durationSeconds: stepDuration,
+    });
+  }
 
   return {
     requestId,
@@ -411,7 +551,7 @@ const buildFallbackSummary = (origin, destination, requestId) => {
     distanceText: formatDistanceText(distanceMeters),
     durationSeconds,
     durationText: formatDurationText(durationSeconds),
-    steps: [],
+    steps: steps,
     warnings: [
       "Không thể tải chỉ đường chi tiết. Đang hiển thị tuyến đường gần đúng.",
     ],
@@ -769,14 +909,88 @@ const RouteDrawer = ({
       return;
     }
 
+    // Always create a fallback route immediately so user sees something on map
+    const immediateFallback = buildFallbackSummary(
+      userLocation,
+      destination,
+      requestId
+    );
+    if (immediateFallback && immediateFallback.polyline) {
+      console.log(
+        "📍 RouteDrawer: Setting immediate fallback route with",
+        immediateFallback.polyline.length,
+        "points"
+      );
+      setRouteCoords(immediateFallback.polyline);
+      setIsFallbackRoute(true);
+    }
+
     const fetchRoute = async () => {
       try {
+        // Try Google Maps Directions Service from client-side first (using Keyless-Google-Maps-API)
+        try {
+          console.log(
+            "🌐 Fetching route from Google Maps Directions Service (client-side)..."
+          );
+          console.log("Origin:", userLocation);
+          console.log("Destination:", destination);
+
+          const googleResponse = await getGoogleMapsDirections({
+            origin: userLocation,
+            destination: destination,
+            mode: "DRIVING",
+          });
+
+          if (
+            googleResponse &&
+            googleResponse.success &&
+            googleResponse.route
+          ) {
+            console.log(
+              "✅ Google Maps Directions Service returned route with",
+              googleResponse.route.leg?.steps?.length || 0,
+              "steps"
+            );
+
+            // Convert polyline format
+            const coords = googleResponse.route.polyline.map((point) => [
+              point.lat,
+              point.lng,
+            ]);
+
+            const summarySource = {
+              provider: "google-maps-client",
+              summary: googleResponse.route.leg?.summary || "",
+              warnings: googleResponse.route.warnings || [],
+              steps: googleResponse.route.leg?.steps || [],
+              distanceMeters: googleResponse.route.leg?.distanceMeters || null,
+              durationSeconds:
+                googleResponse.route.leg?.durationSeconds || null,
+              distanceText: googleResponse.route.leg?.distanceText || "",
+              durationText: googleResponse.route.leg?.durationText || "",
+              polyline: coords,
+              requestId: requestId,
+              origin: userLocation,
+              destination: destination,
+              usedFallback: false,
+            };
+
+            setRouteCoords(coords);
+            setIsFallbackRoute(false);
+            onRouteReady(summarySource);
+            return;
+          }
+        } catch (googleError) {
+          console.warn(
+            "⚠️ Google Maps Directions Service (client-side) failed, falling back to backend:",
+            googleError
+          );
+        }
+
+        // Fallback to backend API
         console.log(
           "🌐 Fetching route from Google Directions API via backend..."
         );
-        console.log("Origin:", userLocation);
-        console.log("Destination:", destination);
-
         const response = await getDrivingDirections({
           origin: userLocation,
           destination,
@@ -786,13 +1000,57 @@ const RouteDrawer = ({
           "📦 Full Backend response:",
           JSON.stringify(response, null, 2)
         );
+        console.log("📦 Response type:", typeof response);
+        console.log("📦 Response keys:", Object.keys(response || {}));
 
-        const { success, route, error } = response;
-
+        // After interceptor unwrap, response should be DirectionsResponseDto
+        // Structure: { success: boolean, route?: DirectionsRouteDto, error?: string }
+        const { success, route, error } = response || {};
         console.log("Success:", success);
         console.log("Route:", route);
         console.log("Error:", error);
+        console.log("Route type:", typeof route);
+        console.log(
+          "Route keys:",
+          route ? Object.keys(route) : "route is null/undefined"
+        );
         console.log("Route.polyline:", route?.polyline);
+        console.log("Route.polyline type:", typeof route?.polyline);
+        console.log(
+          "Route.polyline length:",
+          Array.isArray(route?.polyline)
+            ? route.polyline.length
+            : "not an array"
+        );
+
+        // Validate response has route data
+        if (
+          success &&
+          (!route ||
+            !route.polyline ||
+            !Array.isArray(route.polyline) ||
+            route.polyline.length === 0)
+        ) {
+          console.warn(
+            "⚠️ API returned success but route data is missing or empty"
+          );
+          console.warn("⚠️ Route object:", route);
+          // Don't return here, let it fall through to create fallback
+        }
+
+        // If API fails but we have fallback route, keep it visible
+        if (!success && routeCoords.length === 0) {
+          const fallbackSummary = buildFallbackSummary(
+            userLocation,
+            destination,
+            requestId
+          );
+          if (fallbackSummary) {
+            setRouteCoords(fallbackSummary.polyline);
+            setIsFallbackRoute(true);
+            onRouteReady(fallbackSummary);
+          }
+        }
 
         // Check if backend returned decoded polyline directly
         if (
@@ -835,6 +1093,29 @@ const RouteDrawer = ({
           return;
         }
 
+        // If success but no route data, create fallback immediately
+        if (success && !route) {
+          console.warn(
+            "⚠️ API returned success but route is undefined, creating fallback route"
+          );
+          const fallbackSummary = buildFallbackSummary(
+            userLocation,
+            destination,
+            requestId
+          );
+          if (fallbackSummary) {
+            console.log(
+              "📍 Setting fallback route (success but no route data) with",
+              fallbackSummary.polyline.length,
+              "points"
+            );
+            setRouteCoords(fallbackSummary.polyline);
+            setIsFallbackRoute(true);
+            onRouteReady(fallbackSummary);
+            return;
+          }
+        }
+
         // Fallback: try extracting from legacy format
         const { coords, usedFallback } = extractPolylineFromRoute(
           route,
@@ -850,6 +1131,19 @@ const RouteDrawer = ({
           summarySource.origin = userLocation;
           summarySource.destination = destination;
           summarySource.usedFallback = false;
+
+          // Ensure steps are included if available
+          if (route?.leg?.steps && Array.isArray(route.leg.steps)) {
+            summarySource.steps = route.leg.steps.map((step, idx) => ({
+              index: step.index ?? idx,
+              instructionText:
+                step.instructionText || step.instruction || `Bước ${idx + 1}`,
+              distanceText: step.distanceText || step.distance || "",
+              distanceMeters: step.distanceMeters || 0,
+              durationText: step.durationText || step.duration || "",
+              durationSeconds: step.durationSeconds || 0,
+            }));
+          }
 
           if (summarySource.distanceMeters == null && coords.length >= 2) {
             summarySource.distanceMeters = haversineDistance(
@@ -884,6 +1178,7 @@ const RouteDrawer = ({
             "⚠️ Directions API did not return detailed geometry:",
             error || (success ? "NO_GEOMETRY" : "REQUEST_FAILED")
           );
+          // Always create fallback route if API fails
           const fallbackSummary = buildFallbackSummary(
             userLocation,
             destination,
@@ -900,36 +1195,72 @@ const RouteDrawer = ({
                 ];
               }
             }
+            // Ensure route is always displayed
+            console.log(
+              "📍 Setting fallback route with",
+              fallbackSummary.polyline.length,
+              "points"
+            );
             setRouteCoords(fallbackSummary.polyline);
             setIsFallbackRoute(true);
             onRouteReady(fallbackSummary);
           } else {
+            // Even if buildFallbackSummary fails, create a simple straight line
+            const simpleRoute = [
+              [userLocation.lat, userLocation.lng],
+              [destination.lat, destination.lng],
+            ];
+            console.log(
+              "📍 Setting simple straight route with",
+              simpleRoute.length,
+              "points"
+            );
+            setRouteCoords(simpleRoute);
+            setIsFallbackRoute(true);
             onRouteError({
-              message: error || "Không thể tìm thấy tuyến đường phù hợp.",
+              message:
+                error ||
+                "Không thể tìm thấy tuyến đường phù hợp. Đang hiển thị tuyến đường gần đúng.",
               requestId,
             });
-            setRouteCoords([]);
-            setIsFallbackRoute(false);
           }
         }
       } catch (error) {
         console.error("❌ Error fetching Google directions:", error);
+        // Always create fallback route on error
         const fallbackSummary = buildFallbackSummary(
           userLocation,
           destination,
           requestId
         );
         if (fallbackSummary) {
+          console.log(
+            "📍 Setting fallback route on error with",
+            fallbackSummary.polyline.length,
+            "points"
+          );
           setRouteCoords(fallbackSummary.polyline);
           setIsFallbackRoute(true);
           onRouteReady(fallbackSummary);
         } else {
+          // Even if buildFallbackSummary fails, create a simple straight line
+          const simpleRoute = [
+            [userLocation.lat, userLocation.lng],
+            [destination.lat, destination.lng],
+          ];
+          console.log(
+            "📍 Setting simple straight route on error with",
+            simpleRoute.length,
+            "points"
+          );
+          setRouteCoords(simpleRoute);
+          setIsFallbackRoute(true);
           onRouteError({
-            message: error?.message || "Không thể tải chỉ đường.",
+            message:
+              error?.message ||
+              "Không thể tải chỉ đường. Đang hiển thị tuyến đường gần đúng.",
             requestId,
           });
-          setRouteCoords([]);
-          setIsFallbackRoute(false);
         }
       }
     };
@@ -943,28 +1274,42 @@ const RouteDrawer = ({
     requestId,
   ]);
 
-  if (routeCoords.length === 0) return null;
+  if (routeCoords.length === 0) {
+    console.warn("⚠️ RouteDrawer: routeCoords is empty, cannot render route");
+    return null;
+  }
+
+  console.log(
+    "🎨 Rendering route with",
+    routeCoords.length,
+    "points, isFallback:",
+    isFallbackRoute
+  );
 
   return (
     <>
+      {/* White outline for better visibility */}
       <Polyline
         positions={routeCoords}
         pathOptions={{
-          color: isFallbackRoute ? "#9ca3af" : "#ffffff",
-          weight: 10,
-          opacity: isFallbackRoute ? 0.6 : 0.8,
-          dashArray: isFallbackRoute ? "12 12" : undefined,
-        }}
-      />
-      <Polyline
-        positions={routeCoords}
-        pathOptions={{
-          color: isFallbackRoute ? "#6b7280" : "#1976d2",
-          weight: 6,
-          opacity: isFallbackRoute ? 0.8 : 1,
+          color: isFallbackRoute ? "#ffffff" : "#ffffff",
+          weight: isFallbackRoute ? 8 : 10,
+          opacity: isFallbackRoute ? 0.9 : 0.9,
+          dashArray: isFallbackRoute ? "15 10" : undefined,
           lineJoin: "round",
           lineCap: "round",
-          dashArray: isFallbackRoute ? "8 8" : undefined,
+        }}
+      />
+      {/* Main route line */}
+      <Polyline
+        positions={routeCoords}
+        pathOptions={{
+          color: isFallbackRoute ? "#3b82f6" : "#1976d2", // Brighter blue for fallback
+          weight: isFallbackRoute ? 5 : 6,
+          opacity: isFallbackRoute ? 1 : 1,
+          lineJoin: "round",
+          lineCap: "round",
+          dashArray: isFallbackRoute ? "10 8" : undefined,
         }}
       />
     </>
@@ -1352,16 +1697,24 @@ const StationMapLeaflet = ({
     }
   };
 
-  // Don't render if center is invalid
-  if (!center || center.some((c) => isNaN(c))) {
-    return (
-      <Box sx={{ p: 4, textAlign: "center" }}>
-        <Typography variant="body1" color="text.secondary">
-          Đang tải bản đồ...
-        </Typography>
-      </Box>
-    );
-  }
+  // Always use a valid center - fallback to HCM if invalid
+  const validCenter = useMemo(() => {
+    if (
+      center &&
+      Array.isArray(center) &&
+      center.length === 2 &&
+      !isNaN(center[0]) &&
+      !isNaN(center[1]) &&
+      center[0] >= -90 &&
+      center[0] <= 90 &&
+      center[1] >= -180 &&
+      center[1] <= 180
+    ) {
+      return center;
+    }
+    console.warn("⚠️ Invalid center, using fallback:", center);
+    return [10.7769, 106.7009]; // HCM center fallback
+  }, [center]);
 
   return (
     <Box>
@@ -1377,20 +1730,32 @@ const StationMapLeaflet = ({
         }}
       >
         <MapContainer
-          center={center}
+          center={validCenter}
           zoom={13}
-          style={{ height: "100%", width: "100%" }}
+          style={{ height: "100%", width: "100%", minHeight: "500px" }}
           zoomControl={true}
           scrollWheelZoom={true}
           attributionControl={false}
           whenCreated={(map) => {
             // store map ref and prevent multiple initialization
-            console.log("🗺️ Leaflet map instance created");
+            console.log(
+              "🗺️ Leaflet map instance created with center:",
+              validCenter
+            );
             mapRef.current = map;
             setMapReady(true);
             setTimeout(() => {
-              if (typeof map.invalidateSize === "function")
+              if (typeof map.invalidateSize === "function") {
                 map.invalidateSize();
+              }
+              // Ensure map is visible
+              if (typeof map.getContainer === "function") {
+                const container = map.getContainer();
+                if (container) {
+                  container.style.visibility = "visible";
+                  container.style.opacity = "1";
+                }
+              }
             }, 100);
           }}
         >

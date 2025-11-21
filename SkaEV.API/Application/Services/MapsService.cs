@@ -40,26 +40,53 @@ public class MapsService : IMapsService
             throw new ArgumentNullException(nameof(request));
         }
 
-        // Try OSRM first (free, no API key needed)
-        var osrmResult = await GetOsrmDirectionsAsync(request, cancellationToken);
-        if (osrmResult.Success)
-        {
-            _logger.LogInformation("Successfully fetched directions from OSRM");
-            return osrmResult;
-        }
+        _logger.LogInformation("Getting directions from {OriginLat},{OriginLng} to {DestLat},{DestLng}", 
+            request.OriginLat, request.OriginLng, request.DestinationLat, request.DestinationLng);
 
-        // Fallback to Google Maps if API key is configured
+        // Try Google Maps first if API key is configured (more reliable for Vietnam)
         if (!string.IsNullOrWhiteSpace(_options.DirectionsApiKey))
         {
-            _logger.LogInformation("Falling back to Google Maps Directions API");
-            return await GetGoogleDirectionsAsync(request, cancellationToken);
+            _logger.LogInformation("Attempting Google Maps Directions API first");
+            var googleResult = await GetGoogleDirectionsAsync(request, cancellationToken);
+            if (googleResult.Success && googleResult.Route != null && googleResult.Route.Polyline != null && googleResult.Route.Polyline.Count > 0)
+            {
+                _logger.LogInformation("✅ Successfully fetched directions from Google Maps with {PointCount} points", googleResult.Route.Polyline.Count);
+                return googleResult;
+            }
+            
+            if (googleResult.Success && (googleResult.Route == null || googleResult.Route.Polyline == null || googleResult.Route.Polyline.Count == 0))
+            {
+                _logger.LogWarning("⚠️ Google Maps returned success but no route data, trying OSRM");
+            }
+            else
+            {
+                _logger.LogWarning("⚠️ Google Maps failed: {Error}, trying OSRM", googleResult.Error);
+            }
         }
 
-        _logger.LogWarning("No routing service available");
+        // Fallback to OSRM (free, no API key needed)
+        _logger.LogInformation("Attempting OSRM API");
+        var osrmResult = await GetOsrmDirectionsAsync(request, cancellationToken);
+        if (osrmResult.Success && osrmResult.Route != null && osrmResult.Route.Polyline != null && osrmResult.Route.Polyline.Count > 0)
+        {
+            _logger.LogInformation("✅ Successfully fetched directions from OSRM with {PointCount} points", osrmResult.Route.Polyline.Count);
+            return osrmResult;
+        }
+        
+        if (osrmResult.Success && (osrmResult.Route == null || osrmResult.Route.Polyline == null || osrmResult.Route.Polyline.Count == 0))
+        {
+            _logger.LogWarning("⚠️ OSRM returned success but no route data");
+        }
+        else
+        {
+            _logger.LogWarning("⚠️ OSRM failed: {Error}", osrmResult.Error);
+        }
+
+        _logger.LogError("❌ All routing services failed to return valid route data");
         return new DirectionsResponseDto
         {
             Success = false,
-            Error = "No routing service is configured."
+            Error = "No routing service is configured or all services failed to return route data."
         };
     }
 
@@ -84,24 +111,57 @@ public class MapsService : IMapsService
                 return new DirectionsResponseDto { Success = false, Error = "OSRM API failed" };
             }
 
+            _logger.LogInformation("OSRM API response content: {Content}", content);
+            
             var payload = JsonSerializer.Deserialize<OsrmResponse>(content, JsonOptions);
-            if (payload?.Code != "Ok" || payload.Routes == null || payload.Routes.Length == 0)
+            if (payload == null)
             {
-                _logger.LogWarning("OSRM returned no routes");
-                return new DirectionsResponseDto { Success = false, Error = "No route found" };
+                _logger.LogWarning("Failed to deserialize OSRM response");
+                return new DirectionsResponseDto { Success = false, Error = "Failed to parse OSRM response" };
+            }
+            
+            _logger.LogInformation("OSRM response code: {Code}, Routes count: {Count}", payload.Code, payload.Routes?.Length ?? 0);
+            
+            if (payload.Code != "Ok" || payload.Routes == null || payload.Routes.Length == 0)
+            {
+                _logger.LogWarning("OSRM returned no routes. Code: {Code}", payload.Code);
+                return new DirectionsResponseDto { Success = false, Error = $"No route found. OSRM code: {payload.Code}" };
             }
 
             var route = payload.Routes[0];
             var leg = route.Legs?[0];
             
+            _logger.LogInformation("OSRM route - Distance: {Distance}, Duration: {Duration}, Geometry: {HasGeometry}", 
+                route.Distance, route.Duration, route.Geometry != null);
+            
             // Convert GeoJSON coordinates to our format
             var polyline = route.Geometry?.Coordinates?
-                .Select(coord => new RoutePointDto 
-                { 
-                    Lat = coord[1], // GeoJSON is [lng, lat]
-                    Lng = coord[0] 
+                .Select(coord => 
+                {
+                    if (coord == null || coord.Length < 2)
+                    {
+                        _logger.LogWarning("Invalid coordinate in OSRM geometry: {Coord}", coord);
+                        return null;
+                    }
+                    return new RoutePointDto 
+                    { 
+                        Lat = coord[1], // GeoJSON is [lng, lat]
+                        Lng = coord[0] 
+                    };
                 })
+                .Where(p => p != null)
+                .Cast<RoutePointDto>()
                 .ToArray() ?? Array.Empty<RoutePointDto>();
+
+            // Validate that we have polyline points
+            if (polyline.Length == 0)
+            {
+                _logger.LogWarning("OSRM returned route but no valid geometry coordinates. Geometry: {Geometry}", 
+                    route.Geometry != null ? "exists" : "null");
+                return new DirectionsResponseDto { Success = false, Error = "OSRM returned route without valid geometry" };
+            }
+
+            _logger.LogInformation("OSRM returned route with {PointCount} polyline points", polyline.Length);
 
             // Parse steps from OSRM
             var steps = leg?.Steps?
@@ -149,7 +209,8 @@ public class MapsService : IMapsService
         var destination = $"{request.DestinationLat.ToString(System.Globalization.CultureInfo.InvariantCulture)},{request.DestinationLng.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
         var mode = string.IsNullOrWhiteSpace(request.Mode) ? "driving" : request.Mode.ToLowerInvariant();
 
-        var url = $"{_options.BaseDirectionsUrl}?origin={origin}&destination={destination}&mode={mode}&key={_options.DirectionsApiKey}";
+        // Request detailed steps and alternative routes from Google Maps API
+        var url = $"{_options.BaseDirectionsUrl}?origin={origin}&destination={destination}&mode={mode}&language=vi&key={_options.DirectionsApiKey}";
 
         try
         {
@@ -204,6 +265,54 @@ public class MapsService : IMapsService
 
             var decodedPoints = DecodePolyline(route.OverviewPolyline?.Points);
 
+            // Parse steps from Google Maps API
+            // Google Maps API returns steps in leg.Steps array by default
+            var steps = leg.Steps?
+                .Select((step, index) => 
+                {
+                    // Extract plain text from HTML instructions (remove HTML tags)
+                    var htmlInstruction = step.HtmlInstructions ?? step.Instructions ?? string.Empty;
+                    var plainText = htmlInstruction;
+                    if (!string.IsNullOrEmpty(htmlInstruction))
+                    {
+                        // Simple HTML tag removal using regex
+                        plainText = System.Text.RegularExpressions.Regex.Replace(
+                            htmlInstruction, 
+                            "<[^>]+>", 
+                            string.Empty
+                        );
+                        // Decode HTML entities
+                        plainText = plainText
+                            .Replace("&nbsp;", " ")
+                            .Replace("&amp;", "&")
+                            .Replace("&lt;", "<")
+                            .Replace("&gt;", ">")
+                            .Replace("&quot;", "\"")
+                            .Replace("&#39;", "'")
+                            .Trim();
+                    }
+                    
+                    return new DirectionsStepDto
+                    {
+                        Index = index,
+                        InstructionText = !string.IsNullOrEmpty(plainText) ? plainText : $"Bước {index + 1}",
+                        InstructionHtml = step.HtmlInstructions ?? string.Empty,
+                        DistanceText = step.Distance?.Text ?? string.Empty,
+                        DistanceMeters = step.Distance?.Value ?? 0,
+                        DurationText = step.Duration?.Text ?? string.Empty,
+                        DurationSeconds = step.Duration?.Value ?? 0
+                    };
+                })
+                .ToArray() ?? Array.Empty<DirectionsStepDto>();
+
+            _logger.LogInformation("Google Maps returned route with {PointCount} polyline points and {StepCount} steps", 
+                decodedPoints.Length, steps.Length);
+            
+            if (steps.Length == 0)
+            {
+                _logger.LogWarning("Google Maps API returned route but no steps. This might indicate the API response format has changed or steps were not requested.");
+            }
+
             var responseDto = new DirectionsResponseDto
             {
                 Success = true,
@@ -215,7 +324,8 @@ public class MapsService : IMapsService
                         DistanceText = leg.Distance?.Text ?? string.Empty,
                         DistanceMeters = leg.Distance?.Value ?? 0,
                         DurationText = leg.Duration?.Text ?? string.Empty,
-                        DurationSeconds = leg.Duration?.Value ?? 0
+                        DurationSeconds = leg.Duration?.Value ?? 0,
+                        Steps = steps
                     },
                     Polyline = decodedPoints,
                     RawOverviewPolyline = route.OverviewPolyline?.Points,
@@ -417,6 +527,15 @@ public class MapsService : IMapsService
 
     private sealed class GoogleLeg
     {
+        public GoogleTextValue? Distance { get; set; }
+        public GoogleTextValue? Duration { get; set; }
+        public GoogleStep[]? Steps { get; set; }
+    }
+
+    private sealed class GoogleStep
+    {
+        public string? HtmlInstructions { get; set; }
+        public string? Instructions { get; set; }
         public GoogleTextValue? Distance { get; set; }
         public GoogleTextValue? Duration { get; set; }
     }
