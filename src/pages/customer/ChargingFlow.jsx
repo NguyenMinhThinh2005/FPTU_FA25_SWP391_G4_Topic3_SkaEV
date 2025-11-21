@@ -84,7 +84,7 @@ import {
   chargingAPI,
   stationsAPI,
   invoicesAPI,
-  vnpayAPI,
+  mockPaymentAPI,
   bookingsAPI,
 } from "../../services/api";
 
@@ -1246,12 +1246,13 @@ const ChargingFlow = () => {
 
   // Calculate total cost including parking fee
   const calculateTotalCost = React.useCallback(() => {
-    const energyCost = completedSession?.totalAmount || sessionData.currentCost;
+    const energyCost = parseFloat(completedSession?.totalAmount || sessionData.currentCost || 0);
     const chargingDuration = chargingStartTime
       ? Math.round((new Date() - chargingStartTime) / (1000 * 60))
-      : Math.round(sessionData.energyDelivered * 3); // 3 minutes per kWh estimate
+      : Math.round((sessionData.energyDelivered || 0) * 3); // 3 minutes per kWh estimate
     const parkingFee = Math.max(0, chargingDuration * 500); // 500 VND per minute
-    return energyCost + parkingFee;
+    const total = (isNaN(energyCost) ? 0 : energyCost) + parkingFee;
+    return isNaN(total) ? 0 : total;
   }, [completedSession, sessionData, chargingStartTime]);
 
   // Simulate realistic charging progress
@@ -2854,8 +2855,8 @@ const ChargingFlow = () => {
                     >
                       <Typography variant="body2">Năng lượng:</Typography>
                       <Typography variant="body2" fontWeight="medium">
-                        {completedSession?.energyDelivered ||
-                          sessionData.energyDelivered.toFixed(1)}{" "}
+                        {(completedSession?.energyDelivered ||
+                          parseFloat(sessionData.energyDelivered) || 0).toFixed(1)}{" "}
                         kWh
                       </Typography>
                     </Box>
@@ -2874,7 +2875,7 @@ const ChargingFlow = () => {
                               ? Math.round(
                                   (new Date() - chargingStartTime) / (1000 * 60)
                                 )
-                              : Math.round(sessionData.energyDelivered * 3))
+                              : Math.round((parseFloat(sessionData.energyDelivered) || 0) * 3)) || 0
                         )}
                       </Typography>
                     </Box>
@@ -2902,8 +2903,7 @@ const ChargingFlow = () => {
                       </Typography>
                       <Typography variant="body2" fontWeight="medium">
                         {formatCurrency(
-                          completedSession?.totalAmount ||
-                            sessionData.currentCost
+                          parseFloat(completedSession?.totalAmount || sessionData.currentCost || 0) || 0
                         )}
                       </Typography>
                     </Box>
@@ -2917,11 +2917,11 @@ const ChargingFlow = () => {
                       <Typography variant="body2">Phí đỗ xe:</Typography>
                       <Typography variant="body2" fontWeight="medium">
                         {formatCurrency(
-                          (chargingStartTime
+                          ((chargingStartTime
                             ? Math.round(
                                 (new Date() - chargingStartTime) / (1000 * 60)
                               )
-                            : Math.round(sessionData.energyDelivered * 3)) * 500
+                            : Math.round((parseFloat(sessionData.energyDelivered) || 0) * 3)) || 0) * 500
                         )}
                       </Typography>
                     </Box>
@@ -2958,10 +2958,10 @@ const ChargingFlow = () => {
                       color="text.secondary"
                       sx={{ mb: 3 }}
                     >
-                      Thanh toán an toàn qua cổng VNPay
+                      Thanh toán nhanh chóng và an toàn
                     </Typography>
 
-                    {/* VNPay Payment Info */}
+                    {/* Payment Info */}
                     <Box
                       sx={{
                         border: 2,
@@ -2981,7 +2981,7 @@ const ChargingFlow = () => {
                           fontWeight="bold"
                           color="primary.main"
                         >
-                          💳 VNPay
+                          💳 Ví điện tử
                         </Typography>
                       </Box>
                       <Typography
@@ -2989,17 +2989,17 @@ const ChargingFlow = () => {
                         color="text.secondary"
                         sx={{ mb: 2 }}
                       >
-                        • Thanh toán qua thẻ ATM/Visa/MasterCard
+                        • Thanh toán ngay lập tức
                       </Typography>
                       <Typography
                         variant="body2"
                         color="text.secondary"
                         sx={{ mb: 2 }}
                       >
-                        • Ví điện tử VNPay
+                        • Không cần chuyển hướng
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        • Bảo mật SSL 256-bit
+                        • Bảo mật và an toàn
                       </Typography>
                     </Box>
 
@@ -3045,46 +3045,34 @@ const ChargingFlow = () => {
                           const invoice = invoiceResponse;
                           console.log("✅ Found invoice:", invoice);
 
-                          // 2. Create VNPay payment URL
-                          console.log("💳 Creating VNPay payment URL...");
-                          const vnpayResponse = await vnpayAPI.createPaymentUrl(
+                          // 2. Process payment immediately (Mock Payment)
+                          console.log("💳 Processing payment...");
+                          const paymentResponse = await mockPaymentAPI.processPayment(
                             {
                               invoiceId: invoice.invoiceId,
-                              amount: invoice.totalAmount,
-                              orderDescription: `Thanh toan hoa don #${
-                                invoice.invoiceId
-                              } - Phien sac ${invoice.stationName || "SkaEV"}`,
-                              bankCode: null, // Let user choose at VNPay
                             }
                           );
 
-                          if (!vnpayResponse?.data?.paymentUrl) {
+                          // Axios interceptor unwraps ApiResponse, so paymentResponse is the data object directly
+                          if (!paymentResponse?.success) {
                             throw new Error(
-                              "Không thể tạo liên kết thanh toán"
+                              paymentResponse?.message || "Không thể xử lý thanh toán"
                             );
                           }
 
                           console.log(
-                            "🔗 VNPay payment URL created:",
-                            vnpayResponse.data.paymentUrl
+                            "✅ Payment processed successfully:",
+                            paymentResponse
                           );
 
-                          // 3. Save current state before redirecting
-                          sessionStorage.setItem(
-                            "pendingPaymentInvoiceId",
-                            invoice.invoiceId
-                          );
-                          sessionStorage.setItem(
-                            "pendingPaymentBookingId",
-                            bookingId
-                          );
-                          sessionStorage.setItem(
-                            "returnToChargingFlow",
-                            "true"
+                          // 3. Payment successful - move to complete step
+                          notificationService.success(
+                            `Thanh toán thành công! Số tiền: ${formatCurrency(paymentResponse.amount)}`
                           );
 
-                          // 4. Redirect to VNPay
-                          window.location.href = vnpayResponse.data.paymentUrl;
+                          // 4. Move to complete step
+                          setFlowStep(6);
+                          setPaymentLoading(false);
                         } catch (error) {
                           console.error("❌ Payment error:", error);
                           setPaymentError(

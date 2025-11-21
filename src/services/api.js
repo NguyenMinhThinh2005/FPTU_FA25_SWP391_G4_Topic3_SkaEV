@@ -592,7 +592,16 @@ export const chargingAPI = {
   },
 };
 
-// VNPay Payment Gateway API
+// Mock Payment API - Simple payment processing without external gateway
+export const mockPaymentAPI = {
+  // Process payment immediately
+  processPayment: (paymentData) => {
+    // paymentData: { invoiceId }
+    return axiosInstance.post("/mock-payment/process", paymentData);
+  },
+};
+
+// VNPay Payment Gateway API (Deprecated - kept for backward compatibility)
 export const vnpayAPI = {
   // Create VNPay payment URL
   createPaymentUrl: (paymentData) => {
