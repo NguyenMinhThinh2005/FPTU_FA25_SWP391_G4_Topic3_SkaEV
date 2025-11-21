@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using SkaEV.API.Application.DTOs.Stations;
 using SkaEV.API.Application.DTOs.Slots;
@@ -18,15 +19,18 @@ public class StationsController : BaseApiController
 {
     private readonly IStationService _stationService;
     private readonly ILogger<StationsController> _logger;
+    private readonly SkaEV.API.Infrastructure.Data.SkaEVDbContext _context;
 
     /// <summary>
-    /// Constructor nhận vào StationService và Logger.
+    /// Constructor nhận vào StationService, DbContext và Logger.
     /// </summary>
     /// <param name="stationService">Service trạm sạc.</param>
+    /// <param name="context">Database context.</param>
     /// <param name="logger">Logger hệ thống.</param>
-    public StationsController(IStationService stationService, ILogger<StationsController> logger)
+    public StationsController(IStationService stationService, SkaEV.API.Infrastructure.Data.SkaEVDbContext context, ILogger<StationsController> logger)
     {
         _stationService = stationService;
+        _context = context;
         _logger = logger;
     }
 
@@ -368,8 +372,41 @@ public class StationsController : BaseApiController
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAvailablePosts(int stationId)
     {
-        // Gọi service để lấy trụ sạc khả dụng
-        var posts = await _stationService.GetAvailablePostsAsync(stationId);
+        // Lấy posts với slots nested từ database
+        var postsFromDb = await _context.ChargingPosts
+            .Include(p => p.ChargingSlots)
+            .Where(p => p.StationId == stationId && p.Status == "available")
+            .ToListAsync();
+        
+        // Transform to ChargingPostDto structure with PostType and nested Slots
+        var posts = postsFromDb.Select(p => {
+            // Determine PostType from ConnectorTypes or PostNumber
+            string postType = "AC"; // Default
+            if (!string.IsNullOrEmpty(p.ConnectorTypes))
+            {
+                if (p.ConnectorTypes.Contains("CCS", StringComparison.OrdinalIgnoreCase) ||
+                    p.ConnectorTypes.Contains("CHAdeMO", StringComparison.OrdinalIgnoreCase) ||
+                    p.ConnectorTypes.Contains("GB/T", StringComparison.OrdinalIgnoreCase) ||
+                    p.PostNumber.Contains("DC", StringComparison.OrdinalIgnoreCase))
+                {
+                    postType = "DC";
+                }
+            }
+            
+            return new {
+                PostId = p.PostId,
+                PostName = p.PostNumber,
+                PostType = postType,
+                Slots = p.ChargingSlots.Select(s => new {
+                    SlotId = s.SlotId,
+                    SlotNumber = s.SlotNumber,
+                    ConnectorType = s.ConnectorType,
+                    MaxPower = s.MaxPower,
+                    Status = s.Status,
+                    CurrentBookingId = s.CurrentBookingId
+                }).ToList()
+            };
+        }).ToList();
         
         // Trả về danh sách trụ sạc và số lượng
         return OkResponse(new { data = posts, count = posts.Count });

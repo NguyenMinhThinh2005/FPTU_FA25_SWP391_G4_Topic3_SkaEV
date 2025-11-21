@@ -169,8 +169,9 @@ public partial class Program
         builder.Services.AddScoped<SkaEV.API.Application.Services.Payments.IPaymentProcessor, SkaEV.API.Application.Services.Payments.SimulatedPaymentProcessor>();
 
         // Background Simulation Services (Hosted Services run in the background for the lifetime of the app)
-        builder.Services.AddHostedService<SkaEV.API.Services.ChargingSimulationService>(); // Simulates charging progress
-        builder.Services.AddHostedService<SkaEV.API.Services.SystemEventsSimulationService>(); // Simulates system events
+        // ⚠️ DISABLED - Vô hiệu hóa tạm thời để tránh sinh dữ liệu rác trong quá trình test
+        // builder.Services.AddHostedService<SkaEV.API.Services.ChargingSimulationService>(); // Simulates charging progress
+        // builder.Services.AddHostedService<SkaEV.API.Services.SystemEventsSimulationService>(); // Simulates system events
 
         // Configure Swagger/OpenAPI for API documentation
         builder.Services.AddEndpointsApiExplorer();

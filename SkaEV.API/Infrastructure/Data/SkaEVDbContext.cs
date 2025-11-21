@@ -209,8 +209,7 @@ public class SkaEVDbContext : DbContext
             entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").IsRequired();
             entity.Property(e => e.DeletedAt).HasColumnName("deleted_at");
 
-            // Temporarily disable global query filter as deleted_at column doesn't exist in database
-            // entity.HasQueryFilter(e => e.DeletedAt == null); // Global query filter for soft delete
+            entity.HasQueryFilter(e => e.DeletedAt == null); // Global query filter for soft delete
 
             entity.HasOne(e => e.ChargingPost)
                 .WithMany(p => p.ChargingSlots)
@@ -235,8 +234,7 @@ public class SkaEVDbContext : DbContext
             entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").IsRequired();
             entity.Property(e => e.DeletedAt).HasColumnName("deleted_at");
 
-            // Temporarily disable global query filter as deleted_at column doesn't exist in database
-            // entity.HasQueryFilter(e => e.DeletedAt == null); // Global query filter for soft delete
+            entity.HasQueryFilter(e => e.DeletedAt == null); // Global query filter for soft delete
 
             entity.HasOne(e => e.ChargingStation)
                 .WithMany(s => s.ChargingPosts)

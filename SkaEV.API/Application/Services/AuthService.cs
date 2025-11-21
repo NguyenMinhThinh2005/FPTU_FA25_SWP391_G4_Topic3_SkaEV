@@ -63,9 +63,7 @@ public class AuthService : IAuthService
             return null;
         }
 
-        // BCrypt.Verify can throw when the stored password hash is in an unexpected format
-        // (for example legacy hashes). Treat verification errors as failed login instead
-        // of allowing an exception to bubble up (which caused HTTP 500 in logs).
+        // Verify password using BCrypt (Standard secure method)
         bool passwordMatches = false;
         try
         {
@@ -73,8 +71,7 @@ public class AuthService : IAuthService
         }
         catch (BCrypt.Net.SaltParseException)
         {
-            // Optional: log the issue to help debugging (keeps behavior stable).
-            // We don't have a logger injected here; swallowing is acceptable to avoid 500.
+            // Invalid BCrypt hash format in database
             passwordMatches = false;
         }
 

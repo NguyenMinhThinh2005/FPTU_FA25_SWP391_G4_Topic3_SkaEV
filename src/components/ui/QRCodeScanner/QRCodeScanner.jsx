@@ -6,7 +6,7 @@
   useCallback,
 } from "react";
 import { Camera, X, AlertCircle, RefreshCw } from "lucide-react";
-import { BrowserQRCodeReader } from "@zxing/browser";
+import { BrowserMultiFormatReader } from "@zxing/browser";
 import {
   Box,
   Typography,
@@ -178,12 +178,9 @@ const QRCodeScanner = ({ onScanSuccess, onClose }) => {
         checkVideo();
       });
 
-      // Initialize QR code reader
+      // Initialize QR code reader (without hints for compatibility)
       if (!codeReaderRef.current) {
-        codeReaderRef.current = new BrowserQRCodeReader(undefined, {
-          delayBetweenScanAttempts: 300,
-          delayBetweenScanSuccess: 1000,
-        });
+        codeReaderRef.current = new BrowserMultiFormatReader();
       }
 
       // Start decoding

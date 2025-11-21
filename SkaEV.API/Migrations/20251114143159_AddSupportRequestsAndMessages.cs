@@ -11,11 +11,12 @@ namespace SkaEV.API.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<int>(
-                name: "assigned_to_team_id",
-                table: "incidents",
-                type: "int",
-                nullable: true);
+            // Commented out: incidents table doesn't exist in current schema
+            // migrationBuilder.AddColumn<int>(
+            //     name: "assigned_to_team_id",
+            //     table: "incidents",
+            //     type: "int",
+            //     nullable: true);
 
             migrationBuilder.CreateTable(
                 name: "maintenance_teams",
@@ -80,7 +81,7 @@ namespace SkaEV.API.Migrations
                         column: x => x.user_id,
                         principalTable: "users",
                         principalColumn: "user_id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.NoAction); // Changed from Cascade to avoid multiple cascade paths
                 });
 
             migrationBuilder.CreateTable(
@@ -110,13 +111,14 @@ namespace SkaEV.API.Migrations
                         column: x => x.sender_id,
                         principalTable: "users",
                         principalColumn: "user_id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.NoAction); // Changed from Cascade to avoid multiple cascade paths
                 });
 
-            migrationBuilder.CreateIndex(
-                name: "IX_incidents_assigned_to_team_id",
-                table: "incidents",
-                column: "assigned_to_team_id");
+            // Commented out: incidents table doesn't exist in current schema
+            // migrationBuilder.CreateIndex(
+            //     name: "IX_incidents_assigned_to_team_id",
+            //     table: "incidents",
+            //     column: "assigned_to_team_id");
 
             migrationBuilder.CreateIndex(
                 name: "IX_support_request_messages_request_id",
@@ -158,21 +160,23 @@ namespace SkaEV.API.Migrations
                 table: "support_requests",
                 column: "user_id");
 
-            migrationBuilder.AddForeignKey(
-                name: "FK_incidents_maintenance_teams_assigned_to_team_id",
-                table: "incidents",
-                column: "assigned_to_team_id",
-                principalTable: "maintenance_teams",
-                principalColumn: "maintenance_team_id",
-                onDelete: ReferentialAction.SetNull);
+            // Commented out: incidents table doesn't exist in current schema
+            // migrationBuilder.AddForeignKey(
+            //     name: "FK_incidents_maintenance_teams_assigned_to_team_id",
+            //     table: "incidents",
+            //     column: "assigned_to_team_id",
+            //     principalTable: "maintenance_teams",
+            //     principalColumn: "maintenance_team_id",
+            //     onDelete: ReferentialAction.SetNull);
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropForeignKey(
-                name: "FK_incidents_maintenance_teams_assigned_to_team_id",
-                table: "incidents");
+            // Commented out: incidents table doesn't exist in current schema
+            // migrationBuilder.DropForeignKey(
+            //     name: "FK_incidents_maintenance_teams_assigned_to_team_id",
+            //     table: "incidents");
 
             migrationBuilder.DropTable(
                 name: "maintenance_teams");
@@ -183,13 +187,14 @@ namespace SkaEV.API.Migrations
             migrationBuilder.DropTable(
                 name: "support_requests");
 
-            migrationBuilder.DropIndex(
-                name: "IX_incidents_assigned_to_team_id",
-                table: "incidents");
+            // Commented out: incidents table doesn't exist in current schema
+            // migrationBuilder.DropIndex(
+            //     name: "IX_incidents_assigned_to_team_id",
+            //     table: "incidents");
 
-            migrationBuilder.DropColumn(
-                name: "assigned_to_team_id",
-                table: "incidents");
+            // migrationBuilder.DropColumn(
+            //     name: "assigned_to_team_id",
+            //     table: "incidents");
         }
     }
 }

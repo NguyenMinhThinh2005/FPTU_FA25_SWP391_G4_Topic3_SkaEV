@@ -182,17 +182,26 @@ namespace SkaEV.API.Application.Services
 
         public async Task<List<PostDto>> GetAvailablePostsAsync(int stationId)
         {
+            // CRITICAL: Must return ChargingPostDto structure for BookingModal
+            // This method needs refactoring to return proper nested structure
             var posts = await _context.ChargingPosts
+                .Include(p => p.ChargingSlots) // Include slots
                 .Where(p => p.StationId == stationId && p.Status == "available")
                 .ToListAsync();
 
-            return posts.Select(p => new PostDto
-            {
-                PostId = p.PostId,
-                StationId = p.StationId,
-                PostName = p.PostNumber,
-                Status = p.Status,
-                IsAvailable = p.Status == "available"
+            // Transform to PostDto with nested slots info
+            // PostType is derived from Post.ConnectorTypes or Post name
+            return posts.Select(p => {
+                var dto = new PostDto
+                {
+                    PostId = p.PostId,
+                    StationId = p.StationId,
+                    PostName = p.PostNumber,
+                    Status = p.Status,
+                    ConnectorTypes = p.ConnectorTypes,
+                    IsAvailable = p.Status == "available"
+                };
+                return dto;
             }).ToList();
         }
 

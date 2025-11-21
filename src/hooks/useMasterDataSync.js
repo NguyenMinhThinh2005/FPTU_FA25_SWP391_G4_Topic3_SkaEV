@@ -12,7 +12,7 @@ export const useMasterDataSync = () => {
   const { user } = useAuthStore();
   const bookingHistory = useBookingStore((state) => state.bookingHistory);
   const getBookingStats = useBookingStore((state) => state.getBookingStats);
-  const loadUserBookings = useBookingStore((state) => state.loadUserBookings);
+  const fetchBookings = useBookingStore((state) => state.fetchBookings);
   const fetchVehicles = useVehicleStore((state) => state.fetchVehicles);
   const paymentMethods = usePaymentMethodStore((state) => state.methods);
   const fetchPaymentMethods = usePaymentMethodStore(
@@ -31,7 +31,7 @@ export const useMasterDataSync = () => {
         try {
           // Load both bookings and vehicles in parallel
           await Promise.all([
-            loadUserBookings(),
+            fetchBookings(),
             fetchVehicles(),
             fetchPaymentMethods(),
           ]);
@@ -51,7 +51,7 @@ export const useMasterDataSync = () => {
     user,
     hasLoaded,
     isLoading,
-    loadUserBookings,
+    fetchBookings,
     fetchVehicles,
     fetchPaymentMethods,
   ]);

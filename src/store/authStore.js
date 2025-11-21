@@ -1,6 +1,7 @@
 ﻿import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { authAPI } from "../services/api";
+import axiosInstance from "../services/api";
 
 const useAuthStore = create(
   persist(
@@ -155,15 +156,41 @@ const useAuthStore = create(
         set({ user: userData });
       },
 
-      updateProfile: (profileData) => {
+      updateProfile: async (profileData) => {
         const currentUser = get().user;
-        if (currentUser) {
-          set({
-            user: {
-              ...currentUser,
-              ...profileData,
-            },
-          });
+        if (!currentUser) {
+          return { success: false, error: "No user logged in" };
+        }
+
+        try {
+          // Call API to update profile
+          const response = await axiosInstance.put(
+            "/auth/profile",
+            profileData
+          );
+
+          if (response.data?.success && response.data?.data) {
+            // Update local state with response data
+            set({
+              user: {
+                ...currentUser,
+                ...response.data.data,
+              },
+            });
+            return { success: true, data: response.data.data };
+          }
+
+          return {
+            success: false,
+            error: response.data?.message || "Update failed",
+          };
+        } catch (error) {
+          console.error("❌ Update profile error:", error);
+          return {
+            success: false,
+            error:
+              error.response?.data?.message || error.message || "Network error",
+          };
         }
       },
 

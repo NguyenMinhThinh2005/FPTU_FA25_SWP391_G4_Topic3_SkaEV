@@ -9,11 +9,14 @@ namespace SkaEV.API.Migrations
     {
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<DateTime>(
-                name: "deleted_at",
-                table: "charging_posts",
-                type: "datetime2",
-                nullable: true);
+            // Check and add deleted_at to charging_posts only if it doesn't exist
+            migrationBuilder.Sql(@"
+                IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS 
+                              WHERE TABLE_NAME = 'charging_posts' AND COLUMN_NAME = 'deleted_at')
+                BEGIN
+                    ALTER TABLE charging_posts ADD deleted_at datetime2 NULL;
+                END
+            ");
 
             migrationBuilder.AddColumn<DateTime>(
                 name: "deleted_at",
