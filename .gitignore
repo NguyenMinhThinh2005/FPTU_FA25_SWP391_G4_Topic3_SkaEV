@@ -23,9 +23,11 @@ dist-ssr
 *.sln
 *.sw?
 # Build outputs
-SkaEV.API/bin/
-SkaEV.API/obj/
+[Bb]in/
+[Oo]bj/
 SkaEV.API/logs/
+coverage/
+
 
 # Visual Studio
 .vs/
