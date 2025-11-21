@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "jsxv0LQ0blA=",
+  "dgSpecHash": "ro21h/0dQqg=",
   "success": true,
-  "projectFilePath": "D:\\Term5\\SWP391\\FPTU_FA25_SWP391_G4_Topic3_SkaEV\\SkaEV.API\\Tools\\PasswordHashTool\\PasswordHashTool.csproj",
+  "projectFilePath": "D:\\Term5\\SWP391\\FPTU_FA25_SWP391_G4_Topic3_SkaEV\\SkaEV.API\\tools\\PasswordHashTool\\PasswordHashTool.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\Admin\\.nuget\\packages\\bcrypt.net-next\\4.0.2\\bcrypt.net-next.4.0.2.nupkg.sha512"
   ],
