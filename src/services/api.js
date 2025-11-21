@@ -135,6 +135,11 @@ export const authAPI = {
   updateProfile: (profileData) => {
     return axiosInstance.put("/UserProfiles/me", profileData);
   },
+
+  // Get user statistics
+  getStatistics: () => {
+    return axiosInstance.get("/UserProfiles/me/statistics");
+  },
 };
 
 export const stationsAPI = {
@@ -232,6 +237,12 @@ export const bookingsAPI = {
   // Get available slots for a station
   getAvailableSlots: (stationId) => {
     return axiosInstance.get(`/stations/${stationId}/slots`);
+  },
+
+  // Scan QR code to create instant booking
+  scanQRCode: (qrScanData) => {
+    // qrScanData: { qrData, vehicleId }
+    return axiosInstance.post("/bookings/qr-scan", qrScanData);
   },
 };
 
@@ -417,7 +428,7 @@ export const vehiclesAPI = {
   },
 
   setDefault: (id) => {
-    return axiosInstance.post(`/vehicles/${id}/set-default`);
+    return axiosInstance.patch(`/vehicles/${id}/set-default`);
   },
 };
 

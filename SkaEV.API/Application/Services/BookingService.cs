@@ -303,21 +303,87 @@ public class BookingService : IBookingService
     /// <inheritdoc />
     public async Task<int> ScanQRCodeAsync(ScanQRCodeDto dto)
     {
-        // Sử dụng stored procedure sp_scan_qr_code để xác thực và tạo booking nhanh
-        var qrDataParam = new SqlParameter("@qr_data", dto.QrData);
-        var userIdParam = new SqlParameter("@user_id", dto.UserId);
-        var vehicleIdParam = new SqlParameter("@vehicle_id", dto.VehicleId);
+        // Parse QR Data to extract SlotId and StationId
+        // Expected format: "SLOT-{slotId}-STATION-{stationId}" or JSON
+        int slotId;
+        int stationId;
 
-        var sql = "EXEC sp_scan_qr_code @qr_data, @user_id, @vehicle_id";
+        try
+        {
+            // Try parsing simple format first: SLOT-123-STATION-456
+            if (dto.QrData.StartsWith("SLOT-", StringComparison.OrdinalIgnoreCase))
+            {
+                var parts = dto.QrData.Split('-');
+                if (parts.Length >= 4)
+                {
+                    slotId = int.Parse(parts[1]);
+                    stationId = int.Parse(parts[3]);
+                }
+                else
+                {
+                    throw new InvalidOperationException("Mã QR không hợp lệ. Định dạng sai.");
+                }
+            }
+            else
+            {
+                // Fallback: Try to parse as JSON (future enhancement)
+                throw new InvalidOperationException("Mã QR không đúng định dạng. Vui lòng quét lại.");
+            }
+        }
+        catch (FormatException)
+        {
+            throw new InvalidOperationException("Mã QR không hợp lệ. Không thể đọc thông tin slot/station.");
+        }
 
-        await _context.Database.ExecuteSqlRawAsync(sql, qrDataParam, userIdParam, vehicleIdParam);
+        // Validate that the slot exists and is available
+        var slot = await _context.ChargingSlots
+            .Include(s => s.ChargingPost)
+            .FirstOrDefaultAsync(s => s.SlotId == slotId && s.ChargingPost.StationId == stationId);
 
-        // Lấy booking vừa được tạo (loại qr_immediate)
-        var lastBooking = await _context.Bookings
-            .Where(b => b.UserId == dto.UserId && b.SchedulingType == "qr_immediate")
-            .OrderByDescending(b => b.BookingId)
-            .FirstOrDefaultAsync();
+        if (slot == null)
+        {
+            throw new InvalidOperationException("Slot sạc không tồn tại hoặc không thuộc trạm này.");
+        }
 
-        return lastBooking?.BookingId ?? 0;
+        if (slot.Status != "available")
+        {
+            throw new InvalidOperationException($"Slot sạc hiện đang {slot.Status}. Vui lòng chọn slot khác.");
+        }
+
+        // Validate that the vehicle exists and belongs to the user
+        var vehicle = await _context.Vehicles
+            .FirstOrDefaultAsync(v => v.VehicleId == dto.VehicleId && v.UserId == dto.UserId);
+
+        if (vehicle == null)
+        {
+            throw new InvalidOperationException("Xe không tồn tại hoặc không thuộc về bạn.");
+        }
+
+        // Create booking
+        var newBooking = new Booking
+        {
+            UserId = dto.UserId,
+            VehicleId = dto.VehicleId,
+            SlotId = slotId,
+            StationId = stationId,
+            SchedulingType = "qr_immediate",
+            Status = "confirmed",
+            ScheduledStartTime = DateTime.UtcNow,
+            EstimatedArrival = DateTime.UtcNow.AddMinutes(5),
+            TargetSoc = null, // User will specify during charging
+            EstimatedDuration = 60, // Default 60 minutes
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _context.Bookings.Add(newBooking);
+
+        // Update slot status to 'occupied'
+        slot.Status = "occupied";
+        slot.UpdatedAt = DateTime.UtcNow;
+
+        // Save changes
+        await _context.SaveChangesAsync();
+
+        return newBooking.BookingId;
     }
 }

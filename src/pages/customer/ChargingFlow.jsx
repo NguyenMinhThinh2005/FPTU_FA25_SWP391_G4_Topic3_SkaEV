@@ -933,23 +933,63 @@ const ChargingFlow = () => {
     console.log("📱 QR Scan triggered with result:", result);
 
     try {
-      // For customer demo, skip API validation (API requires Staff role)
-      // In production, Staff would scan and validate
-      console.log(
-        "⚠️ Customer mode - skipping API validation (requires Staff role)"
-      );
-      console.log("✅ QR code accepted in demo mode:", result);
-
-      // Update booking with QR scan info
-      if (currentBooking) {
-        bookingStore.setState({
-          currentBooking: {
-            ...currentBooking,
-            qrScanned: true,
-            scannedAt: new Date().toISOString(),
-          },
-        });
+      // Call API to create booking from QR scan
+      console.log("📤 Calling API to scan QR code:", result);
+      
+      const selectedVehicle = bookingStore.getState().selectedVehicle;
+      if (!selectedVehicle) {
+        throw new Error("Vui lòng chọn xe trước khi quét QR");
       }
+
+      // Parse QR data to get slot ID and station ID
+      // Expected format: SLOT-123-STATION-456 or JSON
+      let slotId, stationId;
+      try {
+        const parsed = JSON.parse(result.qrData || result);
+        slotId = parsed.slotId || parsed.portId;
+        stationId = parsed.stationId;
+      } catch {
+        // Try simple format: SLOT-123-STATION-456
+        const qrString = result.qrData || result;
+        if (qrString.includes('SLOT-') && qrString.includes('STATION-')) {
+          const parts = qrString.split('-');
+          slotId = parseInt(parts[1]);
+          stationId = parseInt(parts[3]);
+        }
+      }
+
+      if (!slotId || !stationId) {
+        throw new Error("Mã QR không hợp lệ. Không thể đọc thông tin slot/station.");
+      }
+
+      // Call backend API to create booking via QR scan
+      const qrScanPayload = {
+        qrData: `SLOT-${slotId}-STATION-${stationId}`,
+        vehicleId: selectedVehicle.id || selectedVehicle.vehicleId,
+      };
+
+      console.log("📤 QR Scan Payload:", qrScanPayload);
+      const bookingResponse = await bookingsAPI.scanQRCode(qrScanPayload);
+      console.log("✅ QR Scan API Response:", bookingResponse);
+
+      // Update currentBooking with the API response
+      const newBooking = {
+        id: bookingResponse.bookingId,
+        apiId: bookingResponse.bookingId,
+        stationId: bookingResponse.stationId,
+        stationName: bookingResponse.stationName,
+        stationAddress: bookingResponse.stationAddress,
+        slotId: bookingResponse.slotId,
+        slotNumber: bookingResponse.slotNumber,
+        vehicleId: bookingResponse.vehicleId,
+        status: bookingResponse.status,
+        qrScanned: true,
+        scannedAt: new Date().toISOString(),
+      };
+
+      bookingStore.setState({
+        currentBooking: newBooking,
+      });
 
       setScanResult(result);
       setFlowStep(3); // Move to connect step
@@ -959,11 +999,9 @@ const ChargingFlow = () => {
       console.log("✅ QR Scanned successfully, moving to step 3");
     } catch (error) {
       console.error("❌ Error scanning QR code:", error);
-      console.warn("⚠️ Continuing with demo mode anyway");
-
-      // Continue with demo mode even if there's an error
-      setScanResult(result);
-      setFlowStep(3);
+      notificationService.error(error.message || "Không thể quét mã QR. Vui lòng thử lại.");
+      
+      // Don't continue to next step if there's an error
       setQrScanOpen(false);
     }
   };
