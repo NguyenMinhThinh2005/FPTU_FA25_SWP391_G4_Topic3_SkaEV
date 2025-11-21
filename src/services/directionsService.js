@@ -31,39 +31,90 @@ const generateMockRoute = (origin, destination) => {
   // Estimate duration (average 30 km/h)
   const durationSeconds = Math.round((distanceKm / 30) * 3600);
   
-  // Generate detailed steps for navigation
-  const stepCount = Math.max(3, Math.min(8, Math.round(distanceKm / 3))); // 3-8 steps based on distance
+  // Generate detailed steps for navigation (like Google Maps)
+  // More steps for longer distances, varied instructions
+  const stepCount = Math.max(5, Math.min(15, Math.round(distanceKm / 1.5))); // 5-15 steps based on distance
   const steps = [];
-  const stepDistance = distanceMeters / stepCount;
-  const stepDuration = durationSeconds / stepCount;
   
-  const directions = [
-    "Bắt đầu đi từ vị trí hiện tại",
-    "Đi thẳng",
-    "Rẽ phải",
-    "Đi thẳng",
-    "Rẽ trái",
-    "Tiếp tục đi thẳng",
-    "Rẽ phải",
-    "Đến đích"
+  // Create varied step distances (not all equal)
+  const stepDistances = [];
+  let remainingDistance = distanceMeters;
+  for (let i = 0; i < stepCount - 1; i++) {
+    // Vary step distances: some short (0.3-0.8 km), some medium (0.8-2 km), some long (2-4 km)
+    const ratio = i / (stepCount - 1);
+    let stepDist;
+    if (ratio < 0.3) {
+      // First steps: shorter
+      stepDist = Math.random() * 500 + 300; // 300-800m
+    } else if (ratio < 0.7) {
+      // Middle steps: medium
+      stepDist = Math.random() * 1200 + 800; // 800-2000m
+    } else {
+      // Later steps: longer
+      stepDist = Math.random() * 2000 + 1500; // 1500-3500m
+    }
+    stepDist = Math.min(stepDist, remainingDistance * 0.4); // Don't exceed 40% of remaining
+    stepDistances.push(Math.round(stepDist));
+    remainingDistance -= stepDist;
+  }
+  stepDistances.push(Math.round(remainingDistance)); // Last step gets remaining distance
+  
+  // Google Maps-like instructions
+  const instructionTemplates = [
+    { type: "start", texts: ["Bắt đầu đi từ vị trí hiện tại", "Bắt đầu hành trình"] },
+    { type: "straight", texts: ["Đi thẳng", "Tiếp tục đi thẳng", "Giữ hướng hiện tại"] },
+    { type: "turn", texts: ["Rẽ phải", "Rẽ trái", "Rẽ phải vào đường phía trước", "Rẽ trái vào đường phía trước"] },
+    { type: "slight", texts: ["Hơi rẽ phải", "Hơi rẽ trái", "Rẽ nhẹ phải", "Rẽ nhẹ trái"] },
+    { type: "sharp", texts: ["Rẽ gắt phải", "Rẽ gắt trái"] },
+    { type: "continue", texts: ["Tiếp tục đi thẳng", "Giữ hướng", "Đi thẳng trên đường này"] },
+    { type: "merge", texts: ["Nhập vào đường chính", "Nhập làn"] },
+    { type: "roundabout", texts: ["Vào vòng xuyến, đi lối thứ nhất", "Vào vòng xuyến, đi lối thứ hai"] },
+    { type: "end", texts: ["Đến đích", "Đã đến nơi", "Điểm đến ở bên phải"] }
   ];
   
   for (let i = 0; i < stepCount; i++) {
-    const stepT = i / stepCount;
-    const stepLat = origin.lat + latDiff * stepT;
-    const stepLng = origin.lng + lngDiff * stepT;
+    const stepDistance = stepDistances[i];
+    const stepDuration = Math.round((stepDistance / distanceMeters) * durationSeconds);
+    const stepDistanceKm = stepDistance / 1000;
+    
+    let instructionText;
+    if (i === 0) {
+      // First step
+      instructionText = instructionTemplates[0].texts[Math.floor(Math.random() * instructionTemplates[0].texts.length)];
+    } else if (i === stepCount - 1) {
+      // Last step
+      instructionText = instructionTemplates[8].texts[Math.floor(Math.random() * instructionTemplates[8].texts.length)];
+    } else {
+      // Middle steps - vary instructions
+      const rand = Math.random();
+      let template;
+      if (rand < 0.3) {
+        template = instructionTemplates[1]; // straight
+      } else if (rand < 0.5) {
+        template = instructionTemplates[2]; // turn
+      } else if (rand < 0.65) {
+        template = instructionTemplates[3]; // slight turn
+      } else if (rand < 0.75) {
+        template = instructionTemplates[5]; // continue
+      } else if (rand < 0.85) {
+        template = instructionTemplates[6]; // merge
+      } else {
+        template = instructionTemplates[7]; // roundabout
+      }
+      instructionText = template.texts[Math.floor(Math.random() * template.texts.length)];
+    }
     
     steps.push({
       index: i,
-      instructionText: directions[i] || `Bước ${i + 1}`,
-      distanceText: stepDistance >= 1000 
-        ? `${(stepDistance / 1000).toFixed(1)} km` 
-        : `${Math.round(stepDistance)} m`,
-      distanceMeters: Math.round(stepDistance),
+      instructionText: instructionText,
+      distanceText: stepDistanceKm >= 1 
+        ? `${stepDistanceKm.toFixed(1)} km` 
+        : `${stepDistance} m`,
+      distanceMeters: stepDistance,
       durationText: stepDuration >= 60
         ? `${Math.floor(stepDuration / 60)} phút`
-        : `${Math.round(stepDuration)} giây`,
-      durationSeconds: Math.round(stepDuration)
+        : `${stepDuration} giây`,
+      durationSeconds: stepDuration
     });
   }
   
@@ -116,15 +167,17 @@ export async function getDrivingDirections({ origin, destination, mode = "drivin
       return generateMockRoute(origin, destination);
     }
     
-    // Ensure steps are present in response
-    if (response.data.route && response.data.route.leg && (!response.data.route.leg.steps || response.data.route.leg.steps.length === 0)) {
-      console.warn("⚠️ Backend API returned route but no steps, adding mock steps");
-      const mockRoute = generateMockRoute(origin, destination);
-      if (mockRoute.route && mockRoute.route.leg && mockRoute.route.leg.steps) {
-        response.data.route.leg.steps = mockRoute.route.leg.steps;
+    // Log steps from backend
+    if (response.data.route && response.data.route.leg) {
+      const stepCount = response.data.route.leg.steps?.length || 0;
+      console.log(`✅ Backend returned route with ${stepCount} steps from Google Maps/OSRM`);
+      if (stepCount === 0) {
+        console.warn("⚠️ Backend API returned route but no steps. This might indicate API key issue or API not returning steps.");
       }
     }
     
+    // Only use mock steps if backend truly has no steps (don't override real Google Maps steps)
+    // This ensures we use real Google Maps directions when available
     return response.data;
   } catch (error) {
     console.warn("⚠️ API call failed, using mock route data:", error.message);

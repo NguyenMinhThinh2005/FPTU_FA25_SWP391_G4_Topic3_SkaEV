@@ -35,6 +35,7 @@ import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
 import { getDrivingDirections } from "../../services/directionsService";
+import { getGoogleMapsDirections } from "../../services/googleMapsDirectionsService";
 
 // Fix for default marker icons in Leaflet
 delete L.Icon.Default.prototype._getIconUrl;
@@ -395,35 +396,89 @@ const buildFallbackSummary = (origin, destination, requestId) => {
     ? Math.round(((distanceMeters / 1000) / 40) * 3600)
     : null; // assume 40 km/h for fallback estimate
 
-  // Generate detailed steps for fallback route
-  const stepCount = Math.max(3, Math.min(8, Math.round(distanceKm / 3))); // 3-8 steps based on distance
-  const stepDistance = distanceMeters / stepCount;
-  const stepDuration = durationSeconds ? durationSeconds / stepCount : 0;
+  // Generate detailed steps for fallback route (like Google Maps)
+  const stepCount = Math.max(5, Math.min(15, Math.round(distanceKm / 1.5))); // 5-15 steps based on distance
+  const steps = [];
   
-  const directions = [
-    "Bắt đầu đi từ vị trí hiện tại",
-    "Đi thẳng",
-    "Rẽ phải",
-    "Đi thẳng",
-    "Rẽ trái",
-    "Tiếp tục đi thẳng",
-    "Rẽ phải",
-    "Đến đích"
+  // Create varied step distances (not all equal)
+  const stepDistances = [];
+  let remainingDistance = distanceMeters;
+  for (let i = 0; i < stepCount - 1; i++) {
+    // Vary step distances: some short (0.3-0.8 km), some medium (0.8-2 km), some long (2-4 km)
+    const ratio = i / (stepCount - 1);
+    let stepDist;
+    if (ratio < 0.3) {
+      // First steps: shorter
+      stepDist = Math.random() * 500 + 300; // 300-800m
+    } else if (ratio < 0.7) {
+      // Middle steps: medium
+      stepDist = Math.random() * 1200 + 800; // 800-2000m
+    } else {
+      // Later steps: longer
+      stepDist = Math.random() * 2000 + 1500; // 1500-3500m
+    }
+    stepDist = Math.min(stepDist, remainingDistance * 0.4); // Don't exceed 40% of remaining
+    stepDistances.push(Math.round(stepDist));
+    remainingDistance -= stepDist;
+  }
+  stepDistances.push(Math.round(remainingDistance)); // Last step gets remaining distance
+  
+  // Google Maps-like instructions
+  const instructionTemplates = [
+    { type: "start", texts: ["Bắt đầu đi từ vị trí hiện tại", "Bắt đầu hành trình"] },
+    { type: "straight", texts: ["Đi thẳng", "Tiếp tục đi thẳng", "Giữ hướng hiện tại"] },
+    { type: "turn", texts: ["Rẽ phải", "Rẽ trái", "Rẽ phải vào đường phía trước", "Rẽ trái vào đường phía trước"] },
+    { type: "slight", texts: ["Hơi rẽ phải", "Hơi rẽ trái", "Rẽ nhẹ phải", "Rẽ nhẹ trái"] },
+    { type: "sharp", texts: ["Rẽ gắt phải", "Rẽ gắt trái"] },
+    { type: "continue", texts: ["Tiếp tục đi thẳng", "Giữ hướng", "Đi thẳng trên đường này"] },
+    { type: "merge", texts: ["Nhập vào đường chính", "Nhập làn"] },
+    { type: "roundabout", texts: ["Vào vòng xuyến, đi lối thứ nhất", "Vào vòng xuyến, đi lối thứ hai"] },
+    { type: "end", texts: ["Đến đích", "Đã đến nơi", "Điểm đến ở bên phải"] }
   ];
   
-  const steps = [];
   for (let i = 0; i < stepCount; i++) {
+    const stepDistance = stepDistances[i];
+    const stepDuration = durationSeconds ? Math.round((stepDistance / distanceMeters) * durationSeconds) : 0;
+    const stepDistanceKm = stepDistance / 1000;
+    
+    let instructionText;
+    if (i === 0) {
+      // First step
+      instructionText = instructionTemplates[0].texts[Math.floor(Math.random() * instructionTemplates[0].texts.length)];
+    } else if (i === stepCount - 1) {
+      // Last step
+      instructionText = instructionTemplates[8].texts[Math.floor(Math.random() * instructionTemplates[8].texts.length)];
+    } else {
+      // Middle steps - vary instructions
+      const rand = Math.random();
+      let template;
+      if (rand < 0.3) {
+        template = instructionTemplates[1]; // straight
+      } else if (rand < 0.5) {
+        template = instructionTemplates[2]; // turn
+      } else if (rand < 0.65) {
+        template = instructionTemplates[3]; // slight turn
+      } else if (rand < 0.75) {
+        template = instructionTemplates[5]; // continue
+      } else if (rand < 0.85) {
+        template = instructionTemplates[6]; // merge
+      } else {
+        template = instructionTemplates[7]; // roundabout
+      }
+      instructionText = template.texts[Math.floor(Math.random() * template.texts.length)];
+    }
+    
     steps.push({
       index: i,
-      instructionText: directions[i] || `Bước ${i + 1}`,
-      distanceText: stepDistance >= 1000 
-        ? `${(stepDistance / 1000).toFixed(1)} km` 
-        : `${Math.round(stepDistance)} m`,
-      distanceMeters: Math.round(stepDistance),
+      instructionText: instructionText,
+      distanceText: stepDistanceKm >= 1 
+        ? `${stepDistanceKm.toFixed(1)} km` 
+        : `${stepDistance} m`,
+      distanceMeters: stepDistance,
       durationText: stepDuration >= 60
         ? `${Math.floor(stepDuration / 60)} phút`
-        : `${Math.round(stepDuration)} giây`,
-      durationSeconds: Math.round(stepDuration)
+        : `${stepDuration} giây`,
+      durationSeconds: stepDuration
     });
   }
 
@@ -796,10 +851,51 @@ const RouteDrawer = ({
 
     const fetchRoute = async () => {
       try {
-        console.log("🌐 Fetching route from Google Directions API via backend...");
-        console.log("Origin:", userLocation);
-        console.log("Destination:", destination);
+        // Try Google Maps Directions Service from client-side first (using Keyless-Google-Maps-API)
+        try {
+          console.log("🌐 Fetching route from Google Maps Directions Service (client-side)...");
+          console.log("Origin:", userLocation);
+          console.log("Destination:", destination);
+          
+          const googleResponse = await getGoogleMapsDirections({
+            origin: userLocation,
+            destination: destination,
+            mode: 'DRIVING'
+          });
+          
+          if (googleResponse && googleResponse.success && googleResponse.route) {
+            console.log("✅ Google Maps Directions Service returned route with", googleResponse.route.leg?.steps?.length || 0, "steps");
+            
+            // Convert polyline format
+            const coords = googleResponse.route.polyline.map(point => [point.lat, point.lng]);
+            
+            const summarySource = {
+              provider: "google-maps-client",
+              summary: googleResponse.route.leg?.summary || "",
+              warnings: googleResponse.route.warnings || [],
+              steps: googleResponse.route.leg?.steps || [],
+              distanceMeters: googleResponse.route.leg?.distanceMeters || null,
+              durationSeconds: googleResponse.route.leg?.durationSeconds || null,
+              distanceText: googleResponse.route.leg?.distanceText || "",
+              durationText: googleResponse.route.leg?.durationText || "",
+              polyline: coords,
+              requestId: requestId,
+              origin: userLocation,
+              destination: destination,
+              usedFallback: false,
+            };
+
+            setRouteCoords(coords);
+            setIsFallbackRoute(false);
+            onRouteReady(summarySource);
+            return;
+          }
+        } catch (googleError) {
+          console.warn("⚠️ Google Maps Directions Service (client-side) failed, falling back to backend:", googleError);
+        }
         
+        // Fallback to backend API
+        console.log("🌐 Fetching route from Google Directions API via backend...");
         const response = await getDrivingDirections({
           origin: userLocation,
           destination,

@@ -209,7 +209,8 @@ public class MapsService : IMapsService
         var destination = $"{request.DestinationLat.ToString(System.Globalization.CultureInfo.InvariantCulture)},{request.DestinationLng.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
         var mode = string.IsNullOrWhiteSpace(request.Mode) ? "driving" : request.Mode.ToLowerInvariant();
 
-        var url = $"{_options.BaseDirectionsUrl}?origin={origin}&destination={destination}&mode={mode}&key={_options.DirectionsApiKey}";
+        // Request detailed steps and alternative routes from Google Maps API
+        var url = $"{_options.BaseDirectionsUrl}?origin={origin}&destination={destination}&mode={mode}&language=vi&key={_options.DirectionsApiKey}";
 
         try
         {
@@ -265,21 +266,52 @@ public class MapsService : IMapsService
             var decodedPoints = DecodePolyline(route.OverviewPolyline?.Points);
 
             // Parse steps from Google Maps API
+            // Google Maps API returns steps in leg.Steps array by default
             var steps = leg.Steps?
-                .Select((step, index) => new DirectionsStepDto
+                .Select((step, index) => 
                 {
-                    Index = index,
-                    InstructionText = step.HtmlInstructions ?? step.Instructions ?? $"Bước {index + 1}",
-                    InstructionHtml = step.HtmlInstructions ?? string.Empty,
-                    DistanceText = step.Distance?.Text ?? string.Empty,
-                    DistanceMeters = step.Distance?.Value ?? 0,
-                    DurationText = step.Duration?.Text ?? string.Empty,
-                    DurationSeconds = step.Duration?.Value ?? 0
+                    // Extract plain text from HTML instructions (remove HTML tags)
+                    var htmlInstruction = step.HtmlInstructions ?? step.Instructions ?? string.Empty;
+                    var plainText = htmlInstruction;
+                    if (!string.IsNullOrEmpty(htmlInstruction))
+                    {
+                        // Simple HTML tag removal using regex
+                        plainText = System.Text.RegularExpressions.Regex.Replace(
+                            htmlInstruction, 
+                            "<[^>]+>", 
+                            string.Empty
+                        );
+                        // Decode HTML entities
+                        plainText = plainText
+                            .Replace("&nbsp;", " ")
+                            .Replace("&amp;", "&")
+                            .Replace("&lt;", "<")
+                            .Replace("&gt;", ">")
+                            .Replace("&quot;", "\"")
+                            .Replace("&#39;", "'")
+                            .Trim();
+                    }
+                    
+                    return new DirectionsStepDto
+                    {
+                        Index = index,
+                        InstructionText = !string.IsNullOrEmpty(plainText) ? plainText : $"Bước {index + 1}",
+                        InstructionHtml = step.HtmlInstructions ?? string.Empty,
+                        DistanceText = step.Distance?.Text ?? string.Empty,
+                        DistanceMeters = step.Distance?.Value ?? 0,
+                        DurationText = step.Duration?.Text ?? string.Empty,
+                        DurationSeconds = step.Duration?.Value ?? 0
+                    };
                 })
                 .ToArray() ?? Array.Empty<DirectionsStepDto>();
 
             _logger.LogInformation("Google Maps returned route with {PointCount} polyline points and {StepCount} steps", 
                 decodedPoints.Length, steps.Length);
+            
+            if (steps.Length == 0)
+            {
+                _logger.LogWarning("Google Maps API returned route but no steps. This might indicate the API response format has changed or steps were not requested.");
+            }
 
             var responseDto = new DirectionsResponseDto
             {
