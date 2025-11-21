@@ -75,6 +75,7 @@ import {
 } from "@mui/icons-material";
 import useBookingStore from "../../store/bookingStore";
 import useStationStore from "../../store/stationStore";
+import useVehicleStore from "../../store/vehicleStore";
 import { formatCurrency, calculateDistance } from "../../utils/helpers";
 import StationMapLeaflet from "../../components/customer/StationMapLeaflet";
 import notificationService from "../../services/notificationService";
@@ -84,6 +85,7 @@ import {
   stationsAPI,
   invoicesAPI,
   vnpayAPI,
+  bookingsAPI,
 } from "../../services/api";
 
 // Helper function to normalize Vietnamese text for search
@@ -222,6 +224,7 @@ const ChargingFlow = () => {
   const bookingStore = useBookingStore;
   const { stations, initializeData, filters, updateFilters, loading } =
     useStationStore();
+  const { vehicles, getDefaultVehicle, fetchVehicles, hasLoaded } = useVehicleStore();
 
   // Lưu flowStep vào sessionStorage để giữ trạng thái khi chuyển tab
   const getInitialFlowStep = () => {
@@ -929,6 +932,118 @@ const ChargingFlow = () => {
     }
   };
 
+  // Handle demo charging - create booking without QR scan
+  const handleDemoCharging = async () => {
+    console.log("🎮 Demo charging triggered");
+
+    try {
+      // First, ensure vehicles are loaded
+      if (!hasLoaded || vehicles.length === 0) {
+        console.log("📦 Vehicles not loaded yet, fetching...");
+        await fetchVehicles();
+      }
+
+      // Get fresh vehicles list from store after potential fetch
+      const vehicleStore = useVehicleStore.getState();
+      const currentVehicles = vehicleStore.vehicles || vehicles;
+      
+      // Try to get selectedVehicle from bookingStore first
+      let selectedVehicle = bookingStore.getState().selectedVehicle;
+      
+      // If not found, try to get default vehicle from vehicleStore
+      if (!selectedVehicle) {
+        selectedVehicle = vehicleStore.getDefaultVehicle();
+        console.log("📦 Auto-selected default vehicle:", selectedVehicle);
+      }
+      
+      // If still not found, try to get first vehicle
+      if (!selectedVehicle && currentVehicles && currentVehicles.length > 0) {
+        selectedVehicle = currentVehicles[0];
+        console.log("📦 Auto-selected first vehicle:", selectedVehicle);
+      }
+      
+      if (!selectedVehicle) {
+        throw new Error("Bạn chưa có xe nào. Vui lòng thêm xe trước khi demo sạc.");
+      }
+
+      // Get station ID - try to use selected station, or first available station
+      let demoStationId = selectedStation?.id || selectedStation?.stationId;
+      if (!demoStationId && stations && stations.length > 0) {
+        // Find first station with available slots
+        const stationWithSlots = stations.find(
+          (s) => s.status?.toLowerCase() === "active" && s.stats?.available > 0
+        );
+        demoStationId = stationWithSlots?.id || stationWithSlots?.stationId || stations[0].id || stations[0].stationId;
+      }
+      if (!demoStationId) {
+        throw new Error("Không tìm thấy trạm sạc khả dụng. Vui lòng chọn trạm trước.");
+      }
+
+      // Get available slots from the station
+      console.log("📦 Fetching available slots for station:", demoStationId);
+      const slotsResponse = await stationsAPI.getAvailableSlots(demoStationId);
+      const availableSlots = slotsResponse?.data?.data || slotsResponse?.data || [];
+      
+      if (!availableSlots || availableSlots.length === 0) {
+        throw new Error(`Trạm ${demoStationId} hiện không có slot sạc khả dụng. Vui lòng chọn trạm khác.`);
+      }
+
+      // Use first available slot
+      const firstAvailableSlot = availableSlots[0];
+      const demoSlotId = firstAvailableSlot.slotId || firstAvailableSlot.id;
+      
+      if (!demoSlotId) {
+        throw new Error("Không thể lấy thông tin slot sạc. Vui lòng thử lại.");
+      }
+
+      console.log("✅ Selected slot for demo:", { slotId: demoSlotId, stationId: demoStationId });
+
+      const qrScanPayload = {
+        qrData: `SLOT-${demoSlotId}-STATION-${demoStationId}`,
+        vehicleId: selectedVehicle.id || selectedVehicle.vehicleId,
+      };
+
+      console.log("📤 Demo QR Scan Payload:", qrScanPayload);
+      const bookingResponse = await bookingsAPI.scanQRCode(qrScanPayload);
+      console.log("✅ Demo QR Scan API Response:", bookingResponse);
+
+      // Extract booking data from API response
+      // Response format: { data: BookingDto } or BookingDto directly
+      const bookingData = bookingResponse?.data || bookingResponse;
+
+      // Update currentBooking with the API response
+      const newBooking = {
+        id: bookingData.bookingId || bookingData.id,
+        apiId: bookingData.bookingId || bookingData.id,
+        stationId: bookingData.stationId,
+        stationName: bookingData.stationName || selectedStation?.name || "Trạm Demo",
+        stationAddress: bookingData.stationAddress || selectedStation?.address || "Địa chỉ demo",
+        slotId: bookingData.slotId,
+        slotNumber: bookingData.slotNumber,
+        vehicleId: bookingData.vehicleId,
+        status: bookingData.status || "confirmed",
+        qrScanned: true,
+        scannedAt: new Date().toISOString(),
+      };
+
+      bookingStore.setState({
+        currentBooking: newBooking,
+      });
+
+      setScanResult(`SLOT-${demoSlotId}-STATION-${demoStationId}`);
+      setFlowStep(3); // Move to connect step
+      setQrScanOpen(false);
+
+      notificationService.success("Demo sạc xe đã được khởi tạo!");
+      console.log("✅ Demo charging started successfully, moving to step 3");
+    } catch (error) {
+      console.error("❌ Error in demo charging:", error);
+      const errorMessage = error.response?.data?.message || error.message || "Không thể khởi tạo demo sạc xe. Vui lòng thử lại.";
+      notificationService.error(errorMessage);
+      alert(errorMessage);
+    }
+  };
+
   const handleQRScan = async (result) => {
     console.log("📱 QR Scan triggered with result:", result);
 
@@ -936,9 +1051,33 @@ const ChargingFlow = () => {
       // Call API to create booking from QR scan
       console.log("📤 Calling API to scan QR code:", result);
       
-      const selectedVehicle = bookingStore.getState().selectedVehicle;
+      // First, ensure vehicles are loaded
+      if (!hasLoaded || vehicles.length === 0) {
+        console.log("📦 Vehicles not loaded yet, fetching...");
+        await fetchVehicles();
+      }
+
+      // Get fresh vehicles list from store after potential fetch
+      const vehicleStore = useVehicleStore.getState();
+      const currentVehicles = vehicleStore.vehicles || vehicles;
+      
+      // Try to get selectedVehicle from bookingStore first
+      let selectedVehicle = bookingStore.getState().selectedVehicle;
+      
+      // If not found, try to get default vehicle from vehicleStore
       if (!selectedVehicle) {
-        throw new Error("Vui lòng chọn xe trước khi quét QR");
+        selectedVehicle = vehicleStore.getDefaultVehicle();
+        console.log("📦 Auto-selected default vehicle for QR scan:", selectedVehicle);
+      }
+      
+      // If still not found, try to get first vehicle
+      if (!selectedVehicle && currentVehicles && currentVehicles.length > 0) {
+        selectedVehicle = currentVehicles[0];
+        console.log("📦 Auto-selected first vehicle for QR scan:", selectedVehicle);
+      }
+      
+      if (!selectedVehicle) {
+        throw new Error("Bạn chưa có xe nào. Vui lòng thêm xe trước khi quét QR.");
       }
 
       // Parse QR data to get slot ID and station ID
@@ -972,17 +1111,21 @@ const ChargingFlow = () => {
       const bookingResponse = await bookingsAPI.scanQRCode(qrScanPayload);
       console.log("✅ QR Scan API Response:", bookingResponse);
 
+      // Extract booking data from API response
+      // Response format: { data: BookingDto } or BookingDto directly
+      const bookingData = bookingResponse?.data || bookingResponse;
+
       // Update currentBooking with the API response
       const newBooking = {
-        id: bookingResponse.bookingId,
-        apiId: bookingResponse.bookingId,
-        stationId: bookingResponse.stationId,
-        stationName: bookingResponse.stationName,
-        stationAddress: bookingResponse.stationAddress,
-        slotId: bookingResponse.slotId,
-        slotNumber: bookingResponse.slotNumber,
-        vehicleId: bookingResponse.vehicleId,
-        status: bookingResponse.status,
+        id: bookingData.bookingId || bookingData.id,
+        apiId: bookingData.bookingId || bookingData.id,
+        stationId: bookingData.stationId,
+        stationName: bookingData.stationName,
+        stationAddress: bookingData.stationAddress,
+        slotId: bookingData.slotId,
+        slotNumber: bookingData.slotNumber,
+        vehicleId: bookingData.vehicleId,
+        status: bookingData.status || "confirmed",
         qrScanned: true,
         scannedAt: new Date().toISOString(),
       };
@@ -3334,7 +3477,7 @@ const ChargingFlow = () => {
           <Button
             variant="outlined"
             size="small"
-            onClick={() => handleQRScan("SKAEV:STATION:ST001:A01")}
+            onClick={handleDemoCharging}
           >
             Demo sạc xe
           </Button>

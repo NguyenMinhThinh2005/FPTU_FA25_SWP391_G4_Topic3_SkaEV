@@ -807,10 +807,10 @@ const CustomerProfile = () => {
                           mb: 1,
                         }}
                       >
-                        <Typography variant="body2">Năng lượng sạc</Typography>
-                        <Typography variant="body2" fontWeight="bold">
-                          {(userStatistics?.totalEnergyConsumedKwh || bookingStats.totalEnergyCharged || 0).toFixed(1)} kWh
-                        </Typography>
+                      <Typography variant="body2">Năng lượng sạc</Typography>
+                      <Typography variant="body2" fontWeight="bold">
+                        {parseFloat(userStatistics?.totalEnergyConsumedKwh || bookingStats.totalEnergyCharged || 0).toFixed(1)} kWh
+                      </Typography>
                       </Box>
                       <LinearProgress
                         variant="determinate"
@@ -876,7 +876,9 @@ const CustomerProfile = () => {
                       <Typography variant="h6" fontWeight="bold">
                         {userStatistics?.completedSessions > 0
                           ? (userStatistics.totalEnergyConsumedKwh / userStatistics.completedSessions).toFixed(1)
-                          : (parseFloat(bookingStats.totalEnergyCharged) / parseFloat(bookingStats.completed) || 20.4).toFixed(1)
+                          : (parseFloat(bookingStats.totalEnergyCharged) > 0 && parseFloat(bookingStats.completed) > 0
+                            ? (parseFloat(bookingStats.totalEnergyCharged) / parseFloat(bookingStats.completed)).toFixed(1)
+                            : '20.4')
                         }
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
@@ -927,9 +929,9 @@ const CustomerProfile = () => {
                     },
                     {
                       month: "Tháng 9",
-                      amount: userStatistics?.totalSpent || bookingStats.totalAmount || 0,
-                      energy: userStatistics?.totalEnergyConsumedKwh || bookingStats.totalEnergyCharged || 0,
-                      sessions: userStatistics?.completedSessions || bookingStats.completed || 0,
+                      amount: userStatistics?.totalSpent || parseFloat(bookingStats.totalAmount) || 0,
+                      energy: userStatistics?.totalEnergyConsumedKwh || parseFloat(bookingStats.totalEnergyCharged) || 0,
+                      sessions: userStatistics?.completedSessions || parseInt(bookingStats.completed) || 0,
                     },
                   ].map((data, index) => (
                     <Grid item xs={12} sm={4} key={index}>
