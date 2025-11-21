@@ -807,7 +807,7 @@ public partial class AdminUserService
 
     // ==================== SUPPORT REQUESTS ====================
 
-    public async Task<(List<SupportRequestDto> Requests, int TotalCount)> GetSupportRequestsAsync(SupportRequestFilterDto filter)
+    public Task<(List<SupportRequestDto> Requests, int TotalCount)> GetSupportRequestsAsync(SupportRequestFilterDto filter)
     {
         // Note: This assumes a SupportRequests table exists in database
         // If not, we'll need to create it first
@@ -815,7 +815,7 @@ public partial class AdminUserService
         // For now, returning empty list as table doesn't exist yet
         _logger.LogWarning("Support requests table not yet implemented in database");
 
-        return (new List<SupportRequestDto>(), 0);
+        return Task.FromResult((new List<SupportRequestDto>(), 0));
 
         // Implementation when table exists:
         /*
@@ -882,33 +882,33 @@ public partial class AdminUserService
         */
     }
 
-    public async Task<SupportRequestDetailDto?> GetSupportRequestDetailAsync(int requestId)
+    public Task<SupportRequestDetailDto?> GetSupportRequestDetailAsync(int requestId)
     {
         _logger.LogWarning("Support requests table not yet implemented in database");
-        return null;
+        return Task.FromResult<SupportRequestDetailDto?>(null);
     }
 
-    public async Task<int> CreateSupportRequestAsync(CreateSupportRequestDto dto)
+    public Task<int> CreateSupportRequestAsync(CreateSupportRequestDto dto)
     {
         _logger.LogWarning("Support requests table not yet implemented in database");
-        return 0;
+        return Task.FromResult(0);
     }
 
-    public async Task<bool> UpdateSupportRequestAsync(int requestId, UpdateSupportRequestDto dto)
+    public Task<bool> UpdateSupportRequestAsync(int requestId, UpdateSupportRequestDto dto)
     {
         _logger.LogWarning("Support requests table not yet implemented in database");
-        return false;
+        return Task.FromResult(false);
     }
 
-    public async Task<bool> ReplySupportRequestAsync(ReplySupportRequestDto dto)
+    public Task<bool> ReplySupportRequestAsync(ReplySupportRequestDto dto)
     {
         _logger.LogWarning("Support requests table not yet implemented in database");
-        return false;
+        return Task.FromResult(false);
     }
 
-    public async Task<bool> CloseSupportRequestAsync(int requestId, string resolutionNotes)
+    public Task<bool> CloseSupportRequestAsync(int requestId, string resolutionNotes)
     {
         _logger.LogWarning("Support requests table not yet implemented in database");
-        return false;
+        return Task.FromResult(false);
     }
 }

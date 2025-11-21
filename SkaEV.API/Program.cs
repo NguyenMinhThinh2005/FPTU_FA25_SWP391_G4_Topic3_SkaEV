@@ -7,52 +7,78 @@ using SkaEV.API.Infrastructure.Data;
 using SkaEV.API.Application.Options;
 using SkaEV.API.Application.Services;
 using SkaEV.API.Application.Services.Payments;
-// using SkaEV.API.Hubs; // Temporarily commented out
+// using SkaEV.API.Hubs; // Uncomment when Hubs are implemented
 using Serilog;
 using Serilog.Events;
 using VNPAY.Extensions;
 
+namespace SkaEV.API;
 
+/// <summary>
+/// Main entry point for the SkaEV API application.
+/// Configures services, middleware pipeline, and starts the web host.
+/// </summary>
 public partial class Program
 {
+    /// <summary>
+    /// Application entry point.
+    /// </summary>
+    /// <param name="args">Command line arguments.</param>
     public static async Task Main(string[] args)
     {
-        // Create a builder for the web application. This is the starting point for configuring services and the app's request pipeline.
+        #region 1. Builder Initialization & Configuration
+        
+        // Create the WebApplication builder which sets up the hosting environment and configuration
         var builder = WebApplication.CreateBuilder(args);
-        // Read connection string early so we can adapt behavior (SQLite demo vs full SQL Server)
+
+        // Retrieve the default connection string from configuration
         var _defaultConnectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? string.Empty;
+        
+        // Determine if we are running in SQLite Demo mode based on the connection string format
+        // This allows the app to switch between SQL Server (Production) and SQLite (Dev/Demo) dynamically
         var _isSqliteDemo = _defaultConnectionString.IndexOf(".db", StringComparison.OrdinalIgnoreCase) >= 0
                             || _defaultConnectionString.StartsWith("Data Source=", StringComparison.OrdinalIgnoreCase);
-        // Configure Serilog - A structured logging library for .NET
+
+        #endregion
+
+        #region 2. Logging Configuration (Serilog)
+
+        // Configure Serilog as the logging provider
+        // We configure it early to capture startup errors
         Log.Logger = new LoggerConfiguration()
-            .MinimumLevel.Information() // Set the minimum log level to Information
-            .MinimumLevel.Override("Microsoft", LogEventLevel.Warning) // Reduce noise from Microsoft libraries
+            .MinimumLevel.Information() // Default to Information level
+            .MinimumLevel.Override("Microsoft", LogEventLevel.Warning) // Reduce noise from Microsoft framework
             .MinimumLevel.Override("Microsoft.EntityFrameworkCore", LogEventLevel.Error) // Only log EF Core errors to keep logs clean
             .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning) // Reduce noise from ASP.NET Core
-            .Enrich.FromLogContext() // Include context information in logs
-            .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}") // Format console output
-            .WriteTo.File("logs/skaev-.txt", rollingInterval: RollingInterval.Day) // Write logs to a file, creating a new file each day
+            .Enrich.FromLogContext() // Include context properties (like RequestId) in logs
+            .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}") // Clean console output
+            .WriteTo.File("logs/skaev-.txt", rollingInterval: RollingInterval.Day) // Rolling file logs for persistent storage
             .CreateLogger();
 
-        // Tell the host to use Serilog as the logging provider
+        // Hook Serilog into the host builder
         builder.Host.UseSerilog();
 
-        // Add services to the container (Dependency Injection)
-        // Add controllers and configure JSON serialization options
+        #endregion
+
+        #region 3. Service Registration (Dependency Injection)
+
+        // === Core MVC & JSON Services ===
         builder.Services.AddControllers()
             .AddNewtonsoftJson(options =>
             {
-                // Use camelCase property names for all JSON responses to match frontend expectations
+                // Use camelCase for JSON properties to align with JavaScript/Frontend conventions
                 options.SerializerSettings.ContractResolver = new Newtonsoft.Json.Serialization.CamelCasePropertyNamesContractResolver();
+                // Ignore circular references to prevent stack overflow serialization errors
                 options.SerializerSettings.ReferenceLoopHandling = Newtonsoft.Json.ReferenceLoopHandling.Ignore;
-                // Ignore null values to reduce payload size
+                // Ignore null values to reduce response payload size
                 options.SerializerSettings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
             });
 
-        // Bind configuration section "GoogleMaps" to the GoogleMapsOptions class for dependency injection
+        // === Configuration Options ===
+        // Bind "GoogleMaps" section to strong-typed options class
         builder.Services.Configure<GoogleMapsOptions>(builder.Configuration.GetSection(GoogleMapsOptions.SectionName));
 
-        // Configure Database Context
+        // === Database Context Configuration ===
         builder.Services.AddDbContext<SkaEVDbContext>(options =>
         {
             var connectionString = _defaultConnectionString;
@@ -60,20 +86,21 @@ public partial class Program
             {
                 throw new InvalidOperationException("DefaultConnection string is not configured.");
             }
+
             if (_isSqliteDemo)
             {
-                // Use SQLite provider
+                // Use SQLite for local development or demo purposes
                 options.UseSqlite(connectionString);
             }
             else
             {
-                // Use SQL Server provider with specific options
+                // Use SQL Server for production with resilient connection options
                 options.UseSqlServer(
                     connectionString,
                     sqlOptions =>
                     {
-                        sqlOptions.UseNetTopologySuite(); // Enable spatial data support (for maps/locations)
-                        // Enable automatic retries for transient failures (e.g., network blips)
+                        sqlOptions.UseNetTopologySuite(); // Enable spatial data types (Geometry/Geography)
+                        // Enable retry logic for transient network failures
                         sqlOptions.EnableRetryOnFailure(
                             maxRetryCount: 5,
                             maxRetryDelay: TimeSpan.FromSeconds(30),
@@ -82,66 +109,59 @@ public partial class Program
             }
         });
 
-        // Configure JWT (JSON Web Token) Authentication
+        // === Authentication & Authorization (JWT) ===
         var jwtSettings = builder.Configuration.GetSection("JwtSettings");
-        // Get the secret key, falling back to a default if not found (Note: Default should not be used in production)
+        // WARNING: Fallback key is for DEV ONLY. Production must use a secure key from config/secrets.
         var secretKey = jwtSettings["SecretKey"] ?? "SkaEV_Secret_Key_2025_Change_This_In_Production_Environment_12345678";
         var key = Encoding.ASCII.GetBytes(secretKey);
 
-        // Add Authentication services
         builder.Services.AddAuthentication(options =>
         {
-            options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme; // Use JWT Bearer as default scheme
+            options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
             options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
         })
         .AddJwtBearer(options =>
         {
-            options.RequireHttpsMetadata = false; // Set to true in production to ensure HTTPS
-            options.SaveToken = true; // Save the token in the AuthenticationProperties
+            options.RequireHttpsMetadata = false; // Set 'true' in production
+            options.SaveToken = true;
             options.TokenValidationParameters = new TokenValidationParameters
             {
-                ValidateIssuerSigningKey = true, // Validate the key used to sign the token
-                IssuerSigningKey = new SymmetricSecurityKey(key), // The key to validate against
-                ValidateIssuer = false, // Do not validate the issuer (who created the token) - simplify for dev
-                ValidateAudience = false, // Do not validate the audience (who the token is for) - simplify for dev
-                ValidateLifetime = true, // Validate that the token has not expired
-                ClockSkew = TimeSpan.Zero // Remove default 5 min clock skew for strict expiration
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKey = new SymmetricSecurityKey(key),
+                ValidateIssuer = false, // Simplify for Dev: Ignore Issuer validation
+                ValidateAudience = false, // Simplify for Dev: Ignore Audience validation
+                ValidateLifetime = true, // Ensure token is not expired
+                ClockSkew = TimeSpan.Zero // Remove default 5-minute leeway for expiration
             };
         });
 
-        // Add Authorization services
         builder.Services.AddAuthorization();
 
-        // Configure CORS (Cross-Origin Resource Sharing) to allow frontend applications to access the API
+        // === CORS Policy ===
         builder.Services.AddCors(options =>
         {
             options.AddPolicy("AllowFrontend", policy =>
             {
                 policy.WithOrigins(
-                    "http://localhost:5173", // Vite default
-                    "http://localhost:3000", // React default
-                    "http://localhost:5174",
-                    "http://localhost:5175",
-                    "http://localhost:5176",
-                    "http://localhost:5177"
+                    "http://localhost:5173", // Vite Local
+                    "http://localhost:3000", // React Local
+                    "http://localhost:5174", "http://localhost:5175", "http://localhost:5176", "http://localhost:5177" // Additional Vite ports
                 )
-                .AllowAnyHeader() // Allow any HTTP header
-                .AllowAnyMethod() // Allow any HTTP method (GET, POST, PUT, DELETE, etc.)
-                .AllowCredentials() // Allow cookies/auth headers
-                .SetIsOriginAllowed(_ => true); // Allow any origin (useful for development, restrict in production)
+                .AllowAnyHeader()
+                .AllowAnyMethod()
+                .AllowCredentials()
+                .SetIsOriginAllowed(_ => true); // Allow localhost origins
             });
         });
 
-        // Register Application Services (Dependency Injection)
-        // Scoped services are created once per client request (connection)
+        // === Application Services (Scoped) ===
+        // Core Logic Services
         builder.Services.AddScoped<IAuthService, AuthService>();
         builder.Services.AddScoped<IStationService, StationService>();
         builder.Services.AddScoped<IBookingService, BookingService>();
         builder.Services.AddScoped<IPaymentMethodService, PaymentMethodService>();
         builder.Services.AddScoped<IReportService, ReportService>();
         builder.Services.AddScoped<IStaffDashboardService, StaffDashboardService>();
-
-        // New Services for extended functionality
         builder.Services.AddScoped<IInvoiceService, InvoiceService>();
         builder.Services.AddScoped<IVehicleService, VehicleService>();
         builder.Services.AddScoped<IReviewService, ReviewService>();
@@ -151,29 +171,30 @@ public partial class Program
         builder.Services.AddScoped<ISlotService, SlotService>();
         builder.Services.AddScoped<IUserProfileService, UserProfileService>();
         builder.Services.AddScoped<IAdminUserService, AdminUserService>();
-        builder.Services.AddScoped<IIssueService, IssueService>(); // Optional - requires 08_ADD_ISSUES_TABLE.sql
+        builder.Services.AddScoped<IIssueService, IssueService>(); // Incident/Issue tracking
         builder.Services.AddScoped<IVNPayService, VNPayService>();
 
-        // Additional admin and analytics services
-        builder.Services.AddScoped<IncidentService>(); // Incident management service
-        builder.Services.AddScoped<StationAnalyticsService>(); // Station analytics service
+        // Admin & Analytics Services
+        builder.Services.AddScoped<IncidentService>();
+        builder.Services.AddScoped<StationAnalyticsService>();
         builder.Services.AddScoped<IAdminStationManagementService, AdminStationManagementService>();
+        builder.Services.AddScoped<IAdvancedAnalyticsService, AdvancedAnalyticsService>();
+        builder.Services.AddScoped<IAdminStationService, AdminStationService>();
 
-        // Maps Service with HttpClient - Registers HttpClient to be injected into MapsService
+        // External Integrations
+        // Register MapsService with a dedicated HttpClient
         builder.Services.AddHttpClient<IMapsService, MapsService>();
-
-        // Register VNPay client with configuration
+        // Register VNPay Client
         builder.Services.AddVnpayClient(options => builder.Configuration.GetSection("VNPay").Bind(options));
+        // Payment Processor (Simulated)
+        builder.Services.AddScoped<IPaymentProcessor, SimulatedPaymentProcessor>();
 
-        // Payment Services - Using Simulated Processor for now
-        builder.Services.AddScoped<SkaEV.API.Application.Services.Payments.IPaymentProcessor, SkaEV.API.Application.Services.Payments.SimulatedPaymentProcessor>();
+        // Background Services (Hosted)
+        // Note: Currently disabled to prevent data noise during development/testing
+        // builder.Services.AddHostedService<SkaEV.API.Services.ChargingSimulationService>();
+        // builder.Services.AddHostedService<SkaEV.API.Services.SystemEventsSimulationService>();
 
-        // Background Simulation Services (Hosted Services run in the background for the lifetime of the app)
-        // ⚠️ DISABLED - Vô hiệu hóa tạm thời để tránh sinh dữ liệu rác trong quá trình test
-        // builder.Services.AddHostedService<SkaEV.API.Services.ChargingSimulationService>(); // Simulates charging progress
-        // builder.Services.AddHostedService<SkaEV.API.Services.SystemEventsSimulationService>(); // Simulates system events
-
-        // Configure Swagger/OpenAPI for API documentation
+        // === Swagger / OpenAPI Documentation ===
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddSwaggerGen(c =>
         {
@@ -182,17 +203,13 @@ public partial class Program
                 Title = "SkaEV API",
                 Version = "v1",
                 Description = "Electric Vehicle Charging Station Management System API",
-                Contact = new OpenApiContact
-                {
-                    Name = "SWP391 G4 Topic 3",
-                    Email = "support@skaev.com"
-                }
+                Contact = new OpenApiContact { Name = "SWP391 G4 Topic 3", Email = "support@skaev.com" }
             });
 
-            // Add JWT Authentication support to Swagger UI
+            // Configure JWT Auth support in Swagger UI
             c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
             {
-                Description = "JWT Authorization header using the Bearer scheme. Enter 'Bearer' [space] and then your token in the text input below.",
+                Description = "JWT Authorization header using the Bearer scheme. Example: \"Bearer {token}\"",
                 Name = "Authorization",
                 In = ParameterLocation.Header,
                 Type = SecuritySchemeType.ApiKey,
@@ -204,30 +221,31 @@ public partial class Program
                 {
                     new OpenApiSecurityScheme
                     {
-                        Reference = new OpenApiReference
-                        {
-                            Type = ReferenceType.SecurityScheme,
-                            Id = "Bearer"
-                        }
+                        Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
                     },
                     Array.Empty<string>()
                 }
             });
         });
 
-        // Add SignalR for real-time updates (WebSockets)
+        // === Real-time Communication (SignalR) ===
         builder.Services.AddSignalR();
 
-        // Add Health Checks to monitor application status
+        // === Health Checks ===
         builder.Services.AddHealthChecks()
-            .AddDbContextCheck<SkaEVDbContext>(); // Check if database is accessible
+            .AddDbContextCheck<SkaEVDbContext>(); // Monitors DB connectivity
 
-        // Build the application
+        #endregion
+
+        #region 4. Build Application
+
         var app = builder.Build();
 
-        // Configure the HTTP request pipeline (Middleware)
+        #endregion
 
-        // Global exception handler (must be first to catch exceptions from other middleware)
+        #region 5. Middleware Pipeline Configuration
+
+        // Global Exception Handler - Must be first to catch downstream errors
         app.UseExceptionHandler(errorApp =>
         {
             errorApp.Run(async context =>
@@ -235,8 +253,7 @@ public partial class Program
                 context.Response.StatusCode = 500;
                 context.Response.ContentType = "application/json";
 
-                var exceptionHandlerPathFeature =
-                    context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerPathFeature>();
+                var exceptionHandlerPathFeature = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerPathFeature>();
 
                 if (exceptionHandlerPathFeature?.Error != null)
                 {
@@ -251,44 +268,46 @@ public partial class Program
             });
         });
 
-        // Configure Swagger UI in Development environment
+        // Swagger UI (Development Only)
         if (app.Environment.IsDevelopment())
         {
             app.UseSwagger();
             app.UseSwaggerUI(c =>
             {
                 c.SwaggerEndpoint("/swagger/v1/swagger.json", "SkaEV API v1");
-                c.RoutePrefix = "swagger"; // Swagger UI available at /swagger
+                c.RoutePrefix = "swagger";
             });
         }
 
-        // Disable HTTPS redirection in development for easier testing
+        // HTTPS Redirection (Disabled in dev for simpler local testing)
         // app.UseHttpsRedirection();
 
-        // IMPORTANT: CORS must be configured before Authentication/Authorization
+        // CORS - Must be before Auth
         app.UseCors("AllowFrontend");
 
-        // Enable Serilog request logging
+        // Request Logging (Serilog)
         app.UseSerilogRequestLogging();
 
-        // Enable Authentication and Authorization middleware
+        // Authentication & Authorization
         app.UseAuthentication();
         app.UseAuthorization();
 
-        // Map controller routes
+        // Endpoint Routing
         app.MapControllers();
-
-        // Map health check endpoint
         app.MapHealthChecks("/health");
-
-        // Map SignalR Hub - Temporarily commented out
+        
+        // SignalR Hub Mapping (Commented out until Hub is implemented)
         // app.MapHub<StationMonitoringHub>("/hubs/station-monitoring");
+
+        #endregion
+
+        #region 6. Startup Logic & Run
 
         try
         {
             Log.Information("Starting SkaEV API in {Environment} mode...", app.Environment.EnvironmentName);
 
-            // Optionally run development-only seeders if configuration requests it
+            // === Development Data Seeding ===
             var seedAdmin = builder.Configuration.GetValue<bool>("SeedAdminData", false);
             if (seedAdmin)
             {
@@ -310,10 +329,9 @@ public partial class Program
                 }
             }
 
-            // Apply EF Core migrations automatically only for the SQLite demo so the DB file
-            // is created and the schema is available when running locally without SQL Server.
-            // Avoid auto-migrating against a fresh SQL Server container to prevent unexpected
-            // schema operations in environments where a production DB is expected.
+            // === Auto-Migration (SQLite Demo Only) ===
+            // We only auto-migrate for SQLite to ensure the file exists. 
+            // For SQL Server, we prefer manual migration control to avoid accidental production schema changes.
             if (_isSqliteDemo)
             {
                 using (var scope = app.Services.CreateScope())
@@ -322,7 +340,6 @@ public partial class Program
                     try
                     {
                         var context = services.GetRequiredService<SkaEVDbContext>();
-                        // Apply pending migrations (safe in local/dev environments)
                         context.Database.Migrate();
                         Log.Information("Database migrations applied (development/SQLite demo).");
                     }
@@ -333,7 +350,7 @@ public partial class Program
                 }
             }
 
-            // Start the application (blocking). This keeps the host running normally in dev/test runs.
+            // Start the web host
             Log.Information("Backend is now running.");
             app.Run();
         }
@@ -346,5 +363,7 @@ public partial class Program
             Log.Information("Shutting down...");
             await Log.CloseAndFlushAsync();
         }
+
+        #endregion
     }
 }
