@@ -445,25 +445,7 @@ const AdvancedAnalytics = () => {
     "#8B5CF6",
   ];
 
-  // Get time range label
-  const getTimeRangeLabel = () => {
-    const days = computeRangeDays();
-    if (dateMode === 'day') {
-      if (days <= 7) return '7 ngày qua';
-      if (days <= 30) return '30 ngày qua';
-      if (days <= 90) return '3 tháng qua';
-      return `${days} ngày`;
-    }
-    if (dateMode === 'month') {
-      const f = selectedFrom ? new Date(selectedFrom) : new Date();
-      const t = selectedTo ? new Date(selectedTo) : new Date();
-      return `${f.getFullYear()}-${String(f.getMonth()+1).padStart(2,'0')} → ${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}`;
-    }
-    // year
-    const fy = selectedFrom ? new Date(selectedFrom).getFullYear() : new Date().getFullYear();
-    const ty = selectedTo ? new Date(selectedTo).getFullYear() : new Date().getFullYear();
-    return `${fy} → ${ty}`;
-  };
+
 
   // Format tooltip
   const formatTooltipValue = (value, name) => {
