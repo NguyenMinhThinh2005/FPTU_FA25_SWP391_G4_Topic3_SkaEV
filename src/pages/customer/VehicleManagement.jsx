@@ -32,7 +32,7 @@ import {
 import VehicleEditModal from "../../components/customer/VehicleEditModal";
 
 const VehicleManagement = () => {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // Store hooks
   const {
@@ -243,11 +243,18 @@ const VehicleManagement = () => {
       );
       if (vehicleToEdit) {
         handleEdit(vehicleToEdit);
+        // Clear URL params after handling to prevent re-triggering
+        searchParams.delete("edit");
+        setSearchParams(searchParams);
       }
     } else if (shouldAdd === "true") {
       handleAddNew();
+      // Clear URL params after handling to prevent re-triggering
+      searchParams.delete("add");
+      setSearchParams(searchParams);
     }
-  }, [handleAddNew, handleEdit, searchParams, vehicles]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams.toString()]); // Only re-run when URL search params change
 
   const getConnectorTypeLabel = (types) => {
     if (Array.isArray(types)) {
@@ -540,9 +547,10 @@ const VehicleManagement = () => {
                   {!vehicle.isDefault && (
                     <Button
                       size="small"
-                      onClick={() =>
-                        handleSetDefault(vehicle.id || vehicle.vehicleId)
-                      }
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSetDefault(vehicle.id || vehicle.vehicleId);
+                      }}
                     >
                       Đặt làm xe mặc định
                     </Button>

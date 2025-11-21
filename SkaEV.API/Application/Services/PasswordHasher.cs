@@ -17,7 +17,22 @@ namespace SkaEV.API.Application.Services
             // If stored value looks like a BCrypt hash, verify accordingly
             if (hashedPassword.StartsWith("$2"))
             {
-                return BCrypt.Net.BCrypt.Verify(providedPassword, hashedPassword);
+                try
+                {
+                    return BCrypt.Net.BCrypt.Verify(providedPassword, hashedPassword);
+                }
+                catch (BCrypt.Net.SaltParseException)
+                {
+                    // Malformed bcrypt hash (e.g. migrated/imported with wrong salt/version).
+                    // Fall back to legacy/plaintext comparison so the application can
+                    // handle migration-on-login without blowing up.
+                    return hashedPassword == providedPassword;
+                }
+                catch
+                {
+                    // Any other bcrypt-related error: fail verification safely
+                    return false;
+                }
             }
 
             // Fallback: plain-comparison (for legacy users) - not ideal but allows transition

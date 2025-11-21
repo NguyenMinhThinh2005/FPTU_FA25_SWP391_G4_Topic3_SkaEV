@@ -41,13 +41,21 @@ public interface IAuthService
 /// </summary>
 public class AuthService : IAuthService
 {
+    // Database context for accessing User data
     private readonly SkaEVDbContext _context;
+    
+    // Configuration for accessing app settings (e.g. JWT secret)
     private readonly IConfiguration _configuration;
+    
+    // Logger for tracking operations and errors
+    private readonly ILogger<AuthService> _logger;
 
-    public AuthService(SkaEVDbContext context, IConfiguration configuration)
+    // Constructor for dependency injection
+    public AuthService(SkaEVDbContext context, IConfiguration configuration, ILogger<AuthService> logger)
     {
         _context = context;
         _configuration = configuration;
+        _logger = logger;
     }
 
     /// <summary>
@@ -55,34 +63,78 @@ public class AuthService : IAuthService
     /// </summary>
     public async Task<LoginResponseDto?> LoginAsync(LoginRequestDto request)
     {
+        // Log the login attempt (masking sensitive data implicitly by only logging email)
+        _logger.LogInformation("Login attempt for email: {Email}", request.Email);
+
+        // Query the database for a user with the matching email who is also active
         var user = await _context.Users
             .FirstOrDefaultAsync(u => u.Email == request.Email && u.IsActive);
 
+        // If no matching user is found
         if (user == null)
         {
+            // Log warning and return null to indicate failure
+            _logger.LogWarning("User not found or inactive: {Email}", request.Email);
             return null;
         }
 
-        // Verify password using BCrypt (Standard secure method)
+        // Log that the user was found (useful for debugging flow)
+        _logger.LogInformation("User found: {Email}, Role: {Role}, IsActive: {IsActive}", user.Email, user.Role, user.IsActive);
+
+        // Verify password using shared PasswordHasher (supports BCrypt and legacy/plaintext)
         bool passwordMatches = false;
         try
         {
-            passwordMatches = BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
+            // Verify the provided password against the stored hash
+            passwordMatches = PasswordHasher.Verify(user.PasswordHash, request.Password);
+            _logger.LogInformation("Password verification result: {Result}", passwordMatches);
         }
-        catch (BCrypt.Net.SaltParseException)
+        catch (Exception ex)
         {
-            // Invalid BCrypt hash format in database
+            // Catch any unexpected error during verification to prevent crash
+            _logger.LogError(ex, "Error verifying password for user: {Email}", user.Email);
             passwordMatches = false;
         }
 
+        // If password does not match
         if (!passwordMatches)
         {
+            // Log warning and return null
+            _logger.LogWarning("Password verification failed for user: {Email}", user.Email);
             return null;
         }
 
+        // Legacy Password Migration Logic
+        // If the stored password was legacy (not BCrypt), migrate it to a BCrypt hash
+        try
+        {
+            // Check if password is not empty and does not start with BCrypt prefix "$2"
+            if (!string.IsNullOrEmpty(user.PasswordHash) && !user.PasswordHash.StartsWith("$2"))
+            {
+                // Hash the plaintext password using BCrypt
+                user.PasswordHash = PasswordHasher.HashPassword(request.Password);
+                // Update the timestamp
+                user.UpdatedAt = DateTime.UtcNow;
+                // Save changes to database
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("Migrated legacy password to BCrypt for user: {Email}", user.Email);
+            }
+        }
+        catch (Exception ex)
+        {
+            // Log migration failure but do not fail the login request
+            _logger.LogError(ex, "Failed to migrate password for user: {Email}", user.Email);
+        }
+
+        // Log successful login
+        _logger.LogInformation("Login successful for user: {Email}", user.Email);
+
+        // Generate JWT token for the authenticated user
         var token = GenerateJwtToken(user);
+        // Set token expiration time (24 hours from now)
         var expiresAt = DateTime.UtcNow.AddHours(24);
 
+        // Return successful response DTO
         return new LoginResponseDto
         {
             UserId = user.UserId,
@@ -101,65 +153,64 @@ public class AuthService : IAuthService
     {
         // === KIỂM TRA DỮ LIỆU ĐẦU VÀO ===
 
-        // 1. Kiểm tra trường FullName (Bắt buộc)
+        // 1. Check if FullName is provided
         if (string.IsNullOrWhiteSpace(request.FullName))
         {
             throw new InvalidOperationException("Full name is required");
         }
 
-        // 2. Kiểm tra trường Role (Bắt buộc)
+        // 2. Check if Role is provided
         if (string.IsNullOrWhiteSpace(request.Role))
         {
             throw new InvalidOperationException("Role is required");
         }
 
-        // 3. Kiểm tra tính hợp lệ của Role
-        var validRoles = new[] { "admin", "staff", "customer" };
+        // 3. Check if Role is valid (User, Staff, Admin)
+        // Normalize role to lowercase for comparison
+        var validRoles = new[] { "customer", "staff", "admin" };
         if (!validRoles.Contains(request.Role.ToLower()))
         {
-            throw new InvalidOperationException("Invalid role specified. Must be 'admin', 'staff', or 'customer'.");
+             throw new InvalidOperationException("Invalid role specified");
         }
 
-        // 4. Kiểm tra Email đã tồn tại chưa
-        if (await _context.Users.AnyAsync(u => u.Email == request.Email))
+        // 4. Check if Email already exists in the database
+        var existingUser = await _context.Users
+            .AnyAsync(u => u.Email == request.Email);
+            
+        if (existingUser)
         {
-            throw new InvalidOperationException("Email already registered");
+            // Throw exception if email is already taken
+            throw new InvalidOperationException("Email is already in use");
         }
 
-        // === TẠO USER MỚI ===
-        var user = new User
+        // Create new User entity
+        var newUser = new User
         {
             Email = request.Email,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password), // Hash mật khẩu trước khi lưu
+            // Hash the password immediately upon creation
+            PasswordHash = PasswordHasher.HashPassword(request.Password),
             FullName = request.FullName,
             PhoneNumber = request.PhoneNumber,
-            Role = request.Role,
-            IsActive = true,
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
+            Role = request.Role.ToLower(), // Store role in lowercase
+            IsActive = true, // Default to active
+            CreatedAt = DateTime.UtcNow
         };
 
-        _context.Users.Add(user);
-
-        // === TẠO HỒ SƠ NGƯỜI DÙNG ===
-        // Tạo UserProfile ngay lập tức để đảm bảo tính toàn vẹn dữ liệu
-        var profile = new UserProfile
-        {
-            User = user, // Gán object User, EF Core sẽ tự động liên kết ID
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
-        };
-
-        _context.UserProfiles.Add(profile);
-
-        // Lưu tất cả thay đổi vào database trong một transaction ngầm định
+        // Add user to the database context
+        _context.Users.Add(newUser);
+        
+        // Save changes to generate the UserId
         await _context.SaveChangesAsync();
+        
+        // Log the registration event
+        _logger.LogInformation("User registered successfully: {Email} with Role: {Role}", newUser.Email, newUser.Role);
 
+        // Return response DTO with new user info
         return new RegisterResponseDto
         {
-            UserId = user.UserId,
-            Email = user.Email,
-            FullName = user.FullName
+            UserId = newUser.UserId,
+            Email = newUser.Email,
+            FullName = newUser.FullName
         };
     }
 
@@ -168,6 +219,8 @@ public class AuthService : IAuthService
     /// </summary>
     public async Task<User?> GetUserByIdAsync(int userId)
     {
+        // Query database for user by ID
+        // Include the UserProfile navigation property to get extended details
         return await _context.Users
             .Include(u => u.UserProfile)
             .FirstOrDefaultAsync(u => u.UserId == userId);
@@ -178,24 +231,32 @@ public class AuthService : IAuthService
     /// </summary>
     private string GenerateJwtToken(User user)
     {
+        // Get JWT settings from configuration
         var jwtSettings = _configuration.GetSection("JwtSettings");
+        
+        // Get the secret key, with a hardcoded fallback for development safety (WARNING: Should always use config in prod)
         var key = Encoding.ASCII.GetBytes(jwtSettings["SecretKey"] ?? "SkaEV_Secret_Key_2025_Change_This_In_Production_Environment_12345678");
 
+        // Create the token descriptor containing claims and expiration
         var tokenDescriptor = new SecurityTokenDescriptor
         {
+            // Define the claims (payload) of the token
             Subject = new ClaimsIdentity(new[]
             {
-                new Claim(ClaimTypes.NameIdentifier, user.UserId.ToString()),
-                new Claim(ClaimTypes.Email, user.Email),
-                new Claim(ClaimTypes.Name, user.FullName),
-                new Claim(ClaimTypes.Role, user.Role)
+                new Claim(ClaimTypes.NameIdentifier, user.UserId.ToString()), // User ID
+                new Claim(ClaimTypes.Email, user.Email), // User Email
+                new Claim(ClaimTypes.Name, user.FullName), // User Name
+                new Claim(ClaimTypes.Role, user.Role) // User Role
             }),
+            // Set expiration time to 24 hours
             Expires = DateTime.UtcNow.AddHours(24),
+            // Sign the token using HmacSha256 algorithm and the secret key
             SigningCredentials = new SigningCredentials(
                 new SymmetricSecurityKey(key),
                 SecurityAlgorithms.HmacSha256Signature)
         };
 
+        // Create and write the token string
         var tokenHandler = new JwtSecurityTokenHandler();
         var token = tokenHandler.CreateToken(tokenDescriptor);
         return tokenHandler.WriteToken(token);

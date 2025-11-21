@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using SkaEV.API.Infrastructure.Data;
 using SkaEV.API.Domain.Entities;
 
-namespace SkaEV.API.Presentation.Controllers;
+namespace SkaEV.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]

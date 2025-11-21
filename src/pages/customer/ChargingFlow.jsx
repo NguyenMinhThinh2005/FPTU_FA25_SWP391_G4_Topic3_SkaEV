@@ -75,6 +75,7 @@ import {
 } from "@mui/icons-material";
 import useBookingStore from "../../store/bookingStore";
 import useStationStore from "../../store/stationStore";
+import useVehicleStore from "../../store/vehicleStore";
 import { formatCurrency, calculateDistance } from "../../utils/helpers";
 import StationMapLeaflet from "../../components/customer/StationMapLeaflet";
 import notificationService from "../../services/notificationService";
@@ -83,7 +84,8 @@ import {
   chargingAPI,
   stationsAPI,
   invoicesAPI,
-  vnpayAPI,
+  mockPaymentAPI,
+  bookingsAPI,
 } from "../../services/api";
 
 // Helper function to normalize Vietnamese text for search
@@ -222,6 +224,7 @@ const ChargingFlow = () => {
   const bookingStore = useBookingStore;
   const { stations, initializeData, filters, updateFilters, loading } =
     useStationStore();
+  const { vehicles, getDefaultVehicle, fetchVehicles, hasLoaded } = useVehicleStore();
 
   // Lưu flowStep vào sessionStorage để giữ trạng thái khi chuyển tab
   const getInitialFlowStep = () => {
@@ -947,27 +950,207 @@ const ChargingFlow = () => {
     }
   };
 
+  // Handle demo charging - create booking without QR scan
+  const handleDemoCharging = async () => {
+    console.log("🎮 Demo charging triggered");
+
+    try {
+      // First, ensure vehicles are loaded
+      if (!hasLoaded || vehicles.length === 0) {
+        console.log("📦 Vehicles not loaded yet, fetching...");
+        await fetchVehicles();
+      }
+
+      // Get fresh vehicles list from store after potential fetch
+      const vehicleStore = useVehicleStore.getState();
+      const currentVehicles = vehicleStore.vehicles || vehicles;
+      
+      // Try to get selectedVehicle from bookingStore first
+      let selectedVehicle = bookingStore.getState().selectedVehicle;
+      
+      // If not found, try to get default vehicle from vehicleStore
+      if (!selectedVehicle) {
+        selectedVehicle = vehicleStore.getDefaultVehicle();
+        console.log("📦 Auto-selected default vehicle:", selectedVehicle);
+      }
+      
+      // If still not found, try to get first vehicle
+      if (!selectedVehicle && currentVehicles && currentVehicles.length > 0) {
+        selectedVehicle = currentVehicles[0];
+        console.log("📦 Auto-selected first vehicle:", selectedVehicle);
+      }
+      
+      if (!selectedVehicle) {
+        throw new Error("Bạn chưa có xe nào. Vui lòng thêm xe trước khi demo sạc.");
+      }
+
+      // Get station ID - try to use selected station, or first available station
+      let demoStationId = selectedStation?.id || selectedStation?.stationId;
+      if (!demoStationId && stations && stations.length > 0) {
+        // Find first station with available slots
+        const stationWithSlots = stations.find(
+          (s) => s.status?.toLowerCase() === "active" && s.stats?.available > 0
+        );
+        demoStationId = stationWithSlots?.id || stationWithSlots?.stationId || stations[0].id || stations[0].stationId;
+      }
+      if (!demoStationId) {
+        throw new Error("Không tìm thấy trạm sạc khả dụng. Vui lòng chọn trạm trước.");
+      }
+
+      // Get available slots from the station
+      console.log("📦 Fetching available slots for station:", demoStationId);
+      const slotsResponse = await stationsAPI.getAvailableSlots(demoStationId);
+      const availableSlots = slotsResponse?.data?.data || slotsResponse?.data || [];
+      
+      if (!availableSlots || availableSlots.length === 0) {
+        throw new Error(`Trạm ${demoStationId} hiện không có slot sạc khả dụng. Vui lòng chọn trạm khác.`);
+      }
+
+      // Use first available slot
+      const firstAvailableSlot = availableSlots[0];
+      const demoSlotId = firstAvailableSlot.slotId || firstAvailableSlot.id;
+      
+      if (!demoSlotId) {
+        throw new Error("Không thể lấy thông tin slot sạc. Vui lòng thử lại.");
+      }
+
+      console.log("✅ Selected slot for demo:", { slotId: demoSlotId, stationId: demoStationId });
+
+      const qrScanPayload = {
+        qrData: `SLOT-${demoSlotId}-STATION-${demoStationId}`,
+        vehicleId: selectedVehicle.id || selectedVehicle.vehicleId,
+      };
+
+      console.log("📤 Demo QR Scan Payload:", qrScanPayload);
+      const bookingResponse = await bookingsAPI.scanQRCode(qrScanPayload);
+      console.log("✅ Demo QR Scan API Response:", bookingResponse);
+
+      // Extract booking data from API response
+      // Response format: { data: BookingDto } or BookingDto directly
+      const bookingData = bookingResponse?.data || bookingResponse;
+
+      // Update currentBooking with the API response
+      const newBooking = {
+        id: bookingData.bookingId || bookingData.id,
+        apiId: bookingData.bookingId || bookingData.id,
+        stationId: bookingData.stationId,
+        stationName: bookingData.stationName || selectedStation?.name || "Trạm Demo",
+        stationAddress: bookingData.stationAddress || selectedStation?.address || "Địa chỉ demo",
+        slotId: bookingData.slotId,
+        slotNumber: bookingData.slotNumber,
+        vehicleId: bookingData.vehicleId,
+        status: bookingData.status || "confirmed",
+        qrScanned: true,
+        scannedAt: new Date().toISOString(),
+      };
+
+      bookingStore.setState({
+        currentBooking: newBooking,
+      });
+
+      setScanResult(`SLOT-${demoSlotId}-STATION-${demoStationId}`);
+      setFlowStep(3); // Move to connect step
+      setQrScanOpen(false);
+
+      notificationService.success("Demo sạc xe đã được khởi tạo!");
+      console.log("✅ Demo charging started successfully, moving to step 3");
+    } catch (error) {
+      console.error("❌ Error in demo charging:", error);
+      const errorMessage = error.response?.data?.message || error.message || "Không thể khởi tạo demo sạc xe. Vui lòng thử lại.";
+      notificationService.error(errorMessage);
+      alert(errorMessage);
+    }
+  };
+
   const handleQRScan = async (result) => {
     console.log("📱 QR Scan triggered with result:", result);
 
     try {
-      // For customer demo, skip API validation (API requires Staff role)
-      // In production, Staff would scan and validate
-      console.log(
-        "⚠️ Customer mode - skipping API validation (requires Staff role)"
-      );
-      console.log("✅ QR code accepted in demo mode:", result);
-
-      // Update booking with QR scan info
-      if (currentBooking) {
-        bookingStore.setState({
-          currentBooking: {
-            ...currentBooking,
-            qrScanned: true,
-            scannedAt: new Date().toISOString(),
-          },
-        });
+      // Call API to create booking from QR scan
+      console.log("📤 Calling API to scan QR code:", result);
+      
+      // First, ensure vehicles are loaded
+      if (!hasLoaded || vehicles.length === 0) {
+        console.log("📦 Vehicles not loaded yet, fetching...");
+        await fetchVehicles();
       }
+
+      // Get fresh vehicles list from store after potential fetch
+      const vehicleStore = useVehicleStore.getState();
+      const currentVehicles = vehicleStore.vehicles || vehicles;
+      
+      // Try to get selectedVehicle from bookingStore first
+      let selectedVehicle = bookingStore.getState().selectedVehicle;
+      
+      // If not found, try to get default vehicle from vehicleStore
+      if (!selectedVehicle) {
+        selectedVehicle = vehicleStore.getDefaultVehicle();
+        console.log("📦 Auto-selected default vehicle for QR scan:", selectedVehicle);
+      }
+      
+      // If still not found, try to get first vehicle
+      if (!selectedVehicle && currentVehicles && currentVehicles.length > 0) {
+        selectedVehicle = currentVehicles[0];
+        console.log("📦 Auto-selected first vehicle for QR scan:", selectedVehicle);
+      }
+      
+      if (!selectedVehicle) {
+        throw new Error("Bạn chưa có xe nào. Vui lòng thêm xe trước khi quét QR.");
+      }
+
+      // Parse QR data to get slot ID and station ID
+      // Expected format: SLOT-123-STATION-456 or JSON
+      let slotId, stationId;
+      try {
+        const parsed = JSON.parse(result.qrData || result);
+        slotId = parsed.slotId || parsed.portId;
+        stationId = parsed.stationId;
+      } catch {
+        // Try simple format: SLOT-123-STATION-456
+        const qrString = result.qrData || result;
+        if (qrString.includes('SLOT-') && qrString.includes('STATION-')) {
+          const parts = qrString.split('-');
+          slotId = parseInt(parts[1]);
+          stationId = parseInt(parts[3]);
+        }
+      }
+
+      if (!slotId || !stationId) {
+        throw new Error("Mã QR không hợp lệ. Không thể đọc thông tin slot/station.");
+      }
+
+      // Call backend API to create booking via QR scan
+      const qrScanPayload = {
+        qrData: `SLOT-${slotId}-STATION-${stationId}`,
+        vehicleId: selectedVehicle.id || selectedVehicle.vehicleId,
+      };
+
+      console.log("📤 QR Scan Payload:", qrScanPayload);
+      const bookingResponse = await bookingsAPI.scanQRCode(qrScanPayload);
+      console.log("✅ QR Scan API Response:", bookingResponse);
+
+      // Extract booking data from API response
+      // Response format: { data: BookingDto } or BookingDto directly
+      const bookingData = bookingResponse?.data || bookingResponse;
+
+      // Update currentBooking with the API response
+      const newBooking = {
+        id: bookingData.bookingId || bookingData.id,
+        apiId: bookingData.bookingId || bookingData.id,
+        stationId: bookingData.stationId,
+        stationName: bookingData.stationName,
+        stationAddress: bookingData.stationAddress,
+        slotId: bookingData.slotId,
+        slotNumber: bookingData.slotNumber,
+        vehicleId: bookingData.vehicleId,
+        status: bookingData.status || "confirmed",
+        qrScanned: true,
+        scannedAt: new Date().toISOString(),
+      };
+
+      bookingStore.setState({
+        currentBooking: newBooking,
+      });
 
       setScanResult(result);
       setFlowStep(3); // Move to connect step
@@ -977,11 +1160,9 @@ const ChargingFlow = () => {
       console.log("✅ QR Scanned successfully, moving to step 3");
     } catch (error) {
       console.error("❌ Error scanning QR code:", error);
-      console.warn("⚠️ Continuing with demo mode anyway");
-
-      // Continue with demo mode even if there's an error
-      setScanResult(result);
-      setFlowStep(3);
+      notificationService.error(error.message || "Không thể quét mã QR. Vui lòng thử lại.");
+      
+      // Don't continue to next step if there's an error
       setQrScanOpen(false);
     }
   };
@@ -1093,12 +1274,13 @@ const ChargingFlow = () => {
 
   // Calculate total cost including parking fee
   const calculateTotalCost = React.useCallback(() => {
-    const energyCost = completedSession?.totalAmount || sessionData.currentCost;
+    const energyCost = parseFloat(completedSession?.totalAmount || sessionData.currentCost || 0);
     const chargingDuration = chargingStartTime
       ? Math.round((new Date() - chargingStartTime) / (1000 * 60))
-      : Math.round(sessionData.energyDelivered * 3); // 3 minutes per kWh estimate
+      : Math.round((sessionData.energyDelivered || 0) * 3); // 3 minutes per kWh estimate
     const parkingFee = Math.max(0, chargingDuration * 500); // 500 VND per minute
-    return energyCost + parkingFee;
+    const total = (isNaN(energyCost) ? 0 : energyCost) + parkingFee;
+    return isNaN(total) ? 0 : total;
   }, [completedSession, sessionData, chargingStartTime]);
 
   // Simulate realistic charging progress
@@ -2701,8 +2883,8 @@ const ChargingFlow = () => {
                     >
                       <Typography variant="body2">Năng lượng:</Typography>
                       <Typography variant="body2" fontWeight="medium">
-                        {completedSession?.energyDelivered ||
-                          sessionData.energyDelivered.toFixed(1)}{" "}
+                        {(completedSession?.energyDelivered ||
+                          parseFloat(sessionData.energyDelivered) || 0).toFixed(1)}{" "}
                         kWh
                       </Typography>
                     </Box>
@@ -2721,7 +2903,7 @@ const ChargingFlow = () => {
                               ? Math.round(
                                   (new Date() - chargingStartTime) / (1000 * 60)
                                 )
-                              : Math.round(sessionData.energyDelivered * 3))
+                              : Math.round((parseFloat(sessionData.energyDelivered) || 0) * 3)) || 0
                         )}
                       </Typography>
                     </Box>
@@ -2749,8 +2931,7 @@ const ChargingFlow = () => {
                       </Typography>
                       <Typography variant="body2" fontWeight="medium">
                         {formatCurrency(
-                          completedSession?.totalAmount ||
-                            sessionData.currentCost
+                          parseFloat(completedSession?.totalAmount || sessionData.currentCost || 0) || 0
                         )}
                       </Typography>
                     </Box>
@@ -2764,11 +2945,11 @@ const ChargingFlow = () => {
                       <Typography variant="body2">Phí đỗ xe:</Typography>
                       <Typography variant="body2" fontWeight="medium">
                         {formatCurrency(
-                          (chargingStartTime
+                          ((chargingStartTime
                             ? Math.round(
                                 (new Date() - chargingStartTime) / (1000 * 60)
                               )
-                            : Math.round(sessionData.energyDelivered * 3)) * 500
+                            : Math.round((parseFloat(sessionData.energyDelivered) || 0) * 3)) || 0) * 500
                         )}
                       </Typography>
                     </Box>
@@ -2805,10 +2986,10 @@ const ChargingFlow = () => {
                       color="text.secondary"
                       sx={{ mb: 3 }}
                     >
-                      Thanh toán an toàn qua cổng VNPay
+                      Thanh toán nhanh chóng và an toàn
                     </Typography>
 
-                    {/* VNPay Payment Info */}
+                    {/* Payment Info */}
                     <Box
                       sx={{
                         border: 2,
@@ -2828,7 +3009,7 @@ const ChargingFlow = () => {
                           fontWeight="bold"
                           color="primary.main"
                         >
-                          💳 VNPay
+                          💳 Ví điện tử
                         </Typography>
                       </Box>
                       <Typography
@@ -2836,17 +3017,17 @@ const ChargingFlow = () => {
                         color="text.secondary"
                         sx={{ mb: 2 }}
                       >
-                        • Thanh toán qua thẻ ATM/Visa/MasterCard
+                        • Thanh toán ngay lập tức
                       </Typography>
                       <Typography
                         variant="body2"
                         color="text.secondary"
                         sx={{ mb: 2 }}
                       >
-                        • Ví điện tử VNPay
+                        • Không cần chuyển hướng
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        • Bảo mật SSL 256-bit
+                        • Bảo mật và an toàn
                       </Typography>
                     </Box>
 
@@ -2913,11 +3094,12 @@ const ChargingFlow = () => {
 
                           console.log("✅ Invoice ready for payment:", invoice);
 
-                          // 2. Create VNPay payment URL
-                          console.log("💳 Creating VNPay payment URL...");
-                          const vnpayResponse = await vnpayAPI.createPaymentUrl(
+                          // 2. Process payment immediately (Mock Payment)
+                          console.log("💳 Processing payment...");
+                          const paymentResponse = await mockPaymentAPI.processPayment(
                             {
                               invoiceId: invoice.invoiceId,
+<<<<<<< HEAD
                               amount: invoice.totalAmount || totalAmount,
                               orderDescription: `Thanh toan hoa don #${
                                 invoice.invoiceId
@@ -2939,26 +3121,31 @@ const ChargingFlow = () => {
                             console.error("❌ Invalid payment URL:", paymentUrl);
                             throw new Error(
                               "Không thể tạo liên kết thanh toán (Invalid URL)"
+=======
+                            }
+                          );
+
+                          // Axios interceptor unwraps ApiResponse, so paymentResponse is the data object directly
+                          if (!paymentResponse?.success) {
+                            throw new Error(
+                              paymentResponse?.message || "Không thể xử lý thanh toán"
+>>>>>>> eff7f134438d6e5a817b685ba4f65518cc63b454
                             );
                           }
 
                           console.log(
+<<<<<<< HEAD
                             "🔗 VNPay payment URL created:",
                             paymentUrl
+=======
+                            "✅ Payment processed successfully:",
+                            paymentResponse
+>>>>>>> eff7f134438d6e5a817b685ba4f65518cc63b454
                           );
 
-                          // 3. Save current state before redirecting
-                          sessionStorage.setItem(
-                            "pendingPaymentInvoiceId",
-                            invoice.invoiceId
-                          );
-                          sessionStorage.setItem(
-                            "pendingPaymentBookingId",
-                            bookingId
-                          );
-                          sessionStorage.setItem(
-                            "returnToChargingFlow",
-                            "true"
+                          // 3. Payment successful - move to complete step
+                          notificationService.success(
+                            `Thanh toán thành công! Số tiền: ${formatCurrency(paymentResponse.amount)}`
                           );
 
                           // 4. Redirect to VNPay
@@ -3355,7 +3542,7 @@ const ChargingFlow = () => {
           <Button
             variant="outlined"
             size="small"
-            onClick={() => handleQRScan("SKAEV:STATION:ST001:A01")}
+            onClick={handleDemoCharging}
           >
             Demo sạc xe
           </Button>

@@ -138,14 +138,26 @@ public class BookingsController : BaseApiController
         // Đảm bảo đặt chỗ được tạo cho người dùng hiện tại
         dto.UserId = CurrentUserId; 
 
-        // Gọi service để xử lý quét QR và tạo đặt chỗ
-        var bookingId = await _bookingService.ScanQRCodeAsync(dto);
-        
-        // Lấy chi tiết đầy đủ của đặt chỗ
-        var booking = await _bookingService.GetBookingByIdAsync(bookingId);
+        try
+        {
+            // Gọi service để xử lý quét QR và tạo đặt chỗ
+            var bookingId = await _bookingService.ScanQRCodeAsync(dto);
+            
+            // Lấy chi tiết đầy đủ của đặt chỗ
+            var booking = await _bookingService.GetBookingByIdAsync(bookingId);
 
-        // Trả về 201 Created
-        return CreatedResponse(nameof(GetBooking), new { id = bookingId }, booking);
+            // Trả về 201 Created
+            return CreatedResponse(nameof(GetBooking), new { id = bookingId }, booking);
+        }
+        catch (InvalidOperationException ex)
+        {
+            // Trả về lỗi 400 với message từ service (ví dụ: QR không hợp lệ)
+            return BadRequestResponse(ex.Message);
+        }
+        catch (Exception)
+        {
+            return StatusCode(500, ApiResponse<object>.Fail("Lỗi hệ thống khi xử lý mã QR"));
+        }
     }
 
     /// <summary>

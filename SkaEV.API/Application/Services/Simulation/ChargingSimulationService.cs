@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using SkaEV.API.Infrastructure.Data;
 
-namespace SkaEV.API.Services;
+namespace SkaEV.API.Application.Services.Simulation;
 
 /// <summary>
 /// Background service mô phỏng charging sessions real-time

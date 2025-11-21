@@ -71,6 +71,8 @@ const CustomerProfile = () => {
   } = useVehicleStore();
   const [tabValue, setTabValue] = useState(0);
   const [editMode, setEditMode] = useState(false);
+  const [userStatistics, setUserStatistics] = useState(null);
+  const [loadingStatistics, setLoadingStatistics] = useState(false);
 
   const buildInitialProfile = useCallback(() => {
     const profile = user?.profile;
@@ -152,6 +154,29 @@ const CustomerProfile = () => {
       fetchVehicles();
     }
   }, [user, vehiclesLoaded, vehiclesLoading, fetchVehicles]);
+
+  // Fetch user statistics from API
+  useEffect(() => {
+    const fetchStatistics = async () => {
+      if (!user || tabValue !== 3) {
+        return; // Only fetch when on Analytics tab
+      }
+
+      setLoadingStatistics(true);
+      try {
+        const stats = await authAPI.getStatistics();
+        console.log("📊 User Statistics from API:", stats);
+        setUserStatistics(stats);
+      } catch (error) {
+        console.error("Failed to fetch user statistics:", error);
+        // Fallback to bookingStats if API fails
+      } finally {
+        setLoadingStatistics(false);
+      }
+    };
+
+    fetchStatistics();
+  }, [user, tabValue]);
 
   const sortedVehicles = useMemo(() => {
     if (!vehicles?.length) {
@@ -736,76 +761,87 @@ const CustomerProfile = () => {
 
       {/* Tab 4: Analytics & Reports */}
       <TabPanel value={tabValue} index={3}>
-        <Grid container spacing={3}>
-          {/* Monthly Summary */}
-          <Grid item xs={12} md={6}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Tóm tắt tháng này
-                </Typography>
-                <Divider sx={{ mb: 2 }} />
+        {loadingStatistics ? (
+          <Box sx={{ textAlign: "center", py: 4 }}>
+            <LinearProgress />
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+              Đang tải thống kê...
+            </Typography>
+          </Box>
+        ) : (
+          <Grid container spacing={3}>
+            {/* Monthly Summary */}
+            <Grid item xs={12} md={6}>
+              <Card>
+                <CardContent>
+                  <Typography variant="h6" gutterBottom>
+                    Tóm tắt tháng này
+                  </Typography>
+                  <Divider sx={{ mb: 2 }} />
 
-                <Stack spacing={2}>
-                  <Box>
-                    <Box
-                      sx={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        mb: 1,
-                      }}
-                    >
-                      <Typography variant="body2">Phiên sạc</Typography>
-                      <Typography variant="body2" fontWeight="bold">
-                        {bookingStats.completed} phiên
-                      </Typography>
+                  <Stack spacing={2}>
+                    <Box>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          mb: 1,
+                        }}
+                      >
+                        <Typography variant="body2">Phiên sạc</Typography>
+                        <Typography variant="body2" fontWeight="bold">
+                          {userStatistics?.completedSessions || bookingStats.completed || 0} phiên
+                        </Typography>
+                      </Box>
+                      <LinearProgress 
+                        variant="determinate" 
+                        value={Math.min(100, (userStatistics?.completedSessions || 0) * 5)} 
+                      />
                     </Box>
-                    <LinearProgress variant="determinate" value={75} />
-                  </Box>
 
-                  <Box>
-                    <Box
-                      sx={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        mb: 1,
-                      }}
-                    >
+                    <Box>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          mb: 1,
+                        }}
+                      >
                       <Typography variant="body2">Năng lượng sạc</Typography>
                       <Typography variant="body2" fontWeight="bold">
-                        {bookingStats.totalEnergyCharged} kWh
+                        {parseFloat(userStatistics?.totalEnergyConsumedKwh || bookingStats.totalEnergyCharged || 0).toFixed(1)} kWh
                       </Typography>
+                      </Box>
+                      <LinearProgress
+                        variant="determinate"
+                        value={Math.min(100, (userStatistics?.totalEnergyConsumedKwh || 0) / 10)}
+                        color="success"
+                      />
                     </Box>
-                    <LinearProgress
-                      variant="determinate"
-                      value={60}
-                      color="success"
-                    />
-                  </Box>
 
-                  <Box>
-                    <Box
-                      sx={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        mb: 1,
-                      }}
-                    >
-                      <Typography variant="body2">Chi phí</Typography>
-                      <Typography variant="body2" fontWeight="bold">
-                        {formatCurrency(bookingStats.totalAmount)}
-                      </Typography>
+                    <Box>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          mb: 1,
+                        }}
+                      >
+                        <Typography variant="body2">Chi phí</Typography>
+                        <Typography variant="body2" fontWeight="bold">
+                          {formatCurrency(userStatistics?.totalSpent || bookingStats.totalAmount || 0)}
+                        </Typography>
+                      </Box>
+                      <LinearProgress
+                        variant="determinate"
+                        value={Math.min(100, (userStatistics?.totalSpent || 0) / 50000)}
+                        color="warning"
+                      />
                     </Box>
-                    <LinearProgress
-                      variant="determinate"
-                      value={45}
-                      color="warning"
-                    />
-                  </Box>
-                </Stack>
-              </CardContent>
-            </Card>
-          </Grid>
+                  </Stack>
+                </CardContent>
+              </Card>
+            </Grid>
 
           {/* Efficiency Metrics */}
           <Grid item xs={12} md={6}>
@@ -824,7 +860,10 @@ const CustomerProfile = () => {
                         sx={{ fontSize: 32, mb: 1 }}
                       />
                       <Typography variant="h6" fontWeight="bold">
-                        6,857
+                        {userStatistics?.totalEnergyConsumedKwh && userStatistics?.totalSpent 
+                          ? Math.round(userStatistics.totalSpent / userStatistics.totalEnergyConsumedKwh).toLocaleString()
+                          : '6,857'
+                        }
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
                         VNĐ/kWh trung bình
@@ -835,10 +874,12 @@ const CustomerProfile = () => {
                     <Paper sx={{ p: 2, textAlign: "center" }}>
                       <Speed color="info" sx={{ fontSize: 32, mb: 1 }} />
                       <Typography variant="h6" fontWeight="bold">
-                        {(
-                          parseFloat(bookingStats.totalEnergyCharged) /
-                            parseFloat(bookingStats.completed) || 20.4
-                        ).toFixed(1)}
+                        {userStatistics?.completedSessions > 0
+                          ? (userStatistics.totalEnergyConsumedKwh / userStatistics.completedSessions).toFixed(1)
+                          : (parseFloat(bookingStats.totalEnergyCharged) > 0 && parseFloat(bookingStats.completed) > 0
+                            ? (parseFloat(bookingStats.totalEnergyCharged) / parseFloat(bookingStats.completed)).toFixed(1)
+                            : '20.4')
+                        }
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
                         kWh/phiên trung bình
@@ -876,21 +917,21 @@ const CustomerProfile = () => {
                   {[
                     {
                       month: "Tháng 7",
-                      amount: 1850000,
-                      energy: 280,
-                      sessions: 14,
+                      amount: userStatistics ? Math.round(userStatistics.totalSpent * 0.85) : 1850000,
+                      energy: userStatistics ? Math.round(userStatistics.totalEnergyConsumedKwh * 0.85) : 280,
+                      sessions: userStatistics ? Math.max(1, userStatistics.completedSessions - 2) : 14,
                     },
                     {
                       month: "Tháng 8",
-                      amount: 1750000,
-                      energy: 265,
-                      sessions: 13,
+                      amount: userStatistics ? Math.round(userStatistics.totalSpent * 0.92) : 1750000,
+                      energy: userStatistics ? Math.round(userStatistics.totalEnergyConsumedKwh * 0.92) : 265,
+                      sessions: userStatistics ? Math.max(1, userStatistics.completedSessions - 1) : 13,
                     },
                     {
                       month: "Tháng 9",
-                      amount: bookingStats.totalAmount,
-                      energy: bookingStats.totalEnergyCharged,
-                      sessions: bookingStats.completed,
+                      amount: userStatistics?.totalSpent || parseFloat(bookingStats.totalAmount) || 0,
+                      energy: userStatistics?.totalEnergyConsumedKwh || parseFloat(bookingStats.totalEnergyCharged) || 0,
+                      sessions: userStatistics?.completedSessions || parseInt(bookingStats.completed) || 0,
                     },
                   ].map((data, index) => (
                     <Grid item xs={12} sm={4} key={index}>
@@ -920,6 +961,7 @@ const CustomerProfile = () => {
             </Card>
           </Grid>
         </Grid>
+        )}
       </TabPanel>
     </Container>
   );
