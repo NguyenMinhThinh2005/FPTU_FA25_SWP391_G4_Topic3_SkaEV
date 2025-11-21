@@ -51,7 +51,7 @@ const UserManagement = () => {
   const { users, addUser, updateUser, deleteUser, fetchUsers, loading } = useUserStore();
   const { stations, fetchStations } = useStationStore();
   const [query, setQuery] = useState("");
-  const [roleFilter, setRoleFilter] = useState("all");
+  const [roleFilter, _setRoleFilter] = useState("all");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [roleDialogOpen, setRoleDialogOpen] = useState(false);
