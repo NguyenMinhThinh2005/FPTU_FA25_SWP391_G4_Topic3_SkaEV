@@ -324,7 +324,9 @@ public class ReportService : IReportService
                     TotalUsageMinutes = reader.IsDBNull(8) ? 0 : reader.GetInt32(8),
                     AvgSessionDurationMinutes = reader.IsDBNull(9) ? null : reader.GetInt32(9),
                     PeakUsageHour = reader.IsDBNull(10) ? null : reader.GetInt32(10),
-                    UtilizationRatePercent = reader.IsDBNull(11) ? null : reader.GetDecimal(11)
+                    UtilizationRatePercent = reader.IsDBNull(11)
+                        ? null
+                        : (decimal?)Convert.ToDecimal(reader.GetValue(11))
                 });
             }
 
