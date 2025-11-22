@@ -9,86 +9,34 @@ using SkaEV.API.Infrastructure.Data;
 
 namespace SkaEV.API.Application.Services;
 
-/// <summary>
-/// Giao diện dịch vụ quản lý trạm sạc dành cho Admin.
-/// </summary>
 public interface IAdminStationManagementService
 {
     // List & Search
-    /// <summary>
-    /// Lấy danh sách trạm sạc với bộ lọc.
-    /// </summary>
     Task<(List<StationListDto> Stations, int TotalCount)> GetStationsAsync(StationFilterDto filter);
 
     // Detail
-    /// <summary>
-    /// Lấy chi tiết trạm sạc.
-    /// </summary>
     Task<StationDetailDto?> GetStationDetailAsync(int stationId);
 
     // Real-time Monitoring
-    /// <summary>
-    /// Lấy dữ liệu giám sát thời gian thực của trạm sạc.
-    /// </summary>
     Task<StationRealTimeMonitoringDto?> GetStationRealTimeDataAsync(int stationId);
 
     // Control
-    /// <summary>
-    /// Điều khiển trụ sạc (Start/Stop/Restart).
-    /// </summary>
     Task<ControlCommandResultDto> ControlChargingPointAsync(ChargingPointControlDto command);
-
-    /// <summary>
-    /// Điều khiển toàn bộ trạm sạc.
-    /// </summary>
     Task<ControlCommandResultDto> ControlStationAsync(StationControlDto command);
 
     // Configuration
-    /// <summary>
-    /// Cấu hình trụ sạc.
-    /// </summary>
     Task<bool> ConfigureChargingPointAsync(ChargingPointConfigDto config);
 
     // Error Management
-    /// <summary>
-    /// Lấy danh sách lỗi của trạm sạc.
-    /// </summary>
     Task<List<StationErrorLogDto>> GetStationErrorsAsync(int stationId, bool includeResolved = false);
-
-    /// <summary>
-    /// Xử lý lỗi trạm sạc.
-    /// </summary>
     Task<bool> ResolveErrorAsync(int logId, string resolvedBy, string resolution);
-
-    /// <summary>
-    /// Ghi log lỗi trạm sạc.
-    /// </summary>
     Task<int> LogStationErrorAsync(int stationId, int? postId, int? slotId, string severity, string errorType, string message, string? details = null);
 
     // CRUD Operations
-    /// <summary>
-    /// Tạo mới trạm sạc.
-    /// </summary>
     Task<StationDetailDto> CreateStationAsync(CreateUpdateStationDto dto);
-
-    /// <summary>
-    /// Cập nhật thông tin trạm sạc.
-    /// </summary>
     Task<bool> UpdateStationAsync(int stationId, CreateUpdateStationDto dto);
-
-    /// <summary>
-    /// Xóa trạm sạc (Soft delete).
-    /// </summary>
     Task<bool> DeleteStationAsync(int stationId);
-
-    /// <summary>
-    /// Tạo mới trụ sạc.
-    /// </summary>
     Task<ChargingPointDetailDto> CreateChargingPostAsync(CreateChargingPostDto dto);
-
-    /// <summary>
-    /// Cập nhật người quản lý trạm sạc.
-    /// </summary>
     Task<bool> UpdateStationManagerAsync(int stationId, int? managerUserId);
 }
 
@@ -101,9 +49,6 @@ internal record StationCompletedSessionSummary(
     DateTime? ActualEndTime,
     decimal Revenue);
 
-/// <summary>
-/// Dịch vụ quản lý trạm sạc dành cho Admin.
-/// </summary>
 public class AdminStationManagementService : IAdminStationManagementService
 {
     private readonly SkaEVDbContext _context;
@@ -147,9 +92,6 @@ public class AdminStationManagementService : IAdminStationManagementService
         return CapacityCalculator.CalculateCapacityMetrics(station);
     }
 
-    /// <summary>
-    /// Lấy danh sách trạm sạc với bộ lọc.
-    /// </summary>
     public async Task<(List<StationListDto> Stations, int TotalCount)> GetStationsAsync(StationFilterDto filter)
     {
         var query = _context.ChargingStations
@@ -392,9 +334,6 @@ public class AdminStationManagementService : IAdminStationManagementService
         return (stations, totalCount);
     }
 
-    /// <summary>
-    /// Lấy chi tiết trạm sạc.
-    /// </summary>
     public async Task<StationDetailDto?> GetStationDetailAsync(int stationId)
     {
         var station = await _context.ChargingStations
@@ -595,9 +534,6 @@ public class AdminStationManagementService : IAdminStationManagementService
         return detail;
     }
 
-    /// <summary>
-    /// Lấy dữ liệu giám sát thời gian thực của trạm sạc.
-    /// </summary>
     public async Task<StationRealTimeMonitoringDto?> GetStationRealTimeDataAsync(int stationId)
     {
         var station = await _context.ChargingStations
@@ -708,9 +644,6 @@ public class AdminStationManagementService : IAdminStationManagementService
         };
     }
 
-    /// <summary>
-    /// Điều khiển trụ sạc (Start/Stop/Restart).
-    /// </summary>
     public async Task<ControlCommandResultDto> ControlChargingPointAsync(ChargingPointControlDto command)
     {
         var result = new ControlCommandResultDto();
@@ -789,9 +722,6 @@ public class AdminStationManagementService : IAdminStationManagementService
         return result;
     }
 
-    /// <summary>
-    /// Điều khiển toàn bộ trạm sạc.
-    /// </summary>
     public async Task<ControlCommandResultDto> ControlStationAsync(StationControlDto command)
     {
         var result = new ControlCommandResultDto();
@@ -895,9 +825,6 @@ public class AdminStationManagementService : IAdminStationManagementService
         return result;
     }
 
-    /// <summary>
-    /// Cấu hình trụ sạc.
-    /// </summary>
     public async Task<bool> ConfigureChargingPointAsync(ChargingPointConfigDto config)
     {
         try
@@ -932,9 +859,6 @@ public class AdminStationManagementService : IAdminStationManagementService
         }
     }
 
-    /// <summary>
-    /// Lấy danh sách lỗi của trạm sạc.
-    /// </summary>
     public async Task<List<StationErrorLogDto>> GetStationErrorsAsync(int stationId, bool includeResolved = false)
     {
         // For now, we'll get from SystemLogs
@@ -978,9 +902,6 @@ public class AdminStationManagementService : IAdminStationManagementService
         }).ToList();
     }
 
-    /// <summary>
-    /// Xử lý lỗi trạm sạc.
-    /// </summary>
     public async Task<bool> ResolveErrorAsync(int logId, string resolvedBy, string resolution)
     {
         try
@@ -1002,9 +923,6 @@ public class AdminStationManagementService : IAdminStationManagementService
         }
     }
 
-    /// <summary>
-    /// Ghi log lỗi trạm sạc.
-    /// </summary>
     public async Task<int> LogStationErrorAsync(int stationId, int? postId, int? slotId,
         string severity, string errorType, string message, string? details = null)
     {
@@ -1161,9 +1079,6 @@ public class AdminStationManagementService : IAdminStationManagementService
         }
     }
 
-    /// <summary>
-    /// Tạo mới trạm sạc.
-    /// </summary>
     public async Task<StationDetailDto> CreateStationAsync(CreateUpdateStationDto dto)
     {
         var station = new ChargingStation
@@ -1189,9 +1104,6 @@ public class AdminStationManagementService : IAdminStationManagementService
         return (await GetStationDetailAsync(station.StationId))!;
     }
 
-    /// <summary>
-    /// Cập nhật thông tin trạm sạc.
-    /// </summary>
     public async Task<bool> UpdateStationAsync(int stationId, CreateUpdateStationDto dto)
     {
         try
@@ -1221,9 +1133,6 @@ public class AdminStationManagementService : IAdminStationManagementService
         }
     }
 
-    /// <summary>
-    /// Xóa trạm sạc (Soft delete).
-    /// </summary>
     public async Task<bool> DeleteStationAsync(int stationId)
     {
         try
@@ -1244,9 +1153,6 @@ public class AdminStationManagementService : IAdminStationManagementService
         }
     }
 
-    /// <summary>
-    /// Tạo mới trụ sạc.
-    /// </summary>
     public async Task<ChargingPointDetailDto> CreateChargingPostAsync(CreateChargingPostDto dto)
     {
         var post = new ChargingPost
@@ -1329,9 +1235,6 @@ public class AdminStationManagementService : IAdminStationManagementService
         };
     }
 
-    /// <summary>
-    /// Cập nhật người quản lý trạm sạc.
-    /// </summary>
     public async Task<bool> UpdateStationManagerAsync(int stationId, int? managerUserId)
     {
         await using var transaction = await _context.Database.BeginTransactionAsync();

@@ -5,9 +5,6 @@ using SkaEV.API.Infrastructure.Data;
 
 namespace SkaEV.API.Application.Services;
 
-/// <summary>
-/// Dịch vụ phân tích dữ liệu trạm sạc dành cho Admin.
-/// </summary>
 public class AdminStationService : IAdminStationService
 {
     private readonly SkaEVDbContext _context;
@@ -19,11 +16,6 @@ public class AdminStationService : IAdminStationService
         _logger = logger;
     }
 
-    /// <summary>
-    /// Lấy dữ liệu phân tích trạm sạc theo khoảng thời gian.
-    /// </summary>
-    /// <param name="timeRange">Khoảng thời gian (7d, 30d, 90d, 12m).</param>
-    /// <returns>Dữ liệu phân tích trạm sạc.</returns>
     public async Task<StationAnalyticsDto> GetStationAnalyticsAsync(string timeRange)
     {
         // Parse time range

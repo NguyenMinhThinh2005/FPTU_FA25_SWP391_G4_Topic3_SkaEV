@@ -1,7 +1,18 @@
-import axiosInstance from './axiosConfig';
+import axios from 'axios';
 
-// Use the shared axios instance which already has interceptors configured
-// This ensures token is automatically added from sessionStorage/localStorage
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+
+// Create axios instance with auth header
+const createAuthAxios = () => {
+  const token = localStorage.getItem('token');
+  return axios.create({
+    baseURL: API_URL,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token && { Authorization: `Bearer ${token}` })
+    }
+  });
+};
 
 /**
  * Admin Station Management API Service
@@ -14,6 +25,7 @@ const adminStationAPI = {
    * Get all stations with filtering, sorting and pagination
    */
   async getStations(filters = {}) {
+    const api = createAuthAxios();
     const params = {
       page: filters.page || 1,
       pageSize: filters.pageSize || 20,
@@ -27,7 +39,7 @@ const adminStationAPI = {
       ...(filters.maxUtilization !== undefined && { maxUtilization: filters.maxUtilization })
     };
     
-    const response = await axiosInstance.get('/admin/stations', { params });
+    const response = await api.get('/admin/stations', { params });
     return response.data;
   },
 
@@ -35,7 +47,8 @@ const adminStationAPI = {
    * Get detailed information for a specific station
    */
   async getStationDetail(stationId) {
-    const response = await axiosInstance.get(`/admin/stations/${stationId}`);
+    const api = createAuthAxios();
+    const response = await api.get(`/admin/stations/${stationId}`);
     return response.data;
   },
 
@@ -45,7 +58,8 @@ const adminStationAPI = {
    * Get real-time monitoring data for a station
    */
   async getStationRealTimeData(stationId) {
-    const response = await axiosInstance.get(`/admin/stations/${stationId}/realtime`);
+    const api = createAuthAxios();
+    const response = await api.get(`/admin/stations/${stationId}/realtime`);
     return response.data;
   },
 
@@ -56,7 +70,8 @@ const adminStationAPI = {
    * Commands: start, stop, restart, pause, resume, maintenance
    */
   async controlChargingPoint(postId, command, reason = null) {
-    const response = await axiosInstance.post(`/admin/stations/posts/${postId}/control`, {
+    const api = createAuthAxios();
+    const response = await api.post(`/admin/stations/posts/${postId}/control`, {
       command,
       reason
     });
@@ -68,7 +83,8 @@ const adminStationAPI = {
    * Commands: enable_all, disable_all, restart_all, maintenance_mode
    */
   async controlStation(stationId, command, reason = null, applyToAllPosts = true) {
-    const response = await axiosInstance.post(`/admin/stations/${stationId}/control`, {
+    const api = createAuthAxios();
+    const response = await api.post(`/admin/stations/${stationId}/control`, {
       command,
       reason,
       applyToAllPosts
@@ -82,7 +98,8 @@ const adminStationAPI = {
    * Configure charging point settings
    */
   async configureChargingPoint(postId, config) {
-    const response = await axiosInstance.put(`/admin/stations/posts/${postId}/config`, config);
+    const api = createAuthAxios();
+    const response = await api.put(`/admin/stations/posts/${postId}/config`, config);
     return response.data;
   },
 
@@ -92,7 +109,8 @@ const adminStationAPI = {
    * Get error logs for a specific station
    */
   async getStationErrors(stationId, includeResolved = false) {
-    const response = await axiosInstance.get(`/admin/stations/${stationId}/errors`, {
+    const api = createAuthAxios();
+    const response = await api.get(`/admin/stations/${stationId}/errors`, {
       params: { includeResolved }
     });
     return response.data;
@@ -102,7 +120,8 @@ const adminStationAPI = {
    * Mark an error as resolved
    */
   async resolveError(logId, resolution) {
-    const response = await axiosInstance.patch(`/admin/stations/errors/${logId}/resolve`, {
+    const api = createAuthAxios();
+    const response = await api.patch(`/admin/stations/errors/${logId}/resolve`, {
       resolution
     });
     return response.data;
@@ -112,7 +131,8 @@ const adminStationAPI = {
    * Log a new station error/warning
    */
   async logStationError(stationId, error) {
-    const response = await axiosInstance.post(`/admin/stations/${stationId}/errors`, error);
+    const api = createAuthAxios();
+    const response = await api.post(`/admin/stations/${stationId}/errors`, error);
     return response.data;
   },
 
@@ -122,7 +142,8 @@ const adminStationAPI = {
    * Create a new charging station
    */
   async createStation(stationData) {
-    const response = await axiosInstance.post('/admin/stations', stationData);
+    const api = createAuthAxios();
+    const response = await api.post('/admin/stations', stationData);
     return response.data;
   },
 
@@ -130,7 +151,8 @@ const adminStationAPI = {
    * Update station information
    */
   async updateStation(stationId, stationData) {
-    const response = await axiosInstance.put(`/admin/stations/${stationId}`, stationData);
+    const api = createAuthAxios();
+    const response = await api.put(`/admin/stations/${stationId}`, stationData);
     return response.data;
   },
 
@@ -138,7 +160,8 @@ const adminStationAPI = {
    * Delete station (soft delete)
    */
   async deleteStation(stationId) {
-    const response = await axiosInstance.delete(`/admin/stations/${stationId}`);
+    const api = createAuthAxios();
+    const response = await api.delete(`/admin/stations/${stationId}`);
     return response.data;
   },
 
@@ -146,7 +169,8 @@ const adminStationAPI = {
    * Update manager assignment for a station
    */
   async updateStationManager(stationId, managerUserId) {
-    const response = await axiosInstance.put(`/admin/stations/${stationId}/manager`, {
+    const api = createAuthAxios();
+    const response = await api.put(`/admin/stations/${stationId}/manager`, {
       managerUserId,
     });
     return response.data;
@@ -156,7 +180,8 @@ const adminStationAPI = {
    * Add a new charging post to a station
    */
   async createChargingPost(stationId, postData) {
-    const response = await axiosInstance.post(`/admin/stations/${stationId}/posts`, postData);
+    const api = createAuthAxios();
+    const response = await api.post(`/admin/stations/${stationId}/posts`, postData);
     return response.data;
   },
 

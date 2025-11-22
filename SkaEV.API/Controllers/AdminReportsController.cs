@@ -1,34 +1,23 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using SkaEV.API.Application.Common;
-using SkaEV.API.Application.Constants;
 using SkaEV.API.Application.DTOs.Reports;
 using SkaEV.API.Application.Services;
 
 namespace SkaEV.API.Controllers;
 
 /// <summary>
-/// Controller quản lý các báo cáo và phân tích dữ liệu dành cho Admin.
-/// Cung cấp các API để xem doanh thu, mức độ sử dụng, hiệu suất trạm sạc, và các thống kê khác.
+/// Controller for admin analytics and reporting
 /// </summary>
-[Authorize(Roles = Roles.Admin + "," + Roles.Staff)]
+[ApiController]
 [Route("api/admin/[controller]")]
-public class AdminReportsController : BaseApiController
+[Authorize(Roles = "admin,staff")]
+public class AdminReportsController : ControllerBase
 {
-    // Service xử lý logic báo cáo
     private readonly IReportService _reportService;
-    // Logger để ghi lại các hoạt động
     private readonly ILogger<AdminReportsController> _logger;
     private readonly IConfiguration _configuration;
     private readonly IWebHostEnvironment _env;
 
-    /// <summary>
-    /// Constructor nhận vào ReportService và Logger thông qua Dependency Injection.
-    /// </summary>
-    /// <param name="reportService">Service xử lý báo cáo.</param>
-    /// <param name="logger">Logger hệ thống.</param>
-    /// <param name="configuration">Cấu hình ứng dụng.</param>
-    /// <param name="env">Môi trường hosting.</param>
     public AdminReportsController(IReportService reportService, ILogger<AdminReportsController> logger, IConfiguration configuration, IWebHostEnvironment env)
     {
         _reportService = reportService;
@@ -38,79 +27,87 @@ public class AdminReportsController : BaseApiController
     }
 
     /// <summary>
-    /// Lấy báo cáo doanh thu cho tất cả hoặc một trạm cụ thể.
+    /// Get revenue reports for all or specific station
     /// </summary>
-    /// <param name="stationId">ID trạm (tùy chọn, nếu null sẽ lấy tất cả).</param>
-    /// <param name="year">Năm lọc báo cáo (tùy chọn).</param>
-    /// <param name="month">Tháng lọc báo cáo (tùy chọn).</param>
-    /// <returns>Dữ liệu báo cáo doanh thu và tóm tắt tổng quan.</returns>
+    /// <param name="stationId">Optional station ID filter</param>
+    /// <param name="year">Optional year filter</param>
+    /// <param name="month">Optional month filter</param>
     [HttpGet("revenue")]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(IEnumerable<RevenueReportDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetRevenueReports(
         [FromQuery] int? stationId = null,
         [FromQuery] int? year = null,
         [FromQuery] int? month = null)
     {
-        // Lấy dữ liệu báo cáo từ service
-        var reports = await _reportService.GetRevenueReportsAsync(stationId, year, month);
-
-        // Tính toán các chỉ số tổng hợp
-        var totalRevenue = reports.Sum(r => r.TotalRevenue);
-        var totalEnergy = reports.Sum(r => r.TotalEnergySoldKwh);
-        var totalTransactions = reports.Sum(r => r.TotalTransactions);
-
-        // Trả về kết quả bao gồm chi tiết và tóm tắt
-        return OkResponse(new
+        try
         {
-            data = reports,
-            summary = new
+            var reports = await _reportService.GetRevenueReportsAsync(stationId, year, month);
+
+            var totalRevenue = reports.Sum(r => r.TotalRevenue);
+            var totalEnergy = reports.Sum(r => r.TotalEnergySoldKwh);
+            var totalTransactions = reports.Sum(r => r.TotalTransactions);
+
+            return Ok(new
             {
-                totalRevenue,
-                totalEnergySold = totalEnergy,
-                totalTransactions,
-                averageTransactionValue = totalTransactions > 0 ? totalRevenue / totalTransactions : 0
-            }
-        });
+                data = reports,
+                summary = new
+                {
+                    totalRevenue,
+                    totalEnergySold = totalEnergy,
+                    totalTransactions,
+                    averageTransactionValue = totalTransactions > 0 ? totalRevenue / totalTransactions : 0
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting revenue reports");
+            return StatusCode(500, new { message = "An error occurred while retrieving revenue reports" });
+        }
     }
 
     /// <summary>
-    /// Lấy thống kê mức độ sử dụng cho tất cả hoặc một trạm cụ thể.
+    /// Get usage statistics for all or specific station
     /// </summary>
-    /// <param name="stationId">ID trạm (tùy chọn).</param>
-    /// <param name="year">Năm (tùy chọn).</param>
-    /// <param name="month">Tháng (tùy chọn).</param>
-    /// <returns>Dữ liệu thống kê sử dụng và tóm tắt.</returns>
+    /// <param name="stationId">Optional station ID filter</param>
+    /// <param name="year">Optional year filter</param>
+    /// <param name="month">Optional month filter</param>
     [HttpGet("usage")]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(IEnumerable<UsageReportDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetUsageReports(
         [FromQuery] int? stationId = null,
         [FromQuery] int? year = null,
         [FromQuery] int? month = null)
     {
-        // Lấy dữ liệu báo cáo sử dụng từ service
-        var reports = await _reportService.GetUsageReportsAsync(stationId, year, month);
-
-        // Tính toán các chỉ số tổng hợp
-        var totalBookings = reports.Sum(r => r.TotalBookings);
-        var totalCompleted = reports.Sum(r => r.CompletedSessions);
-        var avgUtilization = reports.Any() ? reports.Average(r => r.UtilizationRatePercent ?? 0) : 0;
-
-        // Trả về kết quả
-        return OkResponse(new
+        try
         {
-            data = reports,
-            summary = new
+            var reports = await _reportService.GetUsageReportsAsync(stationId, year, month);
+
+            var totalBookings = reports.Sum(r => r.TotalBookings);
+            var totalCompleted = reports.Sum(r => r.CompletedSessions);
+            var avgUtilization = reports.Any() ? reports.Average(r => r.UtilizationRatePercent ?? 0) : 0;
+
+            return Ok(new
             {
-                totalBookings,
-                completedSessions = totalCompleted,
-                averageUtilizationRate = avgUtilization,
-                completionRate = totalBookings > 0 ? (decimal)totalCompleted / totalBookings * 100 : 0
-            }
-        });
+                data = reports,
+                summary = new
+                {
+                    totalBookings,
+                    completedSessions = totalCompleted,
+                    averageUtilizationRate = avgUtilization,
+                    completionRate = totalBookings > 0 ? (decimal)totalCompleted / totalBookings * 100 : 0
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting usage reports");
+            return StatusCode(500, new { message = "An error occurred" });
+        }
     }
 
     /// <summary>
-    /// Endpoint debug để kiểm tra quyền truy cập vào View trong database.
+    /// Debug endpoint to test view access
     /// </summary>
     [HttpGet("test-view")]
     public async Task<IActionResult> TestViewAccess()
@@ -118,7 +115,6 @@ public class AdminReportsController : BaseApiController
         try
         {
             _logger.LogInformation("Testing direct SQL access to view...");
-            // Kết nối trực tiếp SQL để kiểm tra (Lưu ý: Hardcoded connection string chỉ dùng cho debug/test)
             using var connection = new Microsoft.Data.SqlClient.SqlConnection("Server=ADMIN-PC\\MSSQLSERVER01;Database=SkaEV_DB;TrustServerCertificate=True;Integrated Security=True;");
             await connection.OpenAsync();
             using var command = connection.CreateCommand();
@@ -129,12 +125,12 @@ public class AdminReportsController : BaseApiController
                 : System.Convert.ToInt32(scalarResult);
             _logger.LogInformation($"Direct SQL returned {count} records");
 
-            // Kiểm tra thông qua Service
+            // Now test through service
             _logger.LogInformation("Testing through ReportService...");
             var serviceResult = await _reportService.GetUsageReportsAsync();
             _logger.LogInformation($"Service returned {serviceResult.Count()} records");
 
-            return OkResponse(new
+            return Ok(new
             {
                 directSqlCount = count,
                 serviceCount = serviceResult.Count(),
@@ -144,78 +140,101 @@ public class AdminReportsController : BaseApiController
         catch (Exception ex)
         {
             _logger.LogError(ex, "Test endpoint failed");
-            return OkResponse(new { message = "Test failed", error = ex.Message, stack = ex.StackTrace });
+            return Ok(new { message = "Test failed", error = ex.Message, stack = ex.StackTrace });
         }
     }
 
     /// <summary>
-    /// Lấy các chỉ số hiệu suất trạm sạc theo thời gian thực.
+    /// Get real-time station performance metrics
     /// </summary>
-    /// <param name="stationId">ID trạm (tùy chọn).</param>
-    /// <returns>Dữ liệu hiệu suất trạm.</returns>
+    /// <param name="stationId">Optional station ID filter</param>
     [HttpGet("station-performance")]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(IEnumerable<StationPerformanceDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetStationPerformance([FromQuery] int? stationId = null)
     {
-        var performance = await _reportService.GetStationPerformanceAsync(stationId);
-        return OkResponse(new { data = performance, timestamp = DateTime.UtcNow });
+        try
+        {
+            var performance = await _reportService.GetStationPerformanceAsync(stationId);
+            return Ok(new { data = performance, timestamp = DateTime.UtcNow });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting station performance");
+            return StatusCode(500, new { message = "An error occurred" });
+        }
     }
 
     /// <summary>
-    /// Lấy danh sách các trạm có doanh thu cao nhất.
+    /// Get top performing stations by revenue
     /// </summary>
-    /// <param name="year">Năm.</param>
-    /// <param name="month">Tháng.</param>
-    /// <param name="limit">Số lượng trạm muốn lấy (mặc định 10).</param>
-    /// <returns>Danh sách top trạm theo doanh thu.</returns>
+    /// <param name="year">Year</param>
+    /// <param name="month">Month</param>
+    /// <param name="limit">Number of top stations to return (default: 10)</param>
     [HttpGet("top-stations")]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(IEnumerable<RevenueReportDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetTopStations(
         [FromQuery] int? year = null,
         [FromQuery] int? month = null,
         [FromQuery] int limit = 10)
     {
-        var currentYear = year ?? DateTime.Now.Year;
-        var currentMonth = month ?? DateTime.Now.Month;
+        try
+        {
+            var currentYear = year ?? DateTime.Now.Year;
+            var currentMonth = month ?? DateTime.Now.Month;
 
-        // Lấy báo cáo doanh thu và sắp xếp giảm dần
-        var reports = await _reportService.GetRevenueReportsAsync(null, currentYear, currentMonth);
-        var topStations = reports.OrderByDescending(r => r.TotalRevenue).Take(limit);
+            var reports = await _reportService.GetRevenueReportsAsync(null, currentYear, currentMonth);
+            var topStations = reports.OrderByDescending(r => r.TotalRevenue).Take(limit);
 
-        return OkResponse(new { data = topStations, year = currentYear, month = currentMonth });
+            return Ok(new { data = topStations, year = currentYear, month = currentMonth });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting top stations");
+            return StatusCode(500, new { message = "An error occurred" });
+        }
     }
 
     /// <summary>
-    /// Lấy dữ liệu tổng quan cho Dashboard Admin.
+    /// Get dashboard summary with key metrics
     /// </summary>
-    /// <returns>Các chỉ số chính cho dashboard.</returns>
     [HttpGet("dashboard")]
-    [ProducesResponseType(typeof(ApiResponse<AdminDashboardDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(AdminDashboardDto), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetDashboardSummary()
     {
-        var dashboard = await _reportService.GetAdminDashboardAsync();
-        return OkResponse(dashboard);
+        try
+        {
+            var dashboard = await _reportService.GetAdminDashboardAsync();
+            return Ok(dashboard);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting dashboard summary");
+            return StatusCode(500, new { message = "An error occurred" });
+        }
     }
 
     /// <summary>
-    /// Lấy thống kê sử dụng các phương thức thanh toán.
+    /// Get payment methods usage statistics
     /// </summary>
-    /// <returns>Thống kê phương thức thanh toán.</returns>
     [HttpGet("payment-methods-stats")]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(IEnumerable<PaymentMethodStatsDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetPaymentMethodsStatistics()
     {
-        var stats = await _reportService.GetPaymentMethodsStatsAsync();
-        return OkResponse(new { data = stats });
+        try
+        {
+            var stats = await _reportService.GetPaymentMethodsStatsAsync();
+            return Ok(new { data = stats });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting payment methods statistics");
+            return StatusCode(500, new { message = "An error occurred" });
+        }
     }
 
     /// <summary>
-    /// Xuất báo cáo doanh thu ra file CSV.
+    /// Export revenue report to CSV
     /// </summary>
-    /// <param name="stationId">ID trạm (tùy chọn).</param>
-    /// <param name="year">Năm (tùy chọn).</param>
-    /// <param name="month">Tháng (tùy chọn).</param>
-    /// <returns>File CSV chứa báo cáo doanh thu.</returns>
     [HttpGet("revenue/export")]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
     public async Task<IActionResult> ExportRevenueReport(
@@ -223,167 +242,370 @@ public class AdminReportsController : BaseApiController
         [FromQuery] int? year = null,
         [FromQuery] int? month = null)
     {
-        var csvContent = await _reportService.ExportRevenueReportToCsvAsync(stationId, year, month);
-        var fileName = $"revenue_report_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
+        try
+        {
+            var csvContent = await _reportService.ExportRevenueReportToCsvAsync(stationId, year, month);
+            var fileName = $"revenue_report_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
 
-        return File(
-            System.Text.Encoding.UTF8.GetBytes(csvContent),
-            "text/csv",
-            fileName
-        );
+            return File(
+                System.Text.Encoding.UTF8.GetBytes(csvContent),
+                "text/csv",
+                fileName
+            );
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error exporting revenue report");
+            return StatusCode(500, new { message = "An error occurred" });
+        }
     }
 
     /// <summary>
-    /// Phân tích giờ cao điểm sử dụng trạm sạc.
+    /// Get peak hours analysis
     /// </summary>
-    /// <param name="stationId">ID trạm (tùy chọn).</param>
-    /// <param name="dateRange">Khoảng thời gian (mặc định "last30days").</param>
-    /// <returns>Dữ liệu phân tích giờ cao điểm.</returns>
     [HttpGet("peak-hours")]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetPeakHoursAnalysis(
         [FromQuery] int? stationId = null,
         [FromQuery] string? dateRange = "last30days")
     {
-        var peakHours = await _reportService.GetPeakHoursAnalysisAsync(stationId, dateRange);
-        return OkResponse(peakHours);
+        try
+        {
+            var peakHours = await _reportService.GetPeakHoursAnalysisAsync(stationId, dateRange);
+            return Ok(new { success = true, data = peakHours });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting peak hours analysis");
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
+    }
+
+    /// <summary>
+    /// Get revenue aggregated by connector type (e.g. CCS2, Type2)
+    /// Returns DB-driven results only. No demo fallback in production or development.
+    /// </summary>
+    [HttpGet("revenue-by-connector")]
+    public async Task<IActionResult> GetRevenueByConnector(
+        [FromQuery] int? stationId = null,
+        [FromQuery] DateTime? startDate = null,
+        [FromQuery] DateTime? endDate = null)
+    {
+        try
+        {
+            var data = await _reportService.GetRevenueByConnectorAsync(stationId, startDate, endDate);
+            // Map DTOs to camelCase and aggregate by normalized connector type
+            var rawList = (data ?? Enumerable.Empty<ConnectorRevenueDto>()).ToList();
+
+            // Normalization helper (server-side) to mirror frontend normalization
+            static string NormalizeConnector(string raw)
+            {
+                if (string.IsNullOrWhiteSpace(raw)) return "Standard AC";
+                var s = raw.Normalize();
+                // Replace various unicode spaces with regular spaces
+                s = System.Text.RegularExpressions.Regex.Replace(s, "\\u00A0", " ");
+                // Remove punctuation/symbols
+                s = System.Text.RegularExpressions.Regex.Replace(s, "[\\p{P}\\p{S}]+", "");
+                s = System.Text.RegularExpressions.Regex.Replace(s, "\\s+", " ").Trim();
+                var simple = System.Text.RegularExpressions.Regex.Replace(s, "[^A-Za-z0-9]", "").ToLowerInvariant();
+
+                if (System.Text.RegularExpressions.Regex.IsMatch(simple, "^ccs2?$")) return "CCS2";
+                if (simple.Contains("chademo") || s.IndexOf("chademo", StringComparison.OrdinalIgnoreCase) >= 0) return "CHAdeMO";
+                if (System.Text.RegularExpressions.Regex.IsMatch(simple, "^type2$") || simple.Contains("type2")) return "Type 2";
+
+                // Title case
+                var parts = s.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                for (int i = 0; i < parts.Length; i++)
+                {
+                    var p = parts[i];
+                    parts[i] = p.Length > 1 ? char.ToUpperInvariant(p[0]) + p.Substring(1).ToLowerInvariant() : p.ToUpperInvariant();
+                }
+                return string.Join(' ', parts);
+            }
+
+            var aggregated = rawList
+                .GroupBy(d => NormalizeConnector(d.ConnectorType))
+                .Select(g => new
+                {
+                    connectorType = g.Key,
+                    totalRevenue = g.Sum(x => x.TotalRevenue),
+                    totalEnergyKwh = g.Sum(x => x.TotalEnergyKwh),
+                    totalTransactions = g.Sum(x => x.TotalTransactions)
+                })
+                .OrderByDescending(x => x.totalRevenue)
+                .ToList();
+
+            return Ok(new { success = true, data = aggregated });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting revenue by connector");
+            return StatusCode(500, new { success = false, message = "An error occurred while retrieving revenue by connector" });
+        }
+    }
+
+    /// <summary>
+    /// Development-only: Seed minimal demo data into the configured SQL Server.
+    /// This endpoint will only run when the application is running in Development environment.
+    /// It reads the script at SkaEV.API/Tools/seed_minimal.sql and executes batches separated by GO.
+    /// </summary>
+    [HttpPost("seed-demo")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> SeedDemoData()
+    {
+        if (!_env.IsDevelopment())
+        {
+            return BadRequest(new { success = false, message = "Seeding is allowed only in Development environment." });
+        }
+
+        try
+        {
+            var scriptPath = Path.Combine(_env.ContentRootPath, "SkaEV.API", "Tools", "seed_minimal.sql");
+            if (!System.IO.File.Exists(scriptPath))
+            {
+                return BadRequest(new { success = false, message = $"Seed script not found: {scriptPath}" });
+            }
+
+            var script = await System.IO.File.ReadAllTextAsync(scriptPath);
+
+            var connectionString = _configuration.GetConnectionString("DefaultConnection");
+            if (string.IsNullOrWhiteSpace(connectionString))
+                return BadRequest(new { success = false, message = "DefaultConnection is not configured." });
+
+            // Split on GO statements (common in SQL Server scripts)
+            var batches = System.Text.RegularExpressions.Regex.Split(script, "\r?\nGO\r?\n", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+            using var conn = new Microsoft.Data.SqlClient.SqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            foreach (var batch in batches)
+            {
+                var trimmed = batch.Trim();
+                if (string.IsNullOrWhiteSpace(trimmed)) continue;
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = trimmed;
+                cmd.CommandTimeout = 120;
+                await cmd.ExecuteNonQueryAsync();
+            }
+
+            return Ok(new { success = true, message = "Seed script executed." });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Seed demo failed");
+            return StatusCode(500, new { success = false, message = ex.Message });
+        }
     }
 
     /// <summary>
     /// Get system health metrics
     /// </summary>
-    /// <returns>Thông tin sức khỏe hệ thống.</returns>
-    /// <returns>Thông tin sức khỏe hệ thống.</returns>
     [HttpGet("system-health")]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetSystemHealth()
     {
-        var health = await _reportService.GetSystemHealthAsync();
-        return OkResponse(health);
+        try
+        {
+            var health = await _reportService.GetSystemHealthAsync();
+            return Ok(new { success = true, data = health });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting system health");
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
     }
 
     /// <summary>
-    /// Phân tích sự tăng trưởng người dùng.
+    /// Get user growth analytics
     /// </summary>
-    /// <param name="dateRange">Khoảng thời gian (mặc định "last30days").</param>
-    /// <returns>Dữ liệu tăng trưởng người dùng.</returns>
     [HttpGet("user-growth")]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetUserGrowth([FromQuery] string? dateRange = "last30days")
     {
-        var growth = await _reportService.GetUserGrowthAsync(dateRange);
-        return OkResponse(growth);
+        try
+        {
+            var growth = await _reportService.GetUserGrowthAsync(dateRange);
+            return Ok(new { success = true, data = growth });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting user growth");
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
     }
 
     /// <summary>
-    /// Lấy phân tích chi tiết cho một trạm cụ thể với dữ liệu chuỗi thời gian.
+    /// Get detailed analytics for a specific station with time-series data
     /// </summary>
-    /// <param name="stationId">ID trạm.</param>
-    /// <param name="startDate">Ngày bắt đầu (tùy chọn, mặc định 30 ngày trước).</param>
-    /// <param name="endDate">Ngày kết thúc (tùy chọn, mặc định hiện tại).</param>
-    /// <returns>Dữ liệu phân tích chi tiết trạm.</returns>
+    /// <param name="stationId">Station ID</param>
+    /// <param name="startDate">Start date (optional, defaults to 30 days ago)</param>
+    /// <param name="endDate">End date (optional, defaults to now)</param>
     [HttpGet("stations/{stationId}/detailed-analytics")]
-    [ProducesResponseType(typeof(ApiResponse<StationDetailedAnalyticsDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(StationDetailedAnalyticsDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetStationDetailedAnalytics(
         int stationId,
         [FromQuery] DateTime? startDate = null,
         [FromQuery] DateTime? endDate = null)
     {
-        var analytics = await _reportService.GetStationDetailedAnalyticsAsync(stationId, startDate, endDate);
-        return OkResponse(analytics);
+        try
+        {
+            var analytics = await _reportService.GetStationDetailedAnalyticsAsync(stationId, startDate, endDate);
+            return Ok(new { success = true, data = analytics });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            _logger.LogWarning(ex, "Station not found: {StationId}", stationId);
+            return NotFound(new { success = false, message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting detailed analytics for station {StationId}", stationId);
+            return StatusCode(500, new { success = false, message = "An error occurred while retrieving station analytics" });
+        }
     }
 
     /// <summary>
-    /// Lấy phân tích hàng ngày cho một trạm cụ thể.
+    /// Get daily analytics for a specific station
     /// </summary>
-    /// <param name="stationId">ID trạm.</param>
-    /// <param name="startDate">Ngày bắt đầu.</param>
-    /// <param name="endDate">Ngày kết thúc.</param>
-    /// <returns>Danh sách phân tích theo ngày.</returns>
+    /// <param name="stationId">Station ID</param>
+    /// <param name="startDate">Start date (optional, defaults to 30 days ago)</param>
+    /// <param name="endDate">End date (optional, defaults to now)</param>
     [HttpGet("stations/{stationId}/daily")]
-    [ProducesResponseType(typeof(ApiResponse<List<DailyAnalyticsDto>>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(List<DailyAnalyticsDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetStationDailyAnalytics(
         int stationId,
         [FromQuery] DateTime? startDate = null,
         [FromQuery] DateTime? endDate = null)
     {
-        var analytics = await _reportService.GetStationDailyAnalyticsAsync(stationId, startDate, endDate);
-        return OkResponse(analytics);
+        try
+        {
+            var analytics = await _reportService.GetStationDailyAnalyticsAsync(stationId, startDate, endDate);
+            return Ok(new { success = true, data = analytics, count = analytics.Count });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            _logger.LogWarning(ex, "Station not found: {StationId}", stationId);
+            return NotFound(new { success = false, message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting daily analytics for station {StationId}", stationId);
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
     }
 
     /// <summary>
-    /// Lấy phân tích hàng tháng cho một trạm cụ thể.
+    /// Get monthly analytics for a specific station
     /// </summary>
-    /// <param name="stationId">ID trạm.</param>
-    /// <param name="year">Năm.</param>
-    /// <param name="month">Tháng (1-12).</param>
-    /// <returns>Dữ liệu phân tích tháng.</returns>
+    /// <param name="stationId">Station ID</param>
+    /// <param name="year">Year</param>
+    /// <param name="month">Month (1-12)</param>
     [HttpGet("stations/{stationId}/monthly")]
-    [ProducesResponseType(typeof(ApiResponse<MonthlyAnalyticsDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(MonthlyAnalyticsDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GetStationMonthlyAnalytics(
         int stationId,
         [FromQuery] int? year = null,
         [FromQuery] int? month = null)
     {
-        var currentYear = year ?? DateTime.Now.Year;
-        var currentMonth = month ?? DateTime.Now.Month;
-
-        if (currentMonth < 1 || currentMonth > 12)
+        try
         {
-            return BadRequestResponse("Month must be between 1 and 12");
-        }
+            var currentYear = year ?? DateTime.Now.Year;
+            var currentMonth = month ?? DateTime.Now.Month;
 
-        var analytics = await _reportService.GetStationMonthlyAnalyticsAsync(stationId, currentYear, currentMonth);
-        return OkResponse(analytics);
+            if (currentMonth < 1 || currentMonth > 12)
+            {
+                return BadRequest(new { success = false, message = "Month must be between 1 and 12" });
+            }
+
+            var analytics = await _reportService.GetStationMonthlyAnalyticsAsync(stationId, currentYear, currentMonth);
+            return Ok(new { success = true, data = analytics });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            _logger.LogWarning(ex, "Station not found: {StationId}", stationId);
+            return NotFound(new { success = false, message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting monthly analytics for station {StationId}", stationId);
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
     }
 
     /// <summary>
-    /// Lấy phân tích hàng năm cho một trạm cụ thể.
+    /// Get yearly analytics for a specific station
     /// </summary>
-    /// <param name="stationId">ID trạm.</param>
-    /// <param name="year">Năm (tùy chọn, mặc định năm hiện tại).</param>
-    /// <returns>Dữ liệu phân tích năm.</returns>
+    /// <param name="stationId">Station ID</param>
+    /// <param name="year">Year (optional, defaults to current year)</param>
     [HttpGet("stations/{stationId}/yearly")]
-    [ProducesResponseType(typeof(ApiResponse<YearlyAnalyticsDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(YearlyAnalyticsDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetStationYearlyAnalytics(
         int stationId,
         [FromQuery] int? year = null)
     {
-        var currentYear = year ?? DateTime.Now.Year;
-        var analytics = await _reportService.GetStationYearlyAnalyticsAsync(stationId, currentYear);
-        return OkResponse(analytics);
+        try
+        {
+            var currentYear = year ?? DateTime.Now.Year;
+            var analytics = await _reportService.GetStationYearlyAnalyticsAsync(stationId, currentYear);
+            return Ok(new { success = true, data = analytics });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            _logger.LogWarning(ex, "Station not found: {StationId}", stationId);
+            return NotFound(new { success = false, message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting yearly analytics for station {StationId}", stationId);
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
     }
 
     /// <summary>
-    /// Lấy dữ liệu chuỗi thời gian cho một trạm cụ thể (dùng cho biểu đồ).
+    /// Get time-series data for a specific station
     /// </summary>
-    /// <param name="stationId">ID trạm.</param>
-    /// <param name="granularity">Độ chi tiết: daily (ngày), monthly (tháng), yearly (năm).</param>
-    /// <param name="startDate">Ngày bắt đầu.</param>
-    /// <param name="endDate">Ngày kết thúc.</param>
-    /// <returns>Danh sách điểm dữ liệu chuỗi thời gian.</returns>
+    /// <param name="stationId">Station ID</param>
+    /// <param name="granularity">Granularity: daily, monthly, or yearly</param>
+    /// <param name="startDate">Start date (optional)</param>
+    /// <param name="endDate">End date (optional)</param>
     [HttpGet("stations/{stationId}/time-series")]
-    [ProducesResponseType(typeof(ApiResponse<List<TimeSeriesDataPointDto>>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(List<TimeSeriesDataPointDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GetStationTimeSeries(
         int stationId,
         [FromQuery] string granularity = "daily",
         [FromQuery] DateTime? startDate = null,
         [FromQuery] DateTime? endDate = null)
     {
-        var validGranularities = new[] { "daily", "monthly", "yearly" };
-        if (!validGranularities.Contains(granularity.ToLower()))
+        try
         {
-            return BadRequestResponse("Granularity must be one of: daily, monthly, yearly");
-        }
+            var validGranularities = new[] { "daily", "monthly", "yearly" };
+            if (!validGranularities.Contains(granularity.ToLower()))
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = "Granularity must be one of: daily, monthly, yearly"
+                });
+            }
 
-        var timeSeries = await _reportService.GetStationTimeSeriesAsync(stationId, granularity, startDate, endDate);
-        return OkResponse(timeSeries);
+            var timeSeries = await _reportService.GetStationTimeSeriesAsync(stationId, granularity, startDate, endDate);
+            return Ok(new { success = true, data = timeSeries, granularity, count = timeSeries.Count });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            _logger.LogWarning(ex, "Station not found: {StationId}", stationId);
+            return NotFound(new { success = false, message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting time-series for station {StationId}", stationId);
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
     }
 }

@@ -2,12 +2,10 @@ using Microsoft.EntityFrameworkCore;
 using SkaEV.API.Application.DTOs.Admin;
 using SkaEV.API.Domain.Entities;
 using SkaEV.API.Infrastructure.Data;
+using SkaEV.API.Application.Services;
 
 namespace SkaEV.API.Application.Services;
 
-/// <summary>
-/// Service quản lý người dùng dành cho Admin.
-/// </summary>
 public partial class AdminUserService : IAdminUserService
 {
     private readonly SkaEVDbContext _context;
@@ -19,9 +17,6 @@ public partial class AdminUserService : IAdminUserService
         _logger = logger;
     }
 
-    /// <summary>
-    /// Lấy danh sách tất cả người dùng với bộ lọc và phân trang.
-    /// </summary>
     public async Task<IEnumerable<AdminUserDto>> GetAllUsersAsync(string? role, string? status, string? search, int page, int pageSize)
     {
         var query = _context.Users.AsQueryable();
@@ -37,8 +32,8 @@ public partial class AdminUserService : IAdminUserService
 
         if (!string.IsNullOrEmpty(search))
         {
-            query = query.Where(u => 
-                u.FullName.Contains(search) || 
+            query = query.Where(u =>
+                u.FullName.Contains(search) ||
                 u.Email.Contains(search) ||
                 (u.PhoneNumber != null && u.PhoneNumber.Contains(search)));
         }
@@ -57,14 +52,27 @@ public partial class AdminUserService : IAdminUserService
                 Status = u.IsActive ? "active" : "inactive",
                 CreatedAt = u.CreatedAt,
                 UpdatedAt = u.UpdatedAt,
-                LastLoginAt = null
+                LastLoginAt = null,
+                ManagedStationId = _context.StationStaff
+                    .Where(ss => ss.StaffUserId == u.UserId && ss.IsActive)
+                    .Select(ss => (int?)ss.StationId)
+                    .FirstOrDefault(),
+                ManagedStationName = _context.StationStaff
+                    .Where(ss => ss.StaffUserId == u.UserId && ss.IsActive)
+                    .Select(ss => ss.ChargingStation.StationName)
+                    .FirstOrDefault(),
+                ManagedStationAddress = _context.StationStaff
+                    .Where(ss => ss.StaffUserId == u.UserId && ss.IsActive)
+                    .Select(ss => ss.ChargingStation.Address)
+                    .FirstOrDefault(),
+                ManagedStationCity = _context.StationStaff
+                    .Where(ss => ss.StaffUserId == u.UserId && ss.IsActive)
+                    .Select(ss => ss.ChargingStation.City)
+                    .FirstOrDefault()
             })
             .ToListAsync();
     }
 
-    /// <summary>
-    /// Đếm tổng số người dùng thỏa mãn điều kiện lọc.
-    /// </summary>
     public async Task<int> GetUserCountAsync(string? role, string? status, string? search)
     {
         var query = _context.Users.AsQueryable();
@@ -80,8 +88,8 @@ public partial class AdminUserService : IAdminUserService
 
         if (!string.IsNullOrEmpty(search))
         {
-            query = query.Where(u => 
-                u.FullName.Contains(search) || 
+            query = query.Where(u =>
+                u.FullName.Contains(search) ||
                 u.Email.Contains(search) ||
                 (u.PhoneNumber != null && u.PhoneNumber.Contains(search)));
         }
@@ -89,9 +97,6 @@ public partial class AdminUserService : IAdminUserService
         return await query.CountAsync();
     }
 
-    /// <summary>
-    /// Lấy thông tin chi tiết người dùng.
-    /// </summary>
     public async Task<AdminUserDetailDto?> GetUserDetailAsync(int userId)
     {
         var user = await _context.Users
@@ -104,6 +109,12 @@ public partial class AdminUserService : IAdminUserService
         if (user == null)
             return null;
 
+        var activeAssignment = await _context.StationStaff
+            .Include(ss => ss.ChargingStation)
+            .Where(ss => ss.StaffUserId == userId && ss.IsActive)
+            .OrderByDescending(ss => ss.AssignedAt)
+            .FirstOrDefaultAsync();
+
         return new AdminUserDetailDto
         {
             UserId = user.UserId,
@@ -114,91 +125,68 @@ public partial class AdminUserService : IAdminUserService
             Status = user.IsActive ? "active" : "inactive",
             CreatedAt = user.CreatedAt,
             UpdatedAt = user.UpdatedAt,
-            LastLoginAt = null, // Chưa theo dõi trong schema hiện tại
+            LastLoginAt = null, // Not tracked in current schema
+            ManagedStationId = activeAssignment?.StationId,
+            ManagedStationName = activeAssignment?.ChargingStation.StationName,
+            ManagedStationAddress = activeAssignment?.ChargingStation.Address,
+            ManagedStationCity = activeAssignment?.ChargingStation.City,
             AvatarUrl = user.UserProfile?.AvatarUrl,
             TotalBookings = user.Bookings.Count,
             TotalSpent = user.Invoices.Sum(i => i.TotalAmount),
             VehiclesCount = user.Vehicles.Count,
-            DeactivationReason = null, // Chưa có trong schema
+            DeactivationReason = null, // Not in current schema
             DeactivatedAt = user.IsActive ? null : user.UpdatedAt
         };
     }
 
-    /// <summary>
-    /// Tạo người dùng mới.
-    /// </summary>
     public async Task<AdminUserDto> CreateUserAsync(CreateUserDto createDto)
     {
-        try
+        // Check if email already exists
+        var existingUser = await _context.Users
+            .FirstOrDefaultAsync(u => u.Email == createDto.Email);
+
+        if (existingUser != null)
+            throw new ArgumentException("Email already in use");
+
+        var validRoles = new[] { "customer", "staff", "admin" };
+        if (!validRoles.Contains(createDto.Role))
+            throw new ArgumentException("Invalid role");
+
+        if (createDto.Role == "staff")
         {
-            _logger.LogInformation("Creating user with email: {Email}, role: {Role}", createDto.Email, createDto.Role);
+            if (!createDto.ManagedStationId.HasValue)
+                throw new ArgumentException("Staff users must be assigned to a station");
+        }
+        else if (createDto.ManagedStationId.HasValue)
+        {
+            throw new ArgumentException("Only staff users can be assigned to manage a station");
+        }
 
-            // Kiểm tra email đã tồn tại chưa
-            var existingUser = await _context.Users
-                .FirstOrDefaultAsync(u => u.Email == createDto.Email);
+        var user = new User
+        {
+            Email = createDto.Email,
+            PasswordHash = PasswordHasher.HashPassword(createDto.Password),
+            FullName = createDto.FullName,
+            PhoneNumber = createDto.PhoneNumber,
+            Role = createDto.Role,
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
 
-            if (existingUser != null)
-            {
-                _logger.LogWarning("Email {Email} already exists", createDto.Email);
-                throw new ArgumentException("Email already in use");
-            }
+        _context.Users.Add(user);
+        await _context.SaveChangesAsync();
 
-            var validRoles = new[] { "customer", "staff", "admin" };
-            if (!validRoles.Contains(createDto.Role))
-            {
-                _logger.LogWarning("Invalid role: {Role}", createDto.Role);
-                throw new ArgumentException("Invalid role");
-            }
-
-            _logger.LogInformation("Hashing password for user {Email}", createDto.Email);
-            var hashedPassword = BCrypt.Net.BCrypt.HashPassword(createDto.Password, 11);
-
-            var user = new User
-            {
-                Email = createDto.Email,
-                PasswordHash = hashedPassword,
-                FullName = createDto.FullName,
-                PhoneNumber = createDto.PhoneNumber,
-                Role = createDto.Role,
-                IsActive = true,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
-            };
-
-            _logger.LogInformation("Adding user to database: {Email}", createDto.Email);
-            _context.Users.Add(user);
+        if (user.Role == "staff" && createDto.ManagedStationId.HasValue)
+        {
+            await HandleStaffAssignmentAsync(user, createDto.ManagedStationId.Value);
             await _context.SaveChangesAsync();
-
-            _logger.LogInformation("User created with ID: {UserId}, creating profile...", user.UserId);
-
-            // Tạo hồ sơ người dùng
-            var profile = new UserProfile
-            {
-                UserId = user.UserId,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
-            };
-
-            _context.UserProfiles.Add(profile);
-            await _context.SaveChangesAsync();
-
-            _logger.LogInformation("Successfully created user {UserId} with role {Role}", user.UserId, createDto.Role);
-            return MapToDto(user);
         }
-        catch (ArgumentException)
-        {
-            throw; // Ném lại ArgumentException để controller xử lý
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error creating user {Email}: {Message}", createDto.Email, ex.Message);
-            throw new Exception($"Failed to create user: {ex.Message}", ex);
-        }
+
+        _logger.LogInformation("Created user {UserId} with role {Role}", user.UserId, createDto.Role);
+        return await BuildUserDtoAsync(user.UserId);
     }
 
-    /// <summary>
-    /// Cập nhật thông tin người dùng.
-    /// </summary>
     public async Task<AdminUserDto> UpdateUserAsync(int userId, UpdateUserDto updateDto)
     {
         var user = await _context.Users
@@ -209,20 +197,53 @@ public partial class AdminUserService : IAdminUserService
 
         if (updateDto.FullName != null)
             user.FullName = updateDto.FullName;
-        
+
         if (updateDto.PhoneNumber != null)
             user.PhoneNumber = updateDto.PhoneNumber;
-        
+
         if (updateDto.Email != null)
         {
-            // Kiểm tra email mới có bị trùng không
+            // Check if new email is already in use
             var emailExists = await _context.Users
                 .AnyAsync(u => u.Email == updateDto.Email && u.UserId != userId);
-            
+
             if (emailExists)
                 throw new ArgumentException("Email already in use");
-            
+
             user.Email = updateDto.Email;
+        }
+
+        var validRoles = new[] { "customer", "staff", "admin" };
+        if (!string.IsNullOrEmpty(updateDto.Role) && updateDto.Role != user.Role)
+        {
+            if (!validRoles.Contains(updateDto.Role))
+                throw new ArgumentException("Invalid role");
+
+            // Transitioning away from staff should remove assignments later
+            user.Role = updateDto.Role;
+        }
+
+        var activeAssignment = await GetActiveAssignmentAsync(userId);
+        var managedStationSpecified = updateDto.ManagedStationId.HasValue;
+
+        if (user.Role == "staff")
+        {
+            if (managedStationSpecified)
+            {
+                await HandleStaffAssignmentAsync(user, updateDto.ManagedStationId!.Value, activeAssignment);
+            }
+            else if (activeAssignment == null)
+            {
+                throw new ArgumentException("Staff users must be assigned to a station");
+            }
+        }
+        else
+        {
+            if (managedStationSpecified)
+                throw new ArgumentException("Only staff users can be assigned to manage a station");
+
+            if (activeAssignment != null)
+                activeAssignment.IsActive = false;
         }
 
         user.UpdatedAt = DateTime.UtcNow;
@@ -230,12 +251,9 @@ public partial class AdminUserService : IAdminUserService
         await _context.SaveChangesAsync();
 
         _logger.LogInformation("Updated user {UserId}", userId);
-        return MapToDto(user);
+        return await BuildUserDtoAsync(user.UserId);
     }
 
-    /// <summary>
-    /// Cập nhật vai trò người dùng.
-    /// </summary>
     public async Task<AdminUserDto> UpdateUserRoleAsync(int userId, string role)
     {
         var user = await _context.Users
@@ -248,18 +266,23 @@ public partial class AdminUserService : IAdminUserService
         if (!validRoles.Contains(role))
             throw new ArgumentException("Invalid role");
 
+        var activeAssignment = await GetActiveAssignmentAsync(userId);
+
+        if (role == "staff")
+            throw new ArgumentException("Use the user update endpoint to assign staff role with station selection");
+
         user.Role = role;
         user.UpdatedAt = DateTime.UtcNow;
+
+        if (activeAssignment != null)
+            activeAssignment.IsActive = false;
 
         await _context.SaveChangesAsync();
 
         _logger.LogInformation("Updated user {UserId} role to {Role}", userId, role);
-        return MapToDto(user);
+        return await BuildUserDtoAsync(userId);
     }
 
-    /// <summary>
-    /// Kích hoạt tài khoản người dùng.
-    /// </summary>
     public async Task<AdminUserDto> ActivateUserAsync(int userId)
     {
         var user = await _context.Users
@@ -274,12 +297,9 @@ public partial class AdminUserService : IAdminUserService
         await _context.SaveChangesAsync();
 
         _logger.LogInformation("Activated user {UserId}", userId);
-        return MapToDto(user);
+        return await BuildUserDtoAsync(userId);
     }
 
-    /// <summary>
-    /// Vô hiệu hóa tài khoản người dùng.
-    /// </summary>
     public async Task<AdminUserDto> DeactivateUserAsync(int userId, string reason)
     {
         var user = await _context.Users
@@ -294,12 +314,9 @@ public partial class AdminUserService : IAdminUserService
         await _context.SaveChangesAsync();
 
         _logger.LogInformation("Deactivated user {UserId}. Reason: {Reason}", userId, reason);
-        return MapToDto(user);
+        return await BuildUserDtoAsync(userId);
     }
 
-    /// <summary>
-    /// Xóa người dùng (xóa mềm).
-    /// </summary>
     public async Task DeleteUserAsync(int userId)
     {
         var user = await _context.Users
@@ -308,21 +325,20 @@ public partial class AdminUserService : IAdminUserService
         if (user == null)
             throw new ArgumentException("User not found");
 
-        // Kiểm tra xem người dùng có đặt chỗ đang hoạt động không
+        // Check if user has active bookings
         var hasActiveBookings = await _context.Bookings
             .AnyAsync(b => b.UserId == userId && (b.Status == "scheduled" || b.Status == "in_progress"));
 
         if (hasActiveBookings)
             throw new ArgumentException("Cannot delete user with active bookings");
 
-        // Xóa mềm - đánh dấu là đã xóa và lưu thời gian
+        // Soft delete by deactivating
         user.IsActive = false;
-        user.DeletedAt = DateTime.UtcNow;
         user.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
 
-        _logger.LogInformation("Deleted (soft) user {UserId} at {DeletedAt}", userId, user.DeletedAt);
+        _logger.LogInformation("Deleted (soft) user {UserId}", userId);
     }
 
     public async Task<ResetPasswordResultDto> ResetUserPasswordAsync(int userId, int? performedByUserId = null)
@@ -333,7 +349,7 @@ public partial class AdminUserService : IAdminUserService
         if (user == null)
             throw new ArgumentException("User not found");
 
-        // Tạo mật khẩu tạm thời
+        // Generate temporary password
         var tempPassword = GenerateTemporaryPassword();
         // Store hashed temporary password (BCrypt)
         user.PasswordHash = PasswordHasher.HashPassword(tempPassword);
@@ -431,14 +447,11 @@ public partial class AdminUserService : IAdminUserService
             TotalRevenue = user.Invoices.Sum(i => i.TotalAmount),
             LastMonthRevenue = lastMonthRevenue,
             LastBookingDate = user.Bookings.OrderByDescending(b => b.CreatedAt).FirstOrDefault()?.CreatedAt,
-            LastLoginDate = null, // Chưa theo dõi
+            LastLoginDate = null, // Not tracked
             RecentActivities = new List<string>()
         };
     }
 
-    /// <summary>
-    /// Lấy thống kê tổng quan về người dùng.
-    /// </summary>
     public async Task<UserStatisticsSummaryDto> GetUserStatisticsSummaryAsync()
     {
         var users = await _context.Users.ToListAsync();
@@ -457,27 +470,87 @@ public partial class AdminUserService : IAdminUserService
         };
     }
 
+    private async Task<StationStaff?> GetActiveAssignmentAsync(int userId)
+    {
+        return await _context.StationStaff
+            .Where(ss => ss.StaffUserId == userId && ss.IsActive)
+            .OrderByDescending(ss => ss.AssignedAt)
+            .FirstOrDefaultAsync();
+    }
+
+    private async Task HandleStaffAssignmentAsync(User user, int stationId, StationStaff? existingAssignment = null)
+    {
+        existingAssignment ??= await GetActiveAssignmentAsync(user.UserId);
+
+        if (existingAssignment != null && existingAssignment.StationId == stationId && existingAssignment.IsActive)
+            return;
+
+        if (existingAssignment != null)
+            existingAssignment.IsActive = false;
+
+        var stationExists = await _context.ChargingStations
+            .AnyAsync(s => s.StationId == stationId && s.DeletedAt == null);
+
+        if (!stationExists)
+            throw new ArgumentException("Managed station not found");
+
+        var stationAssigned = await _context.StationStaff
+            .AnyAsync(ss => ss.StationId == stationId && ss.IsActive && ss.StaffUserId != user.UserId);
+
+        if (stationAssigned)
+            throw new ArgumentException("Station is already assigned to another staff");
+
+        var assignment = new StationStaff
+        {
+            StaffUserId = user.UserId,
+            StationId = stationId,
+            AssignedAt = DateTime.UtcNow,
+            IsActive = true
+        };
+
+        _context.StationStaff.Add(assignment);
+    }
+
+    private async Task<AdminUserDto> BuildUserDtoAsync(int userId)
+    {
+        return await _context.Users
+            .Where(u => u.UserId == userId)
+            .Select(u => new AdminUserDto
+            {
+                UserId = u.UserId,
+                Email = u.Email,
+                FullName = u.FullName,
+                PhoneNumber = u.PhoneNumber,
+                Role = u.Role,
+                Status = u.IsActive ? "active" : "inactive",
+                CreatedAt = u.CreatedAt,
+                UpdatedAt = u.UpdatedAt,
+                LastLoginAt = null,
+                ManagedStationId = _context.StationStaff
+                    .Where(ss => ss.StaffUserId == u.UserId && ss.IsActive)
+                    .Select(ss => (int?)ss.StationId)
+                    .FirstOrDefault(),
+                ManagedStationName = _context.StationStaff
+                    .Where(ss => ss.StaffUserId == u.UserId && ss.IsActive)
+                    .Select(ss => ss.ChargingStation.StationName)
+                    .FirstOrDefault(),
+                ManagedStationAddress = _context.StationStaff
+                    .Where(ss => ss.StaffUserId == u.UserId && ss.IsActive)
+                    .Select(ss => ss.ChargingStation.Address)
+                    .FirstOrDefault(),
+                ManagedStationCity = _context.StationStaff
+                    .Where(ss => ss.StaffUserId == u.UserId && ss.IsActive)
+                    .Select(ss => ss.ChargingStation.City)
+                    .FirstOrDefault()
+            })
+            .FirstAsync();
+    }
+
     private string GenerateTemporaryPassword()
     {
         const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%";
         var random = new Random();
         return new string(Enumerable.Repeat(chars, 12)
             .Select(s => s[random.Next(s.Length)]).ToArray());
-    }
-
-    private AdminUserDto MapToDto(User user)
-    {
-        return new AdminUserDto
-        {
-            UserId = user.UserId,
-            Email = user.Email,
-            FullName = user.FullName,
-            PhoneNumber = user.PhoneNumber,
-            Role = user.Role,
-            Status = user.IsActive ? "active" : "inactive",
-            CreatedAt = user.CreatedAt,
-            UpdatedAt = user.UpdatedAt,
-            LastLoginAt = null // Chưa theo dõi trong schema hiện tại
-        };
     }
 }

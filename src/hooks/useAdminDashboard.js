@@ -23,12 +23,11 @@ export const useAdminDashboard = () => {
   const [openStationDialog, setOpenStationDialog] = useState(false);
   const [selectedStation, setSelectedStation] = useState(null);
   
-  // Data states for API data
-  const [users, setUsers] = useState([]);
-  const [bookings, setBookings] = useState([]);
-  
   // Data from stores
   const { stations, loading: stationsLoading, error: stationsError } = useStationStore();
+  // Live data from backend
+  const [users, setUsers] = useState([]);
+  const [bookings, setBookings] = useState([]);
   
   // Initialize data loading
   useEffect(() => {
@@ -53,6 +52,7 @@ export const useAdminDashboard = () => {
         } else {
           console.warn('Failed to load bookings for admin dashboard:', bookingsResp.reason?.message || bookingsResp.reason);
         }
+
         // Validate station data
         const validationResults = stations.map(station => 
           StationDataService.validateStationData(station)
@@ -95,8 +95,8 @@ export const useAdminDashboard = () => {
   const systemOverview = useMemo(() => {
     try {
       return StationDataService.calculateSystemOverview(
-        stations, 
-        users, 
+        stations,
+        users,
         bookings
       );
     } catch (err) {
@@ -138,23 +138,12 @@ export const useAdminDashboard = () => {
       setIsRefreshing(true);
       setError(null);
       
-      // Refetch all data
-      const [usersResp, bookingsResp] = await Promise.allSettled([
-        adminAPI.getUsers({ pageNumber: 1, pageSize: 1000 }),
-        bookingsAPI.get({ pageNumber: 1, pageSize: 1000 }),
-      ]);
+      // Simulate refresh delay
+      await new Promise(resolve => setTimeout(resolve, 1500));
       
-      if (usersResp.status === 'fulfilled') {
-        setUsers(usersResp.value.data?.data || usersResp.value.data || []);
-      } else {
-        console.warn('Failed to refresh users:', usersResp.reason?.message || usersResp.reason);
-      }
-
-      if (bookingsResp.status === 'fulfilled') {
-        setBookings(bookingsResp.value.data?.data || bookingsResp.value.data || []);
-      } else {
-        console.warn('Failed to refresh bookings:', bookingsResp.reason?.message || bookingsResp.reason);
-      }
+      // In real app, this would refetch data from API
+      // await refetchStations();
+      // await refetchBookings();
       
       console.log('Dashboard data refreshed');
     } catch (err) {

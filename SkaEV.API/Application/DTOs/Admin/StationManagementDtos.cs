@@ -1,7 +1,7 @@
 namespace SkaEV.API.Application.DTOs.Admin;
 
 /// <summary>
-/// DTO danh sách trạm sạc với trạng thái và thông tin thời gian thực.
+/// DTO for station list view with status and real-time info
 /// </summary>
 public class StationListDto
 {
@@ -13,10 +13,7 @@ public class StationListDto
     public decimal Longitude { get; set; }
 
     // Status Info
-    /// <summary>
-    /// Trạng thái trạm (online, offline, maintenance).
-    /// </summary>
-    public string Status { get; set; } = string.Empty;
+    public string Status { get; set; } = string.Empty; // online, offline, maintenance
     public bool IsOnline { get; set; }
 
     // Capacity Info
@@ -53,7 +50,7 @@ public class StationListDto
 }
 
 /// <summary>
-/// DTO chi tiết trạm sạc bao gồm tất cả các điểm sạc.
+/// Detailed station information with all charging points
 /// </summary>
 public class StationDetailDto
 {
@@ -120,7 +117,7 @@ public class PeriodMetrics
 }
 
 /// <summary>
-/// DTO chi tiết trụ sạc (post) với thông tin các khe sạc.
+/// Charging point (post) with all slots detail
 /// </summary>
 public class ChargingPointDetailDto
 {
@@ -156,7 +153,7 @@ public class ChargingPointDetailDto
 }
 
 /// <summary>
-/// DTO chi tiết khe sạc (slot) với thông tin đặt chỗ hiện tại.
+/// Charging slot detail with current booking info
 /// </summary>
 public class ChargingSlotDetailDto
 {
@@ -183,7 +180,7 @@ public class ChargingSlotDetailDto
 }
 
 /// <summary>
-/// DTO giám sát thời gian thực cho trạm sạc.
+/// Real-time monitoring data for station
 /// </summary>
 public class StationRealTimeMonitoringDto
 {
@@ -217,9 +214,6 @@ public class StationRealTimeMonitoringDto
     public List<ActiveSessionDto> ActiveSessionsList { get; set; } = new();
 }
 
-/// <summary>
-/// Điểm dữ liệu công suất theo thời gian.
-/// </summary>
 public class PowerDataPoint
 {
     public DateTime Timestamp { get; set; }
@@ -227,9 +221,6 @@ public class PowerDataPoint
     public int ActiveSessions { get; set; }
 }
 
-/// <summary>
-/// DTO phiên sạc đang hoạt động.
-/// </summary>
 public class ActiveSessionDto
 {
     public int BookingId { get; set; }
@@ -247,7 +238,7 @@ public class ActiveSessionDto
 }
 
 /// <summary>
-/// DTO lệnh điều khiển trụ sạc.
+/// Control commands for charging point
 /// </summary>
 public class ChargingPointControlDto
 {
@@ -257,7 +248,7 @@ public class ChargingPointControlDto
 }
 
 /// <summary>
-/// DTO lệnh điều khiển toàn bộ trạm.
+/// Control commands for entire station
 /// </summary>
 public class StationControlDto
 {
@@ -268,7 +259,7 @@ public class StationControlDto
 }
 
 /// <summary>
-/// DTO kết quả lệnh điều khiển.
+/// Response from control command
 /// </summary>
 public class ControlCommandResultDto
 {
@@ -280,7 +271,7 @@ public class ControlCommandResultDto
 }
 
 /// <summary>
-/// DTO cấu hình trụ sạc.
+/// Configuration for charging point
 /// </summary>
 public class ChargingPointConfigDto
 {
@@ -294,7 +285,7 @@ public class ChargingPointConfigDto
 }
 
 /// <summary>
-/// DTO nhật ký lỗi/cảnh báo của trạm.
+/// Station error/warning log
 /// </summary>
 public class StationErrorLogDto
 {
@@ -321,7 +312,7 @@ public class StationErrorLogDto
 }
 
 /// <summary>
-/// DTO yêu cầu tạo/cập nhật trạm sạc.
+/// Request to create/update station
 /// </summary>
 public class CreateUpdateStationDto
 {
@@ -337,7 +328,7 @@ public class CreateUpdateStationDto
 }
 
 /// <summary>
-/// DTO yêu cầu tạo trụ sạc.
+/// Request to create charging post
 /// </summary>
 public class CreateChargingPostDto
 {
@@ -350,7 +341,7 @@ public class CreateChargingPostDto
 }
 
 /// <summary>
-/// DTO bộ lọc danh sách trạm.
+/// Filter for station list
 /// </summary>
 public class StationFilterDto
 {

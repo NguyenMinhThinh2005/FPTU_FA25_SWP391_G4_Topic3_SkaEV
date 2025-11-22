@@ -1,7 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using SkaEV.API.Application.Common;
-using SkaEV.API.Application.Constants;
 using SkaEV.API.Application.DTOs.Admin;
 using SkaEV.API.Application.Services;
 using System.Security.Claims;
@@ -9,60 +7,44 @@ using System.Security.Claims;
 namespace SkaEV.API.Controllers;
 
 /// <summary>
-/// Controller quản lý toàn diện các trạm sạc dành cho Admin.
-/// Bao gồm các chức năng: CRUD, Giám sát thời gian thực, Điều khiển từ xa, Cấu hình, Quản lý lỗi.
+/// Controller for comprehensive admin station management
+/// Includes: CRUD, Real-time monitoring, Remote control, Configuration, Error management
 /// </summary>
-[Authorize(Roles = Roles.Admin + "," + Roles.Staff)]
+[ApiController]
 [Route("api/admin/stations")]
-public class AdminStationsController : BaseApiController
+[Authorize(Roles = "admin,staff")]
+public class AdminStationsController : ControllerBase
 {
-    // Service quản lý trạm sạc (chính)
     private readonly IAdminStationManagementService _stationMgmtService;
-    // Service trạm sạc admin (phụ/legacy)
     private readonly IAdminStationService? _adminStationService;
     private readonly ILogger<AdminStationsController> _logger;
 
-    /// <summary>
-    /// Constructor nhận vào các service cần thiết.
-    /// </summary>
-    /// <param name="stationMgmtService">Service quản lý trạm sạc.</param>
-    /// <param name="logger">Logger để ghi lại các hoạt động.</param>
-    /// <param name="adminStationService">Service trạm sạc admin (tùy chọn).</param>
     public AdminStationsController(
         IAdminStationManagementService stationMgmtService,
         ILogger<AdminStationsController> logger,
         IAdminStationService? adminStationService = null)
     {
         _stationMgmtService = stationMgmtService;
-        _logger = logger;
         _adminStationService = adminStationService;
+        _logger = logger;
     }
 
     #region Station List & Search
 
     /// <summary>
-    /// Lấy danh sách tất cả các trạm với bộ lọc, sắp xếp và phân trang.
+    /// Get all stations with filtering, sorting, and pagination
     /// </summary>
-    /// <param name="filter">Các tiêu chí lọc (tên, trạng thái, vị trí...).</param>
-    /// <returns>Danh sách trạm và thông tin phân trang.</returns>
     [HttpGet]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetStations([FromQuery] StationFilterDto filter)
     {
         try
         {
-            // Debug: Log authentication info
-            _logger.LogInformation("GetStations called. User authenticated: {IsAuthenticated}, User: {User}, Roles: {Roles}",
-                User.Identity?.IsAuthenticated ?? false,
-                User.Identity?.Name ?? "Unknown",
-                string.Join(", ", User.Claims.Where(c => c.Type == System.Security.Claims.ClaimTypes.Role).Select(c => c.Value)));
-
-            // Lấy danh sách trạm và tổng số lượng từ service
             var (stations, totalCount) = await _stationMgmtService.GetStationsAsync(filter);
 
-            // Trả về kết quả kèm thông tin phân trang
-            return OkResponse(new
+            return Ok(new
             {
+                success = true,
                 data = stations,
                 pagination = new
                 {
@@ -75,27 +57,33 @@ public class AdminStationsController : BaseApiController
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting stations. Filter: {@Filter}", filter);
-            return StatusCode(500, new { message = "An error occurred while retrieving stations", error = ex.Message });
+            _logger.LogError(ex, "Error getting stations");
+            return StatusCode(500, new { success = false, message = "An error occurred" });
         }
     }
 
     /// <summary>
-    /// Lấy thông tin chi tiết của một trạm cụ thể.
+    /// Get detailed information for a specific station
     /// </summary>
-    /// <param name="stationId">ID trạm.</param>
-    /// <returns>Thông tin chi tiết trạm.</returns>
     [HttpGet("{stationId}")]
-    [ProducesResponseType(typeof(ApiResponse<StationDetailDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(StationDetailDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetStationDetail(int stationId)
     {
-        var station = await _stationMgmtService.GetStationDetailAsync(stationId);
+        try
+        {
+            var station = await _stationMgmtService.GetStationDetailAsync(stationId);
 
-        if (station == null)
-            return NotFoundResponse("Station not found");
+            if (station == null)
+                return NotFound(new { success = false, message = "Station not found" });
 
-        return OkResponse(station);
+            return Ok(new { success = true, data = station });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting station detail for {StationId}", stationId);
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
     }
 
     #endregion
@@ -103,22 +91,28 @@ public class AdminStationsController : BaseApiController
     #region Real-time Monitoring
 
     /// <summary>
-    /// Lấy dữ liệu giám sát thời gian thực cho một trạm.
-    /// Bao gồm: Công suất sử dụng, phiên sạc đang hoạt động, tiêu thụ năng lượng, tính khả dụng.
+    /// Get real-time monitoring data for a station
+    /// Includes: Power usage, active sessions, energy consumption, availability
     /// </summary>
-    /// <param name="stationId">ID trạm.</param>
-    /// <returns>Dữ liệu giám sát thời gian thực.</returns>
     [HttpGet("{stationId}/realtime")]
-    [ProducesResponseType(typeof(ApiResponse<StationRealTimeMonitoringDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(StationRealTimeMonitoringDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetStationRealTimeData(int stationId)
     {
-        var realtimeData = await _stationMgmtService.GetStationRealTimeDataAsync(stationId);
+        try
+        {
+            var realtimeData = await _stationMgmtService.GetStationRealTimeDataAsync(stationId);
 
-        if (realtimeData == null)
-            return NotFoundResponse("Station not found");
+            if (realtimeData == null)
+                return NotFound(new { success = false, message = "Station not found" });
 
-        return OkResponse(realtimeData);
+            return Ok(new { success = true, data = realtimeData });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting real-time data for station {StationId}", stationId);
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
     }
 
     #endregion
@@ -126,39 +120,49 @@ public class AdminStationsController : BaseApiController
     #region Remote Control
 
     /// <summary>
-    /// Điều khiển một trụ sạc cụ thể (post).
-    /// Các lệnh: start, stop, restart, pause, resume, maintenance.
+    /// Control a specific charging point (post)
+    /// Commands: start, stop, restart, pause, resume, maintenance
     /// </summary>
-    /// <param name="postId">ID trụ sạc.</param>
-    /// <param name="command">Lệnh điều khiển.</param>
-    /// <returns>Kết quả thực hiện lệnh.</returns>
     [HttpPost("posts/{postId}/control")]
-    [Authorize(Roles = Roles.Admin)]
-    [ProducesResponseType(typeof(ApiResponse<ControlCommandResultDto>), StatusCodes.Status200OK)]
+    [Authorize(Roles = "admin")]
+    [ProducesResponseType(typeof(ControlCommandResultDto), StatusCodes.Status200OK)]
     public async Task<IActionResult> ControlChargingPoint(int postId, [FromBody] ChargingPointControlDto command)
     {
-        command.PostId = postId;
-        var result = await _stationMgmtService.ControlChargingPointAsync(command);
+        try
+        {
+            command.PostId = postId;
+            var result = await _stationMgmtService.ControlChargingPointAsync(command);
 
-        return OkResponse(result);
+            return Ok(new { success = result.Success, data = result });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error controlling charging point {PostId}", postId);
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
     }
 
     /// <summary>
-    /// Điều khiển toàn bộ trạm (tất cả các trụ sạc).
-    /// Các lệnh: enable_all, disable_all, restart_all, maintenance_mode.
+    /// Control entire station (all charging points)
+    /// Commands: enable_all, disable_all, restart_all, maintenance_mode
     /// </summary>
-    /// <param name="stationId">ID trạm.</param>
-    /// <param name="command">Lệnh điều khiển.</param>
-    /// <returns>Kết quả thực hiện lệnh.</returns>
     [HttpPost("{stationId}/control")]
-    [Authorize(Roles = Roles.Admin)]
-    [ProducesResponseType(typeof(ApiResponse<ControlCommandResultDto>), StatusCodes.Status200OK)]
+    [Authorize(Roles = "admin")]
+    [ProducesResponseType(typeof(ControlCommandResultDto), StatusCodes.Status200OK)]
     public async Task<IActionResult> ControlStation(int stationId, [FromBody] StationControlDto command)
     {
-        command.StationId = stationId;
-        var result = await _stationMgmtService.ControlStationAsync(command);
+        try
+        {
+            command.StationId = stationId;
+            var result = await _stationMgmtService.ControlStationAsync(command);
 
-        return OkResponse(result);
+            return Ok(new { success = result.Success, data = result });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error controlling station {StationId}", stationId);
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
     }
 
     #endregion
@@ -166,25 +170,30 @@ public class AdminStationsController : BaseApiController
     #region Configuration
 
     /// <summary>
-    /// Cấu hình cài đặt cho trụ sạc.
-    /// Bao gồm: Giới hạn công suất, giới hạn phiên, firmware, cân bằng tải.
+    /// Configure charging point settings
+    /// Includes: Power limits, session limits, firmware, load balancing
     /// </summary>
-    /// <param name="postId">ID trụ sạc.</param>
-    /// <param name="config">Thông tin cấu hình.</param>
-    /// <returns>Kết quả cấu hình.</returns>
     [HttpPut("posts/{postId}/config")]
-    [Authorize(Roles = Roles.Admin)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [Authorize(Roles = "admin")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> ConfigureChargingPoint(int postId, [FromBody] ChargingPointConfigDto config)
     {
-        config.PostId = postId;
-        var success = await _stationMgmtService.ConfigureChargingPointAsync(config);
+        try
+        {
+            config.PostId = postId;
+            var success = await _stationMgmtService.ConfigureChargingPointAsync(config);
 
-        if (!success)
-            return NotFoundResponse("Charging point not found");
+            if (!success)
+                return NotFound(new { success = false, message = "Charging point not found" });
 
-        return OkResponse(new { }, "Configuration updated successfully");
+            return Ok(new { success = true, message = "Configuration updated successfully" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error configuring charging point {PostId}", postId);
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
     }
 
     #endregion
@@ -192,56 +201,72 @@ public class AdminStationsController : BaseApiController
     #region Error Management
 
     /// <summary>
-    /// Lấy danh sách nhật ký lỗi của một trạm.
+    /// Get error logs for a specific station
     /// </summary>
-    /// <param name="stationId">ID trạm.</param>
-    /// <param name="includeResolved">Bao gồm cả lỗi đã xử lý hay không (mặc định false).</param>
-    /// <returns>Danh sách lỗi.</returns>
     [HttpGet("{stationId}/errors")]
-    [ProducesResponseType(typeof(ApiResponse<List<StationErrorLogDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(List<StationErrorLogDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetStationErrors(int stationId, [FromQuery] bool includeResolved = false)
     {
-        var errors = await _stationMgmtService.GetStationErrorsAsync(stationId, includeResolved);
-        return OkResponse(errors);
+        try
+        {
+            var errors = await _stationMgmtService.GetStationErrorsAsync(stationId, includeResolved);
+
+            return Ok(new { success = true, data = errors, count = errors.Count });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting errors for station {StationId}", stationId);
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
     }
 
     /// <summary>
-    /// Đánh dấu một lỗi là đã được xử lý.
+    /// Mark an error as resolved
     /// </summary>
-    /// <param name="logId">ID nhật ký lỗi.</param>
-    /// <param name="dto">Thông tin xử lý.</param>
-    /// <returns>Kết quả xử lý.</returns>
     [HttpPatch("errors/{logId}/resolve")]
-    [Authorize(Roles = Roles.Admin + "," + Roles.Staff)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [Authorize(Roles = "admin,staff")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> ResolveError(int logId, [FromBody] ResolveErrorDto dto)
     {
-        // Lấy tên người dùng hiện tại từ token
-        var userName = User.FindFirst(ClaimTypes.Name)?.Value ?? "Unknown";
-        var success = await _stationMgmtService.ResolveErrorAsync(logId, userName, dto.Resolution);
+        try
+        {
+            var userName = User.FindFirst(ClaimTypes.Name)?.Value ?? "Unknown";
+            var success = await _stationMgmtService.ResolveErrorAsync(logId, userName, dto.Resolution);
 
-        if (!success)
-            return NotFoundResponse("Error log not found");
+            if (!success)
+                return NotFound(new { success = false, message = "Error log not found" });
 
-        return OkResponse(new { }, "Error marked as resolved");
+            return Ok(new { success = true, message = "Error marked as resolved" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error resolving error log {LogId}", logId);
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
     }
 
     /// <summary>
-    /// Ghi nhận một lỗi hoặc cảnh báo mới cho trạm.
+    /// Log a new station error/warning
     /// </summary>
-    /// <param name="stationId">ID trạm.</param>
-    /// <param name="dto">Thông tin lỗi.</param>
-    /// <returns>ID của lỗi vừa tạo.</returns>
     [HttpPost("{stationId}/errors")]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status201Created)]
     public async Task<IActionResult> LogStationError(int stationId, [FromBody] LogStationErrorDto dto)
     {
-        var logId = await _stationMgmtService.LogStationErrorAsync(
-            stationId, dto.PostId, dto.SlotId, dto.Severity,
-            dto.ErrorType, dto.Message, dto.Details);
+        try
+        {
+            var logId = await _stationMgmtService.LogStationErrorAsync(
+                stationId, dto.PostId, dto.SlotId, dto.Severity,
+                dto.ErrorType, dto.Message, dto.Details);
 
-        return CreatedResponse($"/api/admin/stations/errors/{logId}", new { logId }, (object?)null, "Error logged successfully");
+            return Created($"/api/admin/stations/errors/{logId}",
+                new { success = true, logId, message = "Error logged successfully" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error logging station error");
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
     }
 
     #endregion
@@ -249,74 +274,98 @@ public class AdminStationsController : BaseApiController
     #region CRUD Operations
 
     /// <summary>
-    /// Tạo mới một trạm sạc.
+    /// Create a new charging station
     /// </summary>
-    /// <param name="dto">Thông tin trạm sạc mới.</param>
-    /// <returns>Thông tin trạm sạc vừa tạo.</returns>
     [HttpPost]
-    [Authorize(Roles = Roles.Admin)]
-    [ProducesResponseType(typeof(ApiResponse<StationDetailDto>), StatusCodes.Status201Created)]
+    [Authorize(Roles = "admin")]
+    [ProducesResponseType(typeof(StationDetailDto), StatusCodes.Status201Created)]
     public async Task<IActionResult> CreateStation([FromBody] CreateUpdateStationDto dto)
     {
-        var station = await _stationMgmtService.CreateStationAsync(dto);
+        try
+        {
+            var station = await _stationMgmtService.CreateStationAsync(dto);
 
-        return CreatedResponse($"/api/admin/stations/{station.StationId}", new { id = station.StationId }, station, "Station created successfully");
+            return Created($"/api/admin/stations/{station.StationId}",
+                new { success = true, data = station });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating station");
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
     }
 
     /// <summary>
-    /// Cập nhật thông tin trạm sạc.
+    /// Update station information
     /// </summary>
-    /// <param name="stationId">ID trạm.</param>
-    /// <param name="dto">Thông tin cập nhật.</param>
-    /// <returns>Kết quả cập nhật.</returns>
     [HttpPut("{stationId}")]
-    [Authorize(Roles = Roles.Admin)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [Authorize(Roles = "admin")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateStation(int stationId, [FromBody] CreateUpdateStationDto dto)
     {
-        var success = await _stationMgmtService.UpdateStationAsync(stationId, dto);
+        try
+        {
+            var success = await _stationMgmtService.UpdateStationAsync(stationId, dto);
 
-        if (!success)
-            return NotFoundResponse("Station not found");
+            if (!success)
+                return NotFound(new { success = false, message = "Station not found" });
 
-        return OkResponse(new { }, "Station updated successfully");
+            return Ok(new { success = true, message = "Station updated successfully" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating station {StationId}", stationId);
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
     }
 
     /// <summary>
-    /// Xóa trạm sạc (xóa mềm - soft delete).
+    /// Delete station (soft delete)
     /// </summary>
-    /// <param name="stationId">ID trạm.</param>
-    /// <returns>Kết quả xóa.</returns>
     [HttpDelete("{stationId}")]
-    [Authorize(Roles = Roles.Admin)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [Authorize(Roles = "admin")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteStation(int stationId)
     {
-        var success = await _stationMgmtService.DeleteStationAsync(stationId);
+        try
+        {
+            var success = await _stationMgmtService.DeleteStationAsync(stationId);
 
-        if (!success)
-            return NotFoundResponse("Station not found");
+            if (!success)
+                return NotFound(new { success = false, message = "Station not found" });
 
-        return OkResponse<object>(new { }, "Station deleted successfully");
+            return NoContent();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting station {StationId}", stationId);
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
     }
 
     /// <summary>
-    /// Thêm mới một trụ sạc vào trạm.
+    /// Add a new charging post to a station
     /// </summary>
-    /// <param name="stationId">ID trạm.</param>
-    /// <param name="dto">Thông tin trụ sạc mới.</param>
-    /// <returns>Thông tin trụ sạc vừa tạo.</returns>
     [HttpPost("{stationId}/posts")]
-    [Authorize(Roles = Roles.Admin)]
-    [ProducesResponseType(typeof(ApiResponse<ChargingPointDetailDto>), StatusCodes.Status201Created)]
+    [Authorize(Roles = "admin")]
+    [ProducesResponseType(typeof(ChargingPointDetailDto), StatusCodes.Status201Created)]
     public async Task<IActionResult> CreateChargingPost(int stationId, [FromBody] CreateChargingPostDto dto)
     {
-        dto.StationId = stationId;
-        var post = await _stationMgmtService.CreateChargingPostAsync(dto);
+        try
+        {
+            dto.StationId = stationId;
+            var post = await _stationMgmtService.CreateChargingPostAsync(dto);
 
-        return CreatedResponse($"/api/admin/stations/{stationId}/posts/{post.PostId}", new { id = post.PostId }, post, "Charging post created successfully");
+            return Created($"/api/admin/stations/{stationId}/posts/{post.PostId}",
+                new { success = true, data = post });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating charging post");
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
     }
 
     #endregion
@@ -324,24 +373,33 @@ public class AdminStationsController : BaseApiController
     #region Manager Assignment
 
     /// <summary>
-    /// Cập nhật người quản lý cho trạm sạc.
+    /// Update station manager assignment
     /// </summary>
-    /// <param name="stationId">ID trạm.</param>
-    /// <param name="dto">Thông tin người quản lý mới.</param>
-    /// <returns>Kết quả cập nhật.</returns>
     [HttpPut("{stationId}/manager")]
-    [Authorize(Roles = Roles.Admin)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [Authorize(Roles = "admin")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateStationManager(int stationId, [FromBody] UpdateStationManagerDto dto)
     {
-        var success = await _stationMgmtService.UpdateStationManagerAsync(stationId, dto.ManagerUserId);
+        try
+        {
+            var success = await _stationMgmtService.UpdateStationManagerAsync(stationId, dto.ManagerUserId);
 
-        if (!success)
-            return NotFoundResponse("Station not found");
+            if (!success)
+                return NotFound(new { success = false, message = "Station not found" });
 
-        var action = dto.ManagerUserId.HasValue ? "assigned" : "cleared";
-        return OkResponse(new { }, $"Station manager {action} successfully");
+            var action = dto.ManagerUserId.HasValue ? "assigned" : "cleared";
+            return Ok(new { success = true, message = $"Station manager {action} successfully" });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { success = false, message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating manager for station {StationId}", stationId);
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
     }
 
     #endregion
@@ -349,39 +407,42 @@ public class AdminStationsController : BaseApiController
     #region Legacy Analytics (if needed)
 
     /// <summary>
-    /// Lấy phân tích trạm sạc với các chỉ số theo thời gian (Hỗ trợ Legacy).
+    /// Get station analytics with time-based metrics (Legacy support)
     /// </summary>
-    /// <param name="timeRange">Khoảng thời gian (mặc định "30d").</param>
-    /// <returns>Dữ liệu phân tích.</returns>
     [HttpGet("analytics")]
-    [ProducesResponseType(typeof(ApiResponse<StationAnalyticsDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(StationAnalyticsDto), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetStationAnalytics([FromQuery] string timeRange = "30d")
     {
-        if (_adminStationService != null)
+        try
         {
-            var analytics = await _adminStationService.GetStationAnalyticsAsync(timeRange);
-            return OkResponse(analytics);
-        }
+            if (_adminStationService != null)
+            {
+                var analytics = await _adminStationService.GetStationAnalyticsAsync(timeRange);
+                return Ok(new { success = true, data = analytics });
+            }
 
-        return OkResponse(new { }, "Analytics service not available");
+            return Ok(new { success = false, message = "Analytics service not available" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting station analytics");
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
     }
 
     #endregion
 }
 
 /// <summary>
-/// DTO cho việc xử lý lỗi.
+/// DTO for resolving errors
 /// </summary>
 public class ResolveErrorDto
 {
-    /// <summary>
-    /// Nội dung giải pháp xử lý lỗi.
-    /// </summary>
     public string Resolution { get; set; } = string.Empty;
 }
 
 /// <summary>
-/// DTO cho việc ghi nhận lỗi trạm sạc.
+/// DTO for logging errors
 /// </summary>
 public class LogStationErrorDto
 {
@@ -394,7 +455,7 @@ public class LogStationErrorDto
 }
 
 /// <summary>
-/// DTO cập nhật người quản lý trạm.
+/// DTO to update manager assignment
 /// </summary>
 public class UpdateStationManagerDto
 {
