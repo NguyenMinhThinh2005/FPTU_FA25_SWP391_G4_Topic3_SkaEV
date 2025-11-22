@@ -83,7 +83,7 @@ public class MockPaymentController : BaseApiController
             {
                 InvoiceId = request.InvoiceId,
                 Amount = invoice.TotalAmount,
-                PaymentType = "e_wallet", // CHECK constraint allows: e_wallet, card, cash, online
+                PaymentType = "e_wallet", // Reverted to "e_wallet" based on user instruction
                 Status = PaymentStatuses.Completed, // Use constant instead of hardcoded string
                 TransactionId = $"MOCK-{DateTime.UtcNow:yyyyMMddHHmmss}-{Guid.NewGuid():N}",
                 ProcessedAt = DateTime.UtcNow,

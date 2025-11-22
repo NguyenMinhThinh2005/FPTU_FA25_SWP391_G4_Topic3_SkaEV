@@ -217,6 +217,7 @@ const ChargingFlow = () => {
     "Quét QR",
     "Kết nối",
     "Đang sạc",
+    "Thanh toán",
     "Hoàn thành",
   ];
   const { currentBooking, chargingSession, resetFlowState, completeBooking } =
@@ -224,7 +225,8 @@ const ChargingFlow = () => {
   const bookingStore = useBookingStore;
   const { stations, initializeData, filters, updateFilters, loading } =
     useStationStore();
-  const { vehicles, getDefaultVehicle, fetchVehicles, hasLoaded } = useVehicleStore();
+  const { vehicles, getDefaultVehicle, fetchVehicles, hasLoaded } =
+    useVehicleStore();
 
   // Lưu flowStep vào sessionStorage để giữ trạng thái khi chuyển tab
   const getInitialFlowStep = () => {
@@ -906,9 +908,27 @@ const ChargingFlow = () => {
 
   const handleBookingComplete = (booking) => {
     console.log("🎯 Booking completed:", booking);
+
+    // Store booking data
     setCurrentBookingData(booking);
+
+    // Store booking in bookingStore for persistence
+    if (booking?.bookingId) {
+      bookingStore.setState({
+        currentBooking: {
+          ...booking,
+          status: "confirmed",
+        },
+      });
+      console.log("✅ Booking stored in bookingStore:", booking.bookingId);
+    }
+
+    // Close modal and move to navigation step
     setBookingModalOpen(false);
     setFlowStep(1); // Move to navigation/direction map step
+
+    console.log("📍 FlowStep updated to: 1 (Navigation)");
+    console.log("🗺️ User should now see the map with directions");
 
     // Initialize session data based on booking
     const energyNeeded = (sessionData.targetSOC - sessionData.startSOC) * 0.6; // 60kWh battery
@@ -950,24 +970,26 @@ const ChargingFlow = () => {
       // Get fresh vehicles list from store after potential fetch
       const vehicleStore = useVehicleStore.getState();
       const currentVehicles = vehicleStore.vehicles || vehicles;
-      
+
       // Try to get selectedVehicle from bookingStore first
       let selectedVehicle = bookingStore.getState().selectedVehicle;
-      
+
       // If not found, try to get default vehicle from vehicleStore
       if (!selectedVehicle) {
         selectedVehicle = vehicleStore.getDefaultVehicle();
         console.log("📦 Auto-selected default vehicle:", selectedVehicle);
       }
-      
+
       // If still not found, try to get first vehicle
       if (!selectedVehicle && currentVehicles && currentVehicles.length > 0) {
         selectedVehicle = currentVehicles[0];
         console.log("📦 Auto-selected first vehicle:", selectedVehicle);
       }
-      
+
       if (!selectedVehicle) {
-        throw new Error("Bạn chưa có xe nào. Vui lòng thêm xe trước khi demo sạc.");
+        throw new Error(
+          "Bạn chưa có xe nào. Vui lòng thêm xe trước khi demo sạc."
+        );
       }
 
       // Get station ID - try to use selected station, or first available station
@@ -977,30 +999,42 @@ const ChargingFlow = () => {
         const stationWithSlots = stations.find(
           (s) => s.status?.toLowerCase() === "active" && s.stats?.available > 0
         );
-        demoStationId = stationWithSlots?.id || stationWithSlots?.stationId || stations[0].id || stations[0].stationId;
+        demoStationId =
+          stationWithSlots?.id ||
+          stationWithSlots?.stationId ||
+          stations[0].id ||
+          stations[0].stationId;
       }
       if (!demoStationId) {
-        throw new Error("Không tìm thấy trạm sạc khả dụng. Vui lòng chọn trạm trước.");
+        throw new Error(
+          "Không tìm thấy trạm sạc khả dụng. Vui lòng chọn trạm trước."
+        );
       }
 
       // Get available slots from the station
       console.log("📦 Fetching available slots for station:", demoStationId);
       const slotsResponse = await stationsAPI.getAvailableSlots(demoStationId);
-      const availableSlots = slotsResponse?.data?.data || slotsResponse?.data || [];
-      
+      const availableSlots =
+        slotsResponse?.data?.data || slotsResponse?.data || [];
+
       if (!availableSlots || availableSlots.length === 0) {
-        throw new Error(`Trạm ${demoStationId} hiện không có slot sạc khả dụng. Vui lòng chọn trạm khác.`);
+        throw new Error(
+          `Trạm ${demoStationId} hiện không có slot sạc khả dụng. Vui lòng chọn trạm khác.`
+        );
       }
 
       // Use first available slot
       const firstAvailableSlot = availableSlots[0];
       const demoSlotId = firstAvailableSlot.slotId || firstAvailableSlot.id;
-      
+
       if (!demoSlotId) {
         throw new Error("Không thể lấy thông tin slot sạc. Vui lòng thử lại.");
       }
 
-      console.log("✅ Selected slot for demo:", { slotId: demoSlotId, stationId: demoStationId });
+      console.log("✅ Selected slot for demo:", {
+        slotId: demoSlotId,
+        stationId: demoStationId,
+      });
 
       const qrScanPayload = {
         qrData: `SLOT-${demoSlotId}-STATION-${demoStationId}`,
@@ -1020,8 +1054,12 @@ const ChargingFlow = () => {
         id: bookingData.bookingId || bookingData.id,
         apiId: bookingData.bookingId || bookingData.id,
         stationId: bookingData.stationId,
-        stationName: bookingData.stationName || selectedStation?.name || "Trạm Demo",
-        stationAddress: bookingData.stationAddress || selectedStation?.address || "Địa chỉ demo",
+        stationName:
+          bookingData.stationName || selectedStation?.name || "Trạm Demo",
+        stationAddress:
+          bookingData.stationAddress ||
+          selectedStation?.address ||
+          "Địa chỉ demo",
         slotId: bookingData.slotId,
         slotNumber: bookingData.slotNumber,
         vehicleId: bookingData.vehicleId,
@@ -1042,7 +1080,10 @@ const ChargingFlow = () => {
       console.log("✅ Demo charging started successfully, moving to step 3");
     } catch (error) {
       console.error("❌ Error in demo charging:", error);
-      const errorMessage = error.response?.data?.message || error.message || "Không thể khởi tạo demo sạc xe. Vui lòng thử lại.";
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        "Không thể khởi tạo demo sạc xe. Vui lòng thử lại.";
       notificationService.error(errorMessage);
       alert(errorMessage);
     }
@@ -1054,7 +1095,7 @@ const ChargingFlow = () => {
     try {
       // Call API to create booking from QR scan
       console.log("📤 Calling API to scan QR code:", result);
-      
+
       // First, ensure vehicles are loaded
       if (!hasLoaded || vehicles.length === 0) {
         console.log("📦 Vehicles not loaded yet, fetching...");
@@ -1064,24 +1105,32 @@ const ChargingFlow = () => {
       // Get fresh vehicles list from store after potential fetch
       const vehicleStore = useVehicleStore.getState();
       const currentVehicles = vehicleStore.vehicles || vehicles;
-      
+
       // Try to get selectedVehicle from bookingStore first
       let selectedVehicle = bookingStore.getState().selectedVehicle;
-      
+
       // If not found, try to get default vehicle from vehicleStore
       if (!selectedVehicle) {
         selectedVehicle = vehicleStore.getDefaultVehicle();
-        console.log("📦 Auto-selected default vehicle for QR scan:", selectedVehicle);
+        console.log(
+          "📦 Auto-selected default vehicle for QR scan:",
+          selectedVehicle
+        );
       }
-      
+
       // If still not found, try to get first vehicle
       if (!selectedVehicle && currentVehicles && currentVehicles.length > 0) {
         selectedVehicle = currentVehicles[0];
-        console.log("📦 Auto-selected first vehicle for QR scan:", selectedVehicle);
+        console.log(
+          "📦 Auto-selected first vehicle for QR scan:",
+          selectedVehicle
+        );
       }
-      
+
       if (!selectedVehicle) {
-        throw new Error("Bạn chưa có xe nào. Vui lòng thêm xe trước khi quét QR.");
+        throw new Error(
+          "Bạn chưa có xe nào. Vui lòng thêm xe trước khi quét QR."
+        );
       }
 
       // Parse QR data to get slot ID and station ID
@@ -1094,15 +1143,17 @@ const ChargingFlow = () => {
       } catch {
         // Try simple format: SLOT-123-STATION-456
         const qrString = result.qrData || result;
-        if (qrString.includes('SLOT-') && qrString.includes('STATION-')) {
-          const parts = qrString.split('-');
+        if (qrString.includes("SLOT-") && qrString.includes("STATION-")) {
+          const parts = qrString.split("-");
           slotId = parseInt(parts[1]);
           stationId = parseInt(parts[3]);
         }
       }
 
       if (!slotId || !stationId) {
-        throw new Error("Mã QR không hợp lệ. Không thể đọc thông tin slot/station.");
+        throw new Error(
+          "Mã QR không hợp lệ. Không thể đọc thông tin slot/station."
+        );
       }
 
       // Call backend API to create booking via QR scan
@@ -1146,31 +1197,41 @@ const ChargingFlow = () => {
       console.log("✅ QR Scanned successfully, moving to step 3");
     } catch (error) {
       console.error("❌ Error scanning QR code:", error);
-      notificationService.error(error.message || "Không thể quét mã QR. Vui lòng thử lại.");
-      
+      notificationService.error(
+        error.message || "Không thể quét mã QR. Vui lòng thử lại."
+      );
+
       // Don't continue to next step if there's an error
       setQrScanOpen(false);
     }
   };
 
   const handleStartCharging = async () => {
-    if (!currentBooking || !scanResult) {
-      console.error("❌ Missing booking data or QR scan result");
-      alert("Thiếu thông tin booking hoặc mã QR");
+    // Robust way to get booking ID from multiple sources
+    const bookingId =
+      currentBooking?.bookingId ||
+      currentBooking?.id ||
+      bookingStore.currentBooking?.bookingId ||
+      bookingStore.currentBooking?.id ||
+      currentBookingData?.bookingId ||
+      currentBookingData?.id;
+
+    if (!bookingId || !scanResult) {
+      console.error("❌ Missing booking ID or QR scan result", {
+        currentBooking,
+        storeBooking: bookingStore.currentBooking,
+        currentBookingData,
+        scanResult,
+        resolvedBookingId: bookingId,
+      });
+      alert("Không tìm thấy mã đặt chỗ hoặc mã QR, vui lòng thử lại");
       return;
     }
 
     try {
-      console.log(
-        "🔌 Starting charging session for booking:",
-        currentBooking.id,
-        currentBooking
-      );
+      console.log("🔌 Starting charging session for Booking ID:", bookingId);
 
       // Try to call API to start charging session (may fail with 403 if not Staff)
-      // Use numeric ID from API response, not the BOOK... string
-      const bookingId = currentBooking.id;
-
       try {
         const response = await chargingAPI.startCharging(bookingId);
         console.log("✅ Charging session started via API:", response);
@@ -1180,9 +1241,11 @@ const ChargingFlow = () => {
           sessionId: response.sessionId || `SESSION-${Date.now()}`,
           bookingId: bookingId,
           startTime: new Date(),
-          stationId: currentBooking.stationId,
-          stationName: currentBooking.stationName,
-          chargerType: currentBooking.chargerType,
+          stationId: currentBooking?.stationId || currentBookingData?.stationId,
+          stationName:
+            currentBooking?.stationName || currentBookingData?.stationName,
+          chargerType:
+            currentBooking?.chargerType || currentBookingData?.chargerType,
           status: "active",
         };
 
@@ -1199,9 +1262,11 @@ const ChargingFlow = () => {
           sessionId: `DEMO-SESSION-${Date.now()}`,
           bookingId: bookingId,
           startTime: new Date(),
-          stationId: currentBooking.stationId,
-          stationName: currentBooking.stationName,
-          chargerType: currentBooking.chargerType,
+          stationId: currentBooking?.stationId || currentBookingData?.stationId,
+          stationName:
+            currentBooking?.stationName || currentBookingData?.stationName,
+          chargerType:
+            currentBooking?.chargerType || currentBookingData?.chargerType,
           status: "active-demo",
         };
 
@@ -1216,7 +1281,9 @@ const ChargingFlow = () => {
       // Update booking status
       bookingStore.setState({
         currentBooking: {
-          ...currentBooking,
+          ...(currentBooking || currentBookingData || {}),
+          id: bookingId,
+          bookingId: bookingId,
           chargingStarted: true,
           status: "in-progress",
         },
@@ -1233,7 +1300,10 @@ const ChargingFlow = () => {
 
       // Notify charging started
       notificationService.notifyChargingStarted({
-        stationName: currentBooking.stationName || "Trạm sạc",
+        stationName:
+          currentBooking?.stationName ||
+          currentBookingData?.stationName ||
+          "Trạm sạc",
         currentSOC: 25,
       });
 
@@ -1250,7 +1320,9 @@ const ChargingFlow = () => {
 
   // Calculate total cost including parking fee
   const calculateTotalCost = React.useCallback(() => {
-    const energyCost = parseFloat(completedSession?.totalAmount || sessionData.currentCost || 0);
+    const energyCost = parseFloat(
+      completedSession?.totalAmount || sessionData.currentCost || 0
+    );
     const chargingDuration = chargingStartTime
       ? Math.round((new Date() - chargingStartTime) / (1000 * 60))
       : Math.round((sessionData.energyDelivered || 0) * 3); // 3 minutes per kWh estimate
@@ -1913,7 +1985,8 @@ const ChargingFlow = () => {
                       )}
 
                       {/* Always show summary if available, even with errors */}
-                      {(navigationSummary || (selectedStationCoords && userLocation)) && (
+                      {(navigationSummary ||
+                        (selectedStationCoords && userLocation)) && (
                         <>
                           <Box
                             sx={{
@@ -1961,16 +2034,18 @@ const ChargingFlow = () => {
                           {/* Only show error if route is not displayed on map */}
                           {directionsData.error && !navigationSummary && (
                             <Alert severity="info" sx={{ mb: 1 }}>
-                              Tuyến đường đã được hiển thị trên bản đồ. {directionsData.error}
+                              Tuyến đường đã được hiển thị trên bản đồ.{" "}
+                              {directionsData.error}
                             </Alert>
                           )}
 
                           {/* Show warnings only if they provide useful info, not if route is already shown */}
                           {navigationWarnings
-                            .filter((warning) => 
-                              !warning.includes("gần đúng") && 
-                              !warning.includes("không thể tải") &&
-                              !warning.includes("không tìm thấy")
+                            .filter(
+                              (warning) =>
+                                !warning.includes("gần đúng") &&
+                                !warning.includes("không thể tải") &&
+                                !warning.includes("không tìm thấy")
                             )
                             .map((warning, index) => (
                               <Alert
@@ -2052,19 +2127,30 @@ const ChargingFlow = () => {
                           ) : (
                             <Box sx={{ mb: 2 }}>
                               <Alert severity="success" sx={{ mb: 1 }}>
-                                ✅ Tuyến đường đã được hiển thị trên bản đồ phía bên trái.
+                                ✅ Tuyến đường đã được hiển thị trên bản đồ phía
+                                bên trái.
                               </Alert>
                               {!navigationSummary && (
-                                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                                  Để xem hướng dẫn chi tiết từng bước, nhấn "Mở Google Maps".
+                                <Typography
+                                  variant="body2"
+                                  color="text.secondary"
+                                  sx={{ mb: 1 }}
+                                >
+                                  Để xem hướng dẫn chi tiết từng bước, nhấn "Mở
+                                  Google Maps".
                                 </Typography>
                               )}
-                              {navigationSummary && !navigationSummary.steps?.length && (
-                                <Typography variant="body2" color="text.secondary">
-                                  Tuyến đường đã được tính toán và hiển thị trên bản đồ. 
-                                  Bạn có thể sử dụng nút "Mở Google Maps" để xem hướng dẫn chi tiết hơn.
-                                </Typography>
-                              )}
+                              {navigationSummary &&
+                                !navigationSummary.steps?.length && (
+                                  <Typography
+                                    variant="body2"
+                                    color="text.secondary"
+                                  >
+                                    Tuyến đường đã được tính toán và hiển thị
+                                    trên bản đồ. Bạn có thể sử dụng nút "Mở
+                                    Google Maps" để xem hướng dẫn chi tiết hơn.
+                                  </Typography>
+                                )}
                             </Box>
                           )}
                         </>
@@ -2902,8 +2988,11 @@ const ChargingFlow = () => {
                     >
                       <Typography variant="body2">Năng lượng:</Typography>
                       <Typography variant="body2" fontWeight="medium">
-                        {(completedSession?.energyDelivered ||
-                          parseFloat(sessionData.energyDelivered) || 0).toFixed(1)}{" "}
+                        {(
+                          completedSession?.energyDelivered ||
+                          parseFloat(sessionData.energyDelivered) ||
+                          0
+                        ).toFixed(1)}{" "}
                         kWh
                       </Typography>
                     </Box>
@@ -2922,7 +3011,11 @@ const ChargingFlow = () => {
                               ? Math.round(
                                   (new Date() - chargingStartTime) / (1000 * 60)
                                 )
-                              : Math.round((parseFloat(sessionData.energyDelivered) || 0) * 3)) || 0
+                              : Math.round(
+                                  (parseFloat(sessionData.energyDelivered) ||
+                                    0) * 3
+                                )) ||
+                            0
                         )}
                       </Typography>
                     </Box>
@@ -2950,7 +3043,11 @@ const ChargingFlow = () => {
                       </Typography>
                       <Typography variant="body2" fontWeight="medium">
                         {formatCurrency(
-                          parseFloat(completedSession?.totalAmount || sessionData.currentCost || 0) || 0
+                          parseFloat(
+                            completedSession?.totalAmount ||
+                              sessionData.currentCost ||
+                              0
+                          ) || 0
                         )}
                       </Typography>
                     </Box>
@@ -2968,7 +3065,10 @@ const ChargingFlow = () => {
                             ? Math.round(
                                 (new Date() - chargingStartTime) / (1000 * 60)
                               )
-                            : Math.round((parseFloat(sessionData.energyDelivered) || 0) * 3)) || 0) * 500
+                            : Math.round(
+                                (parseFloat(sessionData.energyDelivered) || 0) *
+                                  3
+                              )) || 0) * 500
                         )}
                       </Typography>
                     </Box>
@@ -3068,58 +3168,106 @@ const ChargingFlow = () => {
 
                         try {
                           const totalAmount = calculateTotalCost();
+
+                          // FIX: Get bookingId from multiple sources including store and session
                           const bookingId =
-                            currentBooking?.id || currentBookingData?.id;
+                            currentBooking?.id ||
+                            currentBookingData?.id ||
+                            currentBookingData?.bookingId ||
+                            bookingStore.currentBooking?.bookingId ||
+                            bookingStore.currentBooking?.id ||
+                            sessionStorage.getItem("currentBookingId");
+
+                          console.log("💳 Payment Booking Info:", {
+                            currentBooking,
+                            currentBookingData,
+                            storeBooking: bookingStore.currentBooking,
+                            resolvedBookingId: bookingId,
+                          });
 
                           if (!bookingId) {
-                            throw new Error("Không tìm thấy thông tin đặt chỗ");
+                            throw new Error(
+                              "Không tìm thấy thông tin đặt chỗ (Booking ID missing)"
+                            );
                           }
 
-                          // 1. Get invoice for this booking
+                          // 1. Create Invoice first (to ensure it exists)
                           console.log(
-                            "📋 Fetching invoice for booking:",
+                            "📋 Creating invoice for booking:",
                             bookingId
                           );
-                          const invoiceResponse =
-                            await invoicesAPI.getByBooking(bookingId);
+                          let invoice;
 
-                          if (!invoiceResponse || !invoiceResponse.invoiceId) {
+                          try {
+                            // Try to create invoice first
+                            const createRes = await invoicesAPI.createInvoice(
+                              bookingId
+                            );
+                            invoice = createRes?.data || createRes;
+                            console.log("✅ Invoice created:", invoice);
+                          } catch (createError) {
+                            console.warn(
+                              "⚠️ Create invoice failed, trying to fetch existing:",
+                              createError
+                            );
+                            // If create fails, try to get existing
+                            const getRes = await invoicesAPI.getByBooking(
+                              bookingId
+                            );
+                            invoice = getRes?.data || getRes;
+                          }
+
+                          if (!invoice || !invoice.invoiceId) {
                             throw new Error(
-                              "Không tìm thấy hóa đơn cho phiên sạc này"
+                              "Không thể tạo hoặc tìm thấy hóa đơn cho phiên sạc này"
                             );
                           }
 
-                          const invoice = invoiceResponse;
-                          console.log("✅ Found invoice:", invoice);
+                          console.log("✅ Invoice ready for payment:", invoice);
 
-                          // 2. Process payment immediately (Mock Payment)
-                          console.log("💳 Processing payment...");
-                          const paymentResponse = await mockPaymentAPI.processPayment(
-                            {
+                          // 2. Process payment immediately (Wallet Payment)
+                          console.log("💳 Processing payment via Wallet...");
+                          const paymentResponse =
+                            await mockPaymentAPI.processPayment({
                               invoiceId: invoice.invoiceId,
-                            }
+                              amount: invoice.totalAmount || totalAmount,
+                              orderDescription: `Thanh toan hoa don #${
+                                invoice.invoiceId
+                              } - Phien sac ${invoice.stationName || "SkaEV"}`,
+                            });
+
+                          console.log(
+                            "📥 Wallet Payment API Response:",
+                            paymentResponse
                           );
 
-                          // Axios interceptor unwraps ApiResponse, so paymentResponse is the data object directly
-                          if (!paymentResponse?.success) {
+                          // Check for success
+                          // MockPaymentController returns { success: true, data: { paymentId, ... } }
+                          // Axios interceptor returns data directly if success is true
+                          const isSuccess =
+                            paymentResponse?.paymentId ||
+                            paymentResponse?.success;
+
+                          if (!isSuccess) {
                             throw new Error(
-                              paymentResponse?.message || "Không thể xử lý thanh toán"
+                              paymentResponse?.message ||
+                                "Không thể xử lý thanh toán qua ví. Vui lòng thử lại."
                             );
                           }
 
                           console.log(
-                            "✅ Payment processed successfully:",
-                            paymentResponse
+                            "✅ Payment processed successfully via Wallet"
                           );
 
                           // 3. Payment successful - move to complete step
                           notificationService.success(
-                            `Thanh toán thành công! Số tiền: ${formatCurrency(paymentResponse.amount)}`
+                            `Thanh toán thành công! Số tiền: ${formatCurrency(
+                              invoice.totalAmount || totalAmount
+                            )}`
                           );
 
-                          // 4. Move to complete step
+                          // Move to next step (Complete)
                           setFlowStep(6);
-                          setPaymentLoading(false);
                         } catch (error) {
                           console.error("❌ Payment error:", error);
                           setPaymentError(
@@ -3509,11 +3657,7 @@ const ChargingFlow = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setQrScanOpen(false)}>Đóng</Button>
-          <Button
-            variant="outlined"
-            size="small"
-            onClick={handleDemoCharging}
-          >
+          <Button variant="outlined" size="small" onClick={handleDemoCharging}>
             Demo sạc xe
           </Button>
         </DialogActions>

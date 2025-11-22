@@ -84,15 +84,16 @@ public class VNPayService : IVNPayService
             throw new InvalidOperationException("Invoice already settled");
         }
 
-        if (invoice.TotalAmount < 5000)
-        {
-            throw new InvalidOperationException("VNPay requires transactions >= 5,000 VND");
-        }
+        // REMOVED: Validation for < 5000 VND to allow small transactions in Sandbox
+        // if (invoice.TotalAmount < 5000)
+        // {
+        //     throw new InvalidOperationException("VNPay requires transactions >= 5,000 VND");
+        // }
 
         var payment = new Payment
         {
             InvoiceId = invoice.InvoiceId,
-            Amount = invoice.TotalAmount,
+            Amount = invoice.TotalAmount, // Keep original amount in DB
             PaymentType = "vnpay",
             Status = PaymentStatuses.Pending,
             CreatedAt = DateTime.UtcNow
@@ -101,10 +102,13 @@ public class VNPayService : IVNPayService
         _context.Payments.Add(payment);
         await _context.SaveChangesAsync(cancellationToken);
 
+        // Calculate display amount for VNPay (Minimum 5000 VND required by Sandbox)
+        var vnpayDisplayAmount = invoice.TotalAmount < 5000 ? 5000 : invoice.TotalAmount;
+
         var vnpayRequest = new VnpayPaymentRequest
         {
             Description = NormalizeDescription(request.Description, invoice),
-            Money = (double)invoice.TotalAmount,
+            Money = (double)vnpayDisplayAmount, // Send adjusted amount to VNPay
             BankCode = ParseBankCode(request.BankCode)
         };
 

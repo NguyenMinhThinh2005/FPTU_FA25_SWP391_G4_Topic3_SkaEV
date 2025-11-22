@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NetTopologySuite.Geometries;
 using SkaEV.API.Infrastructure.Data;
@@ -12,9 +13,11 @@ using SkaEV.API.Infrastructure.Data;
 namespace SkaEV.API.Migrations
 {
     [DbContext(typeof(SkaEVDbContext))]
-    partial class SkaEVDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251121234247_AddWalletSystem")]
+    partial class AddWalletSystem
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

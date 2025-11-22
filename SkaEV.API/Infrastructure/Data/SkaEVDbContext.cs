@@ -35,6 +35,7 @@ public class SkaEVDbContext : DbContext
     public DbSet<ServicePlan> ServicePlans { get; set; }
     public DbSet<Incident> Incidents { get; set; }
     public DbSet<MaintenanceTeam> MaintenanceTeams { get; set; }
+    public DbSet<WalletTransaction> WalletTransactions { get; set; }
 
     // DbSets - Views (read-only)
     public DbSet<UserCostReport> UserCostReports { get; set; }
@@ -57,24 +58,66 @@ public class SkaEVDbContext : DbContext
         {
             tb.HasTrigger("trg_user_profiles_updated_at");
         });
-        modelBuilder.Entity<Vehicle>().ToTable("vehicles");
-        modelBuilder.Entity<ChargingStation>().ToTable("charging_stations");
-        modelBuilder.Entity<ChargingPost>().ToTable("charging_posts");
-        modelBuilder.Entity<ChargingSlot>().ToTable("charging_slots");
-        modelBuilder.Entity<Booking>().ToTable("bookings");
-        modelBuilder.Entity<SocTracking>().ToTable("soc_tracking");
-        modelBuilder.Entity<Invoice>().ToTable("invoices");
-        modelBuilder.Entity<QRCode>().ToTable("qr_codes");
-        modelBuilder.Entity<Notification>().ToTable("notifications");
-        modelBuilder.Entity<SystemLog>().ToTable("system_logs");
+        modelBuilder.Entity<Vehicle>().ToTable("vehicles", tb =>
+        {
+            tb.HasTrigger("trg_vehicles_updated_at");
+        });
+        modelBuilder.Entity<ChargingStation>().ToTable("charging_stations", tb =>
+        {
+            tb.HasTrigger("trg_charging_stations_updated_at");
+        });
+        modelBuilder.Entity<ChargingPost>().ToTable("charging_posts", tb =>
+        {
+            tb.HasTrigger("trg_charging_posts_updated_at");
+        });
+        modelBuilder.Entity<ChargingSlot>().ToTable("charging_slots", tb =>
+        {
+            tb.HasTrigger("trg_charging_slots_updated_at");
+        });
+        modelBuilder.Entity<Booking>().ToTable("bookings", tb =>
+        {
+            tb.HasTrigger("trg_bookings_updated_at");
+        });
+        modelBuilder.Entity<SocTracking>().ToTable("soc_tracking", tb =>
+        {
+            tb.HasTrigger("trg_soc_tracking_updated_at");
+        });
+        modelBuilder.Entity<Invoice>().ToTable("invoices", tb =>
+        {
+            tb.HasTrigger("trg_invoices_updated_at");
+        });
+        modelBuilder.Entity<QRCode>().ToTable("qr_codes", tb =>
+        {
+            tb.HasTrigger("trg_qr_codes_updated_at");
+        });
+        modelBuilder.Entity<Notification>().ToTable("notifications", tb =>
+        {
+            tb.HasTrigger("trg_notifications_updated_at");
+        });
+        modelBuilder.Entity<SystemLog>().ToTable("system_logs", tb =>
+        {
+            tb.HasTrigger("trg_system_logs_updated_at");
+        });
         modelBuilder.Entity<Review>().ToTable("reviews", tb =>
         {
             tb.HasTrigger("trg_reviews_updated_at");
         });
-        modelBuilder.Entity<PricingRule>().ToTable("pricing_rules");
-        modelBuilder.Entity<StationStaff>().ToTable("station_staff");
-        modelBuilder.Entity<ServicePlan>().ToTable("service_plans");
-        modelBuilder.Entity<Incident>().ToTable("incidents");
+        modelBuilder.Entity<PricingRule>().ToTable("pricing_rules", tb =>
+        {
+            tb.HasTrigger("trg_pricing_rules_updated_at");
+        });
+        modelBuilder.Entity<StationStaff>().ToTable("station_staff", tb =>
+        {
+            tb.HasTrigger("trg_station_staff_updated_at");
+        });
+        modelBuilder.Entity<ServicePlan>().ToTable("service_plans", tb =>
+        {
+            tb.HasTrigger("trg_service_plans_updated_at");
+        });
+        modelBuilder.Entity<Incident>().ToTable("incidents", tb =>
+        {
+            tb.HasTrigger("trg_incidents_updated_at");
+        });
 
         // User configuration
         modelBuilder.Entity<User>(entity =>

@@ -82,28 +82,27 @@ public class BookingService : IBookingService
     /// <inheritdoc />
     public async Task<int> CreateBookingAsync(CreateBookingDto dto)
     {
-        // Validate: Chỉ cho phép đặt chỗ trong ngày hôm nay (theo múi giờ Việt Nam UTC+7)
+        // Validate: Cho phép đặt chỗ trong vòng 24 giờ tới (theo múi giờ Việt Nam UTC+7)
         if (dto.ScheduledStartTime.HasValue)
         {
             var vietnamTimeZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
             var nowInVietnam = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, vietnamTimeZone);
-            var todayInVietnam = nowInVietnam.Date;
             
             var scheduledTimeUtc = dto.ScheduledStartTime.Value;
             var scheduledTimeInVietnam = TimeZoneInfo.ConvertTimeFromUtc(scheduledTimeUtc, vietnamTimeZone);
-            var scheduledDate = scheduledTimeInVietnam.Date;
-            
-            // Kiểm tra nếu ngày đặt không phải là hôm nay
-            if (scheduledDate != todayInVietnam)
-            {
-                throw new InvalidOperationException("Chỉ cho phép đặt trạm sạc trong ngày hôm nay. Không thể đặt trước cho ngày khác.");
-            }
             
             // Kiểm tra thời gian đặt phải ít nhất 30 phút tính từ hiện tại
             var minimumTime = nowInVietnam.AddMinutes(30);
             if (scheduledTimeInVietnam < minimumTime)
             {
                 throw new InvalidOperationException($"Thời gian đặt phải ít nhất 30 phút từ bây giờ. Vui lòng chọn sau {minimumTime:HH:mm}.");
+            }
+            
+            // Kiểm tra thời gian đặt không được vượt quá 24 giờ từ hiện tại
+            var maximumTime = nowInVietnam.AddHours(24);
+            if (scheduledTimeInVietnam > maximumTime)
+            {
+                throw new InvalidOperationException($"Chỉ cho phép đặt chỗ trong vòng 24 giờ tới. Vui lòng chọn trước {maximumTime:dd/MM/yyyy HH:mm}.");
             }
         }
         
