@@ -32,6 +32,8 @@ import {
   Snackbar,
   Stack,
   Divider,
+  Tooltip,
+  Collapse,
 } from "@mui/material";
 import {
   Warning,
@@ -45,7 +47,39 @@ import {
   Info,
   Schedule,
   HourglassEmpty,
+  Delete,
+  KeyboardArrowDown,
+  KeyboardArrowUp,
 } from "@mui/icons-material";
+
+const ExpandableDesc = ({ text }) => {
+  const [expanded, setExpanded] = useState(false);
+  const shouldTruncate = text && text.length > 50;
+
+  return (
+    <Box
+      onClick={() => shouldTruncate && setExpanded(!expanded)}
+      sx={{
+        cursor: shouldTruncate ? "pointer" : "default",
+        "&:hover": {
+          backgroundColor: shouldTruncate ? "rgba(0, 0, 0, 0.04)" : "transparent",
+        },
+        borderRadius: 1,
+        p: 0.5,
+        maxWidth: 300,
+      }}
+    >
+      <Typography variant="body2" noWrap={!expanded} sx={{ whiteSpace: expanded ? 'pre-wrap' : 'nowrap' }}>
+        {text}
+      </Typography>
+      {shouldTruncate && (
+        <Typography variant="caption" color="primary" sx={{ display: "block", mt: 0.5 }}>
+          {expanded ? "Thu gọn" : "Xem thêm"}
+        </Typography>
+      )}
+    </Box>
+  );
+};
 
 const Monitoring = () => {
   const location = useLocation();
@@ -63,6 +97,8 @@ const Monitoring = () => {
     description: "",
     attachments: [],
   });
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [issueToDelete, setIssueToDelete] = useState(null);
 
   const incidentTypes = [
     { value: "hardware", label: "Lỗi Phần cứng Thiết bị" },
@@ -272,7 +308,8 @@ const Monitoring = () => {
 
         return {
           id: issue.issueId,
-          connectorId: issue.postName ? `${issue.stationName} · Post ${issue.postName}` : `ST${issue.stationId}`,
+          chargerId: issue.deviceCode || (issue.postName ? `Post ${issue.postName}` : `ST-${issue.stationId}`),
+          connectorId: issue.deviceCode || (issue.postName ? `${issue.stationName} · Post ${issue.postName}` : `ST${issue.stationId}`),
           type: issue.title || "Sự cố",
           priority,
           description: issue.description,
@@ -323,6 +360,7 @@ const Monitoring = () => {
       const issueData = {
         StationId: targetConnector.stationId,
         PostId: targetConnector.postId,
+        DeviceCode: targetConnector.id, // Send the full connector code
         Title: incidentTypes.find((t) => t.value === reportForm.incidentType)?.label || "Sự cố kỹ thuật",
         Description: reportForm.description,
         Priority: reportForm.priority,
@@ -365,6 +403,31 @@ const Monitoring = () => {
         message: error.response?.data?.message || "Lỗi gửi báo cáo", 
         severity: "error" 
       });
+    }
+  };
+
+  const handleDeleteClick = (issue) => {
+    setIssueToDelete(issue);
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!issueToDelete) return;
+
+    try {
+      await staffAPI.deleteIssue(issueToDelete.id);
+      setSnackbar({ open: true, message: "Đã xóa báo cáo sự cố", severity: "success" });
+      loadMonitoringData();
+    } catch (error) {
+      console.error("Failed to delete issue:", error);
+      setSnackbar({ 
+        open: true, 
+        message: error.response?.data?.message || "Không thể xóa báo cáo. Có thể bạn không có quyền.", 
+        severity: "error" 
+      });
+    } finally {
+      setDeleteConfirmOpen(false);
+      setIssueToDelete(null);
     }
   };
 
@@ -555,6 +618,9 @@ const Monitoring = () => {
                         size="small"
                         variant="outlined"
                         color="default"
+                        size="small"
+                        variant="outlined"
+                        color="default"
                       />
                     </TableCell>
                     <TableCell align="right">
@@ -618,9 +684,10 @@ const Monitoring = () => {
                     <TableCell>Mô tả</TableCell>
                     <TableCell align="center">Ưu tiên</TableCell>
                     <TableCell align="center">Trạng thái</TableCell>
-                    <TableCell>Gán cho</TableCell>
+                    <TableCell>Mã điểm sạc</TableCell>
                     <TableCell>Phản hồi Admin</TableCell>
                     <TableCell>Thời gian báo cáo</TableCell>
+                    <TableCell align="center">Hành động</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -630,9 +697,7 @@ const Monitoring = () => {
                       <TableCell>{incident.stationName || incident.connectorId}</TableCell>
                       <TableCell>{incident.type}</TableCell>
                       <TableCell>
-                        <Typography variant="body2" noWrap sx={{ maxWidth: 200 }}>
-                          {incident.description}
-                        </Typography>
+                        <ExpandableDesc text={incident.description} />
                       </TableCell>
                       <TableCell align="center">
                         <Chip
@@ -653,11 +718,9 @@ const Monitoring = () => {
                         />
                       </TableCell>
                       <TableCell>
-                        {incident.assignedTo || (
-                          <Typography variant="body2" color="text.secondary" fontStyle="italic">
-                            Chưa phân công
-                          </Typography>
-                        )}
+                        <Typography variant="body2" fontWeight={600}>
+                          {incident.chargerId}
+                        </Typography>
                       </TableCell>
                       <TableCell>
                         {incident.adminResponse ? (
@@ -682,6 +745,23 @@ const Monitoring = () => {
                         <Typography variant="caption" color="text.secondary">
                           {incident.reportedAt.toLocaleTimeString("vi-VN")}
                         </Typography>
+                      </TableCell>
+                      <TableCell align="center">
+                        {incident.adminResponse ? (
+                          <Tooltip title="Xóa báo cáo">
+                            <IconButton 
+                              color="error" 
+                              size="small"
+                              onClick={() => handleDeleteClick(incident)}
+                            >
+                              <Delete />
+                            </IconButton>
+                          </Tooltip>
+                        ) : (
+                          <Typography variant="caption" color="text.secondary" fontStyle="italic">
+                            Chưa thể xóa
+                          </Typography>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -924,6 +1004,26 @@ const Monitoring = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDetailDialog(false)}>Đóng</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={deleteConfirmOpen}
+        onClose={() => setDeleteConfirmOpen(false)}
+      >
+        <DialogTitle>Xác nhận xóa</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Bạn có chắc chắn muốn xóa báo cáo sự cố #{issueToDelete?.id} không?
+            Hành động này không thể hoàn tác.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteConfirmOpen(false)}>Hủy</Button>
+          <Button onClick={handleDeleteConfirm} color="error" variant="contained">
+            Xóa
+          </Button>
         </DialogActions>
       </Dialog>
 

@@ -32,6 +32,7 @@ public class SkaEVDbContext : DbContext
     public DbSet<ServicePlan> ServicePlans { get; set; }
     public DbSet<Incident> Incidents { get; set; }
     public DbSet<Issue> Issues { get; set; }
+    public DbSet<IssueComment> IssueComments { get; set; }
 
     // DbSets - Views (read-only)
     public DbSet<UserCostReport> UserCostReports { get; set; }
@@ -614,6 +615,28 @@ public class SkaEVDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.AssignedToUserId)
                 .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // IssueComment configuration
+        modelBuilder.Entity<IssueComment>(entity =>
+        {
+            entity.HasKey(e => e.CommentId);
+            entity.ToTable("IssueComments");
+            entity.Property(e => e.CommentId).HasColumnName("CommentId");
+            entity.Property(e => e.IssueId).HasColumnName("IssueId").IsRequired();
+            entity.Property(e => e.UserId).HasColumnName("UserId").IsRequired();
+            entity.Property(e => e.Comment).HasColumnName("Comment").IsRequired();
+            entity.Property(e => e.CreatedAt).HasColumnName("CreatedAt").IsRequired();
+
+            entity.HasOne(e => e.Issue)
+                .WithMany()
+                .HasForeignKey(e => e.IssueId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         // Configure Views (read-only, no keys needed)

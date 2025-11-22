@@ -15,6 +15,7 @@ public interface IIssueService
     Task<IssueDto> UpdateIssueStatusAsync(int issueId, string status, string? resolution);
     Task<IssueCommentDto> AddCommentAsync(int issueId, int userId, string comment);
     Task<IssueAttachmentDto> AddAttachmentAsync(int issueId, int userId, IFormFile file, string? description);
+    Task<bool> HasAdminResponseAsync(int issueId);
     Task DeleteIssueAsync(int issueId);
     Task<IssueStatisticsDto> GetIssueStatisticsAsync(int? stationId);
     Task<IEnumerable<MaintenanceScheduleDto>> GetMaintenanceScheduleAsync(int? stationId, DateTime? startDate, DateTime? endDate);
