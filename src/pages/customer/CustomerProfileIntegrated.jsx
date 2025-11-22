@@ -220,9 +220,11 @@ const CustomerProfile = () => {
     };
 
     const result = await updateProfile(updatePayload);
+    console.log('UpdateProfile result:', result);
 
-    if (result.success && result.data) {
-      const updated = result.data;
+    if (result.success) {
+      // If backend returns updated data, use it; else, keep current profileData
+      const updated = result.data || {};
       const normalized = {
         name: updated.fullName || profileData.name,
         email: updated.email || profileData.email,
@@ -230,9 +232,9 @@ const CustomerProfile = () => {
         address:
           updated.address ||
           updated.profile?.address ||
+          profileData.address ||
           "Chưa cập nhật địa chỉ",
       };
-
       setProfileData(normalized);
       setOriginalProfileData(normalized);
       setEditMode(false);
@@ -261,8 +263,6 @@ const CustomerProfile = () => {
         >
           <Tab icon={<Person />} label="Thông tin cá nhân" />
           <Tab icon={<ElectricCar />} label="Quản lý xe" />
-          <Tab icon={<History />} label="Lịch sử sạc" />
-          <Tab icon={<Analytics />} label="Thống kê & Báo cáo" />
         </Tabs>
       </Card>
 
@@ -790,12 +790,18 @@ const CustomerProfile = () => {
                       >
                         <Typography variant="body2">Phiên sạc</Typography>
                         <Typography variant="body2" fontWeight="bold">
-                          {userStatistics?.completedSessions || bookingStats.completed || 0} phiên
+                          {userStatistics?.completedSessions ||
+                            bookingStats.completed ||
+                            0}{" "}
+                          phiên
                         </Typography>
                       </Box>
-                      <LinearProgress 
-                        variant="determinate" 
-                        value={Math.min(100, (userStatistics?.completedSessions || 0) * 5)} 
+                      <LinearProgress
+                        variant="determinate"
+                        value={Math.min(
+                          100,
+                          (userStatistics?.completedSessions || 0) * 5
+                        )}
                       />
                     </Box>
 
@@ -807,14 +813,22 @@ const CustomerProfile = () => {
                           mb: 1,
                         }}
                       >
-                      <Typography variant="body2">Năng lượng sạc</Typography>
-                      <Typography variant="body2" fontWeight="bold">
-                        {parseFloat(userStatistics?.totalEnergyConsumedKwh || bookingStats.totalEnergyCharged || 0).toFixed(1)} kWh
-                      </Typography>
+                        <Typography variant="body2">Năng lượng sạc</Typography>
+                        <Typography variant="body2" fontWeight="bold">
+                          {parseFloat(
+                            userStatistics?.totalEnergyConsumedKwh ||
+                              bookingStats.totalEnergyCharged ||
+                              0
+                          ).toFixed(1)}{" "}
+                          kWh
+                        </Typography>
                       </Box>
                       <LinearProgress
                         variant="determinate"
-                        value={Math.min(100, (userStatistics?.totalEnergyConsumedKwh || 0) / 10)}
+                        value={Math.min(
+                          100,
+                          (userStatistics?.totalEnergyConsumedKwh || 0) / 10
+                        )}
                         color="success"
                       />
                     </Box>
@@ -829,12 +843,19 @@ const CustomerProfile = () => {
                       >
                         <Typography variant="body2">Chi phí</Typography>
                         <Typography variant="body2" fontWeight="bold">
-                          {formatCurrency(userStatistics?.totalSpent || bookingStats.totalAmount || 0)}
+                          {formatCurrency(
+                            userStatistics?.totalSpent ||
+                              bookingStats.totalAmount ||
+                              0
+                          )}
                         </Typography>
                       </Box>
                       <LinearProgress
                         variant="determinate"
-                        value={Math.min(100, (userStatistics?.totalSpent || 0) / 50000)}
+                        value={Math.min(
+                          100,
+                          (userStatistics?.totalSpent || 0) / 50000
+                        )}
                         color="warning"
                       />
                     </Box>
@@ -843,124 +864,158 @@ const CustomerProfile = () => {
               </Card>
             </Grid>
 
-          {/* Efficiency Metrics */}
-          <Grid item xs={12} md={6}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Chỉ số hiệu quả
-                </Typography>
-                <Divider sx={{ mb: 2 }} />
+            {/* Efficiency Metrics */}
+            <Grid item xs={12} md={6}>
+              <Card>
+                <CardContent>
+                  <Typography variant="h6" gutterBottom>
+                    Chỉ số hiệu quả
+                  </Typography>
+                  <Divider sx={{ mb: 2 }} />
 
-                <Grid container spacing={2}>
-                  <Grid item xs={6}>
-                    <Paper sx={{ p: 2, textAlign: "center" }}>
-                      <TrendingUp
-                        color="success"
-                        sx={{ fontSize: 32, mb: 1 }}
-                      />
-                      <Typography variant="h6" fontWeight="bold">
-                        {userStatistics?.totalEnergyConsumedKwh && userStatistics?.totalSpent 
-                          ? Math.round(userStatistics.totalSpent / userStatistics.totalEnergyConsumedKwh).toLocaleString()
-                          : '6,857'
-                        }
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        VNĐ/kWh trung bình
-                      </Typography>
-                    </Paper>
-                  </Grid>
-                  <Grid item xs={6}>
-                    <Paper sx={{ p: 2, textAlign: "center" }}>
-                      <Speed color="info" sx={{ fontSize: 32, mb: 1 }} />
-                      <Typography variant="h6" fontWeight="bold">
-                        {userStatistics?.completedSessions > 0
-                          ? (userStatistics.totalEnergyConsumedKwh / userStatistics.completedSessions).toFixed(1)
-                          : (parseFloat(bookingStats.totalEnergyCharged) > 0 && parseFloat(bookingStats.completed) > 0
-                            ? (parseFloat(bookingStats.totalEnergyCharged) / parseFloat(bookingStats.completed)).toFixed(1)
-                            : '20.4')
-                        }
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        kWh/phiên trung bình
-                      </Typography>
-                    </Paper>
-                  </Grid>
-                  <Grid item xs={12}>
-                    <Alert severity="info" sx={{ mt: 2 }}>
-                      <Typography variant="body2">
-                        💡 <strong>Mẹo tiết kiệm:</strong> Sạc vào khung giờ
-                        thấp điểm (22:00-06:00) để được giá ưu đãi!
-                      </Typography>
-                    </Alert>
-                  </Grid>
-                </Grid>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          {/* Cost Analysis */}
-          <Grid item xs={12}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Phân tích chi phí theo tháng
-                </Typography>
-                <Divider sx={{ mb: 2 }} />
-
-                <Alert severity="success" sx={{ mb: 2 }}>
-                  Bạn đã tiết kiệm được <strong>15%</strong> so với tháng trước
-                  nhờ sử dụng hiệu quả các trạm sạc!
-                </Alert>
-
-                <Grid container spacing={2}>
-                  {[
-                    {
-                      month: "Tháng 7",
-                      amount: userStatistics ? Math.round(userStatistics.totalSpent * 0.85) : 1850000,
-                      energy: userStatistics ? Math.round(userStatistics.totalEnergyConsumedKwh * 0.85) : 280,
-                      sessions: userStatistics ? Math.max(1, userStatistics.completedSessions - 2) : 14,
-                    },
-                    {
-                      month: "Tháng 8",
-                      amount: userStatistics ? Math.round(userStatistics.totalSpent * 0.92) : 1750000,
-                      energy: userStatistics ? Math.round(userStatistics.totalEnergyConsumedKwh * 0.92) : 265,
-                      sessions: userStatistics ? Math.max(1, userStatistics.completedSessions - 1) : 13,
-                    },
-                    {
-                      month: "Tháng 9",
-                      amount: userStatistics?.totalSpent || parseFloat(bookingStats.totalAmount) || 0,
-                      energy: userStatistics?.totalEnergyConsumedKwh || parseFloat(bookingStats.totalEnergyCharged) || 0,
-                      sessions: userStatistics?.completedSessions || parseInt(bookingStats.completed) || 0,
-                    },
-                  ].map((data, index) => (
-                    <Grid item xs={12} sm={4} key={index}>
-                      <Paper sx={{ p: 2 }}>
-                        <Typography
-                          variant="subtitle2"
-                          fontWeight="bold"
-                          gutterBottom
-                        >
-                          {data.month}
+                  <Grid container spacing={2}>
+                    <Grid item xs={6}>
+                      <Paper sx={{ p: 2, textAlign: "center" }}>
+                        <TrendingUp
+                          color="success"
+                          sx={{ fontSize: 32, mb: 1 }}
+                        />
+                        <Typography variant="h6" fontWeight="bold">
+                          {userStatistics?.totalEnergyConsumedKwh &&
+                          userStatistics?.totalSpent
+                            ? Math.round(
+                                userStatistics.totalSpent /
+                                  userStatistics.totalEnergyConsumedKwh
+                              ).toLocaleString()
+                            : "6,857"}
                         </Typography>
-                        <Typography variant="body2">
-                          Chi phí:{" "}
-                          <strong>{formatCurrency(data.amount)}</strong>
-                        </Typography>
-                        <Typography variant="body2">
-                          Năng lượng: <strong>{data.energy} kWh</strong>
-                        </Typography>
-                        <Typography variant="body2">
-                          Phiên sạc: <strong>{data.sessions} lần</strong>
+                        <Typography variant="caption" color="text.secondary">
+                          VNĐ/kWh trung bình
                         </Typography>
                       </Paper>
                     </Grid>
-                  ))}
-                </Grid>
-              </CardContent>
-            </Card>
+                    <Grid item xs={6}>
+                      <Paper sx={{ p: 2, textAlign: "center" }}>
+                        <Speed color="info" sx={{ fontSize: 32, mb: 1 }} />
+                        <Typography variant="h6" fontWeight="bold">
+                          {userStatistics?.completedSessions > 0
+                            ? (
+                                userStatistics.totalEnergyConsumedKwh /
+                                userStatistics.completedSessions
+                              ).toFixed(1)
+                            : parseFloat(bookingStats.totalEnergyCharged) > 0 &&
+                              parseFloat(bookingStats.completed) > 0
+                            ? (
+                                parseFloat(bookingStats.totalEnergyCharged) /
+                                parseFloat(bookingStats.completed)
+                              ).toFixed(1)
+                            : "20.4"}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          kWh/phiên trung bình
+                        </Typography>
+                      </Paper>
+                    </Grid>
+                    <Grid item xs={12}>
+                      <Alert severity="info" sx={{ mt: 2 }}>
+                        <Typography variant="body2">
+                          💡 <strong>Mẹo tiết kiệm:</strong> Sạc vào khung giờ
+                          thấp điểm (22:00-06:00) để được giá ưu đãi!
+                        </Typography>
+                      </Alert>
+                    </Grid>
+                  </Grid>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            {/* Cost Analysis */}
+            <Grid item xs={12}>
+              <Card>
+                <CardContent>
+                  <Typography variant="h6" gutterBottom>
+                    Phân tích chi phí theo tháng
+                  </Typography>
+                  <Divider sx={{ mb: 2 }} />
+
+                  <Alert severity="success" sx={{ mb: 2 }}>
+                    Bạn đã tiết kiệm được <strong>15%</strong> so với tháng
+                    trước nhờ sử dụng hiệu quả các trạm sạc!
+                  </Alert>
+
+                  <Grid container spacing={2}>
+                    {[
+                      {
+                        month: "Tháng 7",
+                        amount: userStatistics
+                          ? Math.round(userStatistics.totalSpent * 0.85)
+                          : 1850000,
+                        energy: userStatistics
+                          ? Math.round(
+                              userStatistics.totalEnergyConsumedKwh * 0.85
+                            )
+                          : 280,
+                        sessions: userStatistics
+                          ? Math.max(1, userStatistics.completedSessions - 2)
+                          : 14,
+                      },
+                      {
+                        month: "Tháng 8",
+                        amount: userStatistics
+                          ? Math.round(userStatistics.totalSpent * 0.92)
+                          : 1750000,
+                        energy: userStatistics
+                          ? Math.round(
+                              userStatistics.totalEnergyConsumedKwh * 0.92
+                            )
+                          : 265,
+                        sessions: userStatistics
+                          ? Math.max(1, userStatistics.completedSessions - 1)
+                          : 13,
+                      },
+                      {
+                        month: "Tháng 9",
+                        amount:
+                          userStatistics?.totalSpent ||
+                          parseFloat(bookingStats.totalAmount) ||
+                          0,
+                        energy:
+                          userStatistics?.totalEnergyConsumedKwh ||
+                          parseFloat(bookingStats.totalEnergyCharged) ||
+                          0,
+                        sessions:
+                          userStatistics?.completedSessions ||
+                          parseInt(bookingStats.completed) ||
+                          0,
+                      },
+                    ].map((data, index) => (
+                      <Grid item xs={12} sm={4} key={index}>
+                        <Paper sx={{ p: 2 }}>
+                          <Typography
+                            variant="subtitle2"
+                            fontWeight="bold"
+                            gutterBottom
+                          >
+                            {data.month}
+                          </Typography>
+                          <Typography variant="body2">
+                            Chi phí:{" "}
+                            <strong>{formatCurrency(data.amount)}</strong>
+                          </Typography>
+                          <Typography variant="body2">
+                            Năng lượng: <strong>{data.energy} kWh</strong>
+                          </Typography>
+                          <Typography variant="body2">
+                            Phiên sạc: <strong>{data.sessions} lần</strong>
+                          </Typography>
+                        </Paper>
+                      </Grid>
+                    ))}
+                  </Grid>
+                </CardContent>
+              </Card>
+            </Grid>
           </Grid>
-        </Grid>
         )}
       </TabPanel>
     </Container>

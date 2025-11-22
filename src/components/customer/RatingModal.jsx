@@ -489,8 +489,7 @@ const RatingModal = ({
           </Box>
 
           <Typography variant="body2" color="text.secondary">
-            Đánh giá sẽ được xem xét và hiển thị trong 24h tới. Điểm thưởng sẽ
-            được cộng khi chương trình khuyến khích được kích hoạt trở lại.
+            Đánh giá sẽ được xem xét và hiển thị trong 24h tới.
           </Typography>
         </DialogContent>
       </Dialog>

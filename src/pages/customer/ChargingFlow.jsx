@@ -1769,8 +1769,6 @@ const ChargingFlow = () => {
                                     flexWrap: "wrap",
                                   }}
                                 >
-
-
                                   <Typography
                                     variant="body2"
                                     color="text.secondary"

@@ -955,54 +955,42 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
         <DialogTitle>Điều khoản sử dụng dịch vụ sạc xe điện</DialogTitle>
         <DialogContent dividers>
           <Typography variant="h6" gutterBottom>
-            1. Điều khoản chung
+            1. Đăng ký & Đặt lịch
           </Typography>
           <Typography variant="body2" paragraph>
-            Bằng việc sử dụng dịch vụ sạc xe điện của SkaEV, bạn đồng ý tuân thủ
-            các điều khoản và điều kiện được nêu trong tài liệu này.
+            • Người dùng phải đăng ký tài khoản SkaEV và đặt lịch sạc trước khi
+            đến trạm.
+            <br />• Có thể hủy hoặc thay đổi lịch theo quy định.
           </Typography>
-
           <Typography variant="h6" gutterBottom>
-            2. Quy định sử dụng
+            2. Quy định sử dụng trạm
           </Typography>
           <Typography variant="body2" paragraph>
-            • Người dùng phải đặt lịch trước khi đến trạm sạc.
-            <br />
-            • Chỉ sạc trong khung giờ đã đặt, tối đa 2 giờ mỗi lần.
-            <br />
-            • Không để xe quá thời gian quy định (phạt 50.000đ/30 phút).
-            <br />• Giữ gìn vệ sinh và trang thiết bị tại trạm sạc.
+            • Chỉ sử dụng trạm cho xe điện phù hợp.
+            <br />• Không chiếm dụng trạm quá thời gian đã đặt, vi phạm sẽ bị
+            phạt hoặc khóa tài khoản.
+            <br />• Giữ gìn vệ sinh, không phá hoại tài sản trạm.
           </Typography>
-
           <Typography variant="h6" gutterBottom>
             3. Trách nhiệm người dùng
           </Typography>
           <Typography variant="body2" paragraph>
-            • Đảm bảo xe điện tương thích với loại cổng sạc đã chọn.
-            <br />
-            • Kiểm tra kết nối trước khi rời khỏi trạm.
-            <br />
-            • Báo cáo ngay nếu có sự cố với thiết bị sạc.
-            <br />• Chịu trách nhiệm về thiệt hại do sử dụng sai quy định.
+            • Tự bảo quản tài sản cá nhân, xe và pin trong quá trình sạc.
+            <br />• Báo cáo sự cố cho SkaEV qua ứng dụng hoặc hotline.
           </Typography>
-
           <Typography variant="h6" gutterBottom>
-            4. Chính sách hủy lịch
+            4. Chính sách hủy & hoàn tiền
           </Typography>
           <Typography variant="body2" paragraph>
-            • Có thể hủy miễn phí trước 30 phút.
-            <br />
-            • Hủy trong vòng 30 phút: phạt 20.000đ.
-            <br />• Không đến và không hủy: phạt 50.000đ và có thể bị tạm khóa
-            tài khoản.
+            • Hủy trước 30 phút miễn phí, hủy sát giờ hoặc không đến sẽ bị phạt.
+            <br />• Hoàn tiền nếu thiết bị lỗi hoặc sự cố từ phía SkaEV.
           </Typography>
-
           <Typography variant="h6" gutterBottom>
-            5. Giới hạn trách nhiệm
+            5. Bảo mật & quyền riêng tư
           </Typography>
           <Typography variant="body2" paragraph>
-            SkaEV không chịu trách nhiệm về thiệt hại đối với xe hoặc pin do sử
-            dụng dịch vụ, trừ trường hợp lỗi từ thiết bị của chúng tôi.
+            • SkaEV cam kết bảo mật thông tin cá nhân, không chia sẻ cho bên thứ
+            ba ngoài mục đích vận hành dịch vụ.
           </Typography>
         </DialogContent>
         <DialogActions>
@@ -1025,60 +1013,25 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
             1. Phương thức thanh toán
           </Typography>
           <Typography variant="body2" paragraph>
-            • Thanh toán qua ví điện tử
-            <br />
-            • Thẻ tín dụng/ghi nợ (Visa, Mastercard)
-            <br />
-            • Chuyển khoản ngân hàng
-            <br />• Thanh toán bằng mã QR tại trạm
+            • Chỉ hỗ trợ thanh toán qua ví điện tử SkaEV.
+            <br />• Số dư ví phải đủ trước khi bắt đầu phiên sạc.
+            <br />• Thanh toán tự động sau khi hoàn tất phiên sạc.
           </Typography>
-
           <Typography variant="h6" gutterBottom>
-            2. Giá cước sạc
+            2. Giá dịch vụ
           </Typography>
           <Typography variant="body2" paragraph>
-            • Sạc chậm AC: 3.000đ - 4.000đ/kWh
-            <br />
-            • Sạc nhanh DC: 5.000đ - 7.000đ/kWh
-            <br />
-            • Giá có thể thay đổi theo khung giờ (giờ cao điểm/thấp điểm)
-            <br />• Áp dụng VAT 10% theo quy định
+            • Giá sạc niêm yết theo loại trạm (AC/DC), có thể thay đổi theo
+            khung giờ.
+            <br />• Xem chi tiết giá trong ứng dụng trước khi đặt lịch.
           </Typography>
-
           <Typography variant="h6" gutterBottom>
-            3. Thanh toán và hóa đơn
+            3. Hoàn tiền & khiếu nại
           </Typography>
           <Typography variant="body2" paragraph>
-            • Thanh toán sau khi hoàn tất phiên sạc.
-            <br />
-            • Hóa đơn điện tử được gửi qua email sau 24 giờ.
-            <br />
-            • Có thể xem lịch sử giao dịch trong ứng dụng.
-            <br />• Yêu cầu hóa đơn VAT cần đăng ký trước khi sạc.
-          </Typography>
-
-          <Typography variant="h6" gutterBottom>
-            4. Chính sách hoàn tiền
-          </Typography>
-          <Typography variant="body2" paragraph>
-            • Hoàn tiền 100% nếu thiết bị sạc lỗi.
-            <br />
-            • Hoàn 50% nếu hủy do lý do hợp lệ (xác nhận từ hệ thống).
-            <br />
-            • Thời gian hoàn tiền: 3-7 ngày làm việc.
-            <br />• Không hoàn tiền nếu người dùng hủy không đúng quy định.
-          </Typography>
-
-          <Typography variant="h6" gutterBottom>
-            5. Chương trình khuyến mãi
-          </Typography>
-          <Typography variant="body2" paragraph>
-            • Giảm 10% cho lần sạc đầu tiên.
-            <br />
-            • Tích điểm thưởng: 1 điểm = 1.000đ chi tiêu.
-            <br />
-            • Ưu đãi thành viên VIP: giảm giá đến 20%.
-            <br />• Khuyến mãi đặc biệt vào các ngày lễ.
+            • Hoàn tiền 100% nếu lỗi do thiết bị/trạm.
+            <br />• Hoàn tiền một phần nếu hủy đúng quy định.
+            <br />• Khiếu nại xử lý trong 3-7 ngày làm việc.
           </Typography>
         </DialogContent>
         <DialogActions>

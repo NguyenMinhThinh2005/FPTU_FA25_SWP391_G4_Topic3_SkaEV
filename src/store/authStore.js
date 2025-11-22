@@ -230,27 +230,35 @@ const useAuthStore = create(
             profileData
           );
 
-          if (response.data?.success && response.data?.data) {
-            // Update local state with response data
+          // Accept both PascalCase and camelCase, fallback to always treat 200 as success if neither present
+
+          const isSuccess = response.data?.success === true || response.data?.Success === true;
+          // If neither field exists, but status is 200, treat as success (for legacy BE)
+          const fallbackSuccess = typeof response.data?.success === 'undefined' && typeof response.data?.Success === 'undefined';
+
+          // Always use {} if data is undefined/null to prevent TypeError
+          const userData = response.data?.data || response.data?.Data || {};
+
+          if (isSuccess || fallbackSuccess) {
             set({
               user: {
                 ...currentUser,
-                ...response.data.data,
+                ...userData,
               },
             });
-            return { success: true, data: response.data.data };
+            return { success: true, data: userData };
           }
 
           return {
             success: false,
-            error: response.data?.message || "Update failed",
+            error: response.data?.message || response.data?.Message || "Update failed",
           };
         } catch (error) {
           console.error("❌ Update profile error:", error);
           return {
             success: false,
             error:
-              error.response?.data?.message || error.message || "Network error",
+              error.response?.data?.message || error.response?.data?.Message || error.message || "Network error",
           };
         }
       },
