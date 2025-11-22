@@ -73,14 +73,14 @@ const PaymentPage = () => {
       const response = await walletAPI.getTransactions();
       const data = response?.data || response || [];
 
-      // Transform to transaction format
+      // Transform to transaction format (use backend amount directly)
       const formattedTransactions = Array.isArray(data)
         ? data.map((t) => ({
             id: t.id,
             date: t.createdAt,
             type: t.type.toLowerCase(), // 'topup' or 'payment'
             description: t.description,
-            amount: t.type === "Payment" ? -t.amount : t.amount,
+            amount: t.amount, // Use backend value directly
             status: t.status,
           }))
         : [];

@@ -98,8 +98,109 @@ public class WalletController : BaseApiController
         {
             success = true,
             newBalance = user.WalletBalance,
-            message = $"Nạp thành công {request.Amount:N0} đ"
+            transactionId = transaction.Id
         });
+    }
+
+    [HttpPost("pay-invoice")]
+    public async Task<IActionResult> PayInvoice([FromBody] PayInvoiceRequest request)
+    {
+        var userId = CurrentUserId;
+        var user = await _context.Users.FindAsync(userId);
+
+        if (user == null)
+            return NotFoundResponse("User not found");
+
+        // Find invoice by BookingId or InvoiceId
+        Invoice? invoice = null;
+        if (request.InvoiceId.HasValue)
+        {
+            invoice = await _context.Invoices
+                .Include(i => i.Booking)
+                .FirstOrDefaultAsync(i => i.InvoiceId == request.InvoiceId && i.UserId == userId);
+        }
+        else if (request.BookingId.HasValue)
+        {
+            invoice = await _context.Invoices
+                .Include(i => i.Booking)
+                .FirstOrDefaultAsync(i => i.BookingId == request.BookingId && i.UserId == userId);
+        }
+
+        if (invoice == null)
+            return NotFoundResponse("Invoice not found");
+
+        if (invoice.PaymentStatus == "paid")
+            return BadRequestResponse("Invoice is already paid");
+
+        if (user.WalletBalance < invoice.TotalAmount)
+            return BadRequestResponse("Số dư không đủ để thanh toán");
+
+        var strategy = _context.Database.CreateExecutionStrategy();
+
+        return await strategy.ExecuteAsync(async () =>
+        {
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                // 1. Deduct balance
+                user.WalletBalance -= invoice.TotalAmount;
+
+                // 2. Create Wallet Transaction
+                var walletTransaction = new WalletTransaction
+                {
+                    UserId = userId,
+                    Amount = -invoice.TotalAmount, // Negative for payment
+                    Type = "Payment",
+                    Description = $"Thanh toán hóa đơn #{invoice.InvoiceId} cho Booking #{invoice.BookingId}",
+                    Status = "completed",
+                    CreatedAt = DateTime.UtcNow
+                };
+                _context.WalletTransactions.Add(walletTransaction);
+
+                // 3. Update Invoice
+                invoice.PaymentStatus = "paid";
+                invoice.PaymentMethod = "Wallet";
+                invoice.PaidAt = DateTime.UtcNow;
+                
+                // Update Booking status if needed (usually it's already 'completed' when invoice is generated, but maybe 'paid'?
+                // invoice.Booking.Status = "completed"; // Assuming it's already completed
+
+                // 4. Create Payment Record
+                var payment = new Payment
+                {
+                    InvoiceId = invoice.InvoiceId,
+                    Amount = invoice.TotalAmount,
+                    PaymentType = "Wallet",
+                    Status = "Completed",
+                    CreatedAt = DateTime.UtcNow,
+                    TransactionId = Guid.NewGuid().ToString()
+                };
+                _context.Payments.Add(payment);
+
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                return OkResponse(new
+                {
+                    success = true,
+                    newBalance = user.WalletBalance,
+                    invoiceId = invoice.InvoiceId,
+                    message = "Thanh toán thành công"
+                });
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                _logger.LogError(ex, "Error processing wallet payment");
+                return StatusCode(500, new { success = false, message = "Lỗi xử lý thanh toán" });
+            }
+        });
+    }
+
+    public class PayInvoiceRequest
+    {
+        public int? BookingId { get; set; }
+        public int? InvoiceId { get; set; }
     }
 }
 
