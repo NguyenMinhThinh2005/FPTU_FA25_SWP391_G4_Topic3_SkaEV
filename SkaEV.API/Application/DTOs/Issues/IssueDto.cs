@@ -7,6 +7,7 @@ public class IssueDto
     public string StationName { get; set; } = string.Empty;
     public int? PostId { get; set; }
     public string? PostName { get; set; }
+    public string? DeviceCode { get; set; }
     public string Title { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
     public string? Category { get; set; }
@@ -37,6 +38,7 @@ public class CreateIssueDto
 {
     public int StationId { get; set; }
     public int? PostId { get; set; }
+    public string? DeviceCode { get; set; }
     public string Title { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
     public string Priority { get; set; } = "medium";
