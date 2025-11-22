@@ -12,6 +12,7 @@ namespace SkaEV.API.Controllers;
 /// Cung cấp các API để xem doanh thu, mức độ sử dụng, hiệu suất trạm sạc, và các thống kê khác.
 /// </summary>
 [Authorize(Roles = Roles.Admin + "," + Roles.Staff)]
+[Route("api/admin/[controller]")]
 public class AdminReportsController : BaseApiController
 {
     // Service xử lý logic báo cáo

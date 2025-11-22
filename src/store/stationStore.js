@@ -87,8 +87,27 @@ const transformStationData = (apiStation, slotsData = null) => {
       availablePoles = poles.filter((pole) => pole.availablePorts > 0).length;
     }
 
-    const statusNormalized = (apiStation.status || "").toLowerCase();
-    if (statusNormalized !== "active") {
+    // Normalize status: lowercase and handle empty/null values
+    // Backend may return: "active", "inactive", "maintenance", "offline", or empty string
+    const rawStatus = apiStation.status || "";
+    let normalizedStatus = rawStatus.trim().toLowerCase();
+    
+    // Only fallback to "active" if status is truly missing (null/undefined/empty after trim)
+    // If backend sends empty string, we should preserve it or use a sensible default
+    // But for now, let's check if it's a valid status value
+    const validStatuses = ["active", "inactive", "maintenance", "offline", "online"];
+    if (!normalizedStatus || !validStatuses.includes(normalizedStatus)) {
+      // If status is missing or invalid, check if station has any available ports
+      // If it has ports, assume it's active; otherwise, assume inactive
+      const inferredStatus = (totalPorts > 0 && availablePorts > 0) ? "active" : "inactive";
+      if (rawStatus !== normalizedStatus || !normalizedStatus) {
+        console.warn(`⚠️ Station ${apiStation.stationId || apiStation.stationName} has invalid/missing status: "${rawStatus}". Inferred: "${inferredStatus}"`);
+      }
+      normalizedStatus = inferredStatus;
+    }
+    
+    // Only set available ports to 0 if status is explicitly not active
+    if (normalizedStatus !== "active" && normalizedStatus !== "online") {
       availablePorts = 0;
       availablePoles = 0;
     }
@@ -209,7 +228,7 @@ const transformStationData = (apiStation, slotsData = null) => {
       id: apiStation.stationId,
       stationId: apiStation.stationId,
       name: apiStation.stationName || apiStation.name,
-      status: apiStation.status || "active",
+      status: normalizedStatus, // Use normalized status instead of raw with fallback
       location: {
         address: apiStation.address,
         city: apiStation.city,
@@ -392,9 +411,33 @@ const useStationStore = create((set, get) => ({
     try {
       console.log("📡 Fetching admin stations from API...");
       const response = await adminStationAPI.getStations(filters);
+      console.log("📦 Raw API response:", response);
 
-      if (response?.success && Array.isArray(response.data)) {
-        const stations = response.data.map((station) =>
+      // Backend returns: { success: true, data: { data: [...], pagination: {...} } }
+      // Or sometimes: { data: [...], pagination: {...} } directly
+      let stationsData = [];
+      let paginationData = null;
+
+      if (response?.success && response.data) {
+        // If response.data is an object with nested data and pagination
+        if (response.data.data && Array.isArray(response.data.data)) {
+          stationsData = response.data.data;
+          paginationData = response.data.pagination;
+        }
+        // If response.data is directly an array (legacy format)
+        else if (Array.isArray(response.data)) {
+          stationsData = response.data;
+          paginationData = response.pagination;
+        }
+      }
+      // Handle case where response is directly { data: [...], pagination: {...} }
+      else if (response?.data && Array.isArray(response.data)) {
+        stationsData = response.data;
+        paginationData = response.pagination;
+      }
+
+      if (stationsData.length > 0 || paginationData?.totalCount === 0) {
+        const stations = stationsData.map((station) =>
           transformStationData(station, null)
         );
 
@@ -403,7 +446,14 @@ const useStationStore = create((set, get) => ({
           console.log("🔍 Admin station sample:", stations[0]);
         }
         set({ stations, loading: false });
-        return { success: true, data: stations, pagination: response.pagination };
+        return { success: true, data: stations, pagination: paginationData };
+      }
+
+      // If no data but response is successful, return empty array
+      if (response?.success) {
+        console.log("ℹ️ No stations found (empty result)");
+        set({ stations: [], loading: false });
+        return { success: true, data: [], pagination: paginationData || { totalCount: 0 } };
       }
 
       console.error("❌ Admin stations response invalid:", response);
@@ -411,6 +461,7 @@ const useStationStore = create((set, get) => ({
     } catch (error) {
       const errorMessage = error.message || "Đã xảy ra lỗi khi tải trạm quản trị";
       console.error("❌ Fetch admin stations error:", errorMessage);
+      console.error("❌ Full error:", error);
       set({ error: errorMessage, loading: false, stations: [] });
       return { success: false, error: errorMessage };
     }

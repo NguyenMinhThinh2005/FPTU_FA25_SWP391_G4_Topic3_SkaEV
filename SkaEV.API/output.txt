@@ -1,9 +1,0 @@
-COLUMN_NAME                                                                                                                      TABLE_NAME                                                                                                                      
--------------------------------------------------------------------------------------------------------------------------------- --------------------------------------------------------------------------------------------------------------------------------
-post_id                                                                                                                          charging_posts                                                                                                                  
-station_id                                                                                                                       charging_posts                                                                                                                  
-post_number                                                                                                                      charging_posts                                                                                                                  
-post_type                                                                                                                        charging_posts                                                                                                                  
-power_output                                                                                                                     charging_posts                                                                                                                  
-
-(5 rows affected)
