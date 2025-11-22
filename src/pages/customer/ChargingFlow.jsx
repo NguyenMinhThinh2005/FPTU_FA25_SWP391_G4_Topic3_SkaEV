@@ -737,7 +737,11 @@ const ChargingFlow = () => {
     }
 
     const isActive = (station.status || "").toLowerCase() === "active";
-    const hasAvailableSlots = station.stats?.available > 0;
+    // Check multiple sources for available slots: stats.available, availableSlots, charging.availablePorts
+    const availableFromStats = station.stats?.available ?? 0;
+    const availableFromBackend = station.availableSlots ?? 0;
+    const availableFromCharging = station.charging?.availablePorts ?? 0;
+    const hasAvailableSlots = Math.max(availableFromStats, availableFromBackend, availableFromCharging) > 0;
     const isAvailable = isActive && hasAvailableSlots;
 
     if (!isAvailable) {

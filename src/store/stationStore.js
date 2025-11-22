@@ -6,6 +6,19 @@ import { calculateDistance } from "../utils/helpers";
 // Transform API response to frontend format
 const transformStationData = (apiStation, slotsData = null) => {
   try {
+    // Debug: Log raw backend data for first few stations
+    if (apiStation.stationId && (apiStation.stationId <= 5 || apiStation.stationId % 10 === 0)) {
+      console.log(`🔍 Transforming station ${apiStation.stationId}:`, {
+        status: apiStation.status,
+        availableSlots: apiStation.availableSlots,
+        totalSlots: apiStation.totalSlots,
+        availablePorts: apiStation.availablePorts,
+        totalPorts: apiStation.totalPorts,
+        totalPowerCapacityKw: apiStation.totalPowerCapacityKw,
+        maxPowerKw: apiStation.maxPowerKw,
+        capacityKw: apiStation.capacityKw
+      });
+    }
     // API may still provide legacy totals named 'totalPosts' / 'availablePosts'.
     // Map them to frontend-friendly pole/port names and keep backwards fallback.
   let totalPoles = apiStation.totalPoles ?? apiStation.totalPosts ?? 0;
@@ -106,24 +119,58 @@ const transformStationData = (apiStation, slotsData = null) => {
       normalizedStatus = inferredStatus;
     }
     
-    // Only set available ports to 0 if status is explicitly not active
-    if (normalizedStatus !== "active" && normalizedStatus !== "online") {
+    // Respect backend's availableSlots if provided (backend is source of truth)
+    const backendAvailableSlots = apiStation.availableSlots ?? null;
+    const backendTotalSlots = apiStation.totalSlots ?? null;
+
+    // ALWAYS prioritize backend's availableSlots if provided (regardless of status)
+    // Backend is the source of truth for slot availability
+    if (backendAvailableSlots !== null && backendAvailableSlots !== undefined) {
+      availablePorts = Math.max(0, backendAvailableSlots);
+      // Recalculate available poles based on updated ports
+      if (poles.length > 0) {
+        availablePoles = poles.filter((pole) => pole.availablePorts > 0).length;
+      }
+    } else if (normalizedStatus !== "active" && normalizedStatus !== "online") {
+      // Only set to 0 if status is not active AND backend doesn't provide availableSlots
       availablePorts = 0;
       availablePoles = 0;
+    }
+
+    // Use backend totalSlots if provided, otherwise use calculated totalPorts
+    if (backendTotalSlots !== null && backendTotalSlots !== undefined) {
+      totalPorts = Math.max(totalPorts, backendTotalSlots);
     }
 
     availablePorts = Math.max(0, Math.min(availablePorts, totalPorts));
 
     const totalPolesCount = poles.length > 0 ? poles.length : totalPoles;
 
+    // Calculate maxPower: prioritize backend values, then poles, then fallback
     const maxPowerFromPoles =
       poles.length > 0 ? Math.max(...poles.map((p) => p.power), 0) : 0;
-    const maxPower =
-      maxPowerFromPoles ||
-      apiStation.maxPowerKw ||
+
+    // Backend fields (in order of preference)
+    const backendMaxPower =
       apiStation.totalPowerCapacityKw ||
+      apiStation.maxPowerKw ||
       apiStation.capacityKw ||
-      0;
+      null;
+
+    const maxPower = backendMaxPower !== null && backendMaxPower > 0
+      ? backendMaxPower
+      : (maxPowerFromPoles > 0 ? maxPowerFromPoles : 0);
+
+    // Debug logging for stations with 0 maxPower
+    if (maxPower === 0 && apiStation.stationId) {
+      console.warn(`⚠️ Station ${apiStation.stationId} (${apiStation.stationName || 'Unknown'}) has 0kW maxPower. Backend fields:`, {
+        totalPowerCapacityKw: apiStation.totalPowerCapacityKw,
+        maxPowerKw: apiStation.maxPowerKw,
+        capacityKw: apiStation.capacityKw,
+        polesCount: poles.length,
+        maxPowerFromPoles
+      });
+    }
 
     const connectorTypesSet = new Set();
     poles.forEach((pole) => {
@@ -255,7 +302,7 @@ const transformStationData = (apiStation, slotsData = null) => {
       },
       stats: {
         total: totalPorts,
-        available: availablePorts,
+        available: Math.max(availablePorts, apiStation.availableSlots ?? 0), // Use backend availableSlots if higher
         occupied,
       },
       // Pass through backend calculated fields directly
@@ -417,6 +464,23 @@ const useStationStore = create((set, get) => ({
       // Or sometimes: { data: [...], pagination: {...} } directly
       let stationsData = [];
       let paginationData = null;
+
+      // Debug: Log first station's raw data before transformation
+      const rawFirstStation = response?.data?.data?.[0] || response?.data?.[0];
+      if (rawFirstStation) {
+        console.log("🔍 First station RAW data from backend:", {
+          stationId: rawFirstStation.stationId,
+          stationName: rawFirstStation.stationName,
+          status: rawFirstStation.status,
+          availableSlots: rawFirstStation.availableSlots,
+          totalSlots: rawFirstStation.totalSlots,
+          availablePorts: rawFirstStation.availablePorts,
+          totalPorts: rawFirstStation.totalPorts,
+          totalPowerCapacityKw: rawFirstStation.totalPowerCapacityKw,
+          maxPowerKw: rawFirstStation.maxPowerKw,
+          capacityKw: rawFirstStation.capacityKw
+        });
+      }
 
       if (response?.success && response.data) {
         // If response.data is an object with nested data and pagination
