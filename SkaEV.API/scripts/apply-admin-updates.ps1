@@ -128,6 +128,19 @@ if (Test-Path $viewsScript) {
     Write-Warn "Views script not found at: $viewsScript. Skipping view-fix step."
 }
 
+$incidentsScript = Join-Path $repoRoot 'database\create_incidents.sql'
+if (Test-Path $incidentsScript) {
+    Write-Info "Ensuring incidents object from: $incidentsScript"
+    try {
+        sqlcmd -S $server -E -d $database -i $incidentsScript
+        Write-Info "Incidents creation script applied successfully (or already present)."
+    } catch {
+        Write-Warn "Failed applying incidents script: $_"; # don't abort entirely for now
+    }
+} else {
+    Write-Warn "Incidents script not found at: $incidentsScript. Skipping incidents step."
+}
+
 if (Test-Path $seedScript) {
     Write-Info "Applying admin seed data from: $seedScript"
     try {
