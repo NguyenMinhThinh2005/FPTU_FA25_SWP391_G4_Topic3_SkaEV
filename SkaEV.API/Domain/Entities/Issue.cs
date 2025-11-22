@@ -8,6 +8,7 @@ public class Issue
     public int? AssignedToUserId { get; set; }
     public string Title { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
+    public string? DeviceCode { get; set; } // Store full connector code e.g. "POST-01-A1"
     public string Category { get; set; } = string.Empty; // e.g. "hardware", "software", "network"
     public string Priority { get; set; } = "medium"; // low, medium, high, critical
     public string Status { get; set; } = "reported"; // reported, in_progress, resolved, closed
