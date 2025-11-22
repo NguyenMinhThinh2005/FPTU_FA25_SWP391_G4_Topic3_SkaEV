@@ -61,6 +61,7 @@ public class IssueService : IIssueService
                     StationName = i.Station != null ? i.Station.StationName : "Unknown",
                     PostId = null, // PostId không tồn tại trong database
                     PostName = null,
+                    DeviceCode = i.DeviceCode,
                     Title = i.Title,
                     Description = i.Description,
                     Category = i.Category,
@@ -148,6 +149,7 @@ public class IssueService : IIssueService
                     StationName = i.Station != null ? i.Station.StationName : "Unknown",
                     PostId = null,
                     PostName = null,
+                    DeviceCode = i.DeviceCode,
                     Title = i.Title,
                     Description = i.Description,
                     Category = i.Category,
@@ -179,7 +181,51 @@ public class IssueService : IIssueService
 
     public async Task<IssueDetailDto?> GetIssueDetailAsync(int issueId)
     {
-        return null; // Placeholder
+        try
+        {
+            var issue = await _context.Issues
+                .Include(i => i.Station)
+                .Include(i => i.ReportedByUser)
+                .Include(i => i.AssignedToUser)
+                .FirstOrDefaultAsync(i => i.IssueId == issueId);
+
+            if (issue == null)
+                return null;
+
+            return new IssueDetailDto
+            {
+                IssueId = issue.IssueId,
+                StationId = issue.StationId,
+                StationName = issue.Station != null ? issue.Station.StationName : "Unknown",
+                PostId = null,
+                PostName = null,
+                DeviceCode = issue.DeviceCode,
+                Title = issue.Title,
+                Description = issue.Description,
+                Category = issue.Category,
+                Priority = issue.Priority,
+                Status = issue.Status,
+                Resolution = issue.Resolution,
+                ReportedByUserId = issue.ReportedByUserId,
+                ReportedByUserName = issue.ReportedByUser != null ? issue.ReportedByUser.FullName : "Unknown",
+                AssignedToUserId = issue.AssignedToUserId,
+                AssignedToUserName = issue.AssignedToUser != null ? issue.AssignedToUser.FullName : null,
+                ReportedAt = issue.ReportedAt,
+                AssignedAt = issue.AssignedAt,
+                StartedAt = issue.StartedAt,
+                ResolvedAt = issue.ResolvedAt,
+                ClosedAt = issue.ClosedAt,
+                CreatedAt = issue.CreatedAt,
+                UpdatedAt = issue.UpdatedAt,
+                Comments = new List<IssueCommentDto>(),
+                Attachments = new List<IssueAttachmentDto>()
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting issue detail {IssueId}", issueId);
+            return null;
+        }
     }
 
     public async Task<IssueDto> CreateIssueAsync(int reportedByUserId, CreateIssueDto createDto)
@@ -200,6 +246,7 @@ public class IssueService : IIssueService
             var issue = new Domain.Entities.Issue
             {
                 StationId = createDto.StationId,
+                DeviceCode = createDto.DeviceCode,
                 Title = createDto.Title,
                 Description = createDto.Description,
                 Category = "general", // Default category, can be enhanced later
@@ -224,6 +271,7 @@ public class IssueService : IIssueService
                 StationName = station.StationName,
                 PostId = null,
                 PostName = null,
+                DeviceCode = issue.DeviceCode,
                 Title = issue.Title,
                 Description = issue.Description,
                 Status = issue.Status,
@@ -269,9 +317,45 @@ public class IssueService : IIssueService
         throw new NotImplementedException("Issues table not yet created. Run 08_ADD_ISSUES_TABLE.sql first.");
     }
 
+    public async Task<bool> HasAdminResponseAsync(int issueId)
+    {
+        try
+        {
+            var issue = await _context.Issues
+                .Include(i => i.ReportedByUser)
+                .FirstOrDefaultAsync(i => i.IssueId == issueId);
+
+            if (issue == null)
+                return false;
+
+            // Check if issue has Resolution (admin response)
+            if (!string.IsNullOrEmpty(issue.Resolution))
+                return true;
+
+            // Check if there are any comments from admin users
+            var adminComments = await _context.IssueComments
+                .Include(c => c.User)
+                .Where(c => c.IssueId == issueId && c.User.Role == "admin")
+                .AnyAsync();
+
+            return adminComments;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error checking admin response for issue {IssueId}", issueId);
+            return false;
+        }
+    }
+
     public async Task DeleteIssueAsync(int issueId)
     {
-        throw new NotImplementedException("Issues table not yet created. Run 08_ADD_ISSUES_TABLE.sql first.");
+        var issue = await _context.Issues.FindAsync(issueId);
+        if (issue != null)
+        {
+            _context.Issues.Remove(issue);
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Deleted issue {IssueId}", issueId);
+        }
     }
 
     public async Task<IssueStatisticsDto> GetIssueStatisticsAsync(int? stationId)

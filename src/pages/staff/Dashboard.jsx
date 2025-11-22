@@ -320,7 +320,7 @@ const StaffDashboard = () => {
       faulted: { status: "Faulted", label: "Lỗi", color: "error" },
       offline: { status: "Faulted", label: "Offline", color: "error" },
       unavailable: { status: "Unavailable", label: "Không khả dụng", color: "default" },
-      reserved: { status: "Reserved", label: "Đã giữ chỗ", color: "info" },
+      reserved: { status: "Reserved", label: "Đã đặt", color: "info" },
     };
 
     const mapped = statusMap[statusKey] || {
@@ -342,6 +342,7 @@ const StaffDashboard = () => {
             : null,
         customerName: session.customerName,
         vehicleInfo: session.vehicleInfo,
+        // Add reservation specific info if needed, but customerName and vehicleInfo are already here
       };
     }
 
@@ -565,11 +566,7 @@ const StaffDashboard = () => {
       </Typography>
       <Card sx={{ mb: 3 }}>
         <CardContent>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Liệt kê tất cả các Điểm sạc (CON-01, CON-02, CON-03, CON-04) theo thứ tự và sử dụng{" "}
-            <strong>màu sắc/biểu tượng lớn hơn</strong> để thể hiện trạng thái (Xanh lá – Rảnh, Xanh dương = Đang sạc, 
-            Đỏ = Lỗi/Offline).
-          </Typography>
+          
           <Grid container spacing={2}>
             {connectors.map((connector) => {
               // Xác định màu và biểu tượng dựa trên status
@@ -589,6 +586,11 @@ const StaffDashboard = () => {
                 borderColor = "primary.main";
                 statusText = "🔵 Đang sạc";
                 textColor = "primary.main";
+              } else if (connector.status === "Reserved") {
+                cardBgColor = "info.50";
+                borderColor = "info.main";
+                statusText = "🔵 Đang đặt";
+                textColor = "info.main";
               } else if (connector.status === "Faulted" || connector.status === "Unavailable") {
                 cardBgColor = "error.50";
                 borderColor = "error.main";
@@ -636,9 +638,14 @@ const StaffDashboard = () => {
                           <Typography variant="body2" color="text.secondary">
                             Khách: {(connector.activeSession || connector.currentSession).customerName}
                           </Typography>
-                          {(connector.activeSession || connector.currentSession).vehicleSOC && (
+                          {(connector.activeSession || connector.currentSession).vehicleSOC !== null && (
                             <Typography variant="body2" color="text.secondary">
                               SOC: {(connector.activeSession || connector.currentSession).vehicleSOC}%
+                            </Typography>
+                          )}
+                          {(connector.activeSession || connector.currentSession).startTime && (
+                            <Typography variant="body2" color="text.secondary">
+                              Bắt đầu: {(connector.activeSession || connector.currentSession).startTime.toLocaleTimeString('vi-VN')}
                             </Typography>
                           )}
                         </Box>

@@ -291,12 +291,13 @@ public class StaffIssuesController : ControllerBase
     }
 
     /// <summary>
-    /// Delete an issue (Admin only)
+    /// Delete an issue (Admin/Staff) - Only issues with admin response can be deleted
     /// </summary>
     [HttpDelete("{id}")]
-    [Authorize(Roles = "admin")]
+    [Authorize(Roles = "admin,staff")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> DeleteIssue(int id)
     {
         try
@@ -305,6 +306,14 @@ public class StaffIssuesController : ControllerBase
 
             if (existingIssue == null)
                 return NotFound(new { message = "Issue not found" });
+
+            // Check if issue has admin response (Resolution or admin comment)
+            var hasAdminResponse = await _issueService.HasAdminResponseAsync(id);
+
+            if (!hasAdminResponse)
+            {
+                return StatusCode(403, new { message = "Chỉ có thể xóa báo cáo đã có phản hồi từ admin" });
+            }
 
             await _issueService.DeleteIssueAsync(id);
             return NoContent();
