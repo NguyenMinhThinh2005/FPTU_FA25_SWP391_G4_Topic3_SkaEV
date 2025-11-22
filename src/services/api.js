@@ -626,6 +626,9 @@ export const walletAPI = {
   topup: (amount) => {
     return axiosInstance.post("/wallet/topup", { amount });
   },
+  payInvoice: (bookingId) => {
+    return axiosInstance.post("/wallet/pay-invoice", { bookingId });
+  },
 };
 
 // Health check

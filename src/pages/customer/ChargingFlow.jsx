@@ -72,6 +72,7 @@ import {
   AccessTime,
   Refresh,
   RefreshOutlined,
+  AccountBalanceWallet,
 } from "@mui/icons-material";
 import useBookingStore from "../../store/bookingStore";
 import useStationStore from "../../store/stationStore";
@@ -86,6 +87,7 @@ import {
   invoicesAPI,
   mockPaymentAPI,
   bookingsAPI,
+  walletAPI,
 } from "../../services/api";
 
 // Helper function to normalize Vietnamese text for search
@@ -739,11 +741,7 @@ const ChargingFlow = () => {
     }
 
     const isActive = (station.status || "").toLowerCase() === "active";
-    // Check multiple sources for available slots: stats.available, availableSlots, charging.availablePorts
-    const availableFromStats = station.stats?.available ?? 0;
-    const availableFromBackend = station.availableSlots ?? 0;
-    const availableFromCharging = station.charging?.availablePorts ?? 0;
-    const hasAvailableSlots = Math.max(availableFromStats, availableFromBackend, availableFromCharging) > 0;
+    const hasAvailableSlots = station.stats?.available > 0;
     const isAvailable = isActive && hasAvailableSlots;
 
     if (!isAvailable) {
@@ -1365,6 +1363,25 @@ const ChargingFlow = () => {
     }
   }, [flowStep, chargingStartTime]);
 
+  // Wallet Payment State
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [showTopUpModal, setShowTopUpModal] = useState(false);
+
+  // Fetch wallet balance when entering payment step
+  useEffect(() => {
+    if (flowStep === 5) {
+      const fetchBalance = async () => {
+        try {
+          const data = await walletAPI.getBalance();
+          setWalletBalance(data.balance);
+        } catch (error) {
+          console.error("Failed to fetch wallet balance:", error);
+        }
+      };
+      fetchBalance();
+    }
+  }, [flowStep]);
+
   return (
     <Container maxWidth="lg" sx={{ py: 3 }}>
       <Typography variant="h4" gutterBottom sx={{ mb: 3, fontWeight: "bold" }}>
@@ -1752,23 +1769,7 @@ const ChargingFlow = () => {
                                     flexWrap: "wrap",
                                   }}
                                 >
-                                  <Box
-                                    sx={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: 0.5,
-                                    }}
-                                  >
-                                    <Speed
-                                      sx={{
-                                        fontSize: 18,
-                                        color: "primary.main",
-                                      }}
-                                    />
-                                    <Typography variant="body2">
-                                      Tối đa {station.charging?.maxPower || 0}kW
-                                    </Typography>
-                                  </Box>
+
 
                                   <Typography
                                     variant="body2"
@@ -3098,56 +3099,61 @@ const ChargingFlow = () => {
                 <Card>
                   <CardContent>
                     <Typography variant="h6" gutterBottom>
-                      Phương thức thanh toán
-                    </Typography>
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{ mb: 3 }}
-                    >
-                      Thanh toán nhanh chóng và an toàn
+                      Thanh toán qua Ví
                     </Typography>
 
-                    {/* Payment Info */}
+                    {/* Wallet Balance Info */}
                     <Box
-                      sx={{
-                        border: 2,
-                        borderColor: "primary.main",
-                        borderRadius: 2,
-                        p: 3,
-                        mb: 3,
-                        background:
-                          "linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)",
-                      }}
+                      sx={{ mb: 3, p: 2, bgcolor: "grey.50", borderRadius: 2 }}
                     >
                       <Box
-                        sx={{ display: "flex", alignItems: "center", mb: 2 }}
+                        sx={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          mb: 1,
+                        }}
                       >
-                        <Typography
-                          variant="h6"
-                          fontWeight="bold"
-                          color="primary.main"
-                        >
-                          💳 Ví điện tử
+                        <Typography variant="body2" color="text.secondary">
+                          Số dư ví của bạn:
                         </Typography>
+                        <Chip
+                          label={
+                            walletBalance >= calculateTotalCost()
+                              ? "Đủ số dư"
+                              : "Thiếu số dư"
+                          }
+                          color={
+                            walletBalance >= calculateTotalCost()
+                              ? "success"
+                              : "error"
+                          }
+                          size="small"
+                          variant="outlined"
+                        />
                       </Box>
                       <Typography
-                        variant="body2"
-                        color="text.secondary"
-                        sx={{ mb: 2 }}
+                        variant="h4"
+                        fontWeight="bold"
+                        color={
+                          walletBalance >= calculateTotalCost()
+                            ? "success.main"
+                            : "error.main"
+                        }
                       >
-                        • Thanh toán ngay lập tức
+                        {formatCurrency(walletBalance)}
                       </Typography>
-                      <Typography
-                        variant="body2"
-                        color="text.secondary"
-                        sx={{ mb: 2 }}
-                      >
-                        • Không cần chuyển hướng
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        • Bảo mật và an toàn
-                      </Typography>
+                      {walletBalance < calculateTotalCost() && (
+                        <Typography
+                          variant="caption"
+                          color="error"
+                          sx={{ display: "block", mt: 1 }}
+                        >
+                          Bạn cần thêm{" "}
+                          {formatCurrency(calculateTotalCost() - walletBalance)}{" "}
+                          để thanh toán.
+                        </Typography>
+                      )}
                     </Box>
 
                     {paymentError && (
@@ -3161,7 +3167,7 @@ const ChargingFlow = () => {
                       fullWidth
                       size="large"
                       disabled={paymentLoading}
-                      sx={{ mt: 2 }}
+                      sx={{ mt: 2, py: 1.5 }}
                       onClick={async () => {
                         setPaymentLoading(true);
                         setPaymentError(null);
@@ -3169,7 +3175,15 @@ const ChargingFlow = () => {
                         try {
                           const totalAmount = calculateTotalCost();
 
-                          // FIX: Get bookingId from multiple sources including store and session
+                          // Check balance first
+                          if (walletBalance < totalAmount) {
+                            setPaymentError("Số dư không đủ thanh toán");
+                            setShowTopUpModal(true);
+                            setPaymentLoading(false);
+                            return;
+                          }
+
+                          // Get bookingId
                           const bookingId =
                             currentBooking?.id ||
                             currentBookingData?.id ||
@@ -3178,91 +3192,34 @@ const ChargingFlow = () => {
                             bookingStore.currentBooking?.id ||
                             sessionStorage.getItem("currentBookingId");
 
-                          console.log("💳 Payment Booking Info:", {
-                            currentBooking,
-                            currentBookingData,
-                            storeBooking: bookingStore.currentBooking,
-                            resolvedBookingId: bookingId,
-                          });
-
-                          if (!bookingId) {
+                          if (!bookingId)
                             throw new Error(
                               "Không tìm thấy thông tin đặt chỗ (Booking ID missing)"
                             );
-                          }
 
-                          // 1. Create Invoice first (to ensure it exists)
-                          console.log(
-                            "📋 Creating invoice for booking:",
-                            bookingId
-                          );
-                          let invoice;
-
+                          // 1. Ensure Invoice Exists
                           try {
                             // Try to create invoice first
-                            const createRes = await invoicesAPI.createInvoice(
-                              bookingId
-                            );
-                            invoice = createRes?.data || createRes;
-                            console.log("✅ Invoice created:", invoice);
+                            await invoicesAPI.createInvoice(bookingId);
                           } catch (createError) {
                             console.warn(
-                              "⚠️ Create invoice failed, trying to fetch existing:",
+                              "Invoice might already exist, proceeding to payment",
                               createError
                             );
-                            // If create fails, try to get existing
-                            const getRes = await invoicesAPI.getByBooking(
-                              bookingId
-                            );
-                            invoice = getRes?.data || getRes;
                           }
 
-                          if (!invoice || !invoice.invoiceId) {
-                            throw new Error(
-                              "Không thể tạo hoặc tìm thấy hóa đơn cho phiên sạc này"
-                            );
-                          }
-
-                          console.log("✅ Invoice ready for payment:", invoice);
-
-                          // 2. Process payment immediately (Wallet Payment)
-                          console.log("💳 Processing payment via Wallet...");
-                          const paymentResponse =
-                            await mockPaymentAPI.processPayment({
-                              invoiceId: invoice.invoiceId,
-                              amount: invoice.totalAmount || totalAmount,
-                              orderDescription: `Thanh toan hoa don #${
-                                invoice.invoiceId
-                              } - Phien sac ${invoice.stationName || "SkaEV"}`,
-                            });
-
+                          // 2. Pay with Wallet
                           console.log(
-                            "📥 Wallet Payment API Response:",
-                            paymentResponse
+                            "💳 Processing payment via Wallet API..."
                           );
+                          const result = await walletAPI.payInvoice(bookingId);
 
-                          // Check for success
-                          // MockPaymentController returns { success: true, data: { paymentId, ... } }
-                          // Axios interceptor returns data directly if success is true
-                          const isSuccess =
-                            paymentResponse?.paymentId ||
-                            paymentResponse?.success;
-
-                          if (!isSuccess) {
-                            throw new Error(
-                              paymentResponse?.message ||
-                                "Không thể xử lý thanh toán qua ví. Vui lòng thử lại."
-                            );
-                          }
-
-                          console.log(
-                            "✅ Payment processed successfully via Wallet"
-                          );
+                          console.log("✅ Payment result:", result);
 
                           // 3. Payment successful - move to complete step
                           notificationService.success(
                             `Thanh toán thành công! Số tiền: ${formatCurrency(
-                              invoice.totalAmount || totalAmount
+                              totalAmount
                             )}`
                           );
 
@@ -3274,6 +3231,10 @@ const ChargingFlow = () => {
                             error.message ||
                               "Có lỗi xảy ra khi xử lý thanh toán. Vui lòng thử lại."
                           );
+                          if (error.message?.includes("Số dư không đủ")) {
+                            setShowTopUpModal(true);
+                          }
+                        } finally {
                           setPaymentLoading(false);
                         }
                       }}
@@ -3288,9 +3249,21 @@ const ChargingFlow = () => {
                           Đang xử lý...
                         </>
                       ) : (
-                        `Thanh toán ${formatCurrency(calculateTotalCost())}`
+                        `Thanh toán ngay`
                       )}
                     </Button>
+
+                    {walletBalance < calculateTotalCost() && (
+                      <Button
+                        variant="outlined"
+                        fullWidth
+                        sx={{ mt: 2 }}
+                        onClick={() => setShowTopUpModal(true)}
+                        startIcon={<AccountBalanceWallet />}
+                      >
+                        Nạp tiền vào ví
+                      </Button>
+                    )}
 
                     <Typography
                       variant="caption"
@@ -3692,6 +3665,49 @@ const ChargingFlow = () => {
           }, 1000);
         }}
       />
+      {/* Top Up Modal */}
+      <Dialog
+        open={showTopUpModal}
+        onClose={() => setShowTopUpModal(false)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Nạp tiền nhanh</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" gutterBottom>
+            Chọn mệnh giá để nạp tiền vào ví:
+          </Typography>
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            {[100000, 200000, 500000, 1000000].map((amount) => (
+              <Grid item xs={6} key={amount}>
+                <Button
+                  variant="outlined"
+                  fullWidth
+                  onClick={async () => {
+                    try {
+                      await walletAPI.topup(amount);
+                      notificationService.success(
+                        `Nạp thành công ${formatCurrency(amount)}`
+                      );
+                      // Refresh balance
+                      const data = await walletAPI.getBalance();
+                      setWalletBalance(data.balance);
+                      setShowTopUpModal(false);
+                    } catch (error) {
+                      notificationService.error("Nạp tiền thất bại");
+                    }
+                  }}
+                >
+                  {formatCurrency(amount)}
+                </Button>
+              </Grid>
+            ))}
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowTopUpModal(false)}>Đóng</Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 };

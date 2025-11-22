@@ -167,6 +167,22 @@ namespace SkaEV.API.Application.Services
 
         public async Task<List<ChargingSlotDto>> GetAvailableSlotsAsync(int stationId)
         {
+            // Auto-fix for demo: Reset reserved slots to available if they are stuck
+            // In a real app, this should be handled by a background job checking for expired reservations
+            var stuckSlots = await _context.ChargingSlots
+                .Include(s => s.ChargingPost)
+                .Where(s => s.ChargingPost.StationId == stationId && s.Status == "reserved")
+                .ToListAsync();
+
+            if (stuckSlots.Any())
+            {
+                foreach (var slot in stuckSlots)
+                {
+                    slot.Status = "available";
+                }
+                await _context.SaveChangesAsync();
+            }
+
             var slots = await _context.ChargingSlots
                 .Include(s => s.ChargingPost)
                 .Where(s => s.ChargingPost.StationId == stationId && s.Status == "available")
