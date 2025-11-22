@@ -217,6 +217,7 @@ const ChargingFlow = () => {
     "Quét QR",
     "Kết nối",
     "Đang sạc",
+    "Thanh toán",
     "Hoàn thành",
   ];
   const { currentBooking, chargingSession, resetFlowState, completeBooking } =
@@ -1980,7 +1981,8 @@ const ChargingFlow = () => {
                       )}
 
                       {/* Always show summary if available, even with errors */}
-                      {(navigationSummary || (selectedStationCoords && userLocation)) && (
+                      {(navigationSummary ||
+                        (selectedStationCoords && userLocation)) && (
                         <>
                           <Box
                             sx={{
@@ -2028,16 +2030,18 @@ const ChargingFlow = () => {
                           {/* Only show error if route is not displayed on map */}
                           {directionsData.error && !navigationSummary && (
                             <Alert severity="info" sx={{ mb: 1 }}>
-                              Tuyến đường đã được hiển thị trên bản đồ. {directionsData.error}
+                              Tuyến đường đã được hiển thị trên bản đồ.{" "}
+                              {directionsData.error}
                             </Alert>
                           )}
 
                           {/* Show warnings only if they provide useful info, not if route is already shown */}
                           {navigationWarnings
-                            .filter((warning) => 
-                              !warning.includes("gần đúng") && 
-                              !warning.includes("không thể tải") &&
-                              !warning.includes("không tìm thấy")
+                            .filter(
+                              (warning) =>
+                                !warning.includes("gần đúng") &&
+                                !warning.includes("không thể tải") &&
+                                !warning.includes("không tìm thấy")
                             )
                             .map((warning, index) => (
                               <Alert
@@ -2119,19 +2123,30 @@ const ChargingFlow = () => {
                           ) : (
                             <Box sx={{ mb: 2 }}>
                               <Alert severity="success" sx={{ mb: 1 }}>
-                                ✅ Tuyến đường đã được hiển thị trên bản đồ phía bên trái.
+                                ✅ Tuyến đường đã được hiển thị trên bản đồ phía
+                                bên trái.
                               </Alert>
                               {!navigationSummary && (
-                                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                                  Để xem hướng dẫn chi tiết từng bước, nhấn "Mở Google Maps".
+                                <Typography
+                                  variant="body2"
+                                  color="text.secondary"
+                                  sx={{ mb: 1 }}
+                                >
+                                  Để xem hướng dẫn chi tiết từng bước, nhấn "Mở
+                                  Google Maps".
                                 </Typography>
                               )}
-                              {navigationSummary && !navigationSummary.steps?.length && (
-                                <Typography variant="body2" color="text.secondary">
-                                  Tuyến đường đã được tính toán và hiển thị trên bản đồ. 
-                                  Bạn có thể sử dụng nút "Mở Google Maps" để xem hướng dẫn chi tiết hơn.
-                                </Typography>
-                              )}
+                              {navigationSummary &&
+                                !navigationSummary.steps?.length && (
+                                  <Typography
+                                    variant="body2"
+                                    color="text.secondary"
+                                  >
+                                    Tuyến đường đã được tính toán và hiển thị
+                                    trên bản đồ. Bạn có thể sử dụng nút "Mở
+                                    Google Maps" để xem hướng dẫn chi tiết hơn.
+                                  </Typography>
+                                )}
                             </Box>
                           )}
                         </>
@@ -3206,69 +3221,49 @@ const ChargingFlow = () => {
 
                           console.log("✅ Invoice ready for payment:", invoice);
 
-                          // 2. Process payment immediately (Mock Payment)
-                          console.log("💳 Processing payment...");
+                          // 2. Process payment immediately (Wallet Payment)
+                          console.log("💳 Processing payment via Wallet...");
                           const paymentResponse =
                             await mockPaymentAPI.processPayment({
                               invoiceId: invoice.invoiceId,
-
                               amount: invoice.totalAmount || totalAmount,
                               orderDescription: `Thanh toan hoa don #${
                                 invoice.invoiceId
                               } - Phien sac ${invoice.stationName || "SkaEV"}`,
-                              bankCode: null, // Let user choose at VNPay
                             });
 
                           console.log(
-                            "📥 VNPay API Response:",
+                            "📥 Wallet Payment API Response:",
                             paymentResponse
                           );
 
-                          // Robust way to get payment URL (handle different response structures)
-                          const paymentUrl =
-                            paymentResponse?.paymentUrl ||
-                            paymentResponse?.data?.paymentUrl ||
-                            paymentResponse?.url ||
-                            paymentResponse?.data;
+                          // Check for success
+                          // MockPaymentController returns { success: true, data: { paymentId, ... } }
+                          // Axios interceptor returns data directly if success is true
+                          const isSuccess =
+                            paymentResponse?.paymentId ||
+                            paymentResponse?.success;
 
-                          if (
-                            !paymentUrl ||
-                            typeof paymentUrl !== "string" ||
-                            !paymentUrl.startsWith("http")
-                          ) {
-                            console.error(
-                              "❌ Invalid payment URL:",
-                              paymentUrl
-                            );
-                            throw new Error(
-                              "Không thể tạo liên kết thanh toán (Invalid URL)"
-                            );
-                          }
-
-                          // Axios interceptor unwraps ApiResponse, so paymentResponse is the data object directly
-                          if (paymentResponse?.success === false) {
+                          if (!isSuccess) {
                             throw new Error(
                               paymentResponse?.message ||
-                                "Không thể xử lý thanh toán"
+                                "Không thể xử lý thanh toán qua ví. Vui lòng thử lại."
                             );
                           }
 
                           console.log(
-                            "🔗 VNPay payment URL created:",
-                            paymentUrl,
-                            "✅ Payment processed successfully:",
-                            paymentResponse
+                            "✅ Payment processed successfully via Wallet"
                           );
 
                           // 3. Payment successful - move to complete step
                           notificationService.success(
                             `Thanh toán thành công! Số tiền: ${formatCurrency(
-                              paymentResponse.amount
+                              invoice.totalAmount || totalAmount
                             )}`
                           );
 
-                          // 4. Redirect to VNPay
-                          window.location.href = paymentUrl;
+                          // Move to next step (Complete)
+                          setFlowStep(6);
                         } catch (error) {
                           console.error("❌ Payment error:", error);
                           setPaymentError(

@@ -238,9 +238,26 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
   // Get poles (posts) for selected charger type - grouped from slots
   const availablePoles = useMemo(() => {
     if (!slotsData || !selectedChargerType) return [];
-    const filteredSlots = slotsData.filter(
-      (s) => s.postType === selectedChargerType && s.status === "available"
-    );
+
+    const filteredSlots = slotsData.filter((s) => {
+      if (s.status !== "available") return false;
+
+      // Robust filtering matching chargerTypes logic
+      if (selectedChargerType === "DC") {
+        return (
+          s.postType === "DC" ||
+          ["CCS", "CCS2", "CCS1", "CHAdeMO", "GB/T"].includes(s.connectorType)
+        );
+      }
+      if (selectedChargerType === "AC") {
+        return (
+          s.postType === "AC" ||
+          ["Type 2", "Type2", "J1772", "Mennekes"].includes(s.connectorType)
+        );
+      }
+
+      return s.postType === selectedChargerType;
+    });
 
     // Group slots by PostId
     const grouped = filteredSlots.reduce((acc, slot) => {
@@ -1008,7 +1025,7 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
             1. Phương thức thanh toán
           </Typography>
           <Typography variant="body2" paragraph>
-            • Thanh toán qua ví điện tử (MoMo, ZaloPay, VNPay)
+            • Thanh toán qua ví điện tử
             <br />
             • Thẻ tín dụng/ghi nợ (Visa, Mastercard)
             <br />

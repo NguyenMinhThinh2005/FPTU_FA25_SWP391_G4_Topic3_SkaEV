@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NetTopologySuite.Geometries;
 using SkaEV.API.Infrastructure.Data;
@@ -12,9 +13,11 @@ using SkaEV.API.Infrastructure.Data;
 namespace SkaEV.API.Migrations
 {
     [DbContext(typeof(SkaEVDbContext))]
-    partial class SkaEVDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251121194656_UpdatePaymentTypeConstraint")]
+    partial class UpdatePaymentTypeConstraint
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1250,9 +1253,6 @@ namespace SkaEV.API.Migrations
                         .HasColumnType("datetime2")
                         .HasColumnName("updated_at");
 
-                    b.Property<decimal>("WalletBalance")
-                        .HasColumnType("decimal(18, 2)");
-
                     b.HasKey("UserId");
 
                     b.HasIndex("Email")
@@ -1707,42 +1707,6 @@ namespace SkaEV.API.Migrations
                     b.ToView("v_user_cost_reports", (string)null);
                 });
 
-            modelBuilder.Entity("SkaEV.API.Domain.Entities.WalletTransaction", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<decimal>("Amount")
-                        .HasColumnType("decimal(18, 2)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("WalletTransactions");
-                });
-
             modelBuilder.Entity("SkaEV.API.Domain.Entities.Booking", b =>
                 {
                     b.HasOne("SkaEV.API.Domain.Entities.ChargingSlot", "ChargingSlot")
@@ -2023,17 +1987,6 @@ namespace SkaEV.API.Migrations
                 {
                     b.HasOne("SkaEV.API.Domain.Entities.User", "User")
                         .WithMany("Vehicles")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("SkaEV.API.Domain.Entities.WalletTransaction", b =>
-                {
-                    b.HasOne("SkaEV.API.Domain.Entities.User", "User")
-                        .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();

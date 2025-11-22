@@ -36,13 +36,18 @@ axiosInstance.interceptors.response.use(
   (response) => {
     const data = response.data;
     // Check if it's our ApiResponse format (has success and data properties)
-    if (data && typeof data === 'object' && 'success' in data && 'data' in data) {
-        if (data.success) {
-            return data.data;
-        } else {
-            // It's a failure but with 200 OK (shouldn't happen often with current setup)
-            return Promise.reject(new Error(data.message || 'Operation failed'));
-        }
+    if (
+      data &&
+      typeof data === "object" &&
+      "success" in data &&
+      "data" in data
+    ) {
+      if (data.success) {
+        return data.data;
+      } else {
+        // It's a failure but with 200 OK (shouldn't happen often with current setup)
+        return Promise.reject(new Error(data.message || "Operation failed"));
+      }
     }
     // Return data directly (legacy behavior)
     return data;
@@ -607,6 +612,19 @@ export const vnpayAPI = {
   createPaymentUrl: (paymentData) => {
     // paymentData: { invoiceId, amount, orderDescription, bankCode? }
     return axiosInstance.post("/vnpay/create-payment-url", paymentData);
+  },
+};
+
+// Wallet API
+export const walletAPI = {
+  getBalance: () => {
+    return axiosInstance.get("/wallet/balance");
+  },
+  getTransactions: () => {
+    return axiosInstance.get("/wallet/transactions");
+  },
+  topup: (amount) => {
+    return axiosInstance.post("/wallet/topup", { amount });
   },
 };
 

@@ -380,16 +380,21 @@ public class StationsController : BaseApiController
         
         // Transform to ChargingPostDto structure with PostType and nested Slots
         var posts = postsFromDb.Select(p => {
-            // Determine PostType from ConnectorTypes or PostNumber
-            string postType = "AC"; // Default
-            if (!string.IsNullOrEmpty(p.ConnectorTypes))
+            // Use PostType from DB, fallback to inference if empty
+            string postType = p.PostType;
+            
+            if (string.IsNullOrEmpty(postType))
             {
-                if (p.ConnectorTypes.Contains("CCS", StringComparison.OrdinalIgnoreCase) ||
-                    p.ConnectorTypes.Contains("CHAdeMO", StringComparison.OrdinalIgnoreCase) ||
-                    p.ConnectorTypes.Contains("GB/T", StringComparison.OrdinalIgnoreCase) ||
-                    p.PostNumber.Contains("DC", StringComparison.OrdinalIgnoreCase))
+                postType = "AC"; // Default
+                if (!string.IsNullOrEmpty(p.ConnectorTypes))
                 {
-                    postType = "DC";
+                    if (p.ConnectorTypes.Contains("CCS", StringComparison.OrdinalIgnoreCase) ||
+                        p.ConnectorTypes.Contains("CHAdeMO", StringComparison.OrdinalIgnoreCase) ||
+                        p.ConnectorTypes.Contains("GB/T", StringComparison.OrdinalIgnoreCase) ||
+                        p.PostNumber.Contains("DC", StringComparison.OrdinalIgnoreCase))
+                    {
+                        postType = "DC";
+                    }
                 }
             }
             
