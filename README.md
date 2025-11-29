@@ -2,7 +2,7 @@
 
 **Hệ thống Quản lý Trạm Sạc Xe Điện**
 
-[![.NET](https://img.shields.io/badge/.NET-8.0-purple)](https://dotnet.microsoft.com/)
+[![.NET](https://img.shields.io/badge/.NET-8.0%2F9.0-purple)](https://dotnet.microsoft.com/)
 [![React](https://img.shields.io/badge/React-19-blue)](https://react.dev/)
 [![SQL Server](https://img.shields.io/badge/SQL%20Server-2019+-red)](https://www.microsoft.com/sql-server)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
@@ -91,18 +91,25 @@ npm --version     # 9.x.x
 ```
 ┌─────────────────┐      HTTPS/REST API      ┌─────────────────┐
 │   Frontend      │ ←─────────────────────→  │   Backend API   │
-│  React + Vite   │   JWT Authentication     │  ASP.NET Core   │
-│  Zustand Store  │   Axios HTTP Client      │  Entity FW Core │
+│  React 19       │   JWT Authentication     │  ASP.NET Core 8 │
+│  Vite 7         │   Axios HTTP Client      │  .NET 9.0       │
+│  Zustand Store  │   SignalR (Real-time)    │  EF Core 8.0    │
 └─────────────────┘                           └─────────────────┘
         ↓                                              ↓
    localStorage                                       ↓
    (JWT Tokens)                              ┌─────────────────┐
                                              │   SQL Server    │
                                              │   SkaEV_DB      │
-                                             │   16 Tables     │
+                                             │   21 Tables     │
                                              │   15 Stored Procs│
                                              └─────────────────┘
 ```
+
+### Backend Architecture (Clean Architecture)
+- **Presentation Layer**: 38 Controllers
+- **Application Layer**: 49 Services, 28 DTOs
+- **Domain Layer**: 21 Entities
+- **Infrastructure Layer**: DbContext, External Services
 
 ---
 
@@ -110,15 +117,32 @@ npm --version     # 9.x.x
 
 ```
 FPTU_FA25_SWP391_G4_Topic3_SkaEV/
-├── 📂 SkaEV.API/                    # Backend ASP.NET Core 8
-│   ├── Controllers/                 # API Controllers (Auth, Stations, Bookings)
-│   ├── Application/                 # Services & DTOs
-│   │   ├── Services/                # Business Logic
-│   │   └── DTOs/                    # Data Transfer Objects
-│   ├── Domain/Entities/             # 16 Entity Classes
-│   ├── Infrastructure/              # DbContext, Repositories
-│   │   └── Data/SkaEVDbContext.cs
-│   ├── Program.cs                   # App Configuration
+├── 📂 SkaEV.API/                    # Backend ASP.NET Core 8 / .NET 9
+│   ├── Controllers/                 # 38 API Controllers
+│   │   ├── AuthController.cs
+│   │   ├── StationsController.cs
+│   │   ├── BookingsController.cs
+│   │   ├── AdminControllers/        # Admin management
+│   │   └── StaffControllers/        # Staff dashboard
+│   ├── Application/                 # Business Logic Layer
+│   │   ├── Services/                # 49 Services
+│   │   │   ├── AuthService.cs
+│   │   │   ├── StationService.cs
+│   │   │   ├── BookingService.cs
+│   │   │   └── Payments/            # Payment processors
+│   │   └── DTOs/                    # 28 DTOs (Data Transfer Objects)
+│   │       ├── Auth/
+│   │       ├── Stations/
+│   │       ├── Bookings/
+│   │       ├── Payments/
+│   │       └── ...
+│   ├── Domain/Entities/             # 21 Entity Classes
+│   ├── Infrastructure/              # Infrastructure Layer
+│   │   └── Data/
+│   │       └── SkaEVDbContext.cs    # EF Core DbContext
+│   ├── Hubs/                        # SignalR Hubs (Real-time)
+│   ├── Migrations/                   # EF Core Migrations
+│   ├── Program.cs                   # App Configuration & Startup
 │   └── appsettings.json             # Configuration (DB, JWT, CORS)
 │
 ├── 📂 src/                          # Frontend React 19
@@ -149,6 +173,24 @@ FPTU_FA25_SWP391_G4_Topic3_SkaEV/
 ├── LOCAL_SETUP_GUIDE.md             # Detailed Setup Guide
 └── README.md                        # This file
 ```
+
+---
+
+## 📊 Quy Mô Dự Án
+
+### Backend API
+- **38 Controllers** - API endpoints
+- **49 Services** - Business logic layer
+- **28 DTOs** - Data transfer objects
+- **21 Entities** - Database models
+- **15 Stored Procedures** - Database procedures
+- **11 Migrations** - EF Core migrations
+
+### Frontend
+- **113+ Pages** - Page components
+- **39 Components** - Reusable components
+- **24 Services** - API service layer
+- **13 Stores** - Zustand state management
 
 ---
 
@@ -186,12 +228,32 @@ FPTU_FA25_SWP391_G4_Topic3_SkaEV/
 - Invoice generation
 - Payment method management
 - Transaction history
+- Payment status tracking
 
 #### 📊 **Admin Dashboard**
 - System analytics & reports
-- User management
-- Station management
-- Revenue tracking
+- User management (CRUD operations)
+- Station management (CRUD operations)
+- Revenue tracking & forecasting
+- Advanced analytics & demand forecasting
+- System monitoring & health checks
+
+#### 🗺️ **Maps & Location**
+- Google Maps API integration
+- GPS-based station search
+- Route directions
+- Nearby station finder
+
+#### 🔔 **Notifications & Reviews**
+- Real-time notifications
+- Station reviews & ratings
+- User feedback system
+
+#### 🛠️ **Staff Management**
+- Staff dashboard
+- Issue/Incident tracking
+- Station control & monitoring
+- Charging session management
 
 ---
 
@@ -221,11 +283,34 @@ FPTU_FA25_SWP391_G4_Topic3_SkaEV/
 
 **Xem đầy đủ:** https://localhost:5001/swagger
 
+### Admin
+- `GET /api/admin/*` - Quản lý người dùng, trạm, báo cáo
+- `GET /api/admin/reports/*` - Báo cáo và phân tích
+- `GET /api/admin/stations/*` - Quản lý trạm sạc
+
+### Staff
+- `GET /api/staff/dashboard` - Dashboard nhân viên
+- `GET /api/staff/issues/*` - Quản lý sự cố
+
+**Xem đầy đủ:** https://localhost:5001/swagger
+
+---
+
+## 📊 Swagger Documentation
+
+Truy cập Swagger UI tại: **http://localhost:5000/swagger** hoặc **https://localhost:5001/swagger**
+
+Swagger cung cấp:
+- Interactive API testing
+- Request/Response schemas
+- JWT authentication integration
+- Endpoint descriptions
+
 ---
 
 ## 💾 Database Schema
 
-### 16 Tables:
+### 21 Tables:
 - `users` - User accounts
 - `user_profiles` - Extended user info
 - `vehicles` - User vehicles
@@ -237,11 +322,16 @@ FPTU_FA25_SWP391_G4_Topic3_SkaEV/
 - `soc_tracking` - SOC history
 - `soc_history` - Detailed SOC logs
 - `invoices` - Payment records
+- `payments` - Payment transactions
 - `qr_codes` - QR code data
 - `notifications` - User notifications
 - `reviews` - Station reviews
 - `pricing_rules` - Dynamic pricing
 - `system_logs` - Audit logs
+- `station_staff` - Staff assignments
+- `issues` - Issue/Incident tracking
+- `incidents` - Incident records
+- `payment_methods` - Payment method management
 
 ### 15 Stored Procedures:
 - `sp_authenticate_user` - Login authentication
@@ -275,12 +365,18 @@ FPTU_FA25_SWP391_G4_Topic3_SkaEV/
 - **Tailwind CSS** - Styling (optional)
 
 ### Backend
-- **ASP.NET Core 8** - Web API Framework
-- **Entity Framework Core** - ORM
-- **SQL Server** - Database
-- **JWT Bearer** - Authentication
-- **Serilog** - Logging
+- **ASP.NET Core 8.0** / **.NET 9.0** - Web API Framework
+- **Entity Framework Core 8.0** - ORM
+- **SQL Server 2019+** / **SQLite** - Database (hỗ trợ cả hai)
+- **JWT Bearer Token** - Authentication
+- **SignalR** - Real-time communication
+- **Serilog** - Logging (Console + File)
 - **Swagger/OpenAPI** - API documentation
+- **AutoMapper** - Object mapping
+- **FluentValidation** - Input validation
+- **BCrypt.Net** - Password hashing
+- **QRCoder** - QR code generation
+- **NetTopologySuite** - Spatial data (GPS)
 
 ---
 
@@ -293,6 +389,97 @@ FPTU_FA25_SWP391_G4_Topic3_SkaEV/
 | [API_DOCUMENTATION.md](SkaEV.API/API_DOCUMENTATION.md) | API endpoints & usage |
 | [DATABASE_BACKEND_COMPATIBILITY.md](DATABASE_BACKEND_COMPATIBILITY.md) | Database schema & mapping |
 | [MIGRATION_STATUS.md](MIGRATION_STATUS.md) | Frontend migration từ mock → real API |
+| [SkaEV.API/CRUD_OPERATIONS_LOCATION.md](SkaEV.API/CRUD_OPERATIONS_LOCATION.md) | Vị trí CRUD operations trong codebase |
+| [SkaEV.API/PROJECT_STRUCTURE_ANALYSIS.md](SkaEV.API/PROJECT_STRUCTURE_ANALYSIS.md) | Phân tích chi tiết cấu trúc backend |
+
+---
+
+## 🔧 Backend Setup Chi Tiết
+
+### Prerequisites
+- .NET 8.0 SDK
+- SQL Server 2019+ hoặc SQLite
+- Visual Studio 2022 hoặc VS Code
+
+### Database Setup
+```powershell
+# Deploy database từ file duy nhất
+cd database
+# Mở SQL Server Management Studio và chạy DEPLOY_COMPLETE.sql
+```
+
+### Update Connection String
+Sửa file `SkaEV.API/appsettings.json`:
+
+```json
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Server=YOUR_SERVER;Database=SkaEV_DB;User Id=YOUR_USER;Password=YOUR_PASSWORD;"
+  }
+}
+```
+
+Hoặc dùng Windows Authentication:
+```json
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Server=localhost;Database=SkaEV_DB;Trusted_Connection=True;TrustServerCertificate=True;"
+  }
+}
+```
+
+### Restore Packages & Run
+```powershell
+cd SkaEV.API
+dotnet restore
+dotnet run              # Chạy ứng dụng
+dotnet watch run        # Auto-reload on changes
+```
+
+API sẽ chạy tại:
+- **HTTP**: http://localhost:5000
+- **HTTPS**: https://localhost:5001
+- **Swagger**: http://localhost:5000/swagger
+
+---
+
+## 🔐 Authentication Details
+
+API sử dụng JWT Bearer Token authentication.
+
+### Login Example
+```bash
+POST /api/auth/login
+Content-Type: application/json
+
+{
+  "email": "customer@skaev.com",
+  "password": "password123"
+}
+```
+
+Response:
+```json
+{
+  "userId": 1,
+  "email": "customer@skaev.com",
+  "fullName": "John Doe",
+  "role": "customer",
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "expiresAt": "2025-10-14T10:00:00Z"
+}
+```
+
+### Use Token
+```bash
+GET /api/auth/profile
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+### User Roles
+- **customer**: Khách hàng - Tạo booking, xem history, scan QR
+- **staff**: Nhân viên trạm - Quản lý charging sessions
+- **admin**: Quản trị viên - Full access
 
 ---
 
@@ -310,10 +497,21 @@ cd SkaEV.API
 dotnet test           # Run unit tests
 ```
 
-### Manual Testing
+### Manual Testing với curl/PowerShell
+```powershell
+# Test login với curl
+curl -X POST http://localhost:5000/api/auth/login `
+  -H "Content-Type: application/json" `
+  -d '{"email":"test@example.com","password":"password123"}'
+
+# Test với PowerShell
+Invoke-RestMethod -Uri "http://localhost:5000/api/stations" -Method Get
+```
+
+### Swagger Testing
 1. Mở Swagger UI: https://localhost:5001/swagger
 2. Test authentication: Register → Login → Get token
-3. Authorize trong Swagger với token
+3. Authorize trong Swagger với token (click "Authorize" button)
 4. Test các endpoints
 
 ---
@@ -334,6 +532,46 @@ dotnet publish -c Release -o ./publish
 
 ---
 
+## 🚧 Development Guide
+
+### Add New Controller
+```csharp
+[ApiController]
+[Route("api/[controller]")]
+public class VehiclesController : ControllerBase
+{
+    // Implementation
+}
+```
+
+### Add New Service
+```csharp
+public interface IVehicleService
+{
+    Task<List<VehicleDto>> GetUserVehiclesAsync(int userId);
+}
+
+public class VehicleService : IVehicleService
+{
+    // Implementation
+}
+```
+
+Register trong `Program.cs`:
+```csharp
+builder.Services.AddScoped<IVehicleService, VehicleService>();
+```
+
+### Logging
+Logs được lưu tại `SkaEV.API/logs/skaev-YYYYMMDD.txt`
+
+```csharp
+_logger.LogInformation("User {UserId} logged in", userId);
+_logger.LogError(ex, "Error processing booking {BookingId}", bookingId);
+```
+
+---
+
 ## 🐛 Troubleshooting
 
 ### Backend không start được
@@ -347,6 +585,24 @@ Get-Service -Name "MSSQLSERVER" | Start-Service
 # Xem logs
 cat SkaEV.API/logs/skaev-*.txt
 ```
+
+### Database Connection Error
+```
+SqlException: Cannot open database "SkaEV_DB"
+```
+**Solution**: Chạy `DEPLOY_COMPLETE.sql` trong SSMS
+
+### JWT Token Invalid
+```
+401 Unauthorized
+```
+**Solution**: Kiểm tra token trong header `Authorization: Bearer <token>`
+
+### Spatial Data Error
+```
+InvalidOperationException: No NetTopologySuite
+```
+**Solution**: Đảm bảo đã cài package `NetTopologySuite` và `NetTopologySuite.IO.SqlServerBytes`
 
 ### Frontend không connect được backend
 ```powershell
@@ -364,7 +620,7 @@ curl http://localhost:5000/health
 ```sql
 -- Verify database
 USE SkaEV_DB;
-SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES;  -- Phải có 16
+SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES;  -- Phải có 21
 SELECT COUNT(*) FROM INFORMATION_SCHEMA.ROUTINES WHERE ROUTINE_TYPE = 'PROCEDURE';  -- Phải có 15
 ```
 
@@ -412,4 +668,4 @@ Nếu gặp vấn đề:
 
 **✨ Happy Coding! 🚀**
 
-**Last Updated:** October 13, 2025
+**Last Updated:** November 22, 2025
