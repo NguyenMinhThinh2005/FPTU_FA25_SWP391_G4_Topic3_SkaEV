@@ -111,6 +111,7 @@ const PaymentPage = () => {
         });
       }
     } catch (error) {
+      console.error("Error during topup:", error);
       setSnackbar({
         open: true,
         message: "Nạp tiền thất bại",
