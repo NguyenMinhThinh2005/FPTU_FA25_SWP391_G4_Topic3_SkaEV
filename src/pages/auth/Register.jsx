@@ -1,4 +1,4 @@
-/* eslint-disable */
+﻿/* eslint-disable */
 import React, { useState } from "react";
 import {
   Box,
@@ -52,6 +52,8 @@ const RegisterPage = () => {
     phone: false,
   });
   const [phoneModalOpen, setPhoneModalOpen] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [countdown, setCountdown] = useState(null);
 
   const handleInputChange = (e) => {
     const { name, value, checked } = e.target;
@@ -92,24 +94,40 @@ const RegisterPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
+    
+    // Clear any previous errors
+    clearError();
+    
     try {
       const result = await register({
-        firstName: formData.firstName,
-        lastName: formData.lastName,
+        fullName: `${formData.firstName} ${formData.lastName}`.trim(),
         email: formData.email,
-        phone: formData.phone,
+        phoneNumber: formData.phone,
         password: formData.password,
         role: formData.role,
       });
 
       if (result.success) {
-        if (result.requiresVerification)
-          navigate(
-            `/verify-email?email=${encodeURIComponent(
-              formData.email
-            )}&mode=auto`
-          );
-        else navigate("/customer/dashboard");
+        // Hiển thị thông báo thành công và đếm ngược
+        setSuccessMessage("Đăng ký thành công!");
+        setCountdown(2);
+        
+        // Xác định trang đích
+        const targetPage = result.requiresVerification
+          ? `/verify-email?email=${encodeURIComponent(formData.email)}&mode=auto`
+          : "/login";
+        
+        // Đếm ngược và chuyển trang
+        let timeLeft = 2;
+        const countdownInterval = setInterval(() => {
+          timeLeft--;
+          setCountdown(timeLeft);
+          
+          if (timeLeft <= 0) {
+            clearInterval(countdownInterval);
+            navigate(targetPage);
+          }
+        }, 1000);
       }
     } catch (err) {
       console.error("Registration failed:", err);
@@ -210,6 +228,22 @@ const RegisterPage = () => {
           {error && (
             <Alert severity="error" sx={{ mb: 2 }}>
               {error}
+            </Alert>
+          )}
+
+          {successMessage && (
+            <Alert 
+              severity="success" 
+              sx={{ 
+                mb: 2,
+                backgroundColor: "#4caf50",
+                color: "white",
+                "& .MuiAlert-icon": {
+                  color: "white"
+                }
+              }}
+            >
+              {successMessage} Chuyển đến trang đăng nhập trong {countdown}s...
             </Alert>
           )}
 

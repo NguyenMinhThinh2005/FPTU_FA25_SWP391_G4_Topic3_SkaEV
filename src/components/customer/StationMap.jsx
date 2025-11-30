@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Box, Card, CardContent, Typography, Chip, Button, IconButton, Tooltip } from '@mui/material';
 import { MyLocation, Close } from '@mui/icons-material';
 
@@ -141,9 +141,7 @@ const StationMap = ({ stations, onStationSelect }) => {
                     boxShadow: 4,
                     bgcolor: 'rgba(255,255,255,0.95)'
                 }}>
-                    <Typography variant="subtitle2" fontWeight="bold" gutterBottom sx={{ mb: 1.5 }}>
-                        📍 Chú thích
-                    </Typography>
+
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                             <Box sx={{

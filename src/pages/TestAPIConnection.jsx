@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { Card, Button, Space, Alert, Spin, Typography, Divider, Tag } from 'antd';
 import { CheckCircleOutlined, CloseCircleOutlined, LoadingOutlined, ApiOutlined } from '@ant-design/icons';
 import { authAPI, stationsAPI, healthAPI } from '../services/api.real';

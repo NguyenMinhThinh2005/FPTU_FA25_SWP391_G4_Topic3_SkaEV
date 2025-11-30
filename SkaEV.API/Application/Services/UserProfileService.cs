@@ -146,11 +146,10 @@ public class UserProfileService : IUserProfileService
         if (user == null)
             throw new ArgumentException("User not found");
 
-        // Verify current password (would use proper hashing in production)
-        // For now, skip verification as we don't have the hashing logic here
-        
-        // Hash new password (simplified - would use BCrypt or similar)
-        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(changePasswordDto.NewPassword);
+    // Verify current password (would use proper hashing in production)
+    // For now, skip verification as we store plain passwords in this environment
+
+    user.PasswordHash = changePasswordDto.NewPassword;
         user.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();

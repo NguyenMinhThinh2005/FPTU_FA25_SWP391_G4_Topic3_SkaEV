@@ -2,7 +2,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SkaEV.API.Infrastructure.Data;
-using BCrypt.Net;
 
 namespace SkaEV.API.Controllers;
 
@@ -32,15 +31,12 @@ public class AdminController : ControllerBase
             return NotFound(new { message = "User not found" });
         }
 
-        // Hash the new password with BCrypt
-        var newPasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
-        
-        user.PasswordHash = newPasswordHash;
+    user.PasswordHash = request.NewPassword;
         user.UpdatedAt = DateTime.UtcNow;
         
         await _context.SaveChangesAsync();
 
-        _logger.LogInformation($"Password reset for user {userId} ({user.Email})");
+    _logger.LogInformation("Password reset for user {UserId} ({Email})", userId, user.Email);
 
         return Ok(new 
         { 
@@ -57,7 +53,6 @@ public class AdminController : ControllerBase
     public async Task<IActionResult> ResetAllAdminPasswords()
     {
         const string defaultPassword = "Admin123!@#";
-        var newPasswordHash = BCrypt.Net.BCrypt.HashPassword(defaultPassword);
 
         var adminUsers = await _context.Users
             .Where(u => u.Role == "Admin" && u.IsActive)
@@ -65,13 +60,13 @@ public class AdminController : ControllerBase
 
         foreach (var user in adminUsers)
         {
-            user.PasswordHash = newPasswordHash;
+            user.PasswordHash = defaultPassword;
             user.UpdatedAt = DateTime.UtcNow;
         }
 
         await _context.SaveChangesAsync();
 
-        _logger.LogWarning($"Reset passwords for {adminUsers.Count} admin accounts");
+    _logger.LogWarning("Reset passwords for {AdminCount} admin accounts", adminUsers.Count);
 
         return Ok(new 
         { 

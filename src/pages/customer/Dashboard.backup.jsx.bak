@@ -100,7 +100,7 @@ const CustomerDashboard = () => {
         {
             id: "B002",
             stationName: "AEON Mall Bình Tân",
-            date: "29/09/2024",
+            date: "29/09/2025",
             energy: 32.5,
             cost: 176000,
             status: "completed",
@@ -109,7 +109,7 @@ const CustomerDashboard = () => {
         {
             id: "B003",
             stationName: "Lotte Mart Gò Vấp",
-            date: "27/09/2024",
+            date: "27/09/2025",
             energy: 28.0,
             cost: 152000,
             status: "completed",
@@ -118,7 +118,7 @@ const CustomerDashboard = () => {
         {
             id: "B004",
             stationName: "Big C Thăng Long",
-            date: "25/09/2024",
+            date: "25/09/2025",
             energy: 35.2,
             cost: 191000,
             status: "completed",

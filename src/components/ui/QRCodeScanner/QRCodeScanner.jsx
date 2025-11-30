@@ -1,4 +1,4 @@
-/* eslint-disable */
+﻿/* eslint-disable */
 import React, { useState, useRef, useEffect } from 'react';
 import { QrReader } from 'react-qr-reader';
 import useStationStore from '../../../store/stationStore';
@@ -73,7 +73,7 @@ const QRCodeScanner = ({ onScanSuccess, onClose }) => {
               name: 'Auto-detected',
               compatible: 'Universal',
             },
-            slot: {
+            port: {
               id: portId,
               location: `Port ${portId}`,
             },
@@ -133,7 +133,7 @@ const QRCodeScanner = ({ onScanSuccess, onClose }) => {
         name: station.charging.connectorTypes[0] || 'Tự động',
         compatible: 'Tương thích',
       },
-      slot: {
+      port: {
         id: portId,
         location: `Port ${portId}`,
       },

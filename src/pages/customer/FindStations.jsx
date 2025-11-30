@@ -1,4 +1,4 @@
-/* eslint-disable */
+﻿/* eslint-disable */
 import React, { useState, useEffect } from "react";
 import useVehicleStore from "../../store/vehicleStore";
 import useBookingStore from "../../store/bookingStore";
@@ -104,6 +104,19 @@ const FindStations = () => {
     }
   }, [getFilteredStations, searchQuery, filters]);
 
+  // Cache station distances to prevent recalculation
+  const stationsWithDistance = React.useMemo(() => {
+    return filteredStations.map(station => ({
+      ...station,
+      cachedDistance: calculateDistance(
+        userLocation.lat,
+        userLocation.lng,
+        station.location.coordinates.lat,
+        station.location.coordinates.lng
+      )
+    }));
+  }, [filteredStations, userLocation]);
+
   useEffect(() => {
     // Initialize data first
     initializeData();
@@ -172,12 +185,16 @@ const FindStations = () => {
 
 
   const getDistanceToStation = (station) => {
+    // Use cached distance if available, otherwise calculate
+    if (station.cachedDistance !== undefined) {
+      return station.cachedDistance.toFixed(1);
+    }
     return calculateDistance(
       userLocation.lat,
       userLocation.lng,
       station.location.coordinates.lat,
       station.location.coordinates.lng
-    );
+    ).toFixed(1);
   };
 
   const getStatusChip = (station) => {
@@ -237,15 +254,18 @@ const FindStations = () => {
             {/* Connector Type Filter with Smart Suggestions */}
             <Grid item xs={12} md={3}>
               <FormControl fullWidth>
-                <InputLabel>{getText("stations.connectorType")}</InputLabel>
+                <InputLabel id="findstations-connector-label">{getText("stations.connectorType")}</InputLabel>
                 <Select
-                  value={filters.connectorTypes || []}
-                  multiple
+                  labelId="findstations-connector-label"
+                  id="findstations-connector-select"
+                  label={getText("stations.connectorType")}
+                  value={Array.isArray(filters.connectorTypes) ? (filters.connectorTypes[0] || "") : (filters.connectorTypes || "")}
                   onChange={(e) => {
-                    console.log("Selected connectors:", e.target.value);
-                    updateFilters({ connectorTypes: e.target.value });
+                    const value = e.target.value;
+                    console.log("Selected connector:", value);
+                    updateFilters({ connectorTypes: value || "" });
                   }}
-                  renderValue={(selected) => selected.join(', ')}
+                  renderValue={(selected) => (selected ? selected : null)}
                 >
                   {Object.values(CONNECTOR_TYPES).map((type) => {
                     const isVehicleCompatible = getCurrentVehicleConnectors().includes(type);
@@ -287,7 +307,7 @@ const FindStations = () => {
           <Card>
             <CardContent>
               <Typography variant="h6" gutterBottom>
-                {loading ? "Đang tải..." : `${filteredStations.length} ${getText("stations.stationsFound")}`}
+                {loading ? "Đang tải..." : `${stationsWithDistance.length} ${getText("stations.stationsFound")}`}
               </Typography>
 
               {loading ? (
@@ -296,7 +316,7 @@ const FindStations = () => {
                 </Box>
               ) : (
                 <List>
-                  {filteredStations.map((station, index) => (
+                  {stationsWithDistance.map((station, index) => (
                     <React.Fragment key={station.id}>
                       <ListItem
                         onClick={() => setSelectedStation(station)}
@@ -318,6 +338,10 @@ const FindStations = () => {
                           <Avatar
                             src={getStationImage(station)}
                             sx={{ width: 60, height: 60 }}
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="60" height="60"%3E%3Crect fill="%231379FF" width="60" height="60"/%3E%3Ctext fill="white" x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="12"%3EStation%3C/text%3E%3C/svg%3E';
+                            }}
                           >
                             <ElectricCar />
                           </Avatar>
@@ -426,7 +450,7 @@ const FindStations = () => {
                         </Button>
                       </ListItem>
 
-                      {index < filteredStations.length - 1 && <Divider />}
+                      {index < stationsWithDistance.length - 1 && <Divider />}
                     </React.Fragment>
                   ))}
                 </List>
@@ -448,6 +472,10 @@ const FindStations = () => {
                   component="img"
                   src={getStationImage(selectedStation)}
                   alt={selectedStation.name}
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="200"%3E%3Crect fill="%231379FF" width="400" height="200"/%3E%3Ctext fill="white" x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="20"%3ECharging Station%3C/text%3E%3C/svg%3E';
+                  }}
                   sx={{
                     width: "100%",
                     height: 200,

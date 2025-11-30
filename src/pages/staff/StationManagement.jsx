@@ -1,5 +1,6 @@
 /* eslint-disable */
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Box,
   Grid,
@@ -7,15 +8,23 @@ import {
   CardContent,
   Typography,
   Button,
+  Container,
+  ToggleButtonGroup,
+  ToggleButton,
+  Drawer,
+  Divider,
+  Stack,
   Chip,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
   IconButton,
+  Tabs,
+  Tab,
+  Alert,
+  Paper,
+  List,
+  ListItem,
+  ListItemText,
+  TablePagination,
+  Snackbar,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -25,663 +34,597 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Alert,
-  Tab,
-  Tabs,
-  LinearProgress,
-  Tooltip,
 } from "@mui/material";
 import {
-  LocationOn,
-  Build,
-  Settings,
-  Visibility,
-  PlayArrow,
-  Stop,
-  Warning,
-  CheckCircle,
-  Error,
-  Schedule,
+  TableChart,
+  ViewModule,
+  Map as MapIcon,
+  Close,
+  FileDownload,
   PowerSettingsNew,
-  ElectricBolt,
+  Build,
+  Delete,
+  Warning,
+  Info,
+  CheckCircle,
 } from "@mui/icons-material";
+import {
+  StationFilters,
+  StationTable,
+  StationCard,
+} from "../../components/staff";
 
-// Mock data for stations and chargers
-const mockStations = [
-  {
-    id: 1,
-    name: "Vincom Royal City",
-    location: "Thanh Xuân, Hà Nội",
-    totalChargers: 8,
-    activeChargers: 6,
-    status: "operational",
-    chargers: [
+const StationManagement = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  
+  // States
+  const [viewMode, setViewMode] = useState("table"); // table | card | map
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [locationFilter, setLocationFilter] = useState("all");
+  const [selectedStations, setSelectedStations] = useState([]);
+  const [stations, setStations] = useState([]);
+  const [selectedStation, setSelectedStation] = useState(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [orderBy, setOrderBy] = useState("name");
+  const [order, setOrder] = useState("asc");
+  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
+  const [maintenanceDialog, setMaintenanceDialog] = useState({ open: false, station: null });
+  const [deleteDialog, setDeleteDialog] = useState({ open: false, station: null });
+
+  // Mock assigned station IDs
+  const assignedStationIds = [1, 2, 3];
+
+  useEffect(() => {
+    loadStations();
+    
+    // Check if navigated from dashboard with selected station
+    if (location.state?.selectedStation) {
+      handleOpenDetail(location.state.selectedStation);
+    }
+    
+    // Check if filtered by status
+    if (location.state?.filterStatus) {
+      setStatusFilter(location.state.filterStatus);
+    }
+  }, []);
+
+  const loadStations = async () => {
+    // TODO: Replace with real API
+    const mockData = [
       {
         id: 1,
-        name: "Charger #1",
-        status: "charging",
-        power: 22,
-        currentUser: "User123",
-        progress: 75,
+        name: "Trạm sạc FPT Complex",
+        location: { address: "Lô E2a-7, D1, KCN Cao, Q9, HCM" },
+        status: "operational",
+        statusLabel: "Đang hoạt động",
+        charging: { availablePorts: 2, totalPorts: 4 },
+        alerts: [],
+        monthlyRevenue: 45000000,
       },
       {
         id: 2,
-        name: "Charger #2",
-        status: "available",
-        power: 22,
-        currentUser: null,
-        progress: 0,
+        name: "Trạm sạc Landmark 81",
+        location: { address: "720A Điện Biên Phủ, Bình Thạnh, HCM" },
+        status: "maintenance",
+        statusLabel: "Bảo trì",
+        charging: { availablePorts: 0, totalPorts: 2 },
+        alerts: [{ type: "maintenance", message: "Đang bảo trì định kỳ" }],
+        monthlyRevenue: 38000000,
       },
       {
         id: 3,
-        name: "Charger #3",
-        status: "maintenance",
-        power: 50,
-        currentUser: null,
-        progress: 0,
+        name: "Trạm sạc Vincom Center",
+        location: { address: "72 Lê Thánh Tôn, Q1, HCM" },
+        status: "operational",
+        statusLabel: "Đang hoạt động",
+        charging: { availablePorts: 1, totalPorts: 2 },
+        alerts: [],
+        monthlyRevenue: 52000000,
       },
       {
         id: 4,
-        name: "Charger #4",
-        status: "charging",
-        power: 50,
-        currentUser: "User456",
-        progress: 45,
+        name: "Trạm sạc Crescent Mall",
+        location: { address: "101 Tôn Dật Tiên, Q7, HCM" },
+        status: "warning",
+        statusLabel: "Cảnh báo",
+        charging: { availablePorts: 2, totalPorts: 3 },
+        alerts: [{ type: "warning", message: "Công suất cao" }],
+        monthlyRevenue: 31000000,
       },
       {
         id: 5,
-        name: "Charger #5",
-        status: "available",
-        power: 22,
-        currentUser: null,
-        progress: 0,
-      },
-      {
-        id: 6,
-        name: "Charger #6",
-        status: "charging",
-        power: 22,
-        currentUser: "User789",
-        progress: 90,
-      },
-      {
-        id: 7,
-        name: "Charger #7",
+        name: "Trạm sạc Saigon Centre",
+        location: { address: "65 Lê Lợi, Q1, HCM" },
         status: "offline",
-        power: 50,
-        currentUser: null,
-        progress: 0,
+        statusLabel: "Offline",
+        charging: { availablePorts: 0, totalPorts: 4 },
+        alerts: [{ type: "error", message: "Mất kết nối" }],
+        monthlyRevenue: 0,
       },
-      {
-        id: 8,
-        name: "Charger #8",
-        status: "available",
-        power: 22,
-        currentUser: null,
-        progress: 0,
-      },
-    ],
-  },
-  {
-    id: 2,
-    name: "AEON Mall Long Biên",
-    location: "Long Biên, Hà Nội",
-    totalChargers: 12,
-    activeChargers: 10,
-    status: "operational",
-    chargers: [
-      {
-        id: 9,
-        name: "Charger #1",
-        status: "charging",
-        power: 22,
-        currentUser: "UserABC",
-        progress: 60,
-      },
-      {
-        id: 10,
-        name: "Charger #2",
-        status: "available",
-        power: 22,
-        currentUser: null,
-        progress: 0,
-      },
-      // ... more chargers
-    ],
-  },
-];
+    ];
 
-const mockMaintenanceLog = [
-  {
-    id: 1,
-    stationName: "Vincom Royal City",
-    chargerName: "Charger #3",
-    type: "Scheduled",
-    description: "Regular maintenance check",
-    technician: "Nguyễn Văn A",
-    startTime: "2024-03-15 09:00",
-    endTime: "2024-03-15 11:30",
-    status: "completed",
-  },
-  {
-    id: 2,
-    stationName: "AEON Mall Long Biên",
-    chargerName: "Charger #5",
-    type: "Emergency",
-    description: "Power connection issue",
-    technician: "Trần Văn B",
-    startTime: "2024-03-14 14:00",
-    endTime: null,
-    status: "in_progress",
-  },
-];
+    // Filter by assigned stations
+    const filteredData = mockData.filter((s) =>
+      assignedStationIds.includes(s.id)
+    );
+    setStations(filteredData);
+  };
 
-const StaffStationManagement = () => {
-  const [stations, setStations] = useState(mockStations);
-  const [selectedStation, setSelectedStation] = useState(stations[0]);
-  const [tabValue, setTabValue] = useState(0);
-  const [maintenanceDialog, setMaintenanceDialog] = useState(false);
-  const [selectedCharger, setSelectedCharger] = useState(null);
-  const [maintenanceForm, setMaintenanceForm] = useState({
-    type: "scheduled",
-    description: "",
-    priority: "medium",
-    technician: "",
+  const filteredStations = stations.filter((station) => {
+    const matchSearch =
+      !searchQuery ||
+      station.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      station.location.address.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchStatus = statusFilter === "all" || station.status === statusFilter;
+    const matchLocation =
+      locationFilter === "all" ||
+      station.location.address.includes(locationFilter);
+
+    return matchSearch && matchStatus && matchLocation;
   });
-  const [controlDialog, setControlDialog] = useState(false);
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case "charging":
-        return "success";
-      case "available":
-        return "info";
-      case "maintenance":
-        return "warning";
-      case "offline":
-        return "error";
-      default:
-        return "default";
+  const sortedStations = [...filteredStations].sort((a, b) => {
+    const isAsc = order === "asc";
+    if (orderBy === "name") {
+      return isAsc
+        ? a.name.localeCompare(b.name)
+        : b.name.localeCompare(a.name);
     }
-  };
-
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case "charging":
-        return <ElectricBolt />;
-      case "available":
-        return <CheckCircle />;
-      case "maintenance":
-        return <Build />;
-      case "offline":
-        return <Error />;
-      default:
-        return <PowerSettingsNew />;
+    if (orderBy === "status") {
+      return isAsc
+        ? a.status.localeCompare(b.status)
+        : b.status.localeCompare(a.status);
     }
+    if (orderBy === "utilization") {
+      const aUtil = a.charging.totalPorts > 0
+        ? ((a.charging.totalPorts - a.charging.availablePorts) / a.charging.totalPorts) * 100
+        : 0;
+      const bUtil = b.charging.totalPorts > 0
+        ? ((b.charging.totalPorts - b.charging.availablePorts) / b.charging.totalPorts) * 100
+        : 0;
+      return isAsc ? aUtil - bUtil : bUtil - aUtil;
+    }
+    return 0;
+  });
+
+  const paginatedStations = sortedStations.slice(
+    page * rowsPerPage,
+    page * rowsPerPage + rowsPerPage
+  );
+
+  const handleOpenDetail = (station) => {
+    setSelectedStation(station);
+    setDrawerOpen(true);
   };
 
-  const handleTabChange = (event, newValue) => {
-    setTabValue(newValue);
+  const handleCloseDetail = () => {
+    setDrawerOpen(false);
+    setTimeout(() => setSelectedStation(null), 300);
   };
 
-  const handleScheduleMaintenance = (charger) => {
-    setSelectedCharger(charger);
-    setMaintenanceDialog(true);
-  };
-
-  const handleMaintenanceSubmit = () => {
-    // Here you would send the maintenance request to your backend
-    console.log("Maintenance request:", {
-      charger: selectedCharger,
-      ...maintenanceForm,
-    });
-    setMaintenanceDialog(false);
-    setMaintenanceForm({
-      type: "scheduled",
-      description: "",
-      priority: "medium",
-      technician: "",
+  const handleToggleStation = (station) => {
+    setSnackbar({
+      open: true,
+      message: `Đã ${station.status === "operational" ? "tắt" : "bật"} trạm ${station.name}`,
+      severity: "success",
     });
   };
 
-  const handleChargerControl = (charger, action) => {
-    console.log(`${action} charger:`, charger);
-    // Here you would send control commands to your backend
+  const handleOpenMaintenance = (station) => {
+    setMaintenanceDialog({ open: true, station });
   };
 
-  const handleViewDetails = (charger) => {
-    setSelectedCharger(charger);
-    setControlDialog(true);
+  const handleScheduleMaintenance = () => {
+    setSnackbar({
+      open: true,
+      message: `Đã lên lịch bảo trì cho ${maintenanceDialog.station.name}`,
+      severity: "success",
+    });
+    setMaintenanceDialog({ open: false, station: null });
   };
+
+  const handleDeleteStation = (station) => {
+    setDeleteDialog({ open: true, station });
+  };
+
+  const handleConfirmDelete = () => {
+    setSnackbar({
+      open: true,
+      message: `Đã xóa trạm ${deleteDialog.station.name}`,
+      severity: "success",
+    });
+    setStations(stations.filter((s) => s.id !== deleteDialog.station.id));
+    setDeleteDialog({ open: false, station: null });
+  };
+
+  const handleExportCSV = () => {
+    setSnackbar({
+      open: true,
+      message: "Đang xuất dữ liệu...",
+      severity: "info",
+    });
+  };
+
+  const handleSort = (event, property) => {
+    const isAsc = orderBy === property && order === "asc";
+    setOrder(isAsc ? "desc" : "asc");
+    setOrderBy(property);
+  };
+
+  const handleClearFilters = () => {
+    setSearchQuery("");
+    setStatusFilter("all");
+    setLocationFilter("all");
+  };
+
+  const locations = [...new Set(stations.map((s) => s.location.address.split(",").pop().trim()))];
 
   return (
-    <Box sx={{ p: 3 }}>
-      {/* Header */}
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" fontWeight="bold" gutterBottom>
-          Quản lý trạm sạc
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          Giám sát và điều khiển các trạm sạc và thiết bị
-        </Typography>
-      </Box>
-
-      {/* Station Selector */}
-      <Grid container spacing={3} sx={{ mb: 3 }}>
-        {stations.map((station) => (
-          <Grid item xs={12} sm={6} md={4} key={station.id}>
-            <Card
-              sx={{
-                cursor: "pointer",
-                border: selectedStation?.id === station.id ? 2 : 1,
-                borderColor:
-                  selectedStation?.id === station.id
-                    ? "primary.main"
-                    : "grey.300",
-              }}
-              onClick={() => setSelectedStation(station)}
+    <Container maxWidth="xl">
+      <Box>
+        {/* Header */}
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+          <Box>
+            <Typography variant="h4" fontWeight="bold" gutterBottom>
+              Quản lý trạm sạc
+            </Typography>
+            <Typography variant="body1" color="text.secondary">
+              Quản lý chi tiết {assignedStationIds.length} trạm được phân công
+            </Typography>
+          </Box>
+          <Stack direction="row" spacing={2}>
+            <Button
+              variant="outlined"
+              startIcon={<FileDownload />}
+              onClick={handleExportCSV}
             >
-              <CardContent>
-                <Box
-                  sx={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "flex-start",
-                    mb: 2,
+              Xuất CSV
+            </Button>
+            {selectedStations.length > 0 && (
+              <Chip
+                label={`${selectedStations.length} trạm được chọn`}
+                color="primary"
+                onDelete={() => setSelectedStations([])}
+              />
+            )}
+          </Stack>
+        </Box>
+
+        {/* Filters */}
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <StationFilters
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              statusFilter={statusFilter}
+              onStatusChange={setStatusFilter}
+              locationFilter={locationFilter}
+              onLocationChange={setLocationFilter}
+              locations={locations}
+              onClearFilters={handleClearFilters}
+            />
+          </CardContent>
+        </Card>
+
+        {/* View Mode Toggle */}
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+          <Typography variant="body2" color="text.secondary">
+            Hiển thị {paginatedStations.length} / {filteredStations.length} trạm
+          </Typography>
+          <ToggleButtonGroup
+            value={viewMode}
+            exclusive
+            onChange={(e, value) => value && setViewMode(value)}
+            size="small"
+          >
+            <ToggleButton value="table">
+              <TableChart fontSize="small" />
+            </ToggleButton>
+            <ToggleButton value="card">
+              <ViewModule fontSize="small" />
+            </ToggleButton>
+            <ToggleButton value="map">
+              <MapIcon fontSize="small" />
+            </ToggleButton>
+          </ToggleButtonGroup>
+        </Box>
+
+        {/* Content */}
+        <Card>
+          <CardContent sx={{ p: 0 }}>
+            {viewMode === "table" && (
+              <>
+                <StationTable
+                  rows={paginatedStations}
+                  selected={selectedStations}
+                  onSelectOne={setSelectedStations}
+                  onSelectAll={setSelectedStations}
+                  onToggle={handleToggleStation}
+                  onOpen={handleOpenDetail}
+                  onMaintenance={handleOpenMaintenance}
+                  onDelete={handleDeleteStation}
+                  orderBy={orderBy}
+                  order={order}
+                  onSort={handleSort}
+                  showActions={true}
+                  showSelection={true}
+                />
+                <TablePagination
+                  component="div"
+                  count={filteredStations.length}
+                  page={page}
+                  onPageChange={(e, newPage) => setPage(newPage)}
+                  rowsPerPage={rowsPerPage}
+                  onRowsPerPageChange={(e) => {
+                    setRowsPerPage(parseInt(e.target.value, 10));
+                    setPage(0);
                   }}
-                >
+                  labelRowsPerPage="Số hàng mỗi trang:"
+                  labelDisplayedRows={({ from, to, count }) =>
+                    `${from}-${to} trong ${count}`
+                  }
+                />
+              </>
+            )}
+
+            {viewMode === "card" && (
+              <Box sx={{ p: 2 }}>
+                <Grid container spacing={2}>
+                  {paginatedStations.map((station) => (
+                    <Grid item xs={12} md={6} lg={4} key={station.id}>
+                      <StationCard
+                        station={station}
+                        compact={false}
+                        onOpen={handleOpenDetail}
+                        showActions={true}
+                      />
+                    </Grid>
+                  ))}
+                </Grid>
+                <TablePagination
+                  component="div"
+                  count={filteredStations.length}
+                  page={page}
+                  onPageChange={(e, newPage) => setPage(newPage)}
+                  rowsPerPage={rowsPerPage}
+                  onRowsPerPageChange={(e) => {
+                    setRowsPerPage(parseInt(e.target.value, 10));
+                    setPage(0);
+                  }}
+                  labelRowsPerPage="Số hàng mỗi trang:"
+                />
+              </Box>
+            )}
+
+            {viewMode === "map" && (
+              <Box sx={{ p: 3, textAlign: "center", minHeight: 400 }}>
+                <MapIcon sx={{ fontSize: 64, color: "action.disabled", mb: 2 }} />
+                <Typography variant="h6" color="text.secondary">
+                  Chế độ xem bản đồ
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Tính năng đang được phát triển
+                </Typography>
+              </Box>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Detail Drawer */}
+        <Drawer
+          anchor="right"
+          open={drawerOpen}
+          onClose={handleCloseDetail}
+          sx={{ "& .MuiDrawer-paper": { width: { xs: "100%", sm: 480 } } }}
+        >
+          {selectedStation && (
+            <Box>
+              <Box
+                display="flex"
+                justifyContent="space-between"
+                alignItems="center"
+                p={2}
+                borderBottom={1}
+                borderColor="divider"
+              >
+                <Typography variant="h6" fontWeight={600}>
+                  Chi tiết trạm
+                </Typography>
+                <IconButton onClick={handleCloseDetail}>
+                  <Close />
+                </IconButton>
+              </Box>
+
+              <Box p={3}>
+                <Typography variant="h5" fontWeight={700} gutterBottom>
+                  {selectedStation.name}
+                </Typography>
+                <Typography variant="body2" color="text.secondary" gutterBottom>
+                  {selectedStation.location.address}
+                </Typography>
+
+                <Divider sx={{ my: 2 }} />
+
+                <Tabs value={0} sx={{ mb: 2 }}>
+                  <Tab label="Thông tin" />
+                  <Tab label="Cổng sạc" />
+                  <Tab label="Bảo trì" />
+                </Tabs>
+
+                <Stack spacing={2}>
                   <Box>
-                    <Typography variant="h6" fontWeight="bold">
-                      {station.name}
+                    <Typography variant="caption" color="text.secondary">
+                      Trạng thái
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      <LocationOn sx={{ fontSize: 16, mr: 0.5 }} />
-                      {station.location}
+                    <Box mt={0.5}>
+                      <Chip
+                        label={selectedStation.statusLabel}
+                        color={
+                          selectedStation.status === "operational"
+                            ? "success"
+                            : selectedStation.status === "maintenance"
+                            ? "warning"
+                            : "error"
+                        }
+                      />
+                    </Box>
+                  </Box>
+
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">
+                      Cổng sạc
+                    </Typography>
+                    <Typography variant="body1" fontWeight={600}>
+                      {selectedStation.charging.availablePorts}/{selectedStation.charging.totalPorts} cổng
                     </Typography>
                   </Box>
-                  <Chip
-                    label={station.status}
-                    color={getStatusColor(station.status)}
-                    size="small"
-                  />
-                </Box>
 
-                <Typography variant="body2" gutterBottom>
-                  Active: {station.activeChargers}/{station.totalChargers}{" "}
-                  chargers
-                </Typography>
-                <LinearProgress
-                  variant="determinate"
-                  value={(station.activeChargers / station.totalChargers) * 100}
-                  sx={{ height: 6, borderRadius: 3 }}
-                />
-              </CardContent>
-            </Card>
-          </Grid>
-        ))}
-      </Grid>
-
-      {/* Tabs */}
-      <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
-        <Tabs value={tabValue} onChange={handleTabChange}>
-          <Tab label="Charger Status" />
-          <Tab label="Maintenance Log" />
-          <Tab label="Performance" />
-        </Tabs>
-      </Box>
-
-      {/* Tab Content */}
-      {tabValue === 0 && selectedStation && (
-        <Card>
-          <CardContent>
-            <Typography variant="h6" fontWeight="bold" gutterBottom>
-              {selectedStation.name} - Charger Status
-            </Typography>
-
-            <Grid container spacing={2}>
-              {selectedStation.chargers?.map((charger) => (
-                <Grid item xs={12} sm={6} md={4} key={charger.id}>
-                  <Card variant="outlined">
-                    <CardContent>
-                      <Box
-                        sx={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "flex-start",
-                          mb: 2,
-                        }}
-                      >
-                        <Box sx={{ display: "flex", alignItems: "center" }}>
-                          {getStatusIcon(charger.status)}
-                          <Box sx={{ ml: 1 }}>
-                            <Typography variant="subtitle1" fontWeight="bold">
-                              {charger.name}
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                              {charger.power}kW
-                            </Typography>
-                          </Box>
-                        </Box>
-                        <Chip
-                          label={charger.status}
-                          color={getStatusColor(charger.status)}
-                          size="small"
-                        />
-                      </Box>
-
-                      {charger.status === "charging" && (
-                        <Box sx={{ mb: 2 }}>
-                          <Typography variant="body2" gutterBottom>
-                            User: {charger.currentUser}
-                          </Typography>
-                          <LinearProgress
-                            variant="determinate"
-                            value={charger.progress}
-                            sx={{ height: 8, borderRadius: 4 }}
-                          />
-                          <Typography variant="caption" color="text.secondary">
-                            {charger.progress}% Complete
-                          </Typography>
-                        </Box>
-                      )}
-
-                      <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-                        <Tooltip title="Xem chi tiết">
-                          <IconButton
-                            size="small"
-                            onClick={() => handleViewDetails(charger)}
-                          >
-                            <Visibility />
-                          </IconButton>
-                        </Tooltip>
-
-                        {charger.status === "available" && (
-                          <Tooltip title="Start Test">
-                            <IconButton
-                              size="small"
-                              color="success"
-                              onClick={() =>
-                                handleChargerControl(charger, "start")
-                              }
-                            >
-                              <PlayArrow />
-                            </IconButton>
-                          </Tooltip>
-                        )}
-
-                        {charger.status === "charging" && (
-                          <Tooltip title="Stop Charging">
-                            <IconButton
-                              size="small"
-                              color="error"
-                              onClick={() =>
-                                handleChargerControl(charger, "stop")
-                              }
-                            >
-                              <Stop />
-                            </IconButton>
-                          </Tooltip>
-                        )}
-
-                        <Tooltip title="Schedule Maintenance">
-                          <IconButton
-                            size="small"
-                            color="warning"
-                            onClick={() => handleScheduleMaintenance(charger)}
-                          >
-                            <Build />
-                          </IconButton>
-                        </Tooltip>
-
-                        <Tooltip title="Settings">
-                          <IconButton size="small">
-                            <Settings />
-                          </IconButton>
-                        </Tooltip>
-                      </Box>
-                    </CardContent>
-                  </Card>
-                </Grid>
-              ))}
-            </Grid>
-          </CardContent>
-        </Card>
-      )}
-
-      {tabValue === 1 && (
-        <Card>
-          <CardContent>
-            <Typography variant="h6" fontWeight="bold" gutterBottom>
-              Maintenance Log
-            </Typography>
-
-            <TableContainer component={Paper} variant="outlined">
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Station</TableCell>
-                    <TableCell>Charger</TableCell>
-                    <TableCell>Type</TableCell>
-                    <TableCell>Description</TableCell>
-                    <TableCell>Technician</TableCell>
-                    <TableCell>Start Time</TableCell>
-                    <TableCell>Status</TableCell>
-                    <TableCell>Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {mockMaintenanceLog.map((log) => (
-                    <TableRow key={log.id}>
-                      <TableCell>{log.stationName}</TableCell>
-                      <TableCell>{log.chargerName}</TableCell>
-                      <TableCell>
-                        <Chip
-                          label={log.type}
-                          color={log.type === "Emergency" ? "error" : "info"}
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell>{log.description}</TableCell>
-                      <TableCell>{log.technician}</TableCell>
-                      <TableCell>{log.startTime}</TableCell>
-                      <TableCell>
-                        <Chip
-                          label={log.status}
-                          color={
-                            log.status === "completed" ? "success" : "warning"
-                          }
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <IconButton size="small">
-                          <Visibility />
-                        </IconButton>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </CardContent>
-        </Card>
-      )}
-
-      {tabValue === 2 && (
-        <Card>
-          <CardContent>
-            <Typography variant="h6" fontWeight="bold" gutterBottom>
-              Station Performance Metrics
-            </Typography>
-            <Alert severity="info">
-              Performance analytics will be displayed here including usage
-              statistics, energy consumption, revenue generation, and efficiency
-              metrics.
-            </Alert>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Maintenance Dialog */}
-      <Dialog
-        open={maintenanceDialog}
-        onClose={() => setMaintenanceDialog(false)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>
-          Schedule Maintenance - {selectedCharger?.name}
-        </DialogTitle>
-        <DialogContent>
-          <Box sx={{ mt: 2 }}>
-            <FormControl fullWidth sx={{ mb: 2 }}>
-              <InputLabel>Type</InputLabel>
-              <Select
-                value={maintenanceForm.type}
-                label="Type"
-                onChange={(e) =>
-                  setMaintenanceForm({
-                    ...maintenanceForm,
-                    type: e.target.value,
-                  })
-                }
-              >
-                <MenuItem value="scheduled">Scheduled</MenuItem>
-                <MenuItem value="emergency">Emergency</MenuItem>
-                <MenuItem value="preventive">Preventive</MenuItem>
-              </Select>
-            </FormControl>
-
-            <TextField
-              fullWidth
-              label="Description"
-              multiline
-              rows={3}
-              value={maintenanceForm.description}
-              onChange={(e) =>
-                setMaintenanceForm({
-                  ...maintenanceForm,
-                  description: e.target.value,
-                })
-              }
-              sx={{ mb: 2 }}
-            />
-
-            <FormControl fullWidth sx={{ mb: 2 }}>
-              <InputLabel>Priority</InputLabel>
-              <Select
-                value={maintenanceForm.priority}
-                label="Priority"
-                onChange={(e) =>
-                  setMaintenanceForm({
-                    ...maintenanceForm,
-                    priority: e.target.value,
-                  })
-                }
-              >
-                <MenuItem value="low">Low</MenuItem>
-                <MenuItem value="medium">Medium</MenuItem>
-                <MenuItem value="high">High</MenuItem>
-                <MenuItem value="critical">Critical</MenuItem>
-              </Select>
-            </FormControl>
-
-            <TextField
-              fullWidth
-              label="Assigned Technician"
-              value={maintenanceForm.technician}
-              onChange={(e) =>
-                setMaintenanceForm({
-                  ...maintenanceForm,
-                  technician: e.target.value,
-                })
-              }
-            />
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setMaintenanceDialog(false)}>Cancel</Button>
-          <Button onClick={handleMaintenanceSubmit} variant="contained">
-            Schedule
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Charger Control Dialog */}
-      <Dialog
-        open={controlDialog}
-        onClose={() => setControlDialog(false)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>Charger Control - {selectedCharger?.name}</DialogTitle>
-        <DialogContent>
-          {selectedCharger && (
-            <Box sx={{ mt: 2 }}>
-              <Grid container spacing={2}>
-                <Grid item xs={12} sm={6}>
-                  <Typography variant="subtitle2" gutterBottom>
-                    Status
-                  </Typography>
-                  <Chip
-                    label={selectedCharger.status}
-                    color={getStatusColor(selectedCharger.status)}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <Typography variant="subtitle2" gutterBottom>
-                    Power Rating
-                  </Typography>
-                  <Typography variant="body2">
-                    {selectedCharger.power}kW
-                  </Typography>
-                </Grid>
-                {selectedCharger.currentUser && (
-                  <Grid item xs={12}>
-                    <Typography variant="subtitle2" gutterBottom>
-                      Current User
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">
+                      Doanh thu tháng
                     </Typography>
-                    <Typography variant="body2">
-                      {selectedCharger.currentUser}
+                    <Typography variant="body1" fontWeight={600}>
+                      {selectedStation.monthlyRevenue.toLocaleString("vi-VN")} VNĐ
                     </Typography>
-                  </Grid>
-                )}
-                {selectedCharger.status === "charging" && (
-                  <Grid item xs={12}>
-                    <Typography variant="subtitle2" gutterBottom>
-                      Progress
-                    </Typography>
-                    <LinearProgress
-                      variant="determinate"
-                      value={selectedCharger.progress}
-                      sx={{ height: 8, borderRadius: 4, mb: 1 }}
-                    />
-                    <Typography variant="body2">
-                      {selectedCharger.progress}% Complete
-                    </Typography>
-                  </Grid>
-                )}
-              </Grid>
+                  </Box>
+
+                  {selectedStation.alerts?.length > 0 && (
+                    <Alert severity="warning" icon={<Warning />}>
+                      <Typography variant="body2">
+                        {selectedStation.alerts[0].message}
+                      </Typography>
+                    </Alert>
+                  )}
+
+                  <Divider />
+
+                  <Stack spacing={1}>
+                    <Button
+                      fullWidth
+                      variant="contained"
+                      startIcon={<PowerSettingsNew />}
+                      onClick={() => handleToggleStation(selectedStation)}
+                    >
+                      Bật/Tắt trạm
+                    </Button>
+                    <Button
+                      fullWidth
+                      variant="outlined"
+                      startIcon={<Build />}
+                      onClick={() => handleOpenMaintenance(selectedStation)}
+                    >
+                      Lên lịch bảo trì
+                    </Button>
+                  </Stack>
+                </Stack>
+              </Box>
             </Box>
           )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setControlDialog(false)}>Close</Button>
-          {selectedCharger?.status === "charging" && (
-            <Button
-              color="error"
-              onClick={() => {
-                handleChargerControl(selectedCharger, "stop");
-                setControlDialog(false);
-              }}
-            >
-              Stop Charging
+        </Drawer>
+
+        {/* Maintenance Dialog */}
+        <Dialog
+          open={maintenanceDialog.open}
+          onClose={() => setMaintenanceDialog({ open: false, station: null })}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>Lên lịch bảo trì</DialogTitle>
+          <DialogContent>
+            <Stack spacing={2} sx={{ mt: 1 }}>
+              <TextField
+                fullWidth
+                label="Tên trạm"
+                value={maintenanceDialog.station?.name || ""}
+                disabled
+              />
+              <TextField
+                fullWidth
+                label="Ngày bảo trì"
+                type="date"
+                InputLabelProps={{ shrink: true }}
+              />
+              <TextField
+                fullWidth
+                label="Thời gian"
+                type="time"
+                InputLabelProps={{ shrink: true }}
+              />
+              <FormControl fullWidth>
+                <InputLabel>Mức độ ưu tiên</InputLabel>
+                <Select label="Mức độ ưu tiên" defaultValue="medium">
+                  <MenuItem value="low">Thấp</MenuItem>
+                  <MenuItem value="medium">Trung bình</MenuItem>
+                  <MenuItem value="high">Cao</MenuItem>
+                  <MenuItem value="urgent">Khẩn cấp</MenuItem>
+                </Select>
+              </FormControl>
+              <TextField
+                fullWidth
+                label="Ghi chú"
+                multiline
+                rows={3}
+              />
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setMaintenanceDialog({ open: false, station: null })}>
+              Hủy
             </Button>
-          )}
-        </DialogActions>
-      </Dialog>
-    </Box>
+            <Button variant="contained" onClick={handleScheduleMaintenance}>
+              Xác nhận
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Delete Dialog */}
+        <Dialog
+          open={deleteDialog.open}
+          onClose={() => setDeleteDialog({ open: false, station: null })}
+          maxWidth="xs"
+          fullWidth
+        >
+          <DialogTitle>Xác nhận xóa</DialogTitle>
+          <DialogContent>
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              Hành động này không thể hoàn tác!
+            </Alert>
+            <Typography>
+              Bạn có chắc chắn muốn xóa trạm{" "}
+              <strong>{deleteDialog.station?.name}</strong>?
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setDeleteDialog({ open: false, station: null })}>
+              Hủy
+            </Button>
+            <Button variant="contained" color="error" onClick={handleConfirmDelete}>
+              Xóa
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Snackbar */}
+        <Snackbar
+          open={snackbar.open}
+          autoHideDuration={3000}
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+        >
+          <Alert
+            onClose={() => setSnackbar({ ...snackbar, open: false })}
+            severity={snackbar.severity}
+          >
+            {snackbar.message}
+          </Alert>
+        </Snackbar>
+      </Box>
+    </Container>
   );
 };
 
-export default StaffStationManagement;
+export default StationManagement;

@@ -1,4 +1,4 @@
-// services/invoiceService.js
+﻿// services/invoiceService.js
 import { formatCurrency } from "../utils/helpers";
 
 export class InvoiceService {

@@ -1,4 +1,4 @@
-import { create } from "zustand";
+﻿import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { authAPI } from "../services/api";
 
@@ -24,6 +24,7 @@ const useAuthStore = create(
             user_id: response.userId,
             email: response.email,
             full_name: response.fullName,
+            phone_number: response.phoneNumber || null,
             role: response.role.toLowerCase(), // Normalize role to lowercase
           };
 
@@ -63,17 +64,27 @@ const useAuthStore = create(
           // Real API call
           const response = await authAPI.register(userData);
 
-          if (response.success && response.data) {
+          // Backend returns RegisterResponseDto directly (not wrapped in success/data)
+          if (response && response.userId) {
+            const user = {
+              user_id: response.userId,
+              email: response.email,
+              full_name: response.fullName,
+              role: userData.role, // Use role from request
+            };
+
             set({
-              user: response.data.user,
+              user: user,
               isAuthenticated: false, // May require verification
               loading: false,
+              error: null, // Clear any previous errors
             });
 
             return {
               success: true,
-              user: response.data.user,
-              requiresVerification: response.data.requiresVerification,
+              user: user,
+              requiresVerification: false, // Set to false to trigger success message
+              message: response.message,
             };
           } else {
             throw new Error(response.message || "Đăng ký thất bại");
@@ -141,13 +152,17 @@ const useAuthStore = create(
         set({ error: null });
       },
 
+      setUser: (userData) => {
+        set({ user: userData });
+      },
+
       updateProfile: (profileData) => {
         const currentUser = get().user;
         if (currentUser) {
           set({
             user: {
               ...currentUser,
-              profile: { ...currentUser.profile, ...profileData },
+              ...profileData,
             },
           });
         }

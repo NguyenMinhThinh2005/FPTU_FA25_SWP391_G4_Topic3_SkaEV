@@ -1,321 +1,164 @@
-# 🚀 Quick Start Guide - Chạy Local Nhanh
+# 🚀 QUICK START - Setup trong 5 phút
 
-**Cập nhật:** 13/10/2025  
-**Frontend đã migrate sang Real API - Không dùng mock data**
-
----
-
-## ⚡ Chạy Trong 5 Phút
-
-### Bước 1: Kiểm Tra Yêu Cầu (30 giây)
-
-```powershell
-# Check .NET SDK
-dotnet --version  # Cần: 8.0.x
-
-# Check Node.js
-node --version    # Cần: 18.x hoặc cao hơn
-npm --version     # Cần: 9.x hoặc cao hơn
-
-# Check SQL Server
-Get-Service -Name "MSSQL*" | Select-Object Name, Status
-# Phải thấy: MSSQLSERVER - Running
-```
-
-**✅ Nếu OK:** Tiếp tục bước 2  
-**❌ Nếu thiếu:** Xem file `LOCAL_SETUP_GUIDE.md` để cài đặt
+## 📌 Yêu Cầu Hệ Thống
+- Node.js 18+ 
+- .NET 8 SDK
+- SQL Server (Express hoặc Developer Edition)
+- Git
 
 ---
 
-### Bước 2: Setup Database (1-2 phút)
+## ⚡ Setup Nhanh
 
-```powershell
-# Mở PowerShell hoặc CMD tại thư mục project
-cd "d:\University\SWP\FPTU_FA25_SWP391_G4_Topic3_SkaEV"
+### 1️⃣ Clone & Install Dependencies
 
-# Chạy script tạo database
-cd database
-sqlcmd -S localhost -E -i DEPLOY_COMPLETE.sql
+```bash
+# Clone repo
+git clone <repository-url>
+cd FPTU_FA25_SWP391_G4_Topic3_SkaEV
 
-# Quay lại root folder
+# Install frontend
+npm install
+
+# Install backend
+cd SkaEV.API
+dotnet restore
 cd ..
 ```
 
-**Kiểm tra thành công:**
-```powershell
-sqlcmd -S localhost -Q "SELECT name FROM sys.databases WHERE name = 'SkaEV_DB'"
-# Phải thấy: SkaEV_DB
-```
+### 2️⃣ Cấu Hình Backend
 
----
-
-### Bước 3: Chạy Backend (1 phút)
-
-**Terminal 1 - Backend:**
-```powershell
+```bash
+# Copy file template
 cd SkaEV.API
-dotnet restore
-dotnet run
+copy appsettings.template.json appsettings.json
 ```
 
-**Đợi đến khi thấy:**
-```
-info: Microsoft.Hosting.Lifetime[14]
-      Now listening on: https://localhost:5001
-```
+**Chỉnh sửa `appsettings.json`:**
+- Thay `YOUR_SERVER_NAME\\YOUR_INSTANCE` bằng server SQL của bạn
+- Ví dụ: `LAPTOP123\\SQLEXPRESS` hoặc `localhost\\SQLEXPRESS`
 
-**Test Backend:**
-- Mở browser: **https://localhost:5001/swagger**
-- Bạn sẽ thấy Swagger UI với danh sách API
+### 3️⃣ Setup Database
 
----
-
-### Bước 4: Chạy Frontend (1 phút)
-
-**Terminal 2 - Frontend (terminal mới, giữ backend chạy):**
-```powershell
-# Quay lại root folder
-cd d:\University\SWP\FPTU_FA25_SWP391_G4_Topic3_SkaEV
-
-# Install dependencies (chỉ lần đầu)
-npm install
-
-# Start frontend
-npm run dev
+```sql
+-- Tạo database (chạy trong SQL Server Management Studio)
+CREATE DATABASE SkaEV_DB;
+GO
 ```
 
-**Đợi đến khi thấy:**
+Sau đó:
+```bash
+# Chạy migrations
+cd SkaEV.API
+dotnet ef database update
 ```
-➜  Local:   http://localhost:5173/
-```
 
-**Mở browser:** **http://localhost:5173**
+Hoặc xem chi tiết tại: [SETUP_DATABASE.md](./SETUP_DATABASE.md)
 
----
-
-### Bước 5: Test Hoạt Động (1 phút)
-
-1. **Register Account:**
-   - Email: `test@example.com`
-   - Password: `Test@123456`
-   - Name: `Test User`
-
-2. **Login:** Dùng tài khoản vừa tạo
-
-3. **Mở DevTools (F12):**
-   - Console tab: Xem logs
-   - Network tab: Xem API calls
-   - Phải thấy: `POST https://localhost:5001/api/auth/login` → 200 OK
-
-4. **Check localStorage:**
-   ```javascript
-   localStorage.getItem('token')  // Phải có JWT token
-   ```
-
-**✅ Nếu thấy token và không có lỗi → Setup thành công!**
-
----
-
-## 🎯 Workflow Làm Việc Hàng Ngày
-
-### Mỗi Lần Bắt Đầu Code:
+### 4️⃣ Chạy Ứng Dụng
 
 **Terminal 1 - Backend:**
-```powershell
-cd d:\University\SWP\FPTU_FA25_SWP391_G4_Topic3_SkaEV\SkaEV.API
+```bash
+cd SkaEV.API
 dotnet run
 ```
+→ API chạy tại: `http://localhost:5000`
 
 **Terminal 2 - Frontend:**
-```powershell
-cd d:\University\SWP\FPTU_FA25_SWP391_G4_Topic3_SkaEV
+```bash
 npm run dev
 ```
-
-**VS Code:** Mở folder project, edit code, auto-save sẽ trigger hot reload
-
----
-
-## 🔧 Scripts Tiện Ích
-
-### Windows PowerShell Scripts (đã có sẵn):
-
-**Backend:**
-```powershell
-.\run-backend.ps1        # Chạy backend
-.\SkaEV.API\start-api.ps1  # Hoặc chạy script trong API folder
-```
-
-**Frontend:**
-```powershell
-.\run-frontend.ps1       # Chạy frontend
-```
-
-**Database:**
-```powershell
-.\database\deploy-db-simple.ps1  # Deploy database
-```
+→ App chạy tại: `http://localhost:5173`
 
 ---
 
-## 🐛 Lỗi Thường Gặp
+## 🔑 Đăng Nhập Test
 
-### ❌ "Cannot connect to SQL Server"
-```powershell
-# Kiểm tra SQL Server đang chạy
-Get-Service -Name "MSSQLSERVER" | Start-Service
+| Role | Email | Password |
+|------|-------|----------|
+| Admin | `admin@skaev.com` | `Admin@123` |
+| Staff | `staff@skaev.com` | `Admin@123` |
+| Customer | `customer@skaev.com` | `Admin@123` |
 
-# Nếu dùng SQL Express
-Get-Service -Name "MSSQL$SQLEXPRESS" | Start-Service
+**Chi tiết tài khoản:** Xem file [ACCOUNT_PASSWORDS.md](./ACCOUNT_PASSWORDS.md)
+
+---
+
+## 📂 Cấu Trúc Project
+
 ```
-
-### ❌ "Port 5001 already in use"
-```powershell
-# Tìm process đang dùng port
-netstat -ano | findstr :5001
-
-# Kill process (thay PID bằng số từ kết quả trên)
-taskkill /F /PID 12345
-```
-
-### ❌ "CORS policy blocked"
-```
-✅ Backend phải chạy TRƯỚC frontend
-✅ Backend phải ở https://localhost:5001
-✅ Frontend phải ở http://localhost:5173
-```
-
-### ❌ "401 Unauthorized"
-```javascript
-// Xóa token cũ và login lại
-localStorage.clear()
-// Reload page và login lại
-```
-
-### ❌ Frontend lỗi "ERR_CONNECTION_REFUSED"
-```
-→ Backend chưa chạy! Start backend trước.
+FPTU_FA25_SWP391_G4_Topic3_SkaEV/
+├── src/                    # Frontend React + Vite
+├── SkaEV.API/              # Backend .NET 8
+├── database/               # SQL scripts
+├── .env.example            # Frontend config mẫu
+└── SkaEV.API/
+    └── appsettings.template.json  # Backend config mẫu
 ```
 
 ---
 
-## 📊 Ports & URLs
+## ⚠️ Lưu Ý Quan Trọng
 
-| Service | URL | Mô tả |
-|---------|-----|-------|
-| Frontend | http://localhost:5173 | React + Vite dev server |
-| Backend HTTP | http://localhost:5000 | ASP.NET Core API |
-| Backend HTTPS | https://localhost:5001 | ASP.NET Core API (SSL) |
-| Swagger | https://localhost:5001/swagger | API Documentation |
-| Health Check | https://localhost:5001/health | API Health Status |
-| Database | localhost:1433 | SQL Server default port |
+### ❌ KHÔNG Commit Các File Sau:
+- `.env` (frontend config của bạn)
+- `SkaEV.API/appsettings.json` (backend config của bạn)
+- `*.ps1`, `*.bat` (scripts cá nhân)
+- `node_modules/`, `bin/`, `obj/`
 
----
-
-## 📝 Test Data
-
-### Admin Account:
-```sql
--- Chạy trong SSMS hoặc Azure Data Studio
-USE SkaEV_DB;
-
--- Tạo admin (password: Admin@123)
-EXEC sp_create_user 
-    @email = 'admin@skaev.com',
-    @password = 'Admin@123',
-    @full_name = 'Admin User',
-    @phone_number = '0901234567',
-    @role = 'admin';
-```
-
-### Charging Station Mẫu:
-```sql
--- Trạm FPTU HCM
-INSERT INTO charging_stations (
-    station_name, address, city, 
-    latitude, longitude, 
-    total_posts, available_posts, 
-    operating_hours, status
-)
-VALUES (
-    'FPTU HCM Charging Station',
-    'Lô E2a-7, D1, Long Thạnh Mỹ, Thủ Đức, HCM',
-    'Ho Chi Minh City',
-    10.8411276, 106.8097910,
-    4, 4,
-    '24/7', 'active'
-);
-```
+### ✅ CÓ Trong Git:
+- `.env.example` (file mẫu)
+- `appsettings.template.json` (file mẫu)
+- `SETUP_*.md` (hướng dẫn)
 
 ---
 
-## 🎯 Feature Testing Checklist
+## 🆘 Gặp Lỗi?
 
-Sau khi setup, test các tính năng:
-
-- [ ] **Register** - Tạo tài khoản mới
-- [ ] **Login** - Đăng nhập
-- [ ] **View Stations** - Xem danh sách trạm sạc
-- [ ] **Search Nearby** - Tìm trạm gần (cần GPS)
-- [ ] **Create Booking** - Đặt lịch sạc
-- [ ] **QR Scan** - Quét mã QR (cần camera)
-- [ ] **Start Charging** - Bắt đầu sạc
-- [ ] **Monitor SOC** - Theo dõi % pin
-- [ ] **Stop Charging** - Dừng sạc
-- [ ] **View History** - Xem lịch sử
-- [ ] **Submit Review** - Đánh giá trạm
-
----
-
-## 🚀 Production Build
-
-### Build Frontend cho Production:
-```powershell
-npm run build
-# Output: dist/ folder
-
-# Preview production build
-npm run preview
+### Lỗi Connection String
+```
+Kiểm tra tên SQL Server:
+1. Mở SQL Server Management Studio
+2. Khi connect, sao chép chính xác tên server
+3. Dán vào appsettings.json
 ```
 
-### Build Backend cho Production:
-```powershell
+### Lỗi Port Đã Dùng
+```bash
+# Thay đổi port trong:
+# - SkaEV.API/Properties/launchSettings.json (backend)
+# - vite.config.js (frontend)
+```
+
+### Database Migration Lỗi
+```bash
+# Xóa migrations cũ
 cd SkaEV.API
-dotnet publish -c Release -o ./publish
+rm -rf Migrations/
+
+# Tạo migration mới
+dotnet ef migrations add InitialCreate
+dotnet ef database update
 ```
 
 ---
 
 ## 📚 Tài Liệu Chi Tiết
 
-- **Setup đầy đủ:** `LOCAL_SETUP_GUIDE.md`
-- **API Documentation:** `API_DOCUMENTATION.md`
-- **Database Schema:** `DATABASE_BACKEND_COMPATIBILITY.md`
-- **Migration Status:** `MIGRATION_STATUS.md`
+- [SETUP_FOR_TEAM.md](./SETUP_FOR_TEAM.md) - Hướng dẫn setup đầy đủ
+- [SETUP_DATABASE.md](./SETUP_DATABASE.md) - Setup database chi tiết
+- [ACCOUNT_PASSWORDS.md](./ACCOUNT_PASSWORDS.md) - Tài khoản test
+- [README.md](./README.md) - Tổng quan dự án
 
 ---
 
-## 💡 Tips
+## ✅ Checklist Trước Khi Push
 
-1. **Dùng 2 terminals:** 1 cho backend, 1 cho frontend
-2. **Keep Swagger open:** Test API nhanh hơn
-3. **Check DevTools Console:** Debug frontend errors
-4. **Check Backend Logs:** `SkaEV.API/logs/skaev-*.txt`
-5. **Use React DevTools:** Debug React components
-6. **Use SQL Profiler:** Debug SQL queries
+- [ ] `git status` - không có file config cá nhân
+- [ ] Code chạy được trên máy local
+- [ ] Đã test đăng nhập với 3 tài khoản
+- [ ] Không commit `appsettings.json` hoặc `.env`
 
 ---
 
-## 🆘 Cần Giúp Đỡ?
-
-1. Check `LOCAL_SETUP_GUIDE.md` → Section "Troubleshooting"
-2. Check backend logs: `SkaEV.API/logs/`
-3. Check browser console: F12 → Console tab
-4. Test API trực tiếp: Swagger UI
-5. Check database: SSMS hoặc Azure Data Studio
-
----
-
-**✨ Happy Coding! 🚀**
-
-**Updated:** 13/10/2025
+**Setup xong rồi? Bắt đầu code thôi! 🎉**

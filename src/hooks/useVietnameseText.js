@@ -1,4 +1,4 @@
-import { getText, formatText } from '../utils/vietnameseTexts';
+﻿import { getText, formatText } from '../utils/vietnameseTexts';
 
 /**
  * Hook để sử dụng văn bản tiếng Việt trong components

@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import {
   Drawer,
   List,
@@ -20,6 +20,7 @@ import {
   Analytics,
   People,
   ElectricCar,
+  Warning,
 } from "@mui/icons-material";
 import { useNavigate, useLocation } from "react-router-dom";
 import useAuthStore from "../../../store/authStore";
@@ -56,22 +57,32 @@ const Sidebar = ({ open, onClose }) => {
             icon: <People />,
             path: "/admin/users",
           },
+          {
+            text: "Quản lý báo cáo sự cố",
+            icon: <Warning />,
+            path: "/admin/incidents",
+          },
         ];
 
       case "staff":
         return [
           {
-            text: getText("nav.dashboard"),
+            text: "Tổng quan Trạm sạc",
             icon: <Dashboard />,
             path: "/staff/dashboard",
           },
           {
-            text: getText("nav.stationManagement"),
-            icon: <LocationOn />,
-            path: "/staff/stations",
+            text: "Quản lý Phiên sạc",
+            icon: <ElectricCar />,
+            path: "/staff/charging-sessions",
           },
           {
-            text: getText("nav.profile"),
+            text: "Theo dõi & Báo cáo",
+            icon: <LocationOn />,
+            path: "/staff/monitoring",
+          },
+          {
+            text: "Tài khoản",
             icon: <Person />,
             path: "/staff/profile",
           },

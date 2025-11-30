@@ -11,6 +11,10 @@ public class AdminUserDto
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
     public DateTime? LastLoginAt { get; set; }
+    public int? ManagedStationId { get; set; }
+    public string? ManagedStationName { get; set; }
+    public string? ManagedStationAddress { get; set; }
+    public string? ManagedStationCity { get; set; }
 }
 
 public class AdminUserDetailDto : AdminUserDto
@@ -30,6 +34,7 @@ public class CreateUserDto
     public string FullName { get; set; } = string.Empty;
     public string? PhoneNumber { get; set; }
     public string Role { get; set; } = "customer";
+    public int? ManagedStationId { get; set; }
 }
 
 public class UpdateUserDto
@@ -37,6 +42,8 @@ public class UpdateUserDto
     public string? FullName { get; set; }
     public string? PhoneNumber { get; set; }
     public string? Email { get; set; }
+    public string? Role { get; set; }
+    public int? ManagedStationId { get; set; }
 }
 
 public class UpdateUserRoleDto

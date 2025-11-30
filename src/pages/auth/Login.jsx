@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import {
   Box,
   Card,
@@ -13,10 +13,12 @@ import {
   Chip,
   Link,
   IconButton,
+  InputAdornment,
 } from "@mui/material";
-import { ElectricCar, Login, Google, Phone } from "@mui/icons-material";
+import { ElectricCar, Login, Google, Phone, Visibility, VisibilityOff } from "@mui/icons-material";
 import { useNavigate, Link as RouterLink } from "react-router-dom";
 import useAuthStore from "../../store/authStore";
+import { authAPI } from "../../services/api";
 import { getText } from "../../utils/vietnameseTexts";
 import { googleAuth } from "../../services/socialAuthService";
 import PhoneOTPModal from "../../components/auth/PhoneOTPModal";
@@ -29,6 +31,8 @@ const LoginPage = () => {
     email: "",
     password: "",
   });
+
+  const [showPassword, setShowPassword] = useState(false);
 
   const [socialLoading, setSocialLoading] = useState({
     google: false,
@@ -51,9 +55,24 @@ const LoginPage = () => {
 
     if (result.success) {
       console.log("Login successful", result.data);
-      
+
+      // Try to get role from login result first
+      let userRole = result.data?.user?.role;
+
+      // If backend only returned token, fetch profile to get role
+      if (!userRole) {
+        try {
+          const profile = await authAPI.getProfile();
+          userRole = profile?.role || profile?.Role || profile?.roleName;
+        } catch (err) {
+          console.warn("Failed to fetch profile after login:", err);
+        }
+      }
+
+      // Normalize role to lowercase when present
+      if (typeof userRole === "string") userRole = userRole.toLowerCase();
+
       // Navigate based on user role
-      const userRole = result.data?.user?.role;
       switch (userRole) {
         case "admin":
           navigate("/admin/dashboard");
@@ -223,11 +242,25 @@ const LoginPage = () => {
                 fullWidth
                 label={getText("auth.password")}
                 name="password"
-                type="password"
+                type={showPassword ? "text" : "password"}
                 value={formData.password}
                 onChange={handleInputChange}
                 required
                 disabled={loading}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        onClick={() => setShowPassword(!showPassword)}
+                        edge="end"
+                        disabled={loading}
+                        aria-label="toggle password visibility"
+                      >
+                        {showPassword ? <VisibilityOff /> : <Visibility />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
               />
             </Box>
 

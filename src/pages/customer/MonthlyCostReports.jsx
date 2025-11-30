@@ -37,7 +37,7 @@ import { formatCurrency } from "../../utils/helpers";
 import useBookingStore from "../../store/bookingStore";
 
 const MonthlyCostReports = () => {
-    const [selectedMonth, setSelectedMonth] = useState("2024-09");
+    const [selectedMonth, setSelectedMonth] = useState("2025-09");
     const { bookingHistory, getBookingStats} = useBookingStore();
 
     // Calculate monthly data from booking store
@@ -45,7 +45,7 @@ const MonthlyCostReports = () => {
     const completedBookings = bookingHistory.filter(b => b.status === 'completed');
 
     const monthlyReports = {
-        "2024-09": {
+        "2025-09": {
             totalCost: bookingStats.totalAmount || 2450000,
             totalSessions: bookingStats.total || 15,
             totalEnergy: bookingStats.totalEnergyCharged || 450,
@@ -56,30 +56,30 @@ const MonthlyCostReports = () => {
                 sessionsChange: -6.7,
                 energyChange: 8.3},
             dailyBreakdown: [
-                { date: "2024-09-01", sessions: 1, energy: 32, cost: 174000 },
-                { date: "2024-09-03", sessions: 1, energy: 28, cost: 152000 },
-                { date: "2024-09-06", sessions: 2, energy: 64, cost: 348000 },
-                { date: "2024-09-10", sessions: 1, energy: 35, cost: 190000 },
-                { date: "2024-09-14", sessions: 2, energy: 58, cost: 315000 },
-                { date: "2024-09-18", sessions: 1, energy: 29, cost: 158000 },
-                { date: "2024-09-22", sessions: 1, energy: 31, cost: 168000 },
-                { date: "2024-09-25", sessions: 2, energy: 62, cost: 337000 },
-                { date: "2024-09-28", sessions: 1, energy: 33, cost: 179000 },
-                { date: "2024-09-30", sessions: 3, energy: 78, cost: 424000 },
+                { date: "2025-09-01", sessions: 1, energy: 32, cost: 174000 },
+                { date: "2025-09-03", sessions: 1, energy: 28, cost: 152000 },
+                { date: "2025-09-06", sessions: 2, energy: 64, cost: 348000 },
+                { date: "2025-09-10", sessions: 1, energy: 35, cost: 190000 },
+                { date: "2025-09-14", sessions: 2, energy: 58, cost: 315000 },
+                { date: "2025-09-18", sessions: 1, energy: 29, cost: 158000 },
+                { date: "2025-09-22", sessions: 1, energy: 31, cost: 168000 },
+                { date: "2025-09-25", sessions: 2, energy: 62, cost: 337000 },
+                { date: "2025-09-28", sessions: 1, energy: 33, cost: 179000 },
+                { date: "2025-09-30", sessions: 3, energy: 78, cost: 424000 },
             ],
             stationBreakdown: [
                 { name: "Vincom Mega Mall", sessions: 5, energy: 150, cost: 815000 },
-                { name: "AEON Mall BÃ¬nh TÃ¢n", sessions: 3, energy: 96, cost: 522000 },
-                { name: "Lotte Mart GÃ² Váº¥p", sessions: 2, energy: 64, cost: 348000 },
-                { name: "Big C ThÄƒng Long", sessions: 2, energy: 58, cost: 315000 },
-                { name: "Coopmart Cá»‘ng Quá»³nh", sessions: 3, energy: 82, cost: 445000 },
+                { name: "AEON Mall BÌnh Tân", sessions: 3, energy: 96, cost: 522000 },
+                { name: "Lotte Mart Gò Vấp", sessions: 2, energy: 64, cost: 348000 },
+                { name: "Big C Thăng Long", sessions: 2, energy: 58, cost: 315000 },
+                { name: "Coopmart Cống Quỳnh", sessions: 3, energy: 82, cost: 445000 },
             ],
             timeBreakdown: [
                 { period: "06:00 - 12:00", sessions: 3, percentage: 20 },
                 { period: "12:00 - 18:00", sessions: 6, percentage: 40 },
                 { period: "18:00 - 24:00", sessions: 6, percentage: 40 },
             ]},
-        "2024-08": {
+        "2025-08": {
             totalCost: 2180000,
             totalSessions: 16,
             totalEnergy: 416,
@@ -89,7 +89,7 @@ const MonthlyCostReports = () => {
                 costChange: -8.2,
                 sessionsChange: 14.3,
                 energyChange: 2.9}},
-        "2024-07": {
+        "2025-07": {
             totalCost: 2375000,
             totalSessions: 14,
             totalEnergy: 404,
@@ -143,16 +143,16 @@ const MonthlyCostReports = () => {
                     </Avatar>
                     <Box>
                         <Typography variant="h4" fontWeight="bold">
-                            BÃ¡o cÃ¡o chi phÃ­ háº±ng thÃ¡ng
+                            Báo cáo chi phí hàng tháng
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
-                            Chi tiáº¿t chi phÃ­ sáº¡c xe theo tá»«ng thÃ¡ng
+                            Chi tiết chi phí sạc xe theo từng tháng
                         </Typography>
                     </Box>
                 </Box>
                 <Box sx={{ display: "flex", gap: 2 }}>
                     <FormControl sx={{ minWidth: 150 }}>
-                        <InputLabel>ThÃ¡ng</InputLabel>
+                        <InputLabel>Tháng</InputLabel>
                         <Select
                             value={selectedMonth}
                             label="ThÃ¡ng"
@@ -167,19 +167,7 @@ const MonthlyCostReports = () => {
                             ))}
                         </Select>
                     </FormControl>
-                    <Button
-                        variant="outlined"
-                        startIcon={<Download />}
-                        onClick={handleExportReport}
-                    >
-                        Xuáº¥t bÃ¡o cÃ¡o
-                    </Button>
-                    <Button
-                        variant="contained"
-                        onClick={() => window.open("/customer/charging-habits", "_blank")}
-                    >
-                        Xem thÃ³i quen chi tiáº¿t
-                    </Button>
+
                 </Box>
             </Box>
 
@@ -201,12 +189,12 @@ const MonthlyCostReports = () => {
                                         {formatCurrency(currentReport.totalCost)}
                                     </Typography>
                                     <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                                        Tá»•ng chi phÃ­
+                                        Tổng chi phí
                                     </Typography>
                                     <Box sx={{ display: "flex", alignItems: "center", mt: 0.5 }}>
                                         {getChangeIcon(currentReport.comparedToLastMonth.costChange)}
                                         <Typography variant="caption" sx={{ opacity: 0.8, ml: 0.5 }}>
-                                            {Math.abs(currentReport.comparedToLastMonth.costChange)}% so vá»›i thÃ¡ng trÆ°á»›c
+                                            {Math.abs(currentReport.comparedToLastMonth.costChange)}% so với tháng trước
                                         </Typography>
                                     </Box>
                                 </Box>
@@ -231,12 +219,12 @@ const MonthlyCostReports = () => {
                                         {currentReport.totalSessions}
                                     </Typography>
                                     <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                                        Láº§n sáº¡c
+                                        Lần sạc
                                     </Typography>
                                     <Box sx={{ display: "flex", alignItems: "center", mt: 0.5 }}>
                                         {getChangeIcon(currentReport.comparedToLastMonth.sessionsChange)}
                                         <Typography variant="caption" sx={{ opacity: 0.8, ml: 0.5 }}>
-                                            {Math.abs(currentReport.comparedToLastMonth.sessionsChange)}% so vá»›i thÃ¡ng trÆ°á»›c
+                                            {Math.abs(currentReport.comparedToLastMonth.sessionsChange)}% so với tháng trước
                                         </Typography>
                                     </Box>
                                 </Box>
@@ -261,12 +249,12 @@ const MonthlyCostReports = () => {
                                         {currentReport.totalEnergy}
                                     </Typography>
                                     <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                                        kWh tiÃªu thá»¥
+                                        kWh tiêu thụ
                                     </Typography>
                                     <Box sx={{ display: "flex", alignItems: "center", mt: 0.5 }}>
                                         {getChangeIcon(currentReport.comparedToLastMonth.energyChange)}
                                         <Typography variant="caption" sx={{ opacity: 0.8, ml: 0.5 }}>
-                                            {Math.abs(currentReport.comparedToLastMonth.energyChange)}% so vá»›i thÃ¡ng trÆ°á»›c
+                                            {Math.abs(currentReport.comparedToLastMonth.energyChange)}% so với tháng trước
                                         </Typography>
                                     </Box>
                                 </Box>
@@ -291,10 +279,10 @@ const MonthlyCostReports = () => {
                                         {formatCurrency(currentReport.avgCostPerKwh)}
                                     </Typography>
                                     <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                                        /kWh trung bÃ¬nh
+                                        /kWh trung bình
                                     </Typography>
                                     <Typography variant="caption" sx={{ opacity: 0.8 }}>
-                                        {formatCurrency(currentReport.avgSessionCost)}/phiÃªn
+                                        {formatCurrency(currentReport.avgSessionCost)}/phiên
                                     </Typography>
                                 </Box>
                             </Box>
@@ -310,16 +298,16 @@ const MonthlyCostReports = () => {
                         <Card>
                             <CardContent>
                                 <Typography variant="h6" fontWeight="bold" gutterBottom>
-                                    Chi tiáº¿t theo ngÃ y
+                                    Chi tiết theo ngày
                                 </Typography>
                                 <TableContainer>
                                     <Table size="small">
                                         <TableHead>
                                             <TableRow>
-                                                <TableCell>NgÃ y</TableCell>
-                                                <TableCell align="center">Láº§n sáº¡c</TableCell>
-                                                <TableCell align="center">NÄƒng lÆ°á»£ng (kWh)</TableCell>
-                                                <TableCell align="right">Chi phÃ­</TableCell>
+                                                <TableCell>Ngày</TableCell>
+                                                <TableCell align="center">Lần sạc</TableCell>
+                                                <TableCell align="center">Năng lượng (kWh)</TableCell>
+                                                <TableCell align="right">Chi phí</TableCell>
                                             </TableRow>
                                         </TableHead>
                                         <TableBody>
@@ -349,14 +337,14 @@ const MonthlyCostReports = () => {
                         <Card>
                             <CardContent>
                                 <Typography variant="h6" fontWeight="bold" gutterBottom>
-                                    PhÃ¢n bá»‘ theo giá»
+                                    Phân bố theo giờ
                                 </Typography>
                                 {currentReport.timeBreakdown.map((time, index) => (
                                     <Box key={index} sx={{ mb: 3 }}>
                                         <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
                                             <Typography variant="body2">{time.period}</Typography>
                                             <Typography variant="body2" fontWeight="medium">
-                                                {time.sessions} láº§n ({time.percentage}%)
+                                                {time.sessions} lần ({time.percentage}%)
                                             </Typography>
                                         </Box>
                                         <LinearProgress
@@ -380,17 +368,16 @@ const MonthlyCostReports = () => {
                 <Card>
                     <CardContent>
                         <Typography variant="h6" fontWeight="bold" gutterBottom>
-                            Chi phÃ­ theo tráº¡m sáº¡c
+                            Chi phí theo trạm sạc
                         </Typography>
                         <TableContainer>
                             <Table>
                                 <TableHead>
                                     <TableRow>
-                                        <TableCell>Tráº¡m sáº¡c</TableCell>
-                                        <TableCell align="center">Sá»‘ láº§n sáº¡c</TableCell>
-                                        <TableCell align="center">NÄƒng lÆ°á»£ng (kWh)</TableCell>
-                                        <TableCell align="right">Chi phÃ­</TableCell>
-                                        <TableCell align="right">% Tá»•ng chi phÃ­</TableCell>
+                                        <TableCell>Trạm sạc</TableCell>
+                                        <TableCell align="center">Số lần sạc</TableCell>
+                                        <TableCell align="center">Năng lượng (kWh)</TableCell>
+                                        <TableCell align="right">Chi phí</TableCell>
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
@@ -406,13 +393,7 @@ const MonthlyCostReports = () => {
                                             <TableCell align="right" sx={{ fontWeight: "medium" }}>
                                                 {formatCurrency(station.cost)}
                                             </TableCell>
-                                            <TableCell align="right">
-                                                <Chip
-                                                    label={`${((station.cost / currentReport.totalCost) * 100).toFixed(1)}%`}
-                                                    size="small"
-                                                    variant="outlined"
-                                                />
-                                            </TableCell>
+                                            {/* % Tổng chi phí column removed per request */}
                                         </TableRow>
                                     ))}
                                 </TableBody>

@@ -41,8 +41,8 @@ const AnalyticsPage = () => {
     // Ensure data is initialized
     useEffect(() => {
         if (bookingHistory.length === 0) {
-            console.log('âš ï¸ AnalyticsPage - No data, initializing...');
-                    }
+            console.log('🔍 AnalyticsPage - No data, initializing...');
+        }
     }, [bookingHistory.length]);
 
     const handleTabChange = (event, newValue) => {
@@ -51,38 +51,38 @@ const AnalyticsPage = () => {
 
     const stats = getBookingStats();
 
-    // Debug: Log stats Ä‘á»ƒ kiá»ƒm tra dá»¯ liá»‡u
-    console.log('ðŸ“Š AnalyticsPage - Stats from getBookingStats():', {
+    // Debug: Log stats để kiểm tra dữ liệu
+    console.log('🔍 AnalyticsPage - Stats from getBookingStats():', {
         stats,
         bookingHistoryLength: bookingHistory.length
     });
 
-    // Quick Stats Cards - Sá»­ dá»¥ng field names Ä‘Ãºng tá»« bookingStore
+    // Quick Stats Cards - Sử dụng field names đúng từ bookingStore
     const quickStats = [
         {
-            title: 'Tá»•ng phiÃªn sáº¡c',
-            value: stats.completed || 0, // Chá»‰ Ä‘áº¿m completed bookings
+            title: 'Tổng phiên sạc',
+            value: stats.completed || 0, // Chỉ đếm completed bookings
             icon: <ElectricBolt />,
             color: 'primary',
             trend: '+12%'
         },
         {
-            title: 'NÄƒng lÆ°á»£ng tiÃªu thá»¥',
-            value: `${parseFloat(stats.totalEnergyCharged || 0).toFixed(1)} kWh`, // âœ… ÄÃºng field name
+            title: 'Năng lượng tiêu thụ',
+            value: `${parseFloat(stats.totalEnergyCharged || 0).toFixed(1)} kWh`, // ✓ Đúng field name
             icon: <TrendingUp />,
             color: 'success',
             trend: '+8.5%'
         },
         {
-            title: 'Chi phÃ­ thÃ¡ng nÃ y',
+            title: 'Chi phí tháng này',
             value: formatCurrency(parseFloat(stats.totalAmount || 0)),
             icon: <AccountBalanceWallet />,
             color: 'warning',
             trend: '-5.2%'
         },
         {
-            title: 'Thá»i gian sáº¡c TB',
-            value: `${stats.averageDuration || 0} phÃºt`, // âœ… Hiá»ƒn thá»‹ phÃºt/phiÃªn
+            title: 'Thời gian sạc trung bình',
+            value: `${stats.averageDuration || 0} phút`, // ✓ Hiển thị phút/phiên
             icon: <Schedule />,
             color: 'info',
             trend: '+2.1%'
@@ -91,17 +91,17 @@ const AnalyticsPage = () => {
 
     const tabs = [
         {
-            label: 'PhÃ¢n tÃ­ch tá»•ng quan',
+            label: 'Phân tích tổng quan',
             icon: <Analytics />,
             component: <CustomerAnalytics />
         },
         {
-            label: 'BÃ¡o cÃ¡o chi phÃ­',
+            label: 'Báo cáo chi phí',
             icon: <Assessment />,
             component: <MonthlyCostReports />
         },
         {
-            label: 'ThÃ³i quen sáº¡c',
+            label: 'Thói quen sạc',
             icon: <Psychology />,
             component: <ChargingHabitsAnalysis />
         }
@@ -110,63 +110,8 @@ const AnalyticsPage = () => {
     return (
         <Container maxWidth="xl" sx={{ py: 3 }}>
             {/* Header */}
-            <Box sx={{ mb: 4 }}>
-                <Typography variant="h4" fontWeight="bold" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Analytics sx={{ fontSize: 40, color: 'primary.main' }} />
-                    ðŸ“Š Thá»‘ng kÃª & BÃ¡o cÃ¡o
-                </Typography>
-                <Typography variant="body1" color="text.secondary">
-                    PhÃ¢n tÃ­ch chi tiáº¿t vá» hoáº¡t Ä‘á»™ng sáº¡c xe vÃ  chi phÃ­ cá»§a báº¡n
-                </Typography>
-            </Box>
+  
 
-            {/* Quick Stats */}
-            <Grid container spacing={3} sx={{ mb: 4 }}>
-                {quickStats.map((stat, index) => (
-                    <Grid item xs={12} sm={6} md={3} key={index}>
-                        <Card
-                            sx={{
-                                height: '100%',
-                                background: `linear-gradient(135deg, ${stat.color === 'primary' ? '#1976d2' :
-                                    stat.color === 'success' ? '#2e7d32' :
-                                        stat.color === 'warning' ? '#ed6c02' : '#0288d1'} 0%, ${stat.color === 'primary' ? '#1565c0' :
-                                            stat.color === 'success' ? '#1b5e20' :
-                                                stat.color === 'warning' ? '#e65100' : '#0277bd'} 100%)`,
-                                color: 'white'
-                            }}
-                        >
-                            <CardContent>
-                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                                    <Box sx={{
-                                        p: 1.5,
-                                        borderRadius: 2,
-                                        backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                                        display: 'flex',
-                                        alignItems: 'center'
-                                    }}>
-                                        {stat.icon}
-                                    </Box>
-                                    <Chip
-                                        label={stat.trend}
-                                        size="small"
-                                        sx={{
-                                            backgroundColor: stat.trend.startsWith('+') ? 'rgba(76, 175, 80, 0.3)' : 'rgba(244, 67, 54, 0.3)',
-                                            color: 'white',
-                                            fontWeight: 'bold'
-                                        }}
-                                    />
-                                </Box>
-                                <Typography variant="h5" fontWeight="bold" gutterBottom>
-                                    {stat.value}
-                                </Typography>
-                                <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                                    {stat.title}
-                                </Typography>
-                            </CardContent>
-                        </Card>
-                    </Grid>
-                ))}
-            </Grid>
 
             {/* Main Analytics Section */}
             <Paper sx={{ borderRadius: 3, overflow: 'hidden' }}>
@@ -204,14 +149,7 @@ const AnalyticsPage = () => {
 
                         <Box sx={{ display: 'flex', gap: 1 }}>
 
-                            <Button
-                                startIcon={<Download />}
-                                variant="contained"
-                                size="small"
-                                sx={{ textTransform: 'none' }}
-                            >
-                                Xuáº¥t bÃ¡o cÃ¡o
-                            </Button>
+
                         </Box>
                     </Box>
                 </Box>

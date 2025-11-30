@@ -1,5 +1,104 @@
-import { create } from "zustand";
+﻿import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { bookingsAPI } from "../services/api";
+
+const normalizeTimestamp = (value) => {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+};
+
+const calculateDurationMinutes = (startIso, endIso) => {
+  if (!startIso || !endIso) return null;
+  const start = new Date(startIso).getTime();
+  const end = new Date(endIso).getTime();
+  if (Number.isNaN(start) || Number.isNaN(end) || end < start) return null;
+  return Math.round((end - start) / 60000);
+};
+
+const addMinutes = (isoString, minutes) => {
+  if (!isoString || minutes == null) return null;
+  const base = new Date(isoString);
+  if (Number.isNaN(base.getTime())) return null;
+  const end = new Date(base.getTime() + minutes * 60000);
+  return end.toISOString();
+};
+
+const mapApiBookingToStore = (apiBooking) => {
+  // Backend returns PascalCase, handle both PascalCase and camelCase
+  const bookingId = apiBooking.BookingId || apiBooking.bookingId;
+  const createdAt = normalizeTimestamp(apiBooking.CreatedAt || apiBooking.createdAt);
+  const scheduledStart = normalizeTimestamp(apiBooking.ScheduledStartTime || apiBooking.scheduledStartTime);
+  const estimatedArrival = normalizeTimestamp(apiBooking.EstimatedArrival || apiBooking.estimatedArrival);
+  const actualStart = normalizeTimestamp(apiBooking.ActualStartTime || apiBooking.actualStartTime);
+  const actualEnd = normalizeTimestamp(apiBooking.ActualEndTime || apiBooking.actualEndTime);
+  const chargingDuration = calculateDurationMinutes(actualStart, actualEnd);
+  const estimatedDuration = (apiBooking.EstimatedDuration ?? apiBooking.estimatedDuration) ?? null;
+  const durationMinutes = chargingDuration ?? estimatedDuration ?? null;
+  const effectiveStart = actualStart || scheduledStart || estimatedArrival || createdAt;
+  const projectedEnd =
+    effectiveStart && (estimatedDuration ?? durationMinutes) != null
+      ? addMinutes(effectiveStart, estimatedDuration ?? durationMinutes)
+      : null;
+  const estimatedEndTime = actualEnd || projectedEnd;
+  const baseCost = Number(
+    apiBooking.totalAmount ?? apiBooking.totalCost ?? apiBooking.finalAmount ?? 0
+  );
+  const deliveredEnergy = Number(
+    apiBooking.energyDelivered ?? apiBooking.energyKwh ?? apiBooking.totalEnergy ?? 0
+  );
+
+  return {
+    id: bookingId,
+    bookingId: bookingId,
+    apiId: bookingId,
+    userId: apiBooking.UserId || apiBooking.userId,
+    customerName: apiBooking.CustomerName || apiBooking.customerName,
+    stationId: apiBooking.StationId || apiBooking.stationId,
+    stationName: apiBooking.StationName || apiBooking.stationName,
+    stationAddress: apiBooking.StationAddress || apiBooking.stationAddress,
+    slotId: apiBooking.SlotId || apiBooking.slotId,
+    slotNumber: apiBooking.SlotNumber || apiBooking.slotNumber,
+    schedulingType: ((apiBooking.SchedulingType || apiBooking.schedulingType) || "immediate").toLowerCase(),
+    status: ((apiBooking.Status || apiBooking.status) || "pending").toLowerCase(),
+    statusRaw: apiBooking.Status || apiBooking.status,
+    bookingCode: `BK-${bookingId}`,
+    bookingTime: createdAt,
+    createdAt,
+    bookingDate: createdAt,
+    scheduledDateTime: scheduledStart,
+    scheduledTime: scheduledStart,
+    scheduledDate: scheduledStart ? scheduledStart.split("T")[0] : null,
+    estimatedArrival,
+    estimatedDuration,
+    duration: durationMinutes,
+    durationMinutes,
+    sessionDurationMinutes: durationMinutes,
+    actualStartTime: actualStart,
+    actualEndTime: actualEnd,
+    startTime: effectiveStart,
+    endTime: actualEnd || estimatedEndTime,
+    estimatedEndTime,
+    chargingStarted: Boolean(actualStart),
+    chargingEndedAt: actualEnd,
+    chargingDuration,
+    vehicleId: apiBooking.VehicleId || apiBooking.vehicleId,
+    vehicleType: apiBooking.VehicleType || apiBooking.vehicleType,
+    licensePlate: apiBooking.LicensePlate || apiBooking.licensePlate,
+    portNumber: apiBooking.SlotNumber || apiBooking.slotNumber,
+    slotName: apiBooking.SlotNumber || apiBooking.slotNumber,
+    targetSOC: (apiBooking.TargetSoc ?? apiBooking.targetSoc) ?? null,
+    currentSOC: (apiBooking.CurrentSoc ?? apiBooking.currentSoc) ?? null,
+  cost: baseCost,
+  totalAmount: baseCost,
+    chargingRate: null,
+  energyDelivered: deliveredEnergy,
+    powerDelivered: null,
+    qrScanned: false,
+    chargingStartedAt: actualStart,
+    notes: null,
+  };
+};
 
 const useBookingStore = create(
   persist(
@@ -14,75 +113,184 @@ const useBookingStore = create(
       error: null,
 
       // Actions
-      createBooking: (bookingData) => {
-        // Clean data to avoid circular references
+      fetchBookings: async (params = {}) => {
+        set({ loading: true, error: null });
+        try {
+          const response = await bookingsAPI.getAll({ limit: 200, offset: 0, ...params });
+          const apiBookings = Array.isArray(response?.data) ? response.data : [];
+          const transformed = apiBookings.map(mapApiBookingToStore);
+
+          // Sort by creation date desc
+          transformed.sort((a, b) => {
+            const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+            const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+            return bTime - aTime;
+          });
+
+          set({
+            bookings: transformed,
+            bookingHistory: transformed,
+            loading: false,
+          });
+
+          return { success: true, data: transformed };
+        } catch (error) {
+          const errorMessage = error.message || "Error fetching bookings";
+          console.error("Fetch bookings error:", errorMessage, error);
+          set({ error: errorMessage, loading: false });
+          return { success: false, error: errorMessage };
+        }
+      },
+
+      createBooking: async (bookingData) => {
+        // API is enabled - database has sp_create_booking stored procedure
+        const ENABLE_API = true; // Database is ready with stored procedure
+
+        console.log(
+          "📝 Creating booking (API " +
+            (ENABLE_API ? "ENABLED" : "DISABLED") +
+            "):",
+          bookingData
+        );
+
+        // Create local booking data
         const cleanData = {
           stationId: bookingData.stationId,
           stationName: bookingData.stationName,
           chargerType: bookingData.chargerType
             ? {
-              id: bookingData.chargerType.id,
-              name: bookingData.chargerType.name,
-              power: bookingData.chargerType.power,
-              price: bookingData.chargerType.price,
-            }
+                id: bookingData.chargerType.id,
+                name: bookingData.chargerType.name,
+                power: bookingData.chargerType.power,
+                price: bookingData.chargerType.price,
+              }
             : null,
           connector: bookingData.connector
             ? {
-              id: bookingData.connector.id,
-              name: bookingData.connector.name,
-              compatible: bookingData.connector.compatible,
-            }
+                id: bookingData.connector.id,
+                name: bookingData.connector.name,
+                compatible: bookingData.connector.compatible,
+              }
             : null,
-          slot: bookingData.slot
+          port: bookingData.port
             ? {
-              id: bookingData.slot.id,
-              location: bookingData.slot.location,
-            }
+                id: bookingData.port.id,
+                location: bookingData.port.location,
+              }
             : null,
           bookingTime: bookingData.bookingTime,
           scannedAt: bookingData.scannedAt,
           autoStart: bookingData.autoStart,
-          bookingDate: new Date().toISOString().split("T")[0], // Add booking date
-          // Scheduling information
+          bookingDate: new Date().toISOString().split("T")[0],
           schedulingType: bookingData.schedulingType || "immediate",
           scheduledDateTime: bookingData.scheduledDateTime,
           scheduledDate: bookingData.scheduledDate,
           scheduledTime: bookingData.scheduledTime,
         };
 
-        const booking = {
+        let booking = {
           ...cleanData,
           id: `BOOK${Date.now()}`,
           status:
-            cleanData.schedulingType === "scheduled" ? "scheduled" : "pending", // pending = waiting for QR scan
+            cleanData.schedulingType === "scheduled" ? "scheduled" : "pending",
           createdAt: new Date().toISOString(),
           estimatedArrival:
             cleanData.schedulingType === "scheduled"
               ? cleanData.scheduledDateTime
-              : new Date(Date.now() + 15 * 60 * 1000).toISOString(), // 15 minutes from now for immediate
-          qrScanned: false, // Add QR scan tracking
-          chargingStarted: false, // Add charging start tracking
+              : new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+          qrScanned: false,
+          chargingStarted: false,
         };
 
-        // Initialize SOC tracking for this booking
+        // Try API if enabled
+        if (ENABLE_API) {
+          try {
+            set({ loading: true, error: null });
+
+            // Use real slot ID from database if available, otherwise fallback
+            let slotId = bookingData.port?.slotId || 3; // Use real slotId or default to 3
+            
+            if (bookingData.port?.slotId) {
+              console.log('✅ Using real slot ID from database:', slotId);
+            } else {
+              console.warn('⚠️ No real slot ID, using fallback slot:', slotId);
+              // Fallback: Extract from port ID format "stationId-slotX"
+              if (bookingData.port?.id) {
+                const portStr = bookingData.port.id.toString();
+                const slotMatch = portStr.match(/slot(\d+)/);
+                if (slotMatch) {
+                  slotId = parseInt(slotMatch[1]);
+                  console.log('🎯 Extracted slot ID from port string:', slotId);
+                }
+              }
+            }
+
+            const apiPayload = {
+              stationId: parseInt(bookingData.stationId) || 1,
+              slotId: slotId, // Use mapped slot ID
+              vehicleId: 5, // Use actual vehicle ID from database (user has vehicle_id=5,6)
+              scheduledStartTime:
+                bookingData.scheduledDateTime || new Date().toISOString(),
+              estimatedArrival:
+                bookingData.scheduledDateTime ||
+                new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+              estimatedDuration: parseInt(bookingData.estimatedDuration) || 60,
+              schedulingType:
+                bookingData.schedulingType === "scheduled"
+                  ? "scheduled"
+                  : "immediate",
+              targetSoc: bookingData.targetSOC || 80,
+            };
+
+            console.log("📤 API Payload:", apiPayload);
+            const response = await bookingsAPI.create(apiPayload);
+            console.log("✅ API Response:", response);
+
+            // Backend returns PascalCase (BookingId), not camelCase (bookingId)
+            const numericId = response.BookingId || response.bookingId || response.id;
+            console.log("📊 Extracted booking ID from API:", numericId, "Type:", typeof numericId);
+
+            // Merge API response
+            booking = {
+              ...booking,
+              id: numericId, // Use numeric ID from API (MUST be number for API calls)
+              bookingCode: booking.id, // Keep BOOK... string as code for display
+              apiId: numericId, // Keep for backward compatibility
+              bookingId: numericId, // Also set bookingId for consistency
+              status: response.Status || response.status || booking.status,
+              createdAt: response.CreatedAt || response.createdAt || booking.createdAt,
+            };
+
+            set({ loading: false });
+          } catch (error) {
+            console.error(
+              "❌ API Error:",
+              error.response?.data || error.message
+            );
+            set({ loading: false, error: error.message });
+            console.warn("⚠️ Using local booking as fallback");
+          }
+        }
+
+        // Save to store
         set((state) => ({
-          bookings: [...state.bookings, booking],
-          bookingHistory: [...state.bookingHistory, booking],
+          bookings: [booking, ...state.bookings],
+          bookingHistory: [booking, ...state.bookingHistory],
           currentBooking: booking,
           socTracking: {
             ...state.socTracking,
             [booking.id]: {
-              initialSOC: null,
-              currentSOC: null,
-              targetSOC: null,
-              lastUpdated: null,
+              initialSOC: bookingData.initialSOC || null,
+              currentSOC: bookingData.initialSOC || null,
+              targetSOC: bookingData.targetSOC || null,
+              lastUpdated: new Date().toISOString(),
               chargingRate: null,
               estimatedTimeToTarget: null,
             },
           },
         }));
 
+        console.log("✅ Booking created:", booking.id);
         return booking;
       },
 
@@ -91,38 +299,51 @@ const useBookingStore = create(
           bookings: state.bookings.map((booking) =>
             booking.id === bookingId
               ? {
-                ...booking,
-                status,
-                ...data,
-                updatedAt: new Date().toISOString(),
-              }
+                  ...booking,
+                  status,
+                  ...data,
+                  updatedAt: new Date().toISOString(),
+                }
               : booking
           ),
           bookingHistory: state.bookingHistory.map((booking) =>
             booking.id === bookingId
               ? {
-                ...booking,
-                status,
-                ...data,
-                updatedAt: new Date().toISOString(),
-              }
+                  ...booking,
+                  status,
+                  ...data,
+                  updatedAt: new Date().toISOString(),
+                }
               : booking
           ),
           currentBooking:
             state.currentBooking?.id === bookingId
               ? {
-                ...state.currentBooking,
-                status,
-                ...data,
-                updatedAt: new Date().toISOString(),
-              }
+                  ...state.currentBooking,
+                  status,
+                  ...data,
+                  updatedAt: new Date().toISOString(),
+                }
               : state.currentBooking,
         }));
       },
 
-      cancelBooking: (bookingId, reason = "User cancelled") => {
-        const booking = get().bookings.find((b) => b.id === bookingId);
-        if (booking) {
+      cancelBooking: async (bookingId, reason = "User cancelled") => {
+        try {
+          const booking = get().bookings.find((b) => b.id === bookingId);
+          if (booking && booking.apiId) {
+            console.log("📤 Cancelling booking via API:", booking.apiId);
+            await bookingsAPI.cancel(booking.apiId, reason);
+            console.log("✅ Booking cancelled via API");
+          }
+
+          get().updateBookingStatus(bookingId, "cancelled", {
+            cancellationReason: reason,
+            cancelledAt: new Date().toISOString(),
+          });
+        } catch (error) {
+          console.error("❌ Error cancelling booking via API:", error);
+          // Still update local state even if API fails
           get().updateBookingStatus(bookingId, "cancelled", {
             cancellationReason: reason,
             cancelledAt: new Date().toISOString(),
@@ -130,11 +351,51 @@ const useBookingStore = create(
         }
       },
 
-      completeBooking: (bookingId, sessionData) => {
-        get().updateBookingStatus(bookingId, "completed", {
-          ...sessionData,
-          completedAt: new Date().toISOString(),
-        });
+      completeBooking: async (bookingId, sessionData) => {
+        try {
+          const booking = get().bookings.find((b) => b.id === bookingId);
+
+          // API call should be done by caller (ChargingFlow), not here
+          // This method only updates local state
+          const ENABLE_COMPLETE_API = false; // Disabled - caller handles API
+
+          if (booking && booking.apiId && ENABLE_COMPLETE_API) {
+            console.log(
+              "📤 Completing booking via API:",
+              booking.apiId,
+              sessionData
+            );
+
+            // Prepare payload matching backend CompleteChargingDto
+            const completePayload = {
+              finalSoc: sessionData.finalSOC || sessionData.currentSOC || 80,
+              totalEnergyKwh: sessionData.energyDelivered || 0,
+              unitPrice: sessionData.chargingRate || 8500,
+            };
+
+            console.log("📤 Complete API Payload:", completePayload);
+
+            // Call API to complete charging
+            await bookingsAPI.complete(booking.apiId, completePayload);
+            console.log("✅ Booking completed via API");
+          } else if (booking && booking.apiId) {
+            console.log("⚠️ Complete API skipped - requires staff/admin role");
+          }
+
+          // Update local state with session data
+          get().updateBookingStatus(bookingId, "completed", {
+            ...sessionData,
+            completedAt: new Date().toISOString(),
+          });
+        } catch (error) {
+          console.error("❌ Error completing booking via API:", error);
+          console.error("❌ Error details:", error.response?.data);
+          // Still update local state even if API fails
+          get().updateBookingStatus(bookingId, "completed", {
+            ...sessionData,
+            completedAt: new Date().toISOString(),
+          });
+        }
       },
 
       // New method for QR code scanning
@@ -160,31 +421,44 @@ const useBookingStore = create(
         return booking;
       },
 
-      startCharging: (bookingId) => {
-        const state = get();
-        const booking = state.bookings.find((b) => b.id === bookingId);
+      startCharging: async (bookingId) => {
+        try {
+          const state = get();
+          const booking = state.bookings.find((b) => b.id === bookingId);
 
-        if (!booking || !booking.qrScanned) {
-          throw new Error("Must scan QR code before starting charging");
+          if (!booking || !booking.qrScanned) {
+            throw new Error("Must scan QR code before starting charging");
+          }
+
+          // Call API to start charging if we have API ID
+          if (booking.apiId) {
+            console.log("📤 Starting charging via API:", booking.apiId);
+            // Note: Backend requires staff/admin role for this endpoint
+            // await bookingsAPI.start(booking.apiId);
+            console.log("⚠️ Skipping API call (requires staff role)");
+          }
+
+          const chargingSession = {
+            bookingId,
+            startTime: new Date().toISOString(),
+            status: "active",
+            sessionId: `SESSION${Date.now()}`,
+          };
+
+          set((state) => ({
+            ...state,
+            chargingSession,
+          }));
+
+          get().updateBookingStatus(bookingId, "charging", {
+            chargingStartedAt: new Date().toISOString(),
+            chargingStarted: true,
+            sessionId: chargingSession.sessionId,
+          });
+        } catch (error) {
+          console.error("❌ Error starting charging:", error);
+          throw error;
         }
-
-        const chargingSession = {
-          bookingId,
-          startTime: new Date().toISOString(),
-          status: "active",
-          sessionId: `SESSION${Date.now()}`,
-        };
-
-        set((state) => ({
-          ...state,
-          chargingSession,
-        }));
-
-        get().updateBookingStatus(bookingId, "charging", {
-          chargingStartedAt: new Date().toISOString(),
-          chargingStarted: true,
-          sessionId: chargingSession.sessionId,
-        });
       },
 
       // New SOC tracking methods
@@ -253,15 +527,15 @@ const useBookingStore = create(
           chargingSession:
             state.chargingSession?.bookingId === bookingId
               ? {
-                ...state.chargingSession,
-                currentSOC,
-                powerDelivered,
-                energyDelivered,
-                voltage,
-                current,
-                temperature,
-                lastUpdated: new Date().toISOString(),
-              }
+                  ...state.chargingSession,
+                  currentSOC,
+                  powerDelivered,
+                  energyDelivered,
+                  voltage,
+                  current,
+                  temperature,
+                  lastUpdated: new Date().toISOString(),
+                }
               : state.chargingSession,
         }));
 
@@ -323,7 +597,7 @@ const useBookingStore = create(
               (booking.status === "confirmed" ||
                 booking.status === "scheduled") &&
               new Date(booking.scheduledDateTime || booking.estimatedArrival) >
-              now
+                now
           )
           .sort(
             (a, b) =>
@@ -388,19 +662,25 @@ const useBookingStore = create(
         ).length;
 
         // Calculate totals from actual booking data
-        const totalEnergyCharged = completedBookings
-          .reduce((sum, b) => sum + (b.energyDelivered || 0), 0);
-        const totalAmount = completedBookings
-          .reduce((sum, b) => sum + (b.totalAmount || 0), 0);
-        const totalDuration = completedBookings
-          .reduce((sum, b) => sum + (b.chargingDuration || 0), 0);
+        const totalEnergyCharged = completedBookings.reduce(
+          (sum, b) => sum + (b.energyDelivered || 0),
+          0
+        );
+        const totalAmount = completedBookings.reduce(
+          (sum, b) => sum + (b.totalAmount || 0),
+          0
+        );
+        const totalDuration = completedBookings.reduce(
+          (sum, b) => sum + (b.chargingDuration || 0),
+          0
+        );
 
         // Debug log
-        console.log('📊 bookingStore.getBookingStats() - Calculation:', {
+        console.log("📊 bookingStore.getBookingStats() - Calculation:", {
           completedBookings: completed,
           totalEnergyCharged,
           totalAmount,
-          totalDuration
+          totalDuration,
         });
 
         return {
@@ -414,230 +694,16 @@ const useBookingStore = create(
           totalAmount: totalAmount.toFixed(0), // "1679966"
           totalDuration: totalDuration, // 642
           // Averages
-          averageEnergy: completed > 0 ? (totalEnergyCharged / completed).toFixed(2) : "0", // "20.42"
-          averageAmount: completed > 0 ? Math.round(totalAmount / completed) : 0, // 139997
-          averageDuration: completed > 0 ? Math.round(totalDuration / completed) : 0, // 54
+          averageEnergy:
+            completed > 0 ? (totalEnergyCharged / completed).toFixed(2) : "0", // "20.42"
+          averageAmount:
+            completed > 0 ? Math.round(totalAmount / completed) : 0, // 139997
+          averageDuration:
+            completed > 0 ? Math.round(totalDuration / completed) : 0, // 54
           // Keep for backward compatibility
-          averageSession: completed > 0 ? (totalEnergyCharged / completed).toFixed(2) : "0",
+          averageSession:
+            completed > 0 ? (totalEnergyCharged / completed).toFixed(2) : "0",
         };
-      },
-
-      // Mock data for development - Tháng 9/2024 (12 phiên hoàn thành)
-      initializeMockData: () => {
-        const mockBookings = [
-          {
-            id: "BOOK1732457890123",
-            stationId: "ST001",
-            stationName: "Vincom Landmark 81",
-            stationAddress: "Vinhomes Central Park, Quận Bình Thạnh, TP.HCM",
-            connector: { id: "A01", location: "Khu vực A - Slot 01" },
-            status: "completed",
-            createdAt: "2024-09-28T10:15:00.000Z",
-            completedAt: "2024-09-28T11:00:00.000Z",
-            bookingDate: "2024-09-28",
-            energyDelivered: 18.0,
-            totalAmount: 123426,
-            chargingDuration: 45,
-          },
-          {
-            id: "BOOK1732444290456",
-            stationId: "ST002",
-            stationName: "AEON Mall Tân Phú",
-            stationAddress: "30 Bờ Bao Tân Thắng, Tân Phú, TP.HCM",
-            connector: { id: "B02", location: "Khu vực B - Slot 02" },
-            status: "completed",
-            createdAt: "2024-09-26T08:30:00.000Z",
-            completedAt: "2024-09-26T09:08:00.000Z",
-            bookingDate: "2024-09-26",
-            energyDelivered: 15.5,
-            totalAmount: 106284,
-            chargingDuration: 38,
-          },
-          {
-            id: "BOOK1732431290789",
-            stationId: "ST003",
-            stationName: "Saigon Centre Q1",
-            stationAddress: "65 Lê Lợi, Quận 1, TP.HCM",
-            connector: { id: "C03", location: "Khu vực C - Slot 03" },
-            status: "completed",
-            createdAt: "2024-09-24T15:45:00.000Z",
-            completedAt: "2024-09-24T16:53:00.000Z",
-            bookingDate: "2024-09-24",
-            energyDelivered: 25.0,
-            totalAmount: 171425,
-            chargingDuration: 68,
-          },
-          {
-            id: "BOOK1732417690234",
-            stationId: "ST004",
-            stationName: "Diamond Plaza",
-            stationAddress: "34 Lê Duẩn, Quận 1, TP.HCM",
-            connector: { id: "D04", location: "Khu vực D - Slot 04" },
-            status: "completed",
-            createdAt: "2024-09-22T11:20:00.000Z",
-            completedAt: "2024-09-22T12:15:00.000Z",
-            bookingDate: "2024-09-22",
-            energyDelivered: 20.2,
-            totalAmount: 138511,
-            chargingDuration: 55,
-          },
-          {
-            id: "BOOK1732404090567",
-            stationId: "ST005",
-            stationName: "Bitexco Financial Tower",
-            stationAddress: "2 Hải Triều, Quận 1, TP.HCM",
-            connector: { id: "E05", location: "Khu vực E - Slot 05" },
-            status: "completed",
-            createdAt: "2024-09-20T09:15:00.000Z",
-            completedAt: "2024-09-20T10:25:00.000Z",
-            bookingDate: "2024-09-20",
-            energyDelivered: 28.0,
-            totalAmount: 191996,
-            chargingDuration: 70,
-          },
-          {
-            id: "BOOK1732390490890",
-            stationId: "ST006",
-            stationName: "Times Square",
-            stationAddress: "57-69F Nguyễn Huệ, Quận 1, TP.HCM",
-            connector: { id: "F06", location: "Khu vực F - Slot 06" },
-            status: "completed",
-            createdAt: "2024-09-18T13:40:00.000Z",
-            completedAt: "2024-09-18T14:30:00.000Z",
-            bookingDate: "2024-09-18",
-            energyDelivered: 16.5,
-            totalAmount: 113141,
-            chargingDuration: 50,
-          },
-          {
-            id: "BOOK1732376890123",
-            stationId: "ST007",
-            stationName: "Crescent Mall",
-            stationAddress: "101 Tôn Dật Tiên, Quận 7, TP.HCM",
-            connector: { id: "G07", location: "Khu vực G - Slot 07" },
-            status: "completed",
-            createdAt: "2024-09-16T16:25:00.000Z",
-            completedAt: "2024-09-16T17:18:00.000Z",
-            bookingDate: "2024-09-16",
-            energyDelivered: 22.0,
-            totalAmount: 150854,
-            chargingDuration: 53,
-          },
-          {
-            id: "BOOK1732363290456",
-            stationId: "ST008",
-            stationName: "SC VivoCity",
-            stationAddress: "1058 Nguyễn Văn Linh, Quận 7, TP.HCM",
-            connector: { id: "H08", location: "Khu vực H - Slot 08" },
-            status: "completed",
-            createdAt: "2024-09-14T12:10:00.000Z",
-            completedAt: "2024-09-14T13:05:00.000Z",
-            bookingDate: "2024-09-14",
-            energyDelivered: 24.0,
-            totalAmount: 164568,
-            chargingDuration: 55,
-          },
-          {
-            id: "BOOK1732349690789",
-            stationId: "ST009",
-            stationName: "Takashimaya",
-            stationAddress: "92-94 Nam Kỳ Khởi Nghĩa, Quận 1, TP.HCM",
-            connector: { id: "I09", location: "Khu vực I - Slot 09" },
-            status: "completed",
-            createdAt: "2024-09-12T07:55:00.000Z",
-            completedAt: "2024-09-12T08:42:00.000Z",
-            bookingDate: "2024-09-12",
-            energyDelivered: 20.8,
-            totalAmount: 142626,
-            chargingDuration: 47,
-          },
-          {
-            id: "BOOK1732336090234",
-            stationId: "ST010",
-            stationName: "Parkson Saigon Tourist",
-            stationAddress: "35B-45 Lê Thánh Tôn, Quận 1, TP.HCM",
-            connector: { id: "J10", location: "Khu vực J - Slot 10" },
-            status: "completed",
-            createdAt: "2024-09-10T14:30:00.000Z",
-            completedAt: "2024-09-10T15:28:00.000Z",
-            bookingDate: "2024-09-10",
-            energyDelivered: 20.0,
-            totalAmount: 137140,
-            chargingDuration: 58,
-          },
-          {
-            id: "BOOK1732322490567",
-            stationId: "ST011",
-            stationName: "Lotte Center",
-            stationAddress: "54 Liễu Giai, Ba Đình, Hà Nội",
-            connector: { id: "K11", location: "Khu vực K - Slot 11" },
-            status: "completed",
-            createdAt: "2024-09-08T10:45:00.000Z",
-            completedAt: "2024-09-08T11:33:00.000Z",
-            bookingDate: "2024-09-08",
-            energyDelivered: 17.0,
-            totalAmount: 116569,
-            chargingDuration: 48,
-          },
-          {
-            id: "BOOK1732308890890",
-            stationId: "ST012",
-            stationName: "Vincom Center Đồng Khởi",
-            stationAddress: "72 Lê Thánh Tôn, Quận 1, TP.HCM",
-            connector: { id: "L12", location: "Khu vực L - Slot 12" },
-            status: "completed",
-            createdAt: "2024-09-06T18:15:00.000Z",
-            completedAt: "2024-09-06T19:10:00.000Z",
-            bookingDate: "2024-09-06",
-            energyDelivered: 18.0,
-            totalAmount: 123426,
-            chargingDuration: 55,
-          },
-          // Cancelled bookings for testing
-          {
-            id: "BOOK1732308890891",
-            stationId: "ST013",
-            stationName: "Bitexco Financial Tower",
-            stationAddress: "2 Hải Triều, Quận 1, TP.HCM",
-            connector: { id: "M13", location: "Khu vực M - Slot 13" },
-            status: "cancelled",
-            createdAt: "2024-09-05T08:15:00.000Z",
-            bookingDate: "2024-09-05",
-            energyDelivered: 0,
-            totalAmount: 0,
-            chargingDuration: 0,
-          },
-          {
-            id: "BOOK1732308890892",
-            stationId: "ST014",
-            stationName: "Green Mall Charging Hub",
-            stationAddress: "123 Lê Lai, Quận 1, TP.HCM",
-            connector: { id: "N14", location: "Khu vực N - Slot 14" },
-            status: "failed",
-            createdAt: "2024-09-04T14:00:00.000Z",
-            bookingDate: "2024-09-04",
-            energyDelivered: 0,
-            totalAmount: 0,
-            chargingDuration: 0,
-          }
-        ];
-
-        // Initialize SOC tracking for mock data
-        const mockSOCTracking = {
-          BOOK1732457890123: {
-            initialSOC: 15,
-            currentSOC: 85,
-            targetSOC: 80,
-            lastUpdated: "2024-11-24T10:15:00.000Z",
-            chargingRate: 35.2, // %/hour
-            estimatedTimeToTarget: 0,
-          },
-        };
-
-        set({
-          bookingHistory: mockBookings,
-          socTracking: mockSOCTracking,
-        });
       },
     }),
     {

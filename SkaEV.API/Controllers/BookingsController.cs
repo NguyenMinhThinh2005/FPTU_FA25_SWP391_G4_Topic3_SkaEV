@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SkaEV.API.Application.DTOs.Bookings;
 using SkaEV.API.Application.Services;
+using Microsoft.AspNetCore.Hosting;
 using System.Security.Claims;
 
 namespace SkaEV.API.Controllers;
@@ -12,12 +13,20 @@ namespace SkaEV.API.Controllers;
 public class BookingsController : ControllerBase
 {
     private readonly IBookingService _bookingService;
+    private readonly IStationNotificationService _notificationService;
     private readonly ILogger<BookingsController> _logger;
+    private readonly IWebHostEnvironment _env;
 
-    public BookingsController(IBookingService bookingService, ILogger<BookingsController> logger)
+    public BookingsController(
+        IBookingService bookingService, 
+        IStationNotificationService notificationService,
+        ILogger<BookingsController> logger, 
+        IWebHostEnvironment env)
     {
         _bookingService = bookingService;
+        _notificationService = notificationService;
         _logger = logger;
+        _env = env;
     }
 
     /// <summary>
@@ -90,6 +99,13 @@ public class BookingsController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error creating booking");
+
+            if (_env != null && _env.IsDevelopment())
+            {
+                // In development return detailed error to help debugging
+                return StatusCode(500, new { message = "An error occurred creating booking", detail = ex.Message, stack = ex.StackTrace });
+            }
+
             return StatusCode(500, new { message = "An error occurred creating booking" });
         }
     }
@@ -155,18 +171,53 @@ public class BookingsController : ControllerBase
     }
 
     /// <summary>
-    /// Start charging session (Staff only)
+    /// Start charging session (Customer can start their own booking, Staff/Admin can start any)
     /// </summary>
     [HttpPut("{id}/start")]
-    [Authorize(Roles = "staff,admin")]
+    [Authorize]
     public async Task<IActionResult> StartCharging(int id)
     {
         try
         {
+            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+            var userRole = User.FindFirst(ClaimTypes.Role)!.Value;
+            
+            // Check if user owns this booking (unless they are staff/admin)
+            if (userRole != "admin" && userRole != "staff")
+            {
+                var booking = await _bookingService.GetBookingByIdAsync(id);
+                if (booking == null)
+                {
+                    return NotFound(new { message = "Booking not found" });
+                }
+                
+                if (booking.UserId != userId)
+                {
+                    return Forbid();
+                }
+            }
+            
             var success = await _bookingService.StartChargingAsync(id);
             if (!success)
             {
                 return BadRequest(new { message = "Failed to start charging" });
+            }
+
+            // 🔥 Get booking details để broadcast SignalR
+            var bookingDetails = await _bookingService.GetBookingByIdAsync(id);
+            if (bookingDetails != null)
+            {
+                _logger.LogInformation(
+                    "📡 Broadcasting charging started - Booking {BookingId}, Station {StationId}, Slot {SlotId}",
+                    id, bookingDetails.StationId, bookingDetails.SlotId);
+
+                // Broadcast real-time notification to Staff Dashboard
+                await _notificationService.NotifyChargingStarted(
+                    bookingId: id,
+                    stationId: bookingDetails.StationId,
+                    slotId: bookingDetails.SlotId,
+                    connectorCode: bookingDetails.SlotNumber ?? "N/A"
+                );
             }
 
             return Ok(new { message = "Charging started successfully" });
@@ -179,18 +230,53 @@ public class BookingsController : ControllerBase
     }
 
     /// <summary>
-    /// Complete charging session (Staff only)
+    /// Complete charging session (User can complete their own booking, Staff/Admin can complete any)
     /// </summary>
     [HttpPut("{id}/complete")]
-    [Authorize(Roles = "staff,admin")]
+    [Authorize]
     public async Task<IActionResult> CompleteCharging(int id, [FromBody] CompleteChargingDto dto)
     {
         try
         {
+            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+            var userRole = User.FindFirst(ClaimTypes.Role)!.Value;
+            
+            // Check if user owns this booking (unless they are staff/admin)
+            if (userRole != "admin" && userRole != "staff")
+            {
+                var booking = await _bookingService.GetBookingByIdAsync(id);
+                if (booking == null)
+                {
+                    return NotFound(new { message = "Booking not found" });
+                }
+                
+                if (booking.UserId != userId)
+                {
+                    return Forbid();
+                }
+            }
+            
             var success = await _bookingService.CompleteChargingAsync(id, dto.FinalSoc, dto.TotalEnergyKwh, dto.UnitPrice);
             if (!success)
             {
                 return BadRequest(new { message = "Failed to complete charging" });
+            }
+
+            // 🔥 Get booking details để broadcast SignalR
+            var completedBooking = await _bookingService.GetBookingByIdAsync(id);
+            if (completedBooking != null)
+            {
+                _logger.LogInformation(
+                    "📡 Broadcasting charging completed - Booking {BookingId}, Station {StationId}, Slot {SlotId}",
+                    id, completedBooking.StationId, completedBooking.SlotId);
+
+                // Broadcast real-time notification to Staff Dashboard
+                await _notificationService.NotifyChargingCompleted(
+                    bookingId: id,
+                    stationId: completedBooking.StationId,
+                    slotId: completedBooking.SlotId,
+                    connectorCode: completedBooking.SlotNumber ?? "N/A"
+                );
             }
 
             return Ok(new { message = "Charging completed successfully" });

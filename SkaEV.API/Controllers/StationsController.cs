@@ -124,6 +124,26 @@ public class StationsController : ControllerBase
     }
 
     /// <summary>
+    /// Get station slots details with power and status
+    /// Public endpoint - customers need this to see available charging ports
+    /// </summary>
+    [HttpGet("{id}/slots")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetStationSlots(int id)
+    {
+        try
+        {
+            var slots = await _stationService.GetStationSlotsDetailsAsync(id);
+            return Ok(new { success = true, data = slots });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting station slots {StationId}", id);
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
+    }
+
+    /// <summary>
     /// Delete station (Admin only)
     /// </summary>
     [HttpDelete("{id}")]

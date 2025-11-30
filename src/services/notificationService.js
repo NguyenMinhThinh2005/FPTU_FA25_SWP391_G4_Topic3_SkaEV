@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Notification Service - Push Notifications & In-App Notifications
  * Provides both Web Push API notifications and in-app notification center
  */
@@ -313,6 +313,43 @@ class NotificationService {
     resetPromotionCount() {
         this.dailyPromotions = { date: new Date().toDateString(), count: 0 };
         this.saveDailyPromotions();
+    }
+
+    // Helper methods for quick notifications
+    success(message, title = 'Thành công') {
+        return this.addNotification({
+            type: 'success',
+            title,
+            message,
+            timestamp: new Date().toISOString()
+        });
+    }
+
+    error(message, title = 'Lỗi') {
+        return this.addNotification({
+            type: 'error',
+            title,
+            message,
+            timestamp: new Date().toISOString()
+        });
+    }
+
+    info(message, title = 'Thông báo') {
+        return this.addNotification({
+            type: 'info',
+            title,
+            message,
+            timestamp: new Date().toISOString()
+        });
+    }
+
+    warning(message, title = 'Cảnh báo') {
+        return this.addNotification({
+            type: 'warning',
+            title,
+            message,
+            timestamp: new Date().toISOString()
+        });
     }
 }
 

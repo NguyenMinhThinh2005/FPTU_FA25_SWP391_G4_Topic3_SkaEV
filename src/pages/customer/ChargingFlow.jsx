@@ -1,4 +1,4 @@
-/* eslint-disable */
+﻿/* eslint-disable */
 import React, { useState, useEffect } from "react";
 import {
   Box,
@@ -21,7 +21,6 @@ import {
   DialogActions,
   List,
   ListItem,
-  ListItemText,
   ListItemIcon,
   Avatar,
   TextField,
@@ -29,6 +28,7 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  Checkbox,
 } from "@mui/material";
 import {
   QrCodeScanner,
@@ -38,14 +38,24 @@ import {
   LocationOn,
   Speed,
   Search,
-  Map as MapIcon,
-  ViewList,
 } from "@mui/icons-material";
 import useBookingStore from "../../store/bookingStore";
 import useStationStore from "../../store/stationStore";
-import { formatCurrency } from "../../utils/helpers";
+import { formatCurrency, calculateDistance } from "../../utils/helpers";
 import StationMapLeaflet from "../../components/customer/StationMapLeaflet";
 import notificationService from "../../services/notificationService";
+import { qrCodesAPI, chargingAPI } from "../../services/api";
+
+// Helper function to normalize Vietnamese text for search
+const normalize = (text) => {
+  if (!text) return "";
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // Remove diacritics
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "d");
+};
 
 // Helper to render operating hours safely (matches StationMapLeaflet)
 const formatOperatingHours = (oh) => {
@@ -83,107 +93,230 @@ import BookingModal from "../../components/customer/BookingModal";
 import RatingModal from "../../components/customer/RatingModal";
 
 const ChargingFlow = () => {
-  const { currentBooking, chargingSession, resetFlowState } = useBookingStore();
+  // Các bước của flow booking sạc xe
+  const flowSteps = [
+    "Chọn trạm",
+    "Đặt lịch",
+    "Quét QR",
+    "Kết nối",
+    "Đang sạc",
+    "Hoàn thành",
+  ];
+  const { currentBooking, chargingSession, resetFlowState, completeBooking } =
+    useBookingStore();
+  const bookingStore = useBookingStore;
   const { stations, initializeData, filters, updateFilters, loading } =
     useStationStore();
+  
+  // Debug log to check stations value
+  console.log("🔍 ChargingFlow - stations from store:", stations?.length || 0, "stations");
+  console.log("🔍 ChargingFlow - loading:", loading);
 
-  const [flowStep, setFlowStep] = useState(0); // 0: Tìm trạm, 1: Đặt lịch, 2: QR Scan, 3: Kết nối, 4: Sạc, 5: Hoàn thành
+  // Lưu flowStep vào sessionStorage để giữ trạng thái khi chuyển tab
+  const getInitialFlowStep = () => {
+    const saved = sessionStorage.getItem("chargingFlowStep");
+    return saved !== null ? Number(saved) : 0;
+  };
+  const [flowStep, setFlowStepState] = useState(getInitialFlowStep());
+
+  // Custom setter để lưu vào sessionStorage
+  const setFlowStep = (step) => {
+    setFlowStepState(step);
+    sessionStorage.setItem("chargingFlowStep", step);
+  };
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStation, setSelectedStation] = useState(null);
   const [viewMode, setViewMode] = useState("list"); // 'list' or 'map'
+  const [userLocation, setUserLocation] = useState({
+    lat: 10.8231, // Default to Ho Chi Minh City (HCMC)
+    lng: 106.6297,
+  });
 
-  // Reset flow to step 0 on component mount - always start fresh
+  // Khôi phục currentBooking, chargingSession, flowStep từ sessionStorage khi mount (KHÔNG reset flowStep về 0 tự động)
   useEffect(() => {
-    console.log("🔄 Component mounted - resetting flow state");
-    resetFlowState(); // Clear any old booking/session data
-    setFlowStep(0); // Always start from step 0
-  }, []); // Empty dependency array = run only on mount
+    // Khi mount, khôi phục currentBooking và chargingSession nếu chưa có
+    const savedBooking = sessionStorage.getItem("chargingCurrentBooking");
+    if (!currentBooking && savedBooking) {
+      try {
+        const bookingObj = JSON.parse(savedBooking);
+        if (bookingObj && bookingObj.id) {
+          bookingStore.setState({ currentBooking: bookingObj });
+        }
+      } catch (e) {
+        console.error("Lỗi parse currentBooking từ sessionStorage", e);
+      }
+    }
+    const savedSession = sessionStorage.getItem("chargingSession");
+    if (!chargingSession && savedSession) {
+      try {
+        const sessionObj = JSON.parse(savedSession);
+        if (sessionObj && sessionObj.bookingId) {
+          bookingStore.setState({ chargingSession: sessionObj });
+        }
+      } catch (e) {
+        console.error("Lỗi parse chargingSession từ sessionStorage", e);
+      }
+    }
+    // Luôn ưu tiên lấy flowStep từ sessionStorage nếu có
+    const saved = sessionStorage.getItem("chargingFlowStep");
+    if (saved !== null) {
+      setFlowStepState(Number(saved));
+    }
+    // KHÔNG reset flowStep về 0 tự động nữa!
+  }, []);
+  // Lưu chargingSession vào sessionStorage mỗi khi thay đổi
+  useEffect(() => {
+    if (chargingSession) {
+      sessionStorage.setItem(
+        "chargingSession",
+        JSON.stringify(chargingSession)
+      );
+    } else {
+      sessionStorage.removeItem("chargingSession");
+    }
+  }, [chargingSession]);
+  // Lưu currentBooking vào sessionStorage mỗi khi thay đổi
+  useEffect(() => {
+    if (currentBooking) {
+      sessionStorage.setItem(
+        "chargingCurrentBooking",
+        JSON.stringify(currentBooking)
+      );
+    } else {
+      sessionStorage.removeItem("chargingCurrentBooking");
+    }
+  }, [currentBooking]);
 
   // Debug searchQuery changes
   useEffect(() => {
     console.log("🔎 SearchQuery changed to:", searchQuery);
   }, [searchQuery]);
+
   const [bookingModalOpen, setBookingModalOpen] = useState(false);
   const [qrScanOpen, setQrScanOpen] = useState(false);
-  const [scanResult, setScanResult] = useState("");
+  // Persisted state for flow >= 2
+  const getPersisted = (key, fallback) => {
+    const saved = sessionStorage.getItem(key);
+    if (!saved) return fallback;
+    try {
+      return JSON.parse(saved);
+    } catch {
+      return fallback;
+    }
+  };
+  const [scanResult, setScanResultState] = useState(() =>
+    getPersisted("chargingScanResult", "")
+  );
   const [ratingModalOpen, setRatingModalOpen] = useState(false);
   const [completedSession, setCompletedSession] = useState(null);
-  const [currentBookingData, setCurrentBookingData] = useState(null);
-  const [chargingStartTime, setChargingStartTime] = useState(null);
+  const [currentBookingData, setCurrentBookingDataState] = useState(() =>
+    getPersisted("chargingCurrentBookingData", null)
+  );
+  const [chargingStartTime, setChargingStartTimeState] = useState(() =>
+    getPersisted("chargingChargingStartTime", null)
+  );
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
-  const [sessionData, setSessionData] = useState({
-    energyDelivered: 0,
-    startSOC: 25,
-    currentSOC: 25,
-    targetSOC: 80,
-    startTime: null,
-    estimatedDuration: 0,
-    currentCost: 0,
-    chargingRate: 8500,
-    stationId: "ST-001",
-    stationName: "Trạm sạc FPT Hà Nội",
-    connectorType: "CCS2",
-    maxPower: 150,
-  });
+  const [sessionData, setSessionDataState] = useState(() =>
+    getPersisted("chargingSessionData", {
+      energyDelivered: 0,
+      startSOC: 25,
+      currentSOC: 25,
+      targetSOC: 80,
+      startTime: null,
+      estimatedDuration: 0,
+      currentCost: 0,
+      chargingRate: 8500,
+      stationId: "ST-001",
+      stationName: "Trạm sạc FPT Hà Nội",
+      connectorType: "CCS2",
+      maxPower: 150,
+    })
+  );
 
-  const flowSteps = [
-    "Tìm trạm sạc",
-    "Đặt lịch sạc",
-    "Quét QR trạm",
-    "Kết nối xe",
-    "Đang sạc",
-    "Thanh toán",
-    "Hoàn thành",
-  ];
+  // Custom setters to persist
+  const setCurrentBookingData = (data) => {
+    setCurrentBookingDataState(data);
+    if (data)
+      sessionStorage.setItem(
+        "chargingCurrentBookingData",
+        JSON.stringify(data)
+      );
+    else sessionStorage.removeItem("chargingCurrentBookingData");
+  };
+  const setChargingStartTime = (val) => {
+    setChargingStartTimeState(val);
+    if (val)
+      sessionStorage.setItem("chargingChargingStartTime", JSON.stringify(val));
+    else sessionStorage.removeItem("chargingChargingStartTime");
+  };
+  const setScanResult = (val) => {
+    setScanResultState(val);
+    if (val) sessionStorage.setItem("chargingScanResult", JSON.stringify(val));
+    else sessionStorage.removeItem("chargingScanResult");
+  };
+  const setSessionData = (val) => {
+    setSessionDataState(val);
+    if (val) sessionStorage.setItem("chargingSessionData", JSON.stringify(val));
+    else sessionStorage.removeItem("chargingSessionData");
+  };
 
-  // Combined filter for stations based on search text and connector types
+  // Khôi phục state khi flowStep >= 2
+  useEffect(() => {
+    const saved = sessionStorage.getItem("chargingFlowStep");
+    const step = saved !== null ? Number(saved) : 0;
+    if (step >= 2) {
+      setCurrentBookingData(getPersisted("chargingCurrentBookingData", null));
+      setScanResult(getPersisted("chargingScanResult", ""));
+      setChargingStartTime(getPersisted("chargingChargingStartTime", null));
+      setSessionData(
+        getPersisted("chargingSessionData", {
+          energyDelivered: 0,
+          startSOC: 25,
+          currentSOC: 25,
+          targetSOC: 80,
+          startTime: null,
+          estimatedDuration: 0,
+          currentCost: 0,
+          chargingRate: 8500,
+          stationId: "ST-001",
+          stationName: "Trạm sạc FPT Hà Nội",
+          connectorType: "CCS2",
+          maxPower: 150,
+        })
+      );
+    }
+  }, []);
+  // Filter and search stations (useMemo)
   const filteredStations = React.useMemo(() => {
-    console.log(
-      "🔍 FILTER START - Query:",
-      searchQuery,
-      "| Connector:",
-      filters.connectorTypes
-    );
-    console.log("📊 Stations array:", stations);
-
     try {
-      // Start with all stations from store
-      let stationList = Array.isArray(stations) ? [...stations] : [];
-      console.log("📊 Total stations to filter:", stationList.length);
-
-      if (stationList.length === 0) {
-        console.warn("⚠️ No stations available in store!");
-        return [];
-      }
-
-      // Apply text search filter if search query exists
-      if (searchQuery && searchQuery.trim()) {
-        const query = searchQuery.toLowerCase().trim();
-        console.log("🔤 Applying text search for:", query);
-
+      let stationList = stations ? [...stations] : [];
+      const query = normalize(searchQuery.trim());
+      if (query) {
         stationList = stationList.filter((station) => {
           if (!station) return false;
-
-          // Search in station name
+          // Normalize and search in station name
           const matchesName =
-            station.name && station.name.toLowerCase().includes(query);
-
+            station.name && normalize(station.name).includes(query);
+          // Search in city
+          const matchesCity =
+            station.location &&
+            station.location.city &&
+            normalize(station.location.city).includes(query);
           // Search in address
           const matchesAddress =
             station.location &&
             station.location.address &&
-            station.location.address.toLowerCase().includes(query);
-
+            normalize(station.location.address).includes(query);
           // Search in landmarks
           const matchesLandmarks =
             station.location &&
             station.location.landmarks &&
             Array.isArray(station.location.landmarks) &&
             station.location.landmarks.some(
-              (landmark) => landmark && landmark.toLowerCase().includes(query)
+              (landmark) => landmark && normalize(landmark).includes(query)
             );
-
-          const isMatch = matchesName || matchesAddress || matchesLandmarks;
+          const isMatch =
+            matchesName || matchesCity || matchesAddress || matchesLandmarks;
           if (isMatch) {
             console.log("✅ Text match:", station.name);
           }
@@ -191,64 +324,49 @@ const ChargingFlow = () => {
         });
         console.log("🔤 After text search:", stationList.length, "stations");
       }
-
       // Apply connector type filter if selected (independent from text search)
-      // Handle both string and array format for connectorTypes
-      const connectorFilter = Array.isArray(filters.connectorTypes)
-        ? filters.connectorTypes[0]
-        : filters.connectorTypes;
-
-      if (
-        connectorFilter &&
-        typeof connectorFilter === "string" &&
-        connectorFilter.trim() !== ""
-      ) {
-        const filterType = connectorFilter.trim();
-        console.log("🔌 Applying connector filter for:", filterType);
-
+      const connectorFilters = Array.isArray(filters.connectorTypes)
+        ? filters.connectorTypes.filter(Boolean)
+        : filters.connectorTypes
+        ? [filters.connectorTypes]
+        : [];
+      if (connectorFilters.length > 0) {
+        console.log("🔌 Applying connector filters:", connectorFilters);
         stationList = stationList.filter((station) => {
           if (!station || !station.charging) {
             console.log("❌ Station missing charging data:", station?.name);
             return false;
           }
-
           // Check connectorTypes array first
-          if (
-            station.charging.connectorTypes &&
-            Array.isArray(station.charging.connectorTypes)
-          ) {
-            const hasConnector =
-              station.charging.connectorTypes.includes(filterType);
-            if (hasConnector) {
-              console.log(
-                "✅ Connector match in array:",
-                station.name,
-                station.charging.connectorTypes
-              );
-              return true;
-            }
+          const stationConnectors = station.charging.connectorTypes || [];
+          const hasMatchingConnector = connectorFilters.some((filterType) =>
+            stationConnectors.includes(filterType)
+          );
+          if (hasMatchingConnector) {
+            console.log(
+              "✅ Connector match in array:",
+              station.name,
+              stationConnectors
+            );
+            return true;
           }
-
-          // Check chargingPosts if connectorTypes not available
-          if (
-            station.charging.chargingPosts &&
-            Array.isArray(station.charging.chargingPosts)
-          ) {
-            const hasInPosts = station.charging.chargingPosts.some(
-              (post) =>
-                post &&
-                post.slots &&
-                Array.isArray(post.slots) &&
-                post.slots.some(
-                  (slot) => slot && slot.connectorType === filterType
+          // Check poles/ports if connectorTypes not available
+          if (station.charging.poles && Array.isArray(station.charging.poles)) {
+            const hasInPoles = station.charging.poles.some(
+              (pole) =>
+                pole &&
+                pole.ports &&
+                Array.isArray(pole.ports) &&
+                pole.ports.some(
+                  (port) =>
+                    port && connectorFilters.includes(port.connectorType)
                 )
             );
-            if (hasInPosts) {
-              console.log("✅ Connector match in posts:", station.name);
+            if (hasInPoles) {
+              console.log("✅ Connector match in poles:", station.name);
               return true;
             }
           }
-
           console.log("❌ No connector match:", station.name);
           return false;
         });
@@ -258,58 +376,92 @@ const ChargingFlow = () => {
           "stations"
         );
       }
-
       console.log("✅ FINAL RESULT:", stationList.length, "stations");
       if (stationList.length > 0) {
         console.log("   Stations:", stationList.map((s) => s.name).join(", "));
       }
-
-      // Add stats to each station
+      // Add stats and distance to each station
       stationList = stationList.map((station) => {
-        if (!station.stats && station.charging?.chargingPosts) {
-          let totalSlots = 0;
-          let availableSlots = 0;
-
-          station.charging.chargingPosts.forEach((post) => {
-            if (post.slots && Array.isArray(post.slots)) {
-              totalSlots += post.slots.length;
-              availableSlots += post.slots.filter(
-                (slot) => slot.status === "available"
-              ).length;
-            }
+        let updatedStation = { ...station };
+        
+        // Add stats if not present
+        if (!station.stats && station.charging?.poles) {
+          let totalPorts = 0;
+          let availablePorts = 0;
+          station.charging.poles.forEach((pole) => {
+            const ports = pole.ports || [];
+            totalPorts += ports.length;
+            availablePorts += ports.filter(
+              (port) => port.status === "available"
+            ).length;
           });
-
-          return {
-            ...station,
-            stats: {
-              total: totalSlots,
-              available: availableSlots,
-              occupied: totalSlots - availableSlots,
-            },
+          updatedStation.stats = {
+            total: totalPorts,
+            available: availablePorts,
+            occupied: totalPorts - availablePorts,
           };
         }
-        return station;
+        
+        // Calculate distance from user location
+        if (userLocation && station.location?.coordinates) {
+          const distance = calculateDistance(
+            userLocation.lat,
+            userLocation.lng,
+            station.location.coordinates.lat,
+            station.location.coordinates.lng
+          );
+          updatedStation.distanceFromUser = distance;
+        }
+        
+        return updatedStation;
       });
-
+      
+      // Sort by distance (ascending order) - nearest stations first
+      stationList.sort((a, b) => {
+        if (a.distanceFromUser !== undefined && b.distanceFromUser !== undefined) {
+          return a.distanceFromUser - b.distanceFromUser;
+        }
+        return 0;
+      });
+      
+      console.log("📍 Stations sorted by distance:", stationList.map(s => `${s.name} (${s.distanceFromUser?.toFixed(1)}km)`));
+      
       return stationList;
     } catch (error) {
       console.error("❌ Error filtering stations:", error);
       return [];
     }
-  }, [searchQuery, filters.connectorTypes, stations]);
+  }, [searchQuery, filters.connectorTypes, stations, userLocation]);
 
   useEffect(() => {
     console.log("🚀 ChargingFlow mounted - initializing data");
     initializeData();
   }, [initializeData]);
 
-  // Reset flow step to 0 if no active booking or charging session
+  // Get user location
   useEffect(() => {
-    if (!currentBooking && !chargingSession) {
-      console.log("🔄 No active booking or session, resetting flow to step 0");
-      setFlowStep(0);
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const newLocation = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          };
+          console.log("📍 User location updated:", newLocation);
+          setUserLocation(newLocation);
+        },
+        (error) => {
+          console.warn("⚠️ Location access denied, using default location:", error);
+          // Keep default location (HCMC)
+        }
+      );
+    } else {
+      console.warn("⚠️ Geolocation not supported, using default location");
     }
-  }, [currentBooking, chargingSession]);
+  }, []);
+
+  // Reset flow step to 0 if no active booking or charging session
+  // Đã loại bỏ auto-reset flowStep về 0 khi mất currentBooking/changingSession để giữ đúng trạng thái flow khi quay lại
 
   // Debug log when stations change
   useEffect(() => {
@@ -333,7 +485,6 @@ const ChargingFlow = () => {
       "currentStep:",
       flowStep
     );
-
     // Don't auto-advance - user must manually proceed through steps
     // This prevents auto-jumping to QR scan on page load with persisted booking
   }, [currentBooking, chargingSession, flowStep]);
@@ -364,55 +515,135 @@ const ChargingFlow = () => {
     }));
   };
 
-  const handleQRScan = (result) => {
+  const handleQRScan = async (result) => {
     console.log("📱 QR Scan triggered with result:", result);
 
-    // Allow QR scan even without booking for demo purposes
-    if (!currentBookingData) {
-      console.warn("No booking data - proceeding with demo mode");
-      // Create a temporary booking for demo
-      setCurrentBookingData({
-        id: "DEMO-" + Date.now(),
-        stationId: "ST-001",
-        stationName: "Trạm demo",
-        scheduledDateTime: new Date(),
-      });
+    try {
+      // For customer demo, skip API validation (API requires Staff role)
+      // In production, Staff would scan and validate
+      console.log(
+        "⚠️ Customer mode - skipping API validation (requires Staff role)"
+      );
+      console.log("✅ QR code accepted in demo mode:", result);
+
+      // Update booking with QR scan info
+      if (currentBooking) {
+        bookingStore.setState({
+          currentBooking: {
+            ...currentBooking,
+            qrScanned: true,
+            scannedAt: new Date().toISOString(),
+          },
+        });
+      }
+
+      setScanResult(result);
+      setFlowStep(3); // Move to connect step
+      setQrScanOpen(false);
+
+      notificationService.success("Quét mã QR thành công!");
+      console.log("✅ QR Scanned successfully, moving to step 3");
+    } catch (error) {
+      console.error("❌ Error scanning QR code:", error);
+      console.warn("⚠️ Continuing with demo mode anyway");
+
+      // Continue with demo mode even if there's an error
+      setScanResult(result);
+      setFlowStep(3);
+      setQrScanOpen(false);
     }
-
-    setScanResult(result);
-    setFlowStep(3); // Move to connect step
-    setQrScanOpen(false);
-
-    console.log("✅ QR Scanned successfully, moving to step 3");
   };
 
-  const handleStartCharging = () => {
-    if (!currentBookingData || !scanResult) {
-      console.error("Missing booking data or QR scan result");
+  const handleStartCharging = async () => {
+    if (!currentBooking || !scanResult) {
+      console.error("❌ Missing booking data or QR scan result");
+      alert("Thiếu thông tin booking hoặc mã QR");
       return;
     }
 
-    const now = new Date();
-    setChargingStartTime(now);
-    setFlowStep(4); // Move to charging step
+    try {
+      console.log(
+        "🔌 Starting charging session for booking:",
+        currentBooking.id,
+        currentBooking
+      );
 
-    // Initialize session data with real values
-    setSessionData((prev) => ({
-      ...prev,
-      startTime: now,
-      currentSOC: 25, // Starting battery level
-      energyDelivered: 0,
-      currentCost: 0,
-    }));
+      // Use numeric booking ID from API (apiId) if available, otherwise use id
+      // API endpoint expects integer ID, not string "BOOK..."
+      const bookingId = currentBooking.apiId || currentBooking.bookingId || currentBooking.id;
+      console.log('📊 Using booking ID for API:', bookingId, 'Type:', typeof bookingId);
 
-    // Thông báo bắt đầu sạc
-    notificationService.notifyChargingStarted({
-      stationName: selectedStation?.name || "Trạm sạc",
-      currentSOC: 25,
-    });
+      try {
+        const response = await chargingAPI.startCharging(bookingId);
+        console.log("✅ Charging session started via API:", response);
 
-    console.log("⚡ Charging started for station:", selectedStation?.name);
-    console.log("📊 Booking data:", currentBookingData);
+        // Create charging session from API response
+        const newChargingSession = {
+          sessionId: response.sessionId || `SESSION-${Date.now()}`,
+          bookingId: bookingId,
+          startTime: new Date(),
+          stationId: currentBooking.stationId,
+          stationName: currentBooking.stationName,
+          chargerType: currentBooking.chargerType,
+          status: "active",
+        };
+
+        bookingStore.setState({ chargingSession: newChargingSession });
+      } catch (apiError) {
+        // If API fails (403 or other), continue with demo mode
+        console.warn(
+          "⚠️ API call failed (may require Staff role), continuing with demo mode:",
+          apiError.message
+        );
+
+        // Create demo charging session
+        const demoSession = {
+          sessionId: `DEMO-SESSION-${Date.now()}`,
+          bookingId: bookingId,
+          startTime: new Date(),
+          stationId: currentBooking.stationId,
+          stationName: currentBooking.stationName,
+          chargerType: currentBooking.chargerType,
+          status: "active-demo",
+        };
+
+        bookingStore.setState({ chargingSession: demoSession });
+        console.log("📊 Demo charging session created:", demoSession);
+      }
+
+      const now = new Date();
+      setChargingStartTime(now);
+      setFlowStep(4); // Move to charging step
+
+      // Update booking status
+      bookingStore.setState({
+        currentBooking: {
+          ...currentBooking,
+          chargingStarted: true,
+          status: "in-progress",
+        },
+      });
+
+      // Initialize session data
+      setSessionData((prev) => ({
+        ...prev,
+        startTime: now,
+        currentSOC: 25, // Starting battery level
+        energyDelivered: 0,
+        currentCost: 0,
+      }));
+
+      // Notify charging started
+      notificationService.notifyChargingStarted({
+        stationName: currentBooking.stationName || "Trạm sạc",
+        currentSOC: 25,
+      });
+
+      console.log("⚡ Charging started successfully");
+    } catch (error) {
+      console.error("❌ Error starting charging:", error);
+      alert(error.message || "Lỗi khi bắt đầu sạc");
+    }
   };
 
   // Use sessionData for consistent state management
@@ -493,316 +724,70 @@ const ChargingFlow = () => {
               }}
             >
               <CardContent sx={{ p: 3 }}>
-                <Grid container spacing={2.5} alignItems="center">
-                  {/* Search Input - Wider on desktop */}
-                  <Grid item xs={12} md={5}>
-                    <TextField
-                      fullWidth
-                      placeholder="Tìm kiếm theo vị trí, tên trạm..."
-                      value={searchQuery}
-                      onChange={(e) => {
-                        const newValue = e.target.value;
-                        console.log("⌨️ TextField onChange:", newValue);
-                        setSearchQuery(newValue);
-                      }}
-                      InputProps={{
-                        startAdornment: (
-                          <Search sx={{ mr: 1, color: "text.secondary" }} />
-                        ),
-                      }}
-                      sx={{
-                        "& .MuiOutlinedInput-root": {
-                          borderRadius: 2,
-                          backgroundColor: "grey.50",
-                          "&:hover": {
-                            backgroundColor: "white",
-                          },
-                          "&.Mui-focused": {
-                            backgroundColor: "white",
-                          },
-                        },
-                      }}
-                    />
-                  </Grid>
-
-                  {/* Connector Type Filter */}
-                  <Grid item xs={12} sm={6} md={4}>
-                    <FormControl fullWidth>
-                      <InputLabel>Loại cổng sạc</InputLabel>
-                      <Select
-                        value={filters.connectorTypes || ""}
-                        onChange={(e) => {
-                          console.log(
-                            "🔌 Connector type changed:",
-                            e.target.value
-                          );
-                          updateFilters({ connectorTypes: e.target.value });
-                        }}
-                        sx={{
-                          borderRadius: 2,
-                          backgroundColor: "grey.50",
-                          "&:hover": {
-                            backgroundColor: "white",
-                          },
-                          "&.Mui-focused": {
-                            backgroundColor: "white",
-                          },
-                        }}
-                      >
-                        <MenuItem value="">
-                          <em>Tất cả loại cổng</em>
-                        </MenuItem>
-                        {Object.values(CONNECTOR_TYPES).map((type) => (
-                          <MenuItem key={type} value={type}>
-                            {type}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                  </Grid>
-
-                  {/* View Mode Toggle Buttons */}
-                  <Grid item xs={12} sm={6} md={3}>
-                    <Box
-                      sx={{
-                        display: "flex",
-                        gap: 1,
-                        justifyContent: { xs: "stretch", md: "flex-end" },
-                      }}
-                    >
-                      <Button
-                        variant={viewMode === "list" ? "contained" : "outlined"}
-                        onClick={() => setViewMode("list")}
-                        startIcon={<ViewList />}
-                        fullWidth
-                        sx={{
-                          borderRadius: 2,
-                          px: 2,
-                          fontWeight: viewMode === "list" ? 600 : 400,
-                          boxShadow:
-                            viewMode === "list"
-                              ? "0 2px 8px rgba(25,118,210,0.2)"
-                              : "none",
-                        }}
-                      >
-                        Danh sách
-                      </Button>
-                      <Button
-                        variant={viewMode === "map" ? "contained" : "outlined"}
-                        onClick={() => setViewMode("map")}
-                        startIcon={<MapIcon />}
-                        fullWidth
-                        sx={{
-                          borderRadius: 2,
-                          px: 2,
-                          fontWeight: viewMode === "map" ? 600 : 400,
-                          boxShadow:
-                            viewMode === "map"
-                              ? "0 2px 8px rgba(25,118,210,0.2)"
-                              : "none",
-                        }}
-                      >
-                        Bản đồ
-                      </Button>
-                    </Box>
-                  </Grid>
-                </Grid>
+                {/* Search Input - Full Width */}
+                <TextField
+                  fullWidth
+                  placeholder="Tìm kiếm theo tên trạm, địa chỉ, khu vực..."
+                  value={searchQuery}
+                  onChange={(e) => {
+                    const newValue = e.target.value;
+                    console.log("⌨️ TextField onChange:", newValue);
+                    setSearchQuery(newValue);
+                  }}
+                  InputProps={{
+                    startAdornment: (
+                      <Search sx={{ mr: 1, color: "text.secondary", fontSize: 24 }} />
+                    ),
+                  }}
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      borderRadius: 3,
+                      backgroundColor: "grey.50",
+                      fontSize: "1rem",
+                      "&:hover": {
+                        backgroundColor: "white",
+                        boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+                      },
+                      "&.Mui-focused": {
+                        backgroundColor: "white",
+                        boxShadow: "0 4px 12px rgba(0,0,0,0.12)",
+                      },
+                    },
+                    "& .MuiOutlinedInput-input": {
+                      padding: "16px 14px",
+                    },
+                  }}
+                />
               </CardContent>
             </Card>
           </Grid>
 
           {/* Stations List or Map */}
           <Grid item xs={12}>
-            {viewMode === "list" ? (
-              <Card>
-                <CardContent>
-                  <Typography
-                    variant="h6"
-                    gutterBottom
-                    sx={{
-                      fontWeight: "bold",
-                      color: "black",
-                      mb: 3,
-                      textAlign: "center",
-                    }}
-                  >
-                    Danh sách trạm SkaEV ({filteredStations.length} trạm)
-                  </Typography>
-                  {loading ? (
-                    <Box sx={{ textAlign: "center", py: 4 }}>
-                      <Typography>Đang tải...</Typography>
-                    </Box>
-                  ) : (
-                    <List>
-                      {filteredStations.map((station) => (
-                        <ListItem
-                          key={station.id}
-                          onClick={() => handleStationSelect(station)}
-                          sx={{
-                            borderRadius: 2,
-                            mb: 1,
-                            border: 1,
-                            borderColor: "divider",
-                            "&:hover": { backgroundColor: "grey.50" },
-                            cursor: "pointer",
-                          }}
-                        >
-                          <ListItemIcon>
-                            <Avatar
-                              src={getStationImage(station)}
-                              sx={{ width: 60, height: 60 }}
-                            >
-                              <ElectricCar />
-                            </Avatar>
-                          </ListItemIcon>
-                          <ListItemText
-                            primary={
-                              <Box
-                                sx={{
-                                  display: "flex",
-                                  justifyContent: "space-between",
-                                  alignItems: "start",
-                                }}
-                              >
-                                <Typography variant="h6" fontWeight="bold">
-                                  {station.name}
-                                </Typography>
-                                <Box
-                                  sx={{
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    alignItems: "flex-end",
-                                    gap: 0.5,
-                                  }}
-                                >
-                                  <Chip
-                                    label={`${station.charging.availablePorts}/${station.charging.totalPorts} cổng đang trống`}
-                                    size="small"
-                                    color="success"
-                                    sx={{ borderRadius: "16px" }}
-                                  />
-                                  {station.operatingHours && (
-                                    <Typography
-                                      variant="caption"
-                                      color="text.secondary"
-                                    >
-                                      {formatOperatingHours(
-                                        station.operatingHours
-                                      )}
-                                    </Typography>
-                                  )}
-                                </Box>
-                              </Box>
-                            }
-                            secondary={
-                              <Box component="span" sx={{ display: "block" }}>
-                                <Box
-                                  component="span"
-                                  sx={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 1,
-                                    mb: 1,
-                                  }}
-                                >
-                                  <LocationOn
-                                    sx={{
-                                      fontSize: 16,
-                                      color: "text.secondary",
-                                    }}
-                                  />
-                                  <Typography
-                                    variant="body2"
-                                    color="text.secondary"
-                                    component="span"
-                                  >
-                                    {station.location.address}
-                                  </Typography>
-                                </Box>
-                                <Box
-                                  component="span"
-                                  sx={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 2,
-                                  }}
-                                >
-                                  <Box
-                                    component="span"
-                                    sx={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: 1,
-                                    }}
-                                  >
-                                    <Speed
-                                      sx={{
-                                        fontSize: 16,
-                                        color: "primary.main",
-                                      }}
-                                    />
-                                    <Typography
-                                      variant="body2"
-                                      component="span"
-                                    >
-                                      Sạc nhanh lên đến{" "}
-                                      {station.charging.maxPower} kW
-                                    </Typography>
-                                  </Box>
-                                  <Typography
-                                    variant="body2"
-                                    color="success.main"
-                                    fontWeight="medium"
-                                    component="span"
-                                  >
-                                    Từ{" "}
-                                    {formatCurrency(
-                                      station.id === "station-001"
-                                        ? 8500
-                                        : station.id === "station-002"
-                                        ? 9500
-                                        : station.id === "station-003"
-                                        ? 7500
-                                        : station.charging.pricing.acRate
-                                    )}
-                                    /kWh
-                                  </Typography>
-                                </Box>
-                              </Box>
-                            }
-                          />
-                          <Button variant="contained" sx={{ ml: 2 }}>
-                            Đặt ngay
-                          </Button>
-                        </ListItem>
-                      ))}
-                    </List>
-                  )}
-                </CardContent>
-              </Card>
-            ) : (
-              <Card>
-                <CardContent>
-                  <Typography
-                    variant="h6"
-                    gutterBottom
-                    sx={{
-                      fontWeight: "bold",
-                      color: "black",
-                      mb: 3,
-                      textAlign: "center",
-                    }}
-                  >
-                    🗺️ Bản đồ trạm sạc ({filteredStations.length} trạm)
-                  </Typography>
-                  <StationMapLeaflet
-                    stations={filteredStations}
-                    onStationSelect={handleStationSelect}
-                  />
-                </CardContent>
-              </Card>
-            )}
+            <Card>
+              <CardContent>
+                <Typography
+                  variant="h6"
+                  gutterBottom
+                  sx={{
+                    fontWeight: "bold",
+                    color: "black",
+                    mb: 3,
+                    textAlign: "center",
+                  }}
+                >
+                   Bản đồ trạm sạc 
+                </Typography>
+                <StationMapLeaflet
+                  stations={filteredStations}
+                  onStationSelect={handleStationSelect}
+                />
+              </CardContent>
+            </Card>
           </Grid>
+
+          {/* Stations List with Distance and Ranking */}
+
         </Grid>
       )}
       {/* Step 2: QR Scan */}
@@ -1402,7 +1387,7 @@ const ChargingFlow = () => {
                     transform: "translateY(0) scale(0.98)",
                   },
                 }}
-                onClick={() => {
+                onClick={async () => {
                   if (!chargingStartTime) {
                     console.error("No charging session to stop");
                     return;
@@ -1422,7 +1407,68 @@ const ChargingFlow = () => {
                   };
                   setCompletedSession(sessionEndData);
 
-                  // Thông báo hoàn thành sạc
+                  // 🚀 Call API to complete charging session
+                  // Use numeric booking ID from API (apiId), not string "BOOK..."
+                  const bookingId =
+                    currentBooking?.apiId || currentBooking?.bookingId || 
+                    currentBooking?.id || currentBookingData?.id;
+                  console.log('📊 Complete - Using booking ID:', bookingId, 'Type:', typeof bookingId);
+                  if (bookingId) {
+                    try {
+                      console.log(
+                        "📤 Calling completeCharging API with booking ID:",
+                        bookingId
+                      );
+                      console.log("� Session data:", {
+                        finalSoc: currentSOC,
+                        totalEnergyKwh: sessionData.energyDelivered,
+                        unitPrice:
+                          selectedStation?.chargers?.[0]?.powerKw || 3500,
+                      });
+
+                      const response = await chargingAPI.completeCharging(
+                        bookingId,
+                        {
+                          finalSoc: currentSOC,
+                          totalEnergyKwh: sessionData.energyDelivered,
+                          unitPrice:
+                            selectedStation?.chargers?.[0]?.powerKw || 3500,
+                        }
+                      );
+
+                      console.log(
+                        "✅ Charging session completed via API:",
+                        response
+                      );
+
+                      // Update charging session status
+                      if (chargingSession) {
+                        bookingStore.setState({
+                          chargingSession: {
+                            ...chargingSession,
+                            status: "completed",
+                            endTime: new Date(),
+                            totalEnergy: sessionData.energyDelivered,
+                            totalCost: sessionData.currentCost,
+                          },
+                        });
+                      }
+                    } catch (error) {
+                      console.error(
+                        "❌ Error completing charging via API:",
+                        error
+                      );
+                      // Continue with local completion even if API fails
+                      console.warn(
+                        "⚠️ Continuing with local session completion"
+                      );
+                    }
+
+                    // Also call bookingStore completeBooking for local state
+                    completeBooking(bookingId, sessionEndData);
+                  }
+
+                  // Notify charging completed
                   notificationService.notifyChargingCompleted({
                     energyDelivered: sessionData.energyDelivered,
                     finalSOC: currentSOC,
@@ -1521,7 +1567,7 @@ const ChargingFlow = () => {
                         mb: 1,
                       }}
                     >
-                      <Typography variant="body2">Giá điện:</Typography>
+                      <Typography variant="body2">Giá sạc:</Typography>
                       <Typography variant="body2" fontWeight="medium">
                         {formatCurrency(sessionData.chargingRate)}/kWh
                       </Typography>
@@ -1653,6 +1699,25 @@ const ChargingFlow = () => {
                         }}
                       >
                         🏦 Chuyển khoản ngân hàng
+                      </Button>
+                      <Button
+                        variant={
+                          selectedPaymentMethod === "cash"
+                            ? "contained"
+                            : "outlined"
+                        }
+                        fullWidth
+                        onClick={() =>
+                          setSelectedPaymentMethod("cash")
+                        }
+                        sx={{
+                          justifyContent: "flex-start",
+                          p: 2,
+                          borderWidth: 2,
+                          "&:hover": { borderWidth: 2 },
+                        }}
+                      >
+                        💸 Thanh toán tại chỗ
                       </Button>
                     </Box>
 

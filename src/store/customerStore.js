@@ -1,7 +1,7 @@
 ﻿import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-// Unified Customer Data Store - Tá»•ng há»£p vÃ  Ä‘á»“ng bá»™ táº¥t cáº£ dá»¯ liá»‡u customer
+// Unified Customer Data Store - Tổng hợp và đồng bộ tất cả dữ liệu customer
 const useCustomerStore = create(
     persist(
         (set, get) => ({

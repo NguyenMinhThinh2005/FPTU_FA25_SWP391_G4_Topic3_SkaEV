@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React, { useState, useEffect } from "react";
 import {
   Box,
   Container,
@@ -18,10 +18,57 @@ import {
 import { useNavigate } from "react-router-dom";
 import useAuthStore from "../../store/authStore";
 import { getText } from "../../utils/vietnameseTexts";
+import statisticsAPI from "../../services/api/statisticsAPI";
 
 const HomePage = () => {
   const navigate = useNavigate();
   const { isAuthenticated, user } = useAuthStore();
+  const [stats, setStats] = useState([
+    { label: "Trạm sạc đang hoạt động", value: "30", color: "primary" },
+    { label: "Khách hàng đăng ký", value: "1,000+", color: "success" },
+    { label: "Lượt sạc thành công", value: "20,000+", color: "warning" },
+    { label: "Độ tin cậy hệ thống", value: "99.8%", color: "secondary" },
+  ]);
+
+  // Fetch real statistics from API
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const response = await statisticsAPI.getHomeStats();
+        if (response.success && response.data) {
+          const { activeStations, registeredUsers, successfulSessions, systemReliability } = response.data;
+          
+          setStats([
+            { 
+              label: "Trạm sạc đang hoạt động", 
+              value: activeStations.toString(), 
+              color: "primary" 
+            },
+            { 
+              label: "Khách hàng đăng ký", 
+              value: registeredUsers >= 1000 ? `${Math.floor(registeredUsers / 1000)},${registeredUsers % 1000}+` : registeredUsers.toString(), 
+              color: "success" 
+            },
+            { 
+              label: "Lượt sạc thành công", 
+              value: successfulSessions >= 1000 ? `${Math.floor(successfulSessions / 1000)},${String(successfulSessions % 1000).padStart(3, '0')}+` : successfulSessions.toString(), 
+              color: "warning" 
+            },
+            { 
+              label: "Độ tin cậy hệ thống", 
+              value: `${systemReliability}%`, 
+              color: "secondary" 
+            },
+          ]);
+        }
+      } catch (error) {
+        console.error("Failed to fetch statistics:", error);
+        // Keep default values if API fails
+      }
+    };
+
+    fetchStats();
+  }, []);
 
   const features = [
     {
@@ -48,13 +95,6 @@ const HomePage = () => {
       description:
         "Hỗ trợ đa dạng phương thức thanh toán: QR Code, thẻ RFID, ví điện tử",
     },
-  ];
-
-  const stats = [
-    { label: "Trạm sạc hoạt động", value: "3", color: "primary" },
-    { label: "Khách hàng đăng ký", value: "1,000+", color: "success" },
-    { label: "Lượt sạc thành công", value: "20,000+", color: "warning" },
-    { label: "Độ tin cậy hệ thống", value: "99.8%", color: "secondary" },
   ];
 
   const handleGetStarted = () => {
@@ -364,7 +404,7 @@ const HomePage = () => {
       {/* CTA Section */}
       <Container maxWidth="lg" sx={{ py: 8, textAlign: "center" }}>
         <Typography variant="h4" fontWeight="bold" gutterBottom>
-          Sẵn sàng bắt đầu hành trình xe điện?
+          Đang sẵn sàng bắt đầu hành trình xe điện?
         </Typography>
         <Typography variant="h6" color="text.secondary" sx={{ mb: 4 }}>
           Tham gia cùng hàng nghìn tài xế xe điện đang sử dụng mạng lưới sạc
@@ -403,7 +443,7 @@ const HomePage = () => {
               SkaEV
             </Typography>
             <Typography variant="body2" color="grey.400">
-              © 2024 SkaEV. Nền tảng quản lý sạc xe điện thông minh - Phát triển
+              © 2025 SkaEV. Nền tảng quản lý sạc xe điện thông minh - Phát triển
               bởi FPTU SWP391
             </Typography>
           </Box>

@@ -32,5 +32,75 @@ SkaEV.API/logs/
 *.user
 *.suo
 
-# Environment
-.env.local
+# Environment - all .env files except examples
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Backend settings - each developer has their own connection string
+SkaEV.API/appsettings.Development.json
+SkaEV.API/appsettings.json
+SkaEV.API/appsettings.*.json
+!SkaEV.API/appsettings.template.json
+!SkaEV.API/appsettings.*.example
+!SkaEV.API/*.example.json
+
+# PowerShell scripts - may contain machine-specific paths
+*.ps1
+!*.example.ps1
+!start-all.ps1
+!run-backend.ps1
+!run-frontend.ps1
+
+# Sensitive PowerShell scripts with passwords/credentials
+reset-user-password.ps1
+test-user-creation.ps1
+quick-setup-after-pull.ps1
+
+# Batch files - may contain machine-specific paths
+*.bat
+!*.example.bat
+
+# Database scripts that are machine-specific
+database/delete_users_*.sql
+database/local_*.sql
+database/temp_*.sql
+
+# Sensitive database scripts with user data/passwords
+database/delete-soft-deleted-users.sql
+database/reset-user-password.sql
+database/reset-all-new-users.sql
+database/add-main-accounts.sql
+
+# Local configuration files
+*.local.json
+!appsettings.template.json
+
+# SQL Server local files
+*.mdf
+*.ldf
+*.ndf
+
+# Test/temp files
+.azure/*.md
+
+# Sensitive documentation with passwords and test data
+ACCOUNT_PASSWORDS.md
+TEST_USER_CREATION.md
+FIX_USER_MANAGEMENT.md
+FIX_ADMIN_LOGIN.md
+!.azure/README.md
+
+# Temporary documentation files (work in progress)
+*_TEST_*.md
+*_DEBUG_*.md
+*_GUIDE_*.md
+COMPLETE_ACCOUNT_LIST.md
+SYSTEM_STATUS_REPORT.md
+
+# Keep important docs
+!README.md
+!SETUP*.md
+!API_*.md
+!INTEGRATION*.md

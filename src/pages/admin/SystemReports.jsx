@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+﻿import React, { useState, useEffect, useCallback } from "react";
 import {
   Box,
   Grid,
@@ -26,6 +26,7 @@ import {
   LinearProgress,
   IconButton,
   Tooltip,
+  CircularProgress,
 } from "@mui/material";
 import {
   Assessment,
@@ -57,53 +58,66 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-
-// Mock data for reports
-const mockRevenueData = [
-  { month: "Jan", revenue: 125000000, sessions: 1200, users: 450 },
-  { month: "Feb", revenue: 142000000, sessions: 1350, users: 520 },
-  { month: "Mar", revenue: 158000000, sessions: 1480, users: 600 },
-  { month: "Apr", revenue: 175000000, sessions: 1620, users: 680 },
-  { month: "May", revenue: 192000000, sessions: 1750, users: 750 },
-  { month: "Jun", revenue: 210000000, sessions: 1890, users: 820 },
-];
-
-const mockStationUsage = [
-  { name: "Vincom Royal City", usage: 85, sessions: 340, revenue: 45000000 },
-  { name: "AEON Mall Long Biên", usage: 92, sessions: 410, revenue: 52000000 },
-  { name: "Lotte Center", usage: 78, sessions: 290, revenue: 38000000 },
-  { name: "BigC Thăng Long", usage: 65, sessions: 220, revenue: 28000000 },
-  { name: "Vincom Times City", usage: 88, sessions: 380, revenue: 48000000 },
-];
-
-const mockUserGrowth = [
-  { category: "New Customers", value: 1250, color: "#8884d8" },
-  { category: "Active Stations", value: 85, color: "#82ca9d" },
-  { category: "Staff Members", value: 42, color: "#ffc658" },
-  { category: "Returning Users", value: 3200, color: "#ff7300" },
-];
-
-const mockSystemHealth = [
-  { metric: "System Uptime", value: 99.8, status: "excellent" },
-  {
-    metric: "Average Response Time",
-    value: 1.2,
-    unit: "seconds",
-    status: "good",
-  },
-  { metric: "Error Rate", value: 0.02, unit: "%", status: "excellent" },
-  { metric: "Station Availability", value: 96.5, unit: "%", status: "good" },
-  {
-    metric: "Payment Success Rate",
-    value: 99.1,
-    unit: "%",
-    status: "excellent",
-  },
-];
+import reportsAPI from "../../services/api/reportsAPI";
+import statisticsAPI from "../../services/api/statisticsAPI";
 
 const AdminSystemReports = () => {
   const [tabValue, setTabValue] = useState(0);
   const [dateRange, setDateRange] = useState("last30days");
+  const [loading, setLoading] = useState(true);
+  
+  // State for real data
+  const [revenueData, setRevenueData] = useState([]);
+  const [stationUsage, setStationUsage] = useState([]);
+  const [userGrowth, setUserGrowth] = useState([]);
+  const [systemHealth, setSystemHealth] = useState([]);
+  const [dashboardStats, setDashboardStats] = useState(null);
+
+  const fetchAllData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [revenueRes, usageRes, growthRes, healthRes, statsRes] = await Promise.all([
+        reportsAPI.getRevenueReports({ dateRange }),
+        reportsAPI.getUsageReports({ dateRange }),
+        reportsAPI.getUserGrowth(dateRange),
+        reportsAPI.getSystemHealth(),
+        statisticsAPI.getDashboardStats(),
+      ]);
+
+      // Process revenue data for charts
+      if (revenueRes.success && revenueRes.data) {
+        setRevenueData(revenueRes.data.monthlyData || []);
+      }
+
+      // Process station usage
+      if (usageRes.success && usageRes.data) {
+        setStationUsage(usageRes.data);
+      }
+
+      // Process user growth
+      if (growthRes.success && growthRes.data) {
+        setUserGrowth(growthRes.data);
+      }
+
+      // Process system health
+      if (healthRes.success && healthRes.data) {
+        setSystemHealth(healthRes.data);
+      }
+
+      // Process dashboard stats
+      if (statsRes.success && statsRes.data) {
+        setDashboardStats(statsRes.data);
+      }
+    } catch (error) {
+      console.error("Error fetching reports data:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [dateRange]);
+
+  useEffect(() => {
+    fetchAllData();
+  }, [fetchAllData]);
 
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);
@@ -131,10 +145,21 @@ const AdminSystemReports = () => {
     }).format(amount);
   };
 
-  const handleExportReport = () => {
-    console.log("Exporting report...");
-    // Here you would implement the export functionality
+  const handleExportReport = async () => {
+    try {
+      await reportsAPI.exportRevenueReport({ dateRange });
+    } catch (error) {
+      console.error("Error exporting report:", error);
+    }
   };
+
+  if (loading && !dashboardStats) {
+    return (
+      <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "80vh" }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ p: 3 }}>
@@ -166,9 +191,7 @@ const AdminSystemReports = () => {
                 <MenuItem value="lastyear">Năm qua</MenuItem>
               </Select>
             </FormControl>
-            <Button startIcon={<Download />} onClick={handleExportReport}>
-              Xuất báo cáo
-            </Button>
+            
             <Button
               startIcon={<Refresh />}
               onClick={() => window.location.reload()}
@@ -193,7 +216,9 @@ const AdminSystemReports = () => {
                 </Avatar>
                 <Box>
                   <Typography variant="h5" fontWeight="bold">
-                    {formatCurrency(210000000)}
+                    {revenueData.length > 0 
+                      ? formatCurrency(revenueData[revenueData.length - 1]?.revenue || 0)
+                      : formatCurrency(0)}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     Doanh thu tháng
@@ -203,7 +228,7 @@ const AdminSystemReports = () => {
               <Box sx={{ display: "flex", alignItems: "center" }}>
                 <TrendingUp sx={{ color: "success.main", mr: 1 }} />
                 <Typography variant="body2" color="success.main">
-                  +12.5% so với tháng trước
+                  Theo dữ liệu thực
                 </Typography>
               </Box>
             </CardContent>
@@ -219,17 +244,16 @@ const AdminSystemReports = () => {
                 </Avatar>
                 <Box>
                   <Typography variant="h5" fontWeight="bold">
-                    1,890
+                    {dashboardStats?.bookings?.total || 0}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    Phiên sạc
+                    Tổng booking
                   </Typography>
                 </Box>
               </Box>
               <Box sx={{ display: "flex", alignItems: "center" }}>
-                <TrendingUp sx={{ color: "success.main", mr: 1 }} />
-                <Typography variant="body2" color="success.main">
-                  +8.2% so với tháng trước
+                <Typography variant="body2" color="text.secondary">
+                  Hoàn thành: {dashboardStats?.bookings?.completed || 0}
                 </Typography>
               </Box>
             </CardContent>
@@ -245,7 +269,7 @@ const AdminSystemReports = () => {
                 </Avatar>
                 <Box>
                   <Typography variant="h5" fontWeight="bold">
-                    4,577
+                    {dashboardStats?.users?.total || 0}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     Tổng người dùng
@@ -253,9 +277,8 @@ const AdminSystemReports = () => {
                 </Box>
               </Box>
               <Box sx={{ display: "flex", alignItems: "center" }}>
-                <TrendingUp sx={{ color: "success.main", mr: 1 }} />
-                <Typography variant="body2" color="success.main">
-                  +15.3% so với tháng trước
+                <Typography variant="body2" color="text.secondary">
+                  Khách hàng: {dashboardStats?.users?.customers || 0}
                 </Typography>
               </Box>
             </CardContent>
@@ -271,7 +294,7 @@ const AdminSystemReports = () => {
                 </Avatar>
                 <Box>
                   <Typography variant="h5" fontWeight="bold">
-                    127
+                    {dashboardStats?.stations?.active || 0}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     Trạm đang hoạt động
@@ -279,9 +302,8 @@ const AdminSystemReports = () => {
                 </Box>
               </Box>
               <Box sx={{ display: "flex", alignItems: "center" }}>
-                <TrendingUp sx={{ color: "success.main", mr: 1 }} />
-                <Typography variant="body2" color="success.main">
-                  +5 trạm mới
+                <Typography variant="body2" color="text.secondary">
+                  Tổng: {dashboardStats?.stations?.total || 0}
                 </Typography>
               </Box>
             </CardContent>
@@ -305,24 +327,33 @@ const AdminSystemReports = () => {
           <Grid item xs={12}>
             <Card>
               <CardContent>
-                <Typography variant="h6" fontWeight="bold" gutterBottom>
-                  Xu hướng doanh thu (6 tháng gần nhất)
-                </Typography>
+                <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+                  <Typography variant="h6" fontWeight="bold">
+                    Xu hướng doanh thu (theo thời gian)
+                  </Typography>
+                  <Button
+                    startIcon={<Download />}
+                    variant="outlined"
+                    onClick={handleExportReport}
+                  >
+                    Xuất báo cáo
+                  </Button>
+                </Box>
                 <ResponsiveContainer width="100%" height={400}>
-                  <AreaChart data={mockRevenueData}>
+                  <AreaChart data={revenueData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="month" />
                     <YAxis />
                     <RechartsTooltip
                       formatter={(value, name) => [
                         name === "revenue" ? formatCurrency(value) : value,
-                        name === "revenue" ? "Doanh thu" : "Phiên truy cập",
+                        name === "revenue" ? "Doanh thu" : "Số phiên",
                       ]}
                     />
                     <Legend />
                     <Area
                       type="monotone"
-                      dataKey="Doanh thu"
+                      dataKey="revenue"
                       stackId="1"
                       stroke="#8884d8"
                       fill="#8884d8"
@@ -342,7 +373,7 @@ const AdminSystemReports = () => {
                   Biểu đồ phiên truy cập và người dùng
                 </Typography>
                 <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={mockRevenueData}>
+                  <LineChart data={revenueData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="month" />
                     <YAxis />
@@ -350,15 +381,17 @@ const AdminSystemReports = () => {
                     <Legend />
                     <Line
                       type="monotone"
-                      dataKey="Phiên truy cập"
+                      dataKey="sessions"
                       stroke="#8884d8"
                       strokeWidth={2}
+                      name="Phiên truy cập"
                     />
                     <Line
                       type="monotone"
-                      dataKey="Người dùng"
+                      dataKey="users"
                       stroke="#82ca9d"
                       strokeWidth={2}
+                      name="Người dùng"
                     />
                   </LineChart>
                 </ResponsiveContainer>
@@ -412,91 +445,91 @@ const AdminSystemReports = () => {
             <Card>
               <CardContent>
                 <Typography variant="h6" fontWeight="bold" gutterBottom>
-                  Hiệu suất trạm
+                  Hiệu suất trạm (Dữ liệu thật)
                 </Typography>
-                <TableContainer component={Paper} variant="outlined">
-                  <Table>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Tên trạm</TableCell>
-                        <TableCell align="center">Tỷ lệ sử dụng</TableCell>
-                        <TableCell align="center">Phiên</TableCell>
-                        <TableCell align="center">Doanh thu</TableCell>
-                        <TableCell align="center">Trạng thái</TableCell>
-                        <TableCell align="center">Thao tác</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {mockStationUsage.map((station, index) => (
-                        <TableRow key={index}>
-                          <TableCell>
-                            <Box sx={{ display: "flex", alignItems: "center" }}>
-                              <LocationOn
-                                sx={{ mr: 1, color: "text.secondary" }}
-                              />
-                              {station.name}
-                            </Box>
-                          </TableCell>
-                          <TableCell align="center">
-                            <Box
-                              sx={{
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                              }}
-                            >
-                              <LinearProgress
-                                variant="determinate"
-                                value={station.usage}
-                                sx={{
-                                  width: 60,
-                                  height: 6,
-                                  borderRadius: 3,
-                                  mr: 1,
-                                }}
-                              />
-                              <Typography variant="body2">
-                                {station.usage}%
-                              </Typography>
-                            </Box>
-                          </TableCell>
-                          <TableCell align="center">
-                            {station.sessions}
-                          </TableCell>
-                          <TableCell align="center">
-                            {formatCurrency(station.revenue)}
-                          </TableCell>
-                          <TableCell align="center">
-                            <Chip
-                              label={
-                                station.usage > 80
-                                  ? "Sử dụng cao"
-                                  : station.usage > 60
-                                  ? "Sử dụng bình thường"
-                                  : "Sử dụng thấp"
-                              }
-                              color={
-                                station.usage > 80
-                                  ? "success"
-                                  : station.usage > 60
-                                  ? "info"
-                                  : "warning"
-                              }
-                              size="small"
-                            />
-                          </TableCell>
-                          <TableCell align="center">
-                            <Tooltip title="Xem chi tiết">
-                              <IconButton size="small">
-                                <Visibility />
-                              </IconButton>
-                            </Tooltip>
-                          </TableCell>
+                {loading ? (
+                  <Box sx={{ display: "flex", justifyContent: "center", p: 3 }}>
+                    <CircularProgress />
+                  </Box>
+                ) : stationUsage.length === 0 ? (
+                  <Alert severity="info">Chưa có dữ liệu sử dụng trạm trong khoảng thời gian này</Alert>
+                ) : (
+                  <TableContainer component={Paper} variant="outlined">
+                    <Table>
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>Tên trạm</TableCell>
+                          <TableCell align="center">Tỷ lệ sử dụng</TableCell>
+                          <TableCell align="center">Tổng booking</TableCell>
+                          <TableCell align="center">Hoàn thành</TableCell>
+                          <TableCell align="center">Trạng thái</TableCell>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
+                      </TableHead>
+                      <TableBody>
+                        {stationUsage.map((station, index) => (
+                          <TableRow key={index}>
+                            <TableCell>
+                              <Box sx={{ display: "flex", alignItems: "center" }}>
+                                <LocationOn
+                                  sx={{ mr: 1, color: "text.secondary" }}
+                                />
+                                {station.stationName}
+                              </Box>
+                            </TableCell>
+                            <TableCell align="center">
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                }}
+                              >
+                                <LinearProgress
+                                  variant="determinate"
+                                  value={Math.min(station.utilizationRate || 0, 100)}
+                                  sx={{
+                                    width: 60,
+                                    height: 6,
+                                    borderRadius: 3,
+                                    mr: 1,
+                                  }}
+                                />
+                                <Typography variant="body2">
+                                  {(station.utilizationRate || 0).toFixed(1)}%
+                                </Typography>
+                              </Box>
+                            </TableCell>
+                            <TableCell align="center">
+                              {station.totalBookings}
+                            </TableCell>
+                            <TableCell align="center">
+                              {station.completedSessions}
+                            </TableCell>
+                            <TableCell align="center">
+                              <Chip
+                                label={
+                                  station.utilizationRate > 80
+                                    ? "Sử dụng cao"
+                                    : station.utilizationRate > 60
+                                    ? "Sử dụng bình thường"
+                                    : "Sử dụng thấp"
+                                }
+                                color={
+                                  station.utilizationRate > 80
+                                    ? "success"
+                                    : station.utilizationRate > 60
+                                    ? "info"
+                                    : "warning"
+                                }
+                                size="small"
+                              />
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                )}
               </CardContent>
             </Card>
           </Grid>
@@ -509,26 +542,32 @@ const AdminSystemReports = () => {
             <Card>
               <CardContent>
                 <Typography variant="h6" fontWeight="bold" gutterBottom>
-                  Phân tích người dùng
+                  Phân tích người dùng (Dữ liệu thật)
                 </Typography>
-                <ResponsiveContainer width="100%" height={400}>
-                  <PieChart>
-                    <Pie
-                      data={mockUserGrowth}
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={120}
-                      fill="#8884d8"
-                      dataKey="value"
-                      label={({ name, value }) => `${name}: ${value}`}
-                    >
-                      {mockUserGrowth.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <RechartsTooltip />
-                  </PieChart>
-                </ResponsiveContainer>
+                {loading ? (
+                  <Box sx={{ display: "flex", justifyContent: "center", p: 3 }}>
+                    <CircularProgress />
+                  </Box>
+                ) : (
+                  <ResponsiveContainer width="100%" height={400}>
+                    <PieChart>
+                      <Pie
+                        data={userGrowth}
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={120}
+                        fill="#8884d8"
+                        dataKey="value"
+                        label={({ category, value }) => `${category}: ${value}`}
+                      >
+                        {userGrowth.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <RechartsTooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                )}
               </CardContent>
             </Card>
           </Grid>
@@ -539,7 +578,7 @@ const AdminSystemReports = () => {
                 <Typography variant="h6" fontWeight="bold" gutterBottom>
                   Thống kê người dùng
                 </Typography>
-                {mockUserGrowth.map((item, index) => (
+                {userGrowth.map((item, index) => (
                   <Box key={index} sx={{ mb: 2 }}>
                     <Box
                       sx={{
@@ -558,7 +597,7 @@ const AdminSystemReports = () => {
                       variant="determinate"
                       value={
                         (item.value /
-                          Math.max(...mockUserGrowth.map((u) => u.value))) *
+                          Math.max(...userGrowth.map((u) => u.value))) *
                         100
                       }
                       sx={{
@@ -582,61 +621,77 @@ const AdminSystemReports = () => {
         <Grid container spacing={3}>
           <Grid item xs={12}>
             <Alert severity="info" sx={{ mb: 3 }}>
-              Các chỉ số tình trạng hệ thống được cập nhật theo thời gian thực.
-              Tất cả các giá trị hiển thị là dữ liệu mới nhất từ lần kiểm tra hệ
-              thống gần nhất.
+              Các chỉ số tình trạng hệ thống được cập nhật theo thời gian thực từ database.
+              Tất cả các giá trị hiển thị là dữ liệu thật từ lần kiểm tra hệ thống gần nhất.
             </Alert>
           </Grid>
 
-          {mockSystemHealth.map((metric, index) => (
-            <Grid item xs={12} sm={6} md={4} key={index}>
-              <Card>
-                <CardContent>
-                  <Box
-                    sx={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      mb: 2,
-                    }}
-                  >
-                    <Typography variant="h6" fontWeight="bold">
-                      {metric.metric}
-                    </Typography>
-                    <Chip
-                      label={metric.status}
-                      color={getStatusColor(metric.status)}
-                      size="small"
-                    />
-                  </Box>
-                  <Typography
-                    variant="h3"
-                    fontWeight="bold"
-                    color="primary.main"
-                    gutterBottom
-                  >
-                    {metric.value}
-                    {metric.unit || ""}
-                  </Typography>
-                  {metric.status === "excellent" && (
-                    <Typography variant="body2" color="success.main">
-                      ✓ Hoạt động trong tham số tối ưu
-                    </Typography>
-                  )}
-                  {metric.status === "good" && (
-                    <Typography variant="body2" color="info.main">
-                      → Hiệu suất ổn định
-                    </Typography>
-                  )}
-                  {metric.status === "warning" && (
-                    <Typography variant="body2" color="warning.main">
-                      ⚠ Cần chú ý
-                    </Typography>
-                  )}
-                </CardContent>
-              </Card>
+          {loading ? (
+            <Grid item xs={12}>
+              <Box sx={{ display: "flex", justifyContent: "center", p: 3 }}>
+                <CircularProgress />
+              </Box>
             </Grid>
-          ))}
+          ) : systemHealth.length === 0 ? (
+            <Grid item xs={12}>
+              <Alert severity="warning">Không thể tải dữ liệu sức khỏe hệ thống</Alert>
+            </Grid>
+          ) : (
+            systemHealth.map((metric, index) => (
+              <Grid item xs={12} sm={6} md={4} key={index}>
+                <Card>
+                  <CardContent>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        mb: 2,
+                      }}
+                    >
+                      <Typography variant="h6" fontWeight="bold">
+                        {metric.metric}
+                      </Typography>
+                      <Chip
+                        label={metric.status}
+                        color={getStatusColor(metric.status)}
+                        size="small"
+                      />
+                    </Box>
+                    <Typography
+                      variant="h3"
+                      fontWeight="bold"
+                      color="primary.main"
+                      gutterBottom
+                    >
+                      {metric.value}
+                      {metric.unit || ""}
+                    </Typography>
+                    {metric.status === "excellent" && (
+                      <Typography variant="body2" color="success.main">
+                        ✓ Hoạt động trong tham số tối ưu
+                      </Typography>
+                    )}
+                    {metric.status === "good" && (
+                      <Typography variant="body2" color="info.main">
+                        → Hiệu suất ổn định
+                      </Typography>
+                    )}
+                    {metric.status === "warning" && (
+                      <Typography variant="body2" color="warning.main">
+                        ⚠ Cần chú ý
+                      </Typography>
+                    )}
+                    {metric.status === "critical" && (
+                      <Typography variant="body2" color="error.main">
+                        ✕ Cần can thiệp ngay
+                      </Typography>
+                    )}
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))
+          )}
         </Grid>
       )}
     </Box>

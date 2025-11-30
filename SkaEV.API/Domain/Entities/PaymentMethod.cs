@@ -17,6 +17,7 @@ public class PaymentMethod
     public bool IsActive { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+    public DateTime? DeletedAt { get; set; }
 
     // Navigation properties
     public User User { get; set; } = null!;
@@ -36,6 +37,8 @@ public class Payment
     public string? TransactionId { get; set; }
     public int? ProcessedByStaffId { get; set; }
     public DateTime? ProcessedAt { get; set; }
+    public DateTime? RefundDate { get; set; }
+    public string? Notes { get; set; }
     public DateTime CreatedAt { get; set; }
 
     // Navigation properties

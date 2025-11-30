@@ -17,8 +17,11 @@ public class Booking
     public int? EstimatedDuration { get; set; }
     public int? QrCodeId { get; set; }
     public string? CancellationReason { get; set; }
+    public int? CreatedBy { get; set; }
+    public int? UpdatedBy { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? DeletedAt { get; set; }
 
     // Navigation properties
     public User User { get; set; } = null!;

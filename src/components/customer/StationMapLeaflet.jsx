@@ -1,4 +1,4 @@
-/* eslint-disable */
+﻿/* eslint-disable */
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
     Box,
@@ -174,7 +174,128 @@ const StationMapLeaflet = ({ stations, onStationSelect }) => {
     const [selectedFromList, setSelectedFromList] = useState(false);
     const [showRoute, setShowRoute] = useState(false);
     const [mapReady, setMapReady] = useState(false);
+    const [pendingFindNearby, setPendingFindNearby] = useState(false);
     const mapRef = useRef(null);
+    const [nearbyBounds, setNearbyBounds] = useState(null);
+    const [nearbyStations, setNearbyStations] = useState([]);
+    const [showUserPopup, setShowUserPopup] = useState(false);
+    const [findNearbyError, setFindNearbyError] = useState(null);
+    const [shouldZoomToUser, setShouldZoomToUser] = useState(false);
+
+    const FitBoundsRunner = ({ bounds }) => {
+        const map = useMap();
+        useEffect(() => {
+            if (!bounds || !map || !shouldZoomToUser) return;
+            try {
+                if (typeof map.invalidateSize === 'function') map.invalidateSize();
+                if (typeof map.fitBounds === 'function') {
+                    map.fitBounds(bounds, { padding: [80, 80], animate: true });
+                } else if (typeof map.flyToBounds === 'function') {
+                    map.flyToBounds(bounds, { padding: [80, 80], animate: true });
+                }
+                // briefly show user popup
+                setShowUserPopup(true);
+                const t = setTimeout(() => {
+                    setShowUserPopup(false);
+                    setShouldZoomToUser(false); // Reset flag after zooming
+                }, 2500);
+                return () => clearTimeout(t);
+            } catch (err) {
+                console.error('FitBoundsRunner error', err);
+            }
+        }, [bounds, map, shouldZoomToUser]);
+        return null;
+    };
+
+    // Haversine formula to compute distance in meters between two lat/lng points
+    const haversineDistance = (lat1, lon1, lat2, lon2) => {
+        const toRad = (v) => (v * Math.PI) / 180;
+        const R = 6371000; // meters
+        const dLat = toRad(lat2 - lat1);
+        const dLon = toRad(lon2 - lon1);
+        const a =
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+    };
+
+    // Find nearby stations and fit bounds to include user + those stations
+    const handleFindNearby = (options = { maxResults: 5, maxDistanceMeters: 5000 }) => {
+        setFindNearbyError(null);
+        console.log('🔎 Find nearby clicked', { userLocation, stations });
+        if (!userLocation) {
+            setFindNearbyError('Không xác định được vị trí của bạn.');
+            console.warn('No user location available yet');
+            return;
+        }
+        const validStations = stations
+            .map(s => ({ station: s, coords: getStationCoords(s) }))
+            .filter(x => {
+                const valid = x.coords && x.coords.lat != null && x.coords.lng != null && !isNaN(x.coords.lat) && !isNaN(x.coords.lng);
+                if (!valid) {
+                    console.warn('Trạm bị loại khỏi nearby do thiếu hoặc sai lat/lng:', x.station, x.coords);
+                }
+                return valid;
+            });
+
+        if (validStations.length === 0) {
+            setFindNearbyError('Không có trạm nào có vị trí hợp lệ để tìm gần bạn.');
+            console.warn('No valid station coordinates to search nearby');
+            return;
+        }
+
+        const withDistance = validStations.map(x => ({
+            station: x.station,
+            coords: x.coords,
+            distance: haversineDistance(userLocation.lat, userLocation.lng, x.coords.lat, x.coords.lng)
+        }));
+
+        withDistance.sort((a, b) => a.distance - b.distance);
+
+        const nearby = withDistance.filter(x => x.distance <= options.maxDistanceMeters).slice(0, options.maxResults);
+        // if none within maxDistance, take top N
+        const result = nearby.length ? nearby : withDistance.slice(0, options.maxResults);
+        console.log('Nearby stations selected:', result.map(r => ({ id: r.station.id, distance: Math.round(r.distance), coords: r.coords })));
+        // Log user location
+        console.log('User location:', userLocation);
+        // Log all nearby station coords
+        result.forEach((r, idx) => {
+            console.log(`Nearby[${idx}]:`, r.station.name, r.coords);
+        });
+
+        const boundsLatLngs = [ [userLocation.lat, userLocation.lng], ...result.map(r => [r.coords.lat, r.coords.lng]) ];
+        // Set nearby stations and bounds; FitBoundsRunner (child) will perform fit when MapContainer is ready
+        setNearbyStations(result);
+        setNearbyBounds(boundsLatLngs);
+        setShouldZoomToUser(true); // Enable zoom to user location
+        // Also try immediate mapRef if available
+        const map = mapRef.current;
+        if (map) {
+            try {
+                if (typeof map.invalidateSize === 'function') map.invalidateSize();
+                if (typeof map.fitBounds === 'function') {
+                    console.log('Fitting bounds to include user + nearby stations (immediate)', boundsLatLngs);
+                    map.fitBounds(boundsLatLngs, { padding: [80, 80], animate: true });
+                }
+            } catch (err) {
+                console.error('Immediate fitBounds failed', err);
+            }
+        } else {
+            console.log('Map not ready, nearby bounds will be applied when map initializes');
+            setPendingFindNearby(true);
+        }
+    };
+
+    // If user requested find-nearby while map wasn't ready, run when mapReady
+    useEffect(() => {
+        if (pendingFindNearby && mapReady) {
+            console.log('Pending find-nearby now executing because map is ready');
+            setPendingFindNearby(false);
+            handleFindNearby();
+        }
+    }, [pendingFindNearby, mapReady]);
 
     // Debug stations prop
     useEffect(() => {
@@ -184,9 +305,7 @@ const StationMapLeaflet = ({ stations, onStationSelect }) => {
             const coords = getStationCoords(stations[0]);
             console.log('📍 Extracted coords:', coords);
             // Mark map as ready to render once we have stations
-            if (!mapReady) {
-                setMapReady(true);
-            }
+            // NOTE: don't set mapReady here - mapReady should reflect the actual Map instance
         }
     }, [stations, mapReady]);
 
@@ -275,15 +394,29 @@ const StationMapLeaflet = ({ stations, onStationSelect }) => {
     };
 
     const handleCenterOnUser = () => {
-        if (userLocation) {
-            // This will be handled by the map component
+        if (userLocation && mapRef.current) {
+            // Clear any selected station or drawn route
             setSelectedStation(null);
             setShowRoute(false);
+
+            try {
+                // Prefer setView with a sensible zoom (keep current zoom if already > 13)
+                const currentZoom = typeof mapRef.current.getZoom === 'function' ? mapRef.current.getZoom() : 13;
+                const targetZoom = Math.max(currentZoom, 13);
+                mapRef.current.setView([userLocation.lat, userLocation.lng], targetZoom, { animate: true });
+            } catch (err) {
+                // Fallback to panTo
+                try {
+                    mapRef.current.panTo([userLocation.lat, userLocation.lng]);
+                } catch (e) {
+                    console.error('Unable to center map on user location:', e);
+                }
+            }
         }
     };
 
-    // Don't render if no valid center or not ready
-    if (!mapReady || !center || center.some(c => isNaN(c)) || stations.length === 0) {
+    // Don't render if center is invalid
+    if (!center || center.some(c => isNaN(c))) {
         return (
             <Box sx={{ p: 4, textAlign: 'center' }}>
                 <Typography variant="body1" color="text.secondary">
@@ -297,7 +430,6 @@ const StationMapLeaflet = ({ stations, onStationSelect }) => {
         <Box>
             {/* Map Container */}
             <Box sx={{ position: 'relative', height: 500, width: '100%', borderRadius: 2, overflow: 'hidden', mb: 3 }}>
-                {mapReady && (
                     <MapContainer
                         center={center}
                         zoom={13}
@@ -307,9 +439,11 @@ const StationMapLeaflet = ({ stations, onStationSelect }) => {
                         attributionControl={false}
                         whenCreated={(map) => {
                             // store map ref and prevent multiple initialization
+                            console.log('🗺️ Leaflet map instance created');
                             mapRef.current = map;
+                            setMapReady(true);
                             setTimeout(() => {
-                                map.invalidateSize();
+                                if (typeof map.invalidateSize === 'function') map.invalidateSize();
                             }, 100);
                         }}
                     >
@@ -321,17 +455,22 @@ const StationMapLeaflet = ({ stations, onStationSelect }) => {
                         {/* Set bounds to show all markers */}
                         <MapBoundsSetter bounds={bounds} />
 
+                        {/* If user requested nearby, use FitBoundsRunner to apply those bounds inside the Map context */}
+                        {nearbyBounds && <FitBoundsRunner bounds={nearbyBounds} />}
+
                         {/* User location marker */}
                         {userLocation && (
                             <>
                                 <Marker position={[userLocation.lat, userLocation.lng]} icon={userIcon}>
-                                    <Popup>
-                                        <Box sx={{ p: 1 }}>
-                                            <Typography variant="subtitle2" fontWeight="bold">
-                                                📍 Vị trí của bạn
-                                            </Typography>
-                                        </Box>
-                                    </Popup>
+                                    {showUserPopup && (
+                                        <Popup>
+                                            <Box sx={{ p: 1 }}>
+                                                <Typography variant="subtitle2" fontWeight="bold">
+                                                    📍 Vị trí của bạn
+                                                </Typography>
+                                            </Box>
+                                        </Popup>
+                                    )}
                                 </Marker>
                                 <Circle
                                     center={[userLocation.lat, userLocation.lng]}
@@ -362,6 +501,11 @@ const StationMapLeaflet = ({ stations, onStationSelect }) => {
                                             <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
                                                 📍 {station.location?.address || station.address}
                                             </Typography>
+                                            {station.distanceFromUser !== undefined && (
+                                                <Typography variant="caption" color="primary.main" display="block" sx={{ mb: 1, fontWeight: 'bold' }}>
+                                                    🧭 Cách bạn {station.distanceFromUser.toFixed(1)} km
+                                                </Typography>
+                                            )}
                                             <Box sx={{ mb: 1 }}>
                                                 <Chip
                                                     label={`${station.stats?.available} / ${station.stats?.total} cổng đang trống`}
@@ -394,6 +538,11 @@ const StationMapLeaflet = ({ stations, onStationSelect }) => {
                                 </Marker>
                             );
                         })}
+
+                        {/* Highlight nearby stations with a light circle */}
+                        {nearbyStations.map((n) => (
+                            <Circle key={`near-${n.station.id}`} center={[n.coords.lat, n.coords.lng]} radius={50} pathOptions={{ color: '#ffa726', fillColor: '#ffb74d', fillOpacity: 0.4 }} />
+                        ))}
 
                         {/* If a station was selected from the list, show a popup at its location */}
                         {selectedStation && selectedFromList && (() => {
@@ -447,26 +596,32 @@ const StationMapLeaflet = ({ stations, onStationSelect }) => {
                             );
                         })()}
                     </MapContainer>
-                )}
 
-                {/* Center on User button */}
+                {/* Find Nearby Stations button */}
                 {userLocation && (
-                    <Tooltip title="Về vị trí của tôi">
-                        <IconButton
-                            sx={{
-                                position: 'absolute',
-                                top: 80,
-                                right: 10,
-                                bgcolor: 'white',
-                                boxShadow: 2,
-                                '&:hover': { bgcolor: 'grey.100' },
-                                zIndex: 1400
-                            }}
-                            onClick={handleCenterOnUser}
-                        >
-                            <MyLocationIcon color="primary" />
-                        </IconButton>
+                    <Tooltip title="Tìm trạm gần tôi">
+                        <span>
+                            <IconButton
+                                sx={{
+                                    position: 'absolute',
+                                    top: 80,
+                                    right: 10,
+                                    bgcolor: 'white',
+                                    boxShadow: 2,
+                                    '&:hover': { bgcolor: 'grey.100' },
+                                    zIndex: 1400
+                                }}
+                                onClick={() => handleFindNearby()}
+                            >
+                                <EvStationIcon color="primary" />
+                            </IconButton>
+                        </span>
                     </Tooltip>
+                )}
+                {findNearbyError && (
+                    <Alert severity="error" sx={{ position: 'absolute', top: 130, right: 10, zIndex: 1500, minWidth: 260 }}>
+                        {findNearbyError}
+                    </Alert>
                 )}
 
                 {/* Legend */}
@@ -480,9 +635,7 @@ const StationMapLeaflet = ({ stations, onStationSelect }) => {
                     boxShadow: 4,
                     bgcolor: 'rgba(255,255,255,0.95)'
                 }}>
-                    <Typography variant="subtitle2" fontWeight="bold" gutterBottom sx={{ mb: 1.5 }}>
-                        📍 Chú thích
-                    </Typography>
+
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                             <Box sx={{
@@ -531,7 +684,7 @@ const StationMapLeaflet = ({ stations, onStationSelect }) => {
                 📋 Danh sách trạm ({stations.length})
             </Typography>
             <Box>
-                {stations.map((station) => {
+                {stations.map((station, index) => {
                     const isAvailable = station.stats?.available > 0;
                     const maxPower = station.charging?.maxPower || 150;
                     const pricePerKwh = station.id === 'station-001' ? 8500 :
@@ -544,7 +697,7 @@ const StationMapLeaflet = ({ stations, onStationSelect }) => {
                             onClick={() => handleListSelect(station)}
                             sx={{
                                 borderRadius: 2,
-                                mb: 1,
+                                mb: 1.5,
                                 border: 1,
                                 borderColor: selectedStation?.id === station.id ? 'primary.main' : 'divider',
                                 p: 2,
@@ -552,83 +705,106 @@ const StationMapLeaflet = ({ stations, onStationSelect }) => {
                                 transition: 'all 0.2s',
                                 '&:hover': {
                                     backgroundColor: 'grey.50',
-                                    borderColor: 'primary.light'
+                                    borderColor: 'primary.light',
+                                    boxShadow: 1
                                 }
                             }}
                         >
-                            <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
-                                {/* Icon xe */}
+                            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                                {/* Icon xe - căn giữa theo chiều dọc */}
                                 <Box
                                     sx={{
-                                        width: 60,
-                                        height: 60,
+                                        width: 56,
+                                        height: 56,
                                         borderRadius: '50%',
-                                        bgcolor: 'grey.200',
+                                        bgcolor: 'grey.100',
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
-                                        flexShrink: 0
+                                        flexShrink: 0,
+                                        border: '2px solid',
+                                        borderColor: 'grey.300'
                                     }}
                                 >
-                                    <ElectricCar sx={{ fontSize: 32, color: 'grey.600' }} />
+                                    <ElectricCar sx={{ fontSize: 28, color: 'primary.main' }} />
                                 </Box>
 
                                 {/* Thông tin trạm */}
-                                <Box sx={{ flex: 1 }}>
-                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', mb: 1 }}>
-                                        <Typography variant="h6" fontWeight="bold">
+                                <Box sx={{ flex: 1, minWidth: 0 }}>
+                                    {/* Tên trạm và khoảng cách */}
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5, flexWrap: 'wrap' }}>
+                                        <Typography variant="subtitle1" fontWeight="bold" sx={{ color: 'text.primary' }}>
                                             {station.name}
                                         </Typography>
-                                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0.5 }}>
+                                        {station.distanceFromUser !== undefined && (
                                             <Chip
-                                                label={`${station.stats?.available}/${station.stats?.total} cổng đang trống`}
+                                                label={`Cách ${station.distanceFromUser.toFixed(1)} km`}
                                                 size="small"
-                                                color={isAvailable ? 'success' : 'error'}
-                                                sx={{ borderRadius: '16px' }}
+                                                color="primary"
+                                                variant="outlined"
+                                                sx={{ 
+                                                    fontWeight: 600,
+                                                    fontSize: '0.75rem'
+                                                }}
                                             />
-                                            {station.operatingHours && (
-                                                <Typography variant="caption" color="text.secondary">
-                                                    {formatOperatingHours(station.operatingHours)}
-                                                </Typography>
-                                            )}
-                                        </Box>
+                                        )}
                                     </Box>
 
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1, flexWrap: 'wrap' }}>
-                                        <LocationOn sx={{ fontSize: 16, color: 'text.secondary' }} />
-                                        <Typography variant="body2" color="text.secondary" sx={{ mr: 2 }}>
+                                    {/* Địa chỉ */}
+                                    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5, mb: 1 }}>
+                                        <LocationOn sx={{ fontSize: 16, color: 'text.secondary', mt: 0.2 }} />
+                                        <Typography variant="body2" color="text.secondary" sx={{ flex: 1 }}>
                                             {station.location?.address || station.address}
                                         </Typography>
-                                        {/* operating hours displayed only under availability chip on the right */}
                                     </Box>
 
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                    {/* Thông tin chi tiết */}
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                                             <Speed sx={{ fontSize: 16, color: 'primary.main' }} />
-                                            <Typography variant="body2">
+                                            <Typography variant="body2" color="text.secondary">
                                                 Sạc nhanh lên đến {maxPower} kW
                                             </Typography>
                                         </Box>
-                                        <Typography variant="body2" sx={{ color: 'success.main', fontWeight: 'medium' }}>
+                                        <Typography variant="body2" sx={{ color: 'success.main', fontWeight: 600 }}>
                                             Từ {pricePerKwh.toLocaleString('vi-VN')} ₫/kWh
                                         </Typography>
                                     </Box>
                                 </Box>
 
-                                {/* Nút */}
-                                <Button
-                                    variant="contained"
-                                    size="medium"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        if (onStationSelect) {
-                                            onStationSelect(station);
-                                        }
-                                    }}
-                                    sx={{ ml: 2 }}
-                                >
-                                    Đặt ngay
-                                </Button>
+                                {/* Trạng thái và nút đặt */}
+                                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1, ml: 'auto' }}>
+                                    <Chip
+                                        label={`${station.stats?.available}/${station.stats?.total} cổng đang trống`}
+                                        size="small"
+                                        color={isAvailable ? 'success' : 'error'}
+                                        sx={{ 
+                                            borderRadius: '16px',
+                                            fontWeight: 600
+                                        }}
+                                    />
+                                    {station.operatingHours && (
+                                        <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'right' }}>
+                                            {formatOperatingHours(station.operatingHours)}
+                                        </Typography>
+                                    )}
+                                    <Button
+                                        variant="contained"
+                                        size="small"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (onStationSelect) {
+                                                onStationSelect(station);
+                                            }
+                                        }}
+                                        sx={{ 
+                                            minWidth: 90,
+                                            fontWeight: 600
+                                        }}
+                                    >
+                                        Đặt ngay
+                                    </Button>
+                                </Box>
                             </Box>
                         </Box>
                     );

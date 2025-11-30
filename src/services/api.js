@@ -18,7 +18,9 @@ const axiosInstance = axios.create({
 // Request interceptor - Add auth token to requests
 axiosInstance.interceptors.request.use(
   (config) => {
-    const token = sessionStorage.getItem("token");
+    // Try sessionStorage first (used by authStore), fallback to localStorage
+    const token =
+      sessionStorage.getItem("token") || localStorage.getItem("token");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -43,7 +45,9 @@ axiosInstance.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        const refreshToken = sessionStorage.getItem("refreshToken");
+        const refreshToken =
+          sessionStorage.getItem("refreshToken") ||
+          localStorage.getItem("refreshToken");
         if (refreshToken) {
           const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {
             refreshToken,
@@ -51,6 +55,7 @@ axiosInstance.interceptors.response.use(
 
           const { token } = response.data;
           sessionStorage.setItem("token", token);
+          localStorage.setItem("token", token);
 
           // Retry original request with new token
           originalRequest.headers.Authorization = `Bearer ${token}`;
@@ -60,6 +65,8 @@ axiosInstance.interceptors.response.use(
         // Refresh failed - logout user
         sessionStorage.removeItem("token");
         sessionStorage.removeItem("refreshToken");
+        localStorage.removeItem("token");
+        localStorage.removeItem("refreshToken");
         window.location.href = "/login";
         return Promise.reject(refreshError);
       }
@@ -69,7 +76,19 @@ axiosInstance.interceptors.response.use(
     const errorMessage =
       error.response?.data?.message || error.message || "An error occurred";
 
-    return Promise.reject(new Error(errorMessage));
+    // Create error object with response data preserved
+    const customError = new Error(errorMessage);
+    customError.response = error.response; // Preserve response for debugging
+    customError.status = error.response?.status;
+
+    console.error("🚨 API Error:", {
+      message: errorMessage,
+      status: error.response?.status,
+      data: error.response?.data,
+      url: error.config?.url,
+    });
+
+    return Promise.reject(customError);
   }
 );
 
@@ -77,10 +96,10 @@ axiosInstance.interceptors.response.use(
 export const authAPI = {
   login: async (credentials) => {
     const response = await axiosInstance.post("/auth/login", credentials);
-    // Store tokens in sessionStorage
+    // Store tokens
     if (response.token) {
-      sessionStorage.setItem("token", response.token);
-      sessionStorage.setItem("refreshToken", response.refreshToken || "");
+      localStorage.setItem("token", response.token);
+      localStorage.setItem("refreshToken", response.refreshToken || "");
     }
     return response;
   },
@@ -90,8 +109,8 @@ export const authAPI = {
   },
 
   logout: () => {
-    sessionStorage.removeItem("token");
-    sessionStorage.removeItem("refreshToken");
+    localStorage.removeItem("token");
+    localStorage.removeItem("refreshToken");
     return axiosInstance.post("/auth/logout");
   },
 
@@ -100,11 +119,11 @@ export const authAPI = {
   },
 
   getProfile: () => {
-    return axiosInstance.get("/auth/profile");
+    return axiosInstance.get("/UserProfiles/me");
   },
 
   updateProfile: (profileData) => {
-    return axiosInstance.put("/auth/profile", profileData);
+    return axiosInstance.put("/UserProfiles/me", profileData);
   },
 };
 
@@ -144,6 +163,11 @@ export const stationsAPI = {
       params: { q: searchQuery },
     });
   },
+
+  // Get station slots (poles/ports) with real-time status
+  getStationSlots: (stationId) => {
+    return axiosInstance.get(`/stations/${stationId}/slots`);
+  },
 };
 
 export const bookingsAPI = {
@@ -171,34 +195,67 @@ export const bookingsAPI = {
     return axiosInstance.post(`/bookings/${id}/cancel`, { reason });
   },
 
-  complete: (id) => {
-    return axiosInstance.post(`/bookings/${id}/complete`);
+  complete: (id, completeData) => {
+    // Backend expects: { finalSoc, totalEnergyKwh, unitPrice }
+    return axiosInstance.put(`/bookings/${id}/complete`, completeData);
+  },
+
+  // Get available slots for a station
+  getAvailableSlots: (stationId) => {
+    return axiosInstance.get(`/stations/${stationId}/slots`);
   },
 };
 
 export const usersAPI = {
   getAll: (params) => {
-    return axiosInstance.get("/admin/users", { params });
+    return axiosInstance.get("/admin/adminusers", { params });
   },
 
   getById: (id) => {
-    return axiosInstance.get(`/admin/users/${id}`);
+    return axiosInstance.get(`/admin/adminusers/${id}`);
   },
 
   create: (userData) => {
-    return axiosInstance.post("/admin/users", userData);
+    return axiosInstance.post("/admin/adminusers", userData);
   },
 
   update: (id, userData) => {
-    return axiosInstance.put(`/admin/users/${id}`, userData);
+    return axiosInstance.put(`/admin/adminusers/${id}`, userData);
   },
 
   delete: (id) => {
-    return axiosInstance.delete(`/admin/users/${id}`);
+    return axiosInstance.delete(`/admin/adminusers/${id}`);
   },
 
   changePassword: (passwordData) => {
-    return axiosInstance.post("/admin/users/change-password", passwordData);
+    return axiosInstance.post("/users/change-password", passwordData);
+  },
+
+  // Additional admin user endpoints
+  updateRole: (id, roleData) => {
+    return axiosInstance.patch(`/admin/adminusers/${id}/role`, roleData);
+  },
+
+  activate: (id) => {
+    return axiosInstance.patch(`/admin/adminusers/${id}/activate`);
+  },
+
+  deactivate: (id, reason) => {
+    return axiosInstance.patch(`/admin/adminusers/${id}/deactivate`, {
+      reason,
+    });
+  },
+
+  resetPassword: (id) => {
+    return axiosInstance.post(`/admin/adminusers/${id}/reset-password`);
+  },
+
+  getActivity: (id) => {
+    return axiosInstance.get(`/admin/adminusers/${id}/activity`);
+  },
+
+  getStatistics: () => {
+    return axiosInstance.get("/admin/adminusers/statistics");
   },
 };
 
@@ -277,6 +334,58 @@ export const vehiclesAPI = {
 
   setDefault: (id) => {
     return axiosInstance.post(`/vehicles/${id}/set-default`);
+  },
+};
+
+// QR Code API
+export const qrCodesAPI = {
+  // Generate QR code for instant charging
+  generate: (generateData) => {
+    return axiosInstance.post("/qrcodes/generate", generateData);
+  },
+
+  // Get QR code by ID
+  getById: (id) => {
+    return axiosInstance.get(`/qrcodes/${id}`);
+  },
+
+  // Get my active QR codes
+  getMyQRCodes: () => {
+    return axiosInstance.get("/qrcodes/my-qrcodes");
+  },
+
+  // Validate QR code (Staff only)
+  validate: (qrCodeData) => {
+    return axiosInstance.post("/qrcodes/validate", { qrCodeData });
+  },
+
+  // Use QR code to start charging (Staff only)
+  use: (id, useData) => {
+    return axiosInstance.post(`/qrcodes/${id}/use`, useData);
+  },
+
+  // Cancel/revoke QR code
+  cancel: (id) => {
+    return axiosInstance.delete(`/qrcodes/${id}`);
+  },
+
+  // Get QR code image
+  getImage: (id) => {
+    return axiosInstance.get(`/qrcodes/${id}/image`, { responseType: "blob" });
+  },
+};
+
+// Charging Session API (via Bookings)
+export const chargingAPI = {
+  // Start charging session
+  startCharging: (bookingId) => {
+    return axiosInstance.put(`/bookings/${bookingId}/start`);
+  },
+
+  // Complete charging session
+  completeCharging: (bookingId, completeData) => {
+    // completeData: { finalSoc, totalEnergyKwh, unitPrice }
+    return axiosInstance.put(`/bookings/${bookingId}/complete`, completeData);
   },
 };
 

@@ -56,21 +56,37 @@ public class InvoiceService : IInvoiceService
             .FirstOrDefaultAsync(i => i.InvoiceId == invoiceId);
 
         if (invoice == null)
-            throw new ArgumentException("Invoice not found");
+            throw new KeyNotFoundException("Invoice not found");
 
         if (invoice.PaymentStatus == "paid")
-            throw new ArgumentException("Invoice is already paid");
+            throw new InvalidOperationException("Invoice is already paid");
 
-        // Get payment method name if available
+        // Determine payment method name
         var paymentMethodName = "Cash";
-        if (_context.PaymentMethods != null)
+        int? finalPaymentMethodId = null;
+        
+        // Priority 1: If staff provides method name (counter payment)
+        if (!string.IsNullOrWhiteSpace(processDto.Method))
+        {
+            paymentMethodName = processDto.Method.ToLowerInvariant() switch
+            {
+                "cash" => "Cash",
+                "card" => "Card",
+                "qr" => "QR Code",
+                "bank_transfer" => "Bank Transfer",
+                _ => processDto.Method
+            };
+        }
+        // Priority 2: If PaymentMethodId is provided (customer's saved method)
+        else if (processDto.PaymentMethodId.HasValue && _context.PaymentMethods != null)
         {
             var paymentMethod = await _context.PaymentMethods
-                .FirstOrDefaultAsync(pm => pm.PaymentMethodId == processDto.PaymentMethodId);
+                .FirstOrDefaultAsync(pm => pm.PaymentMethodId == processDto.PaymentMethodId.Value);
             
             if (paymentMethod != null)
             {
                 paymentMethodName = paymentMethod.Type ?? "Unknown";
+                finalPaymentMethodId = paymentMethod.PaymentMethodId;
             }
         }
 
@@ -80,16 +96,19 @@ public class InvoiceService : IInvoiceService
             var payment = new Payment
             {
                 InvoiceId = invoiceId,
-                PaymentMethodId = processDto.PaymentMethodId,
+                PaymentMethodId = finalPaymentMethodId,
                 Amount = processDto.Amount,
                 PaymentType = paymentMethodName,
                 Status = "completed",
+                TransactionId = processDto.TransactionReference, // Map to TransactionId column
                 ProcessedByStaffId = processedByUserId,
                 ProcessedAt = DateTime.UtcNow,
                 CreatedAt = DateTime.UtcNow
             };
 
             _context.Payments.Add(payment);
+            _logger.LogInformation("Created payment record for invoice {InvoiceId}: {Amount} via {Method}", 
+                invoiceId, processDto.Amount, paymentMethodName);
         }
 
         // Update invoice
@@ -98,9 +117,28 @@ public class InvoiceService : IInvoiceService
         invoice.PaidAt = DateTime.UtcNow;
         invoice.UpdatedAt = DateTime.UtcNow;
 
+        // ✅ FIX: Free up the charging slot after payment completed
+        if (invoice.Booking != null)
+        {
+            var slot = await _context.ChargingSlots
+                .FirstOrDefaultAsync(cs => cs.SlotId == invoice.Booking.SlotId);
+            
+            if (slot != null && slot.CurrentBookingId == invoice.BookingId)
+            {
+                slot.Status = "available";
+                slot.CurrentBookingId = null;
+                slot.UpdatedAt = DateTime.UtcNow;
+                
+                _logger.LogInformation("✅ Freed charging slot {SlotId} after payment for booking {BookingId}", 
+                    slot.SlotId, invoice.BookingId);
+            }
+        }
+
         await _context.SaveChangesAsync();
 
-        _logger.LogInformation("Processed payment for invoice {InvoiceId} by user {UserId}", invoiceId, processedByUserId);
+        _logger.LogInformation("✅ Processed payment for invoice {InvoiceId} by staff {UserId}: {Amount} via {Method}", 
+            invoiceId, processedByUserId, processDto.Amount, paymentMethodName);
+        
         return MapToDto(invoice);
     }
 

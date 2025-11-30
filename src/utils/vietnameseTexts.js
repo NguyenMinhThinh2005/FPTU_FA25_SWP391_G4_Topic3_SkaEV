@@ -1,4 +1,4 @@
-// Vietnamese text constants for the application
+﻿// Vietnamese text constants for the application
 export const VIETNAMESE_TEXTS = {
   // Common
   common: {
@@ -117,12 +117,12 @@ export const VIETNAMESE_TEXTS = {
     whyChoose: "Tại sao chọn SkaEV?",
     whyChooseSubtitle:
       "Các tính năng tiên tiến cho quản lý sạc xe điện hiện đại",
-    readyToStart: "Sẵn sàng bắt đầu sạc?",
+  readyToStart: "Đang sẵn sàng bắt đầu sạc?",
     readyToStartSubtitle:
       "Tham gia cùng hàng nghìn tài xế xe điện đang sử dụng mạng lưới sạc SkaEV",
     goToDashboard: "Vào Dashboard",
     findStations: "Tìm trạm sạc",
-    copyright: "© 2024 SkaEV. Nền tảng quản lý sạc xe điện.",
+    copyright: "© 2025 SkaEV. Nền tảng quản lý sạc xe điện.",
   },
 
   // Station Management

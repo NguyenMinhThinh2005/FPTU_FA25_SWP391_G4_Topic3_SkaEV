@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -29,42 +29,123 @@ import {
   Close,
 } from "@mui/icons-material";
 import useBookingStore from "../../store/bookingStore";
+import useStationStore from "../../store/stationStore";
 import ChargingDateTimePicker from "../ui/ChargingDateTimePicker/ChargingDateTimePicker";
 import notificationService from "../../services/notificationService";
 
 const BookingModal = ({ open, onClose, station, onSuccess }) => {
   const { createBooking } = useBookingStore();
+  const { initializeData } = useStationStore();
   const [activeStep, setActiveStep] = useState(0);
-  const [selectedChargingPost, setSelectedChargingPost] = useState(null);
-  const [selectedSlot, setSelectedSlot] = useState(null);
+  const [selectedChargingType, setSelectedChargingType] = useState(null); // Step 1: Choose charging type
+  const [selectedPort, setSelectedPort] = useState(null); // Step 2: Choose specific port
   const [selectedDateTime, setSelectedDateTime] = useState(null);
   const [agreeTerms, setAgreeTerms] = useState(false);
+  const [openTerms, setOpenTerms] = useState(false);
+  const [openPolicy, setOpenPolicy] = useState(false);
   const [loading, setLoading] = useState(false);
   const [bookingResult, setBookingResult] = useState(null);
   const [resultMessage, setResultMessage] = useState("");
 
   const steps = [
-    "Chọn trụ sạc",
+    "Chọn loại sạc",
     "Chọn cổng sạc",
     "Chọn thời gian sạc",
     "Xác nhận đặt chỗ",
   ];
 
-  const getChargingPosts = () => {
-    if (!station?.charging?.chargingPosts) return [];
-    return station.charging.chargingPosts;
+  // Helper to render pole label and ensure a single leading "Trụ" prefix
+  // - removes any leading/repeated occurrences of the word 'Trụ' from the
+  //   raw pole name, then prefixes a single 'Trụ ' to the cleaned name.
+  // This avoids results like "Trụ Trụ sạc 1" when the stored name already
+  // contains the word 'Trụ'.
+  const formatPoleLabel = (poleName) => {
+    if (!poleName) return "";
+    let name = String(poleName).trim();
+    // Remove any number of leading 'Trụ' tokens, plus surrounding punctuation/spaces
+    // Examples cleaned:
+    //  - "Trụ sạc 1" -> "sạc 1"
+    //  - "Trụ Trụ sạc 1" -> "sạc 1"
+    //  - "TRỤ: A01" -> "A01"
+    name = name.replace(/^((?:Trụ)[:\s\-–—]*)+/i, "").trim();
+    // If cleaning produced an empty name, fallback to original trimmed name
+    if (!name) {
+      name = String(poleName).trim();
+      // as a last resort, remove duplicated 'Trụ' words anywhere
+      name = name.replace(/(Trụ)\s+/gi, "Trụ ").trim();
+    }
+    // Ensure single prefix
+    if (/^Trụ\b/i.test(name)) return name;
+    return `Trụ ${name}`;
   };
 
-  const getAllSlots = () => {
-    if (!selectedChargingPost) return [];
-    return selectedChargingPost.slots || [];
+  // Get unique charging types from all poles
+  const getChargingTypes = () => {
+    if (!station?.charging?.poles) return [];
+
+    const typesMap = new Map();
+    station.charging.poles.forEach((pole) => {
+      const key = `${pole.type}-${pole.power}`;
+      if (!typesMap.has(key)) {
+        typesMap.set(key, {
+          id: key,
+          type: pole.type,
+          power: pole.power,
+          voltage: pole.voltage,
+          name:
+            pole.type === "AC"
+              ? `Sạc chậm AC`
+              : pole.power >= 150
+              ? `Sạc siêu nhanh DC`
+              : `Sạc nhanh DC`,
+          rate:
+            pole.type === "AC"
+              ? station.charging.pricing.acRate
+              : pole.power >= 150
+              ? station.charging.pricing.dcFastRate ||
+                station.charging.pricing.dcRate
+              : station.charging.pricing.dcRate,
+          availableCount: 0,
+        });
+      }
+      // Count available ports on this pole
+      const availablePorts = (pole.ports || []).filter(
+        (p) => p.status === "available"
+      ).length;
+      const current = typesMap.get(key);
+      current.availableCount += availablePorts;
+    });
+
+    return Array.from(typesMap.values());
   };
 
-  const getAvailableSlots = () => {
-    if (!selectedChargingPost) return [];
-    return selectedChargingPost.slots.filter(
-      (slot) => slot.status === "available"
-    );
+  // Get all ports matching selected charging type
+  const getPortsForType = () => {
+    if (!selectedChargingType || !station?.charging?.poles) return [];
+
+    const ports = [];
+    station.charging.poles.forEach((pole) => {
+      if (
+        pole.type === selectedChargingType.type &&
+        pole.power === selectedChargingType.power
+      ) {
+        (pole.ports || []).forEach((port) => {
+          ports.push({
+            ...port,
+            poleName: pole.name,
+            poleId: pole.id,
+            power: pole.power,
+            type: pole.type,
+          });
+        });
+      }
+    });
+
+    return ports;
+  };
+
+  const getAvailablePortsForType = () => {
+    return getPortsForType().filter((port) => port.status === "available");
   };
 
   const handleNext = () => {
@@ -75,13 +156,13 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
     setActiveStep((prev) => prev - 1);
   };
 
-  const handleChargingPostSelect = (post) => {
-    setSelectedChargingPost(post);
-    setSelectedSlot(null);
+  const handleChargingTypeSelect = (type) => {
+    setSelectedChargingType(type);
+    setSelectedPort(null); // Reset port when type changes
   };
 
-  const handleSlotSelect = (slot) => {
-    setSelectedSlot(slot);
+  const handlePortSelect = (port) => {
+    setSelectedPort(port);
   };
 
   const handleDateTimeChange = (dateTimeData) => {
@@ -90,8 +171,8 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
 
   const handleConfirmBooking = async () => {
     if (
-      !selectedChargingPost ||
-      !selectedSlot ||
+      !selectedChargingType ||
+      !selectedPort ||
       !selectedDateTime ||
       !agreeTerms
     ) {
@@ -100,27 +181,24 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
 
     setLoading(true);
     try {
-      const baseRate =
-        selectedChargingPost.type === "AC"
-          ? station.charging.pricing.acRate
-          : selectedChargingPost.power >= 150
-          ? station.charging.pricing.dcUltraRate ||
-            station.charging.pricing.dcRate
-          : station.charging.pricing.dcRate;
+      const baseRate = selectedChargingType.rate;
 
       const bookingData = {
         stationId: station.id,
         stationName: station.name,
-        chargingPost: {
-          id: selectedChargingPost.id,
-          name: selectedChargingPost.name,
-          type: selectedChargingPost.type,
-          power: selectedChargingPost.power,
-          voltage: selectedChargingPost.voltage,
+        chargerType: {
+          id: selectedChargingType.id,
+          name: selectedChargingType.name,
+          type: selectedChargingType.type,
+          power: selectedChargingType.power,
+          voltage: selectedChargingType.voltage,
         },
-        slot: {
-          id: selectedSlot.id,
-          connectorType: selectedSlot.connectorType,
+        port: {
+          id: selectedPort.id,
+          connectorType: selectedPort.connectorType,
+          poleId: selectedPort.poleId,
+          poleName: selectedPort.poleName,
+          slotId: selectedPort.slotId, // Real slot ID from database
         },
         pricing: {
           baseRate,
@@ -135,9 +213,19 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
         scheduledTime: selectedDateTime?.scheduledTime
           ? selectedDateTime.scheduledTime.toISOString()
           : null,
+        // Add SOC data
+        initialSOC: 20, // Default value, should come from vehicle
+        targetSOC: 80, // Default value, should come from user input
+        estimatedDuration: 60, // Default 60 minutes
       };
 
-      const booking = createBooking(bookingData);
+      // Call async createBooking - it will now call API
+      const booking = await createBooking(bookingData);
+
+      if (!booking) {
+        throw new Error("Failed to create booking");
+      }
+
       setBookingResult("success");
 
       // Success message for scheduled booking
@@ -165,9 +253,30 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
       setTimeout(() => {
         handleClose();
       }, 3000);
-    } catch {
+    } catch (error) {
+      console.error('❌ Booking error:', error);
       setBookingResult("error");
-      setResultMessage("Có lỗi xảy ra khi đặt chỗ. Vui lòng thử lại.");
+      
+      // Check for specific error messages
+      const errorMessage = error?.response?.data?.message || error?.message || '';
+      
+      if (errorMessage.includes('Slot is not available') || errorMessage.includes('not available')) {
+        setResultMessage(
+          "❌ Cổng sạc này hiện không còn trống!\n\n" +
+          "Vui lòng chọn cổng sạc khác hoặc trạm khác.\n" +
+          "Danh sách trạm sẽ được làm mới sau khi đóng."
+        );
+        
+        // Refresh stations list after closing
+        setTimeout(() => {
+          initializeData();
+        }, 3500);
+      } else {
+        setResultMessage(
+          "❌ Có lỗi xảy ra khi đặt chỗ\n\n" +
+          (errorMessage || "Vui lòng thử lại hoặc chọn trạm khác.")
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -175,8 +284,8 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
 
   const handleClose = () => {
     setActiveStep(0);
-    setSelectedChargingPost(null);
-    setSelectedSlot(null);
+    setSelectedChargingType(null);
+    setSelectedPort(null);
     setSelectedDateTime(null);
     setAgreeTerms(false);
     setLoading(false);
@@ -185,36 +294,55 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
     onClose();
   };
 
+  // Accessibility: when dialog opens, blur any currently focused element
+  // to avoid aria-hidden warnings where a focused element is hidden from
+  // assistive technology. MUI Dialog will manage focus internally.
+  React.useEffect(() => {
+    if (open) {
+      try {
+        const active = document.activeElement;
+        if (active && typeof active.blur === "function") {
+          active.blur();
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }, [open]);
+
   const renderStepContent = () => {
     switch (activeStep) {
       case 0:
         return (
           <Box>
             <Typography variant="h6" gutterBottom>
-              Chọn trụ sạc phù hợp
+              Chọn loại sạc phù hợp
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Trạm {station?.name} có {getChargingPosts().length} trụ sạc với
-              các công suất khác nhau
+              Trạm {station?.name} có các loại sạc với mức giá khác nhau
             </Typography>
 
             <Grid container spacing={2}>
-              {getChargingPosts().map((post) => (
-                <Grid item xs={12} key={post.id}>
+              {getChargingTypes().map((type) => (
+                <Grid item xs={12} key={type.id}>
                   <ButtonBase
-                    onClick={() => handleChargingPostSelect(post)}
+                    onClick={() => handleChargingTypeSelect(type)}
                     sx={{ width: "100%", borderRadius: 1 }}
+                    disabled={type.availableCount === 0}
                   >
                     <Card
                       sx={{
                         width: "100%",
-                        cursor: "pointer",
-                        border: selectedChargingPost?.id === post.id ? 2 : 1,
+                        cursor:
+                          type.availableCount > 0 ? "pointer" : "not-allowed",
+                        border: selectedChargingType?.id === type.id ? 2 : 1,
                         borderColor:
-                          selectedChargingPost?.id === post.id
+                          selectedChargingType?.id === type.id
                             ? "primary.main"
                             : "divider",
-                        "&:hover": { boxShadow: 2 },
+                        opacity: type.availableCount > 0 ? 1 : 0.5,
+                        "&:hover":
+                          type.availableCount > 0 ? { boxShadow: 2 } : {},
                       }}
                     >
                       <CardContent>
@@ -234,56 +362,65 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
                           >
                             <Box
                               sx={{
-                                width: 48,
-                                height: 48,
+                                width: 56,
+                                height: 56,
                                 borderRadius: "50%",
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center",
                                 bgcolor:
-                                  post.type === "AC"
+                                  type.type === "AC"
                                     ? "success.light"
-                                    : post.power >= 150
+                                    : type.power >= 150
                                     ? "error.light"
                                     : "warning.light",
                                 color: "white",
                               }}
                             >
-                              {post.type === "AC" ? (
-                                <Schedule />
-                              ) : post.power >= 150 ? (
-                                <ElectricCar />
+                              {type.type === "AC" ? (
+                                <Schedule fontSize="large" />
+                              ) : type.power >= 150 ? (
+                                <ElectricCar fontSize="large" />
                               ) : (
-                                <FlashOn />
+                                <FlashOn fontSize="large" />
                               )}
                             </Box>
-                            <Box>
+                            <Box sx={{ textAlign: "left", width: "100%" }}>
                               <Typography variant="h6" fontWeight="bold">
-                                {post.name}
+                                {type.name}
                               </Typography>
                               <Typography
                                 variant="body2"
                                 color="text.secondary"
+                                sx={{ textAlign: "left" }}
                               >
-                                {post.power} kW • {post.type} • {post.voltage}V
+                                {type.power} kW • {type.type}
                               </Typography>
-                              <Typography
-                                variant="caption"
-                                color="text.secondary"
-                              >
-                                Số cổng trống: {post.availableSlots}/
-                                {post.totalSlots}
-                              </Typography>
+                              <Chip
+                                label={`${type.availableCount} cổng đang sẵn sàng`}
+                                size="small"
+                                color={
+                                  type.availableCount > 0
+                                    ? "success"
+                                    : "default"
+                                }
+                                sx={{ mt: 0.5, height: 22 }}
+                              />
                             </Box>
                           </Box>
                           <Box sx={{ textAlign: "right" }}>
-                            <Typography variant="body2">
-                              {post.type === "AC"
-                                ? `${station?.charging?.pricing?.acRate?.toLocaleString()} VNĐ/kWh`
-                                : `${(
-                                    station?.charging?.pricing?.dcRate ||
-                                    station?.charging?.pricing?.dcUltraRate
-                                  )?.toLocaleString()} VNĐ/kWh`}
+                            <Typography
+                              variant="h6"
+                              fontWeight="bold"
+                              color="primary.main"
+                            >
+                              {type.rate?.toLocaleString()} VNĐ/kWh
+                            </Typography>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              Giá sạc
                             </Typography>
                           </Box>
                         </Box>
@@ -302,26 +439,30 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
             <Typography variant="h6" gutterBottom>
               Chọn cổng sạc
             </Typography>
-            {selectedChargingPost && (
+            {selectedChargingType && (
               <>
                 <Alert severity="success" sx={{ mb: 2 }}>
-                  Đã chọn: {selectedChargingPost.name} -{" "}
-                  {selectedChargingPost.power}kW
+                  Đã chọn: {selectedChargingType.name}
                   <Typography variant="body2" sx={{ mt: 0.5 }}>
-                    Số cổng trống: {selectedChargingPost.availableSlots}/
-                    {selectedChargingPost.totalSlots}
+                    Giá: {selectedChargingType.rate?.toLocaleString()} VNĐ/kWh •
+                    Số cổng trống: {getAvailablePortsForType().length}
                   </Typography>
                 </Alert>
                 <Grid container spacing={2}>
-                  {getAllSlots().map((slot) => {
-                    const isAvailable = slot.status === "available";
-                    const isOccupied = slot.status === "occupied";
-                    const isMaintenance = slot.status === "maintenance";
+                  {getPortsForType().map((port, index) => {
+                    const isAvailable = port.status === "available";
+                    const isOccupied = port.status === "occupied";
+                    const isMaintenance = port.status === "maintenance";
+
+                    // Create unique key with fallback
+                    const uniqueKey = `${port.poleId || "pole"}-${
+                      port.id || index
+                    }-${port.poleName || ""}-${index}`;
 
                     return (
-                      <Grid item xs={12} sm={6} key={slot.id}>
+                      <Grid item xs={12} sm={6} key={uniqueKey}>
                         <ButtonBase
-                          onClick={() => isAvailable && handleSlotSelect(slot)}
+                          onClick={() => isAvailable && handlePortSelect(port)}
                           disabled={!isAvailable}
                           sx={{ width: "100%", borderRadius: 1 }}
                         >
@@ -329,9 +470,9 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
                             sx={{
                               width: "100%",
                               cursor: isAvailable ? "pointer" : "not-allowed",
-                              border: selectedSlot?.id === slot.id ? 2 : 1,
+                              border: selectedPort?.id === port.id ? 2 : 1,
                               borderColor:
-                                selectedSlot?.id === slot.id
+                                selectedPort?.id === port.id
                                   ? "primary.main"
                                   : "divider",
                               opacity: isAvailable ? 1 : 0.6,
@@ -349,15 +490,17 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
                                   justifyContent: "space-between",
                                 }}
                               >
-                                <Box sx={{ flex: 1 }}>
+                                <Box sx={{ flex: 1, textAlign: "left" }}>
                                   <Typography variant="h6" fontWeight="bold">
-                                    Cổng {slot.id}
+                                    {formatPoleLabel(port.poleName)} — Cổng{" "}
+                                    {port.portNumber || port.id}
                                   </Typography>
                                   <Typography
                                     variant="body2"
                                     color="text.secondary"
                                   >
-                                    Loại đầu cắm: {slot.connectorType}
+                                    {port.connectorType} • {port.power}kW •{" "}
+                                    {port.type}
                                   </Typography>
                                   <Box
                                     sx={{
@@ -370,7 +513,7 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
                                     <Chip
                                       label={
                                         isAvailable
-                                          ? "Sẵn sàng"
+                                          ? "Đang sẵn sàng"
                                           : isOccupied
                                           ? "Đang sử dụng"
                                           : isMaintenance
@@ -390,7 +533,7 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
                                       sx={{ height: 20, fontSize: "0.7rem" }}
                                     />
                                   </Box>
-                                  {isMaintenance && slot.lastMaintenance && (
+                                  {isMaintenance && port.lastMaintenance && (
                                     <Typography
                                       variant="caption"
                                       color="error.main"
@@ -398,7 +541,7 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
                                     >
                                       Bảo trì từ:{" "}
                                       {new Date(
-                                        slot.lastMaintenance
+                                        port.lastMaintenance
                                       ).toLocaleString("vi-VN", {
                                         day: "2-digit",
                                         month: "2-digit",
@@ -441,16 +584,16 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
                     );
                   })}
                 </Grid>
-                {getAllSlots().length === 0 && (
+                {getPortsForType().length === 0 && (
                   <Alert severity="warning" sx={{ mt: 2 }}>
-                    Trụ sạc này chưa có cổng nào được cấu hình.
+                    Loại sạc này chưa có cổng nào được cấu hình.
                   </Alert>
                 )}
-                {getAllSlots().length > 0 &&
-                  getAvailableSlots().length === 0 && (
+                {getPortsForType().length > 0 &&
+                  getAvailablePortsForType().length === 0 && (
                     <Alert severity="warning" sx={{ mt: 2 }}>
-                      Tất cả {getAllSlots().length} cổng của trụ này đang bận
-                      hoặc bảo trì. Vui lòng chọn trụ sạc khác.
+                      Tất cả {getPortsForType().length} cổng của loại này đang
+                      bận hoặc bảo trì. Vui lòng chọn loại sạc khác.
                     </Alert>
                   )}
               </>
@@ -464,10 +607,12 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
             <Typography variant="h6" gutterBottom>
               Chọn thời gian sạc
             </Typography>
-            {selectedSlot && (
+            {selectedPort && (
               <>
                 <Alert severity="success" sx={{ mb: 2 }}>
-                  Đã chọn: Cổng {selectedSlot.id} ({selectedSlot.connectorType})
+                  Đã chọn: {formatPoleLabel(selectedPort?.poleName)} — Cổng{" "}
+                  {selectedPort?.portNumber || selectedPort?.id} (
+                  {selectedPort.connectorType})
                 </Alert>
                 <ChargingDateTimePicker
                   station={station}
@@ -531,11 +676,10 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
                     </Grid>
                     <Grid item xs={6}>
                       <Typography variant="body2" color="text.secondary">
-                        Trụ sạc:
+                        Loại sạc:
                       </Typography>
                       <Typography variant="body1" fontWeight="medium">
-                        {selectedChargingPost?.name} (
-                        {selectedChargingPost?.power}kW)
+                        {selectedChargingType?.name}
                       </Typography>
                     </Grid>
                     <Grid item xs={6}>
@@ -543,7 +687,16 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
                         Cổng sạc:
                       </Typography>
                       <Typography variant="body1" fontWeight="medium">
-                        {selectedSlot?.id} - {selectedSlot?.connectorType}
+                        {formatPoleLabel(selectedPort?.poleName)} — Cổng{" "}
+                        {selectedPort?.portNumber || selectedPort?.id}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={6}>
+                      <Typography variant="body2" color="text.secondary">
+                        Đầu cắm:
+                      </Typography>
+                      <Typography variant="body1" fontWeight="medium">
+                        {selectedPort?.connectorType}
                       </Typography>
                     </Grid>
                     <Grid item xs={6}>
@@ -558,19 +711,14 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
                     </Grid>
                     <Grid item xs={6}>
                       <Typography variant="body2" color="text.secondary">
-                        Giá dự kiến:
+                        Giá sạc:
                       </Typography>
                       <Typography
                         variant="body1"
                         fontWeight="medium"
                         color="primary.main"
                       >
-                        {selectedChargingPost?.type === "AC"
-                          ? `${station?.charging?.pricing?.acRate?.toLocaleString()} VNĐ/kWh`
-                          : `${(
-                              station?.charging?.pricing?.dcRate ||
-                              station?.charging?.pricing?.dcUltraRate
-                            )?.toLocaleString()} VNĐ/kWh`}
+                        {selectedChargingType?.rate?.toLocaleString()} VNĐ/kWh
                       </Typography>
                     </Grid>
                   </Grid>
@@ -589,8 +737,51 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
                       onChange={(e) => setAgreeTerms(e.target.checked)}
                     />
                   }
-                  label="Tôi đồng ý với điều khoản sử dụng và chính sách thanh toán"
+                  label={
+                    <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', fontSize: 16 }}>
+                      <span style={{ marginRight: 6 }}>Tôi đồng ý với</span>
+                      <Button variant="text" sx={{ p: 0, minWidth: 'unset', textTransform: 'none', color: 'primary.main', fontWeight: 500, fontSize: 16, mx: 0.5 }} onClick={() => setOpenTerms(true)}>
+                        điều khoản sử dụng
+                      </Button>
+                      <span style={{ margin: '0 6px' }}>và</span>
+                      <Button variant="text" sx={{ p: 0, minWidth: 'unset', textTransform: 'none', color: 'primary.main', fontWeight: 500, fontSize: 16, mx: 0.5 }} onClick={() => setOpenPolicy(true)}>
+                        chính sách thanh toán
+                      </Button>
+                    </Box>
+                  }
                 />
+
+                {/* Modal: Điều khoản sử dụng */}
+                <Dialog open={openTerms} onClose={() => setOpenTerms(false)} maxWidth="md" fullWidth>
+                  <DialogTitle>Điều khoản sử dụng</DialogTitle>
+                  <DialogContent dividers>
+                    <Typography variant="subtitle1" fontWeight="bold" gutterBottom>A. ĐIỀU KHOẢN SỬ DỤNG</Typography>
+                    <Typography variant="body2" paragraph>1. Phạm vi áp dụng<br/>Các điều khoản này áp dụng cho tất cả người dùng đặt chỗ, sử dụng dịch vụ sạc tại các trạm sạc trong hệ thống của SkaEV thông qua ứng dụng di động hoặc website.</Typography>
+                    <Typography variant="body2" paragraph>2. Quy định về Đặt chỗ<br/>Xác nhận đặt chỗ: Việc đặt chỗ của bạn chỉ được xem là thành công khi nhận được thông báo xác nhận qua ứng dụng hoặc email từ hệ thống của chúng tôi.<br/>Thời gian giữ chỗ: Hệ thống sẽ giữ chỗ sạc cho bạn trong vòng 10 phút kể từ thời điểm bạn đặt. Nếu bạn không đến và kết nối sạc trong khoảng thời gian này, lượt đặt chỗ của bạn có thể sẽ tự động bị hủy để nhường cho người dùng khác.<br/>Hủy đặt chỗ: Bạn có thể hủy lượt đặt chỗ miễn phí trước thời điểm hẹn 15 phút.</Typography>
+                    <Typography variant="body2" paragraph>3. Trách nhiệm của Người dùng<br/>Cung cấp thông tin chính xác khi đăng ký tài khoản và đặt chỗ.<br/>Tuân thủ đúng hướng dẫn sử dụng tại trạm sạc để đảm bảo an toàn cho bản thân, phương tiện và thiết bị.<br/>Sử dụng đúng loại cổng sạc tương thích với xe của mình. SkaEV không chịu trách nhiệm cho các hư hỏng nếu người dùng kết nối sai loại sạc.<br/>Khi sạc đầy hoặc hết thời gian đặt chỗ, người dùng có trách nhiệm di chuyển xe ra khỏi vị trí sạc để nhường cho người khác. Việc chiếm dụng vị trí sau khi đã sạc xong có thể bị tính "phí chiếm chỗ" (chi tiết trong Chính sách Thanh toán).<br/>Báo ngay cho bộ phận hỗ trợ của chúng tôi qua hotline 0917123123 nếu phát hiện bất kỳ sự cố, hư hỏng nào tại trạm sạc.<br/>Tự bảo quản tài sản cá nhân. Chúng tôi không chịu trách nhiệm cho bất kỳ mất mát hay hư hỏng nào đối với tài sản của bạn tại trạm sạc.</Typography>
+                    <Typography variant="body2" paragraph>4. Quyền và Trách nhiệm của chúng tôi<br/>Đảm bảo cung cấp dịch vụ ổn định và thiết bị sạc hoạt động tốt.<br/>Có quyền từ chối hoặc hủy phiên sạc nếu phát hiện người dùng vi phạm các điều khoản, có hành vi gian lận hoặc gây mất an toàn.<br/>Trong trường hợp trạm sạc gặp sự cố kỹ thuật đột xuất, chúng tôi sẽ nỗ lực thông báo sớm nhất cho bạn và hỗ trợ tìm kiếm trạm sạc thay thế gần nhất. Chúng tôi không chịu trách nhiệm bồi thường cho bất kỳ thiệt hại gián tiếp nào phát sinh từ sự cố này.</Typography>
+                    <Typography variant="body2" paragraph>5. Miễn trừ Trách nhiệm<br/>Chúng tôi không chịu trách nhiệm cho bất kỳ hư hỏng nào đối với phương tiện của bạn, trừ khi lỗi đó được xác định là do thiết bị của chúng tôi gây ra một cách trực tiếp.</Typography>
+                  </DialogContent>
+                  <DialogActions>
+                    <Button onClick={() => setOpenTerms(false)} variant="contained">Đóng</Button>
+                  </DialogActions>
+                </Dialog>
+
+                {/* Modal: Chính sách thanh toán */}
+                <Dialog open={openPolicy} onClose={() => setOpenPolicy(false)} maxWidth="md" fullWidth>
+                  <DialogTitle>Chính sách thanh toán</DialogTitle>
+                  <DialogContent dividers>
+                    <Typography variant="subtitle1" fontWeight="bold" gutterBottom>B. CHÍNH SÁCH THANH TOÁN</Typography>
+                    <Typography variant="body2" paragraph>1. Chi phí Sạc<br/>Chi phí cho phiên sạc được tính dựa trên lượng điện năng tiêu thụ (số kWh) nhân với đơn giá tại thời điểm sạc.<br/>Đơn giá (VNĐ/kWh) được niêm yết rõ ràng trên ứng dụng và tại màn hình trụ sạc trước khi bạn bắt đầu phiên sạc.<br/>Ngoài chi phí sạc, có thể phát sinh các loại phí sau:<br/>Phí chiếm chỗ: Áp dụng nếu xe của bạn vẫn chiếm vị trí sạc sau khi đã sạc đầy một khoảng thời gian nhất định (ví dụ: sau 15 phút). Mức phí này sẽ được thông báo rõ trên ứng dụng.</Typography>
+                    <Typography variant="body2" paragraph>2. Phương thức Thanh toán<br/>Chúng tôi chấp nhận thanh toán qua các phương thức sau:<br/>Thẻ tín dụng/ghi nợ quốc tế (Visa, Mastercard).<br/>Thẻ ATM nội địa.<br/>Ví điện tử (Momo, ZaloPay, VNPay,...).<br/>Bạn cần liên kết một phương thức thanh toán hợp lệ vào tài khoản trên ứng dụng để có thể bắt đầu phiên sạc.</Typography>
+                    <Typography variant="body2" paragraph>3. Quy trình Thanh toán<br/>Khi phiên sạc kết thúc, tổng chi phí sẽ được tính toán tự động.<br/>Hệ thống sẽ tự động trừ tiền từ phương thức thanh toán mà bạn đã chọn được đăng ký trên tài khoản.<br/>Hóa đơn chi tiết cho phiên sạc sẽ được gửi đến email của bạn và lưu lại trong lịch sử giao dịch trên ứng dụng.</Typography>
+                    <Typography variant="body2" paragraph>4. Hoàn tiền<br/>Việc hoàn tiền chỉ được xem xét trong trường hợp phiên sạc không thành công hoặc bị gián đoạn do lỗi từ hệ thống hoặc thiết bị của chúng tôi.<br/>Vui lòng liên hệ bộ phận chăm sóc khách hàng qua hotline 0917123123 để được hướng dẫn và xử lý yêu cầu hoàn tiền.</Typography>
+                    <Typography variant="body2" paragraph>5. Thay đổi Chính sách<br/>Chúng tôi có quyền thay đổi, cập nhật biểu phí và chính sách thanh toán. Mọi thay đổi sẽ được thông báo đến bạn qua ứng dụng hoặc email trước khi có hiệu lực.</Typography>
+                  </DialogContent>
+                  <DialogActions>
+                    <Button onClick={() => setOpenPolicy(false)} variant="contained">Đóng</Button>
+                  </DialogActions>
+                </Dialog>
               </>
             )}
           </Box>
@@ -604,9 +795,9 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
   const isStepComplete = (step) => {
     switch (step) {
       case 0:
-        return selectedChargingPost !== null;
+        return selectedChargingType !== null;
       case 1:
-        return selectedSlot !== null;
+        return selectedPort !== null;
       case 2:
         return (
           selectedDateTime !== null &&
@@ -636,9 +827,9 @@ const BookingModal = ({ open, onClose, station, onSuccess }) => {
           pb: 1,
         }}
       >
-        <Typography variant="h5" fontWeight="bold">
+        <Box component="span" sx={{ fontWeight: "bold", fontSize: "1.5rem" }}>
           Đặt chỗ sạc xe điện
-        </Typography>
+        </Box>
         <Button
           onClick={handleClose}
           sx={{ minWidth: "auto", p: 1 }}
