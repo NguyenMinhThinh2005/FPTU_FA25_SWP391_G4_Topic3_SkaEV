@@ -1,52 +1,17 @@
-﻿import React, { useMemo, useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
-import {
-  Box,
-  Typography,
-  Card,
-  CardContent,
-  Grid,
-  Button,
-  TextField,
-  InputAdornment,
-  IconButton,
-  Chip,
-  Avatar,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  FormControl,
-  FormHelperText,
-  InputLabel,
-  Select,
-  MenuItem,
-  Snackbar,
-  Alert,
-  Tooltip,
-  CircularProgress,
-  Tab,
-  Tabs,
-  Divider,
-} from "@mui/material";
-import { Search, Add, Edit, Delete, People, Shield, SwapHoriz, CheckCircle, Warning, LocationOn, AdminPanelSettings, Work, Badge, Phone, Email, Person, CalendarToday, Visibility } from "@mui/icons-material";
-import useUserStore from "../../store/userStore";
-import useStationStore from "../../store/stationStore";
-
-const roleOptions = [
-  { value: "admin", label: "Admin", icon: <Shield />, color: "primary" },
-  { value: "staff", label: "Staff", icon: <People />, color: "warning" },
-  { value: "customer", label: "Customer", icon: <People />, color: "default" },
-];
+﻿import React from "react";
+import { Box, Snackbar, Alert } from "@mui/material";
+import { useUserManagement } from "./user-management/hooks/useUserManagement";
+import UserManagementHeader from "./user-management/components/UserManagementHeader";
+import UserStats from "./user-management/components/UserStats";
+import UserFilters from "./user-management/components/UserFilters";
+import UserTable from "./user-management/components/UserTable";
+import UserDialog from "./user-management/components/UserDialog";
+import DeleteUserDialog from "./user-management/components/DeleteUserDialog";
+import ChangeRoleDialog from "./user-management/components/ChangeRoleDialog";
+import StaffEditDialog from "./user-management/components/StaffEditDialog";
 
 const UserManagement = () => {
+<<<<<<< HEAD
   const navigate = useNavigate();
   const { users, addUser, updateUser, deleteUser, fetchUsers, loading } = useUserStore();
   const { stations, fetchStations } = useStationStore();
@@ -393,190 +358,82 @@ const UserManagement = () => {
     { label: "Nhân viên", value: users.filter(u => u.role === "staff").length, color: "warning" },
     { label: "Khách hàng", value: users.filter(u => u.role === "customer").length, color: "success" },
   ];
+=======
+  const {
+    users,
+    loading,
+    stations,
+    query,
+    setQuery,
+    roleFilter,
+    setRoleFilter,
+    dialogOpen,
+    setDialogOpen,
+    deleteDialogOpen,
+    setDeleteDialogOpen,
+    roleDialogOpen,
+    setRoleDialogOpen,
+    staffEditDialogOpen,
+    setStaffEditDialogOpen,
+    staffEditTab,
+    setStaffEditTab,
+    editUser,
+    userToDelete,
+    userToChangeRole,
+    selectedStationId,
+    newRole,
+    setNewRole,
+    snackbar,
+    form,
+    setForm,
+    selectedStation,
+    availableStationsCount,
+    filteredUsers,
+    openCreate,
+    openEdit,
+    openDeleteDialog,
+    openRoleDialog,
+    openStaffEditDialog,
+    handleDelete,
+    handleRoleChange,
+    handleManagedStationChange,
+    handleSave,
+    handleChangeRole,
+    handleSaveStaff,
+    toggleStationSelection,
+    getStationManager,
+    isStationDisabled,
+    closeSnackbar,
+    navigate,
+  } = useUserManagement();
+>>>>>>> origin/develop
 
   return (
     <Box>
-      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 3 }}>
-        <Box>
-          <Typography variant="h4" fontWeight="bold" gutterBottom>
-            Quản lý người dùng
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
-            Quản lý khách hàng, nhân viên và quản trị viên; phân quyền vai trò
-          </Typography>
-        </Box>
-        <Button variant="contained" startIcon={<Add />} onClick={openCreate}>
-          Thêm người dùng
-        </Button>
-      </Box>
+      <UserManagementHeader onAddUser={openCreate} />
 
-      {/* Statistics */}
-      <Grid container spacing={3} sx={{ mb: 3 }}>
-        {stats.map((stat, idx) => (
-          <Grid item xs={12} sm={6} md={3} key={idx}>
-            <Card>
-              <CardContent>
-                <Typography variant="h4" color={stat.color} fontWeight="bold">
-                  {stat.value}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {stat.label}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-        ))}
-      </Grid>
+      <UserStats users={users} />
 
-      {/* Search and Filter */}
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Grid container spacing={2}>
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                placeholder="Tìm kiếm theo tên, email hoặc số điện thoại"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Search />
-                    </InputAdornment>
-                  ),
-                }}
-              />
-            </Grid>
-            <Grid item xs={12} md={3}>
-              <FormControl fullWidth>
-                <InputLabel>Vai trò</InputLabel>
-                <Select value={roleFilter} label="Vai trò" onChange={(e) => setRoleFilter(e.target.value)}>
-                  <MenuItem value="all">Tất cả</MenuItem>
-                  {roleOptions.map((r) => (
-                    <MenuItem key={r.value} value={r.value}>{r.label}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-          </Grid>
-        </CardContent>
-      </Card>
+      <UserFilters 
+        query={query} 
+        setQuery={setQuery} 
+        roleFilter={roleFilter}
+        setRoleFilter={setRoleFilter}
+      />
 
-      <Card>
-        <CardContent>
-          {loading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', py: 5 }}>
-              <CircularProgress />
-            </Box>
-          ) : (
-            <TableContainer component={Paper}>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Người dùng</TableCell>
-                    <TableCell>Email</TableCell>
-                    <TableCell>Số điện thoại</TableCell>
-                    <TableCell align="center">Vai trò</TableCell>
-                    <TableCell align="center">Thao tác</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {filteredUsers.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={5} align="center" sx={{ py: 5 }}>
-                        <Typography color="text.secondary">
-                          {query || roleFilter !== "all" 
-                            ? "Không tìm thấy người dùng phù hợp" 
-                            : "Chưa có người dùng nào"}
-                        </Typography>
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredUsers.map((u) => (
-                      <TableRow key={u.userId} hover>
-                        <TableCell>
-                          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-                            <Avatar src={u.avatarUrl}>{(u.fullName || "?")[0].toUpperCase()}</Avatar>
-                            <Box>
-                              <Typography variant="subtitle2" fontWeight="medium">
-                                {u.fullName}
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                ID: {u.userId}
-                              </Typography>
-                            </Box>
-                          </Box>
-                        </TableCell>
-                        <TableCell>{u.email}</TableCell>
-                        <TableCell>{u.phoneNumber || "-"}</TableCell>
-                        <TableCell align="center">
-                          {getRoleChip(u.role)}
-                        </TableCell>
-                        <TableCell align="center">
-                          <Tooltip title="Xem chi tiết">
-                            <IconButton 
-                              size="small" 
-                              color="info" 
-                              onClick={() => navigate(`/admin/users/${u.userId}`)}
-                            >
-                              <Visibility />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Chỉnh sửa">
-                            <IconButton 
-                              size="small" 
-                              color="primary" 
-                              onClick={() => {
-                                if (u.role === "staff") {
-                                  // Mở dialog đặc biệt cho Staff
-                                  setEditUser(u);
-                                  setForm({
-                                    ...form,
-                                    email: u.email,
-                                    firstName: u.fullName?.split(" ")[0] || "",
-                                    lastName: u.fullName?.split(" ").slice(1).join(" ") || "",
-                                    phone: u.phoneNumber || "",
-                                    role: u.role,
-                                    employeeId: u.employeeId || "",
-                                    department: u.department || "",
-                                    position: u.position || "",
-                                    joinDate: u.joinDate || "",
-                                    location: u.location || "Hà Nội",
-                                  });
-                                  // Load assigned stations
-                                  setSelectedStationId(u.managedStationId || null);
-                                  setStaffEditTab(0);
-                                  setStaffEditDialogOpen(true);
-                                } else {
-                                  // Mở dialog bình thường cho Customer/Admin
-                                  openEdit(u);
-                                }
-                              }}
-                            >
-                              <Edit />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Thay đổi vai trò">
-                            <IconButton size="small" color="warning" onClick={() => openRoleDialog(u)}>
-                              <SwapHoriz />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Xóa">
-                            <IconButton size="small" color="error" onClick={() => openDeleteDialog(u)}>
-                              <Delete />
-                            </IconButton>
-                          </Tooltip>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          )}
-        </CardContent>
-      </Card>
+      <UserTable
+        loading={loading}
+        filteredUsers={filteredUsers}
+        query={query}
+        roleFilter={roleFilter}
+        navigate={navigate}
+        onEdit={openEdit}
+        onRoleChange={openRoleDialog}
+        onDelete={openDeleteDialog}
+        onStaffEdit={openStaffEditDialog}
+      />
 
+<<<<<<< HEAD
       <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>{editUser ? "Chỉnh sửa người dùng" : "Thêm người dùng mới"}</DialogTitle>
         <DialogContent dividers>
@@ -707,405 +564,65 @@ const UserManagement = () => {
           </Button>
         </DialogActions>
       </Dialog>
+=======
+      <UserDialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        editUser={editUser}
+        form={form}
+        setForm={setForm}
+        handleSave={handleSave}
+        handleRoleChange={handleRoleChange}
+        handleManagedStationChange={handleManagedStationChange}
+        stations={stations}
+        availableStationsCount={availableStationsCount}
+        getStationManager={getStationManager}
+        isStationDisabled={isStationDisabled}
+      />
+>>>>>>> origin/develop
 
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>Xác nhận xóa</DialogTitle>
-        <DialogContent>
-          <Alert severity="warning" icon={<Warning />} sx={{ mb: 2 }}>
-            Hành động này không thể hoàn tác!
-          </Alert>
-          <Typography>
-            Bạn có chắc chắn muốn xóa người dùng <strong>{userToDelete?.fullName}</strong> ({userToDelete?.email})?
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteDialogOpen(false)}>Hủy</Button>
-          <Button variant="contained" color="error" onClick={handleDelete}>
-            Xóa
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <DeleteUserDialog
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        userToDelete={userToDelete}
+        handleDelete={handleDelete}
+      />
 
-      {/* Change Role Dialog */}
-      <Dialog open={roleDialogOpen} onClose={() => setRoleDialogOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>Thay đổi vai trò</DialogTitle>
-        <DialogContent>
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="body2" color="text.secondary" gutterBottom>
-              Người dùng: <strong>{userToChangeRole?.fullName}</strong>
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Vai trò hiện tại: {getRoleChip(userToChangeRole?.role)}
-            </Typography>
-          </Box>
-          <FormControl fullWidth>
-            <InputLabel>Vai trò mới</InputLabel>
-            <Select value={newRole} label="Vai trò mới" onChange={(e) => setNewRole(e.target.value)}>
-              {roleOptions.map((r) => (
-                <MenuItem key={r.value} value={r.value}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    {r.icon}
-                    {r.label}
-                  </Box>
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setRoleDialogOpen(false)}>Hủy</Button>
-          <Button variant="contained" onClick={handleChangeRole}>
-            Xác nhận
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <ChangeRoleDialog
+        open={roleDialogOpen}
+        onClose={() => setRoleDialogOpen(false)}
+        userToChangeRole={userToChangeRole}
+        newRole={newRole}
+        setNewRole={setNewRole}
+        handleChangeRole={handleChangeRole}
+      />
 
-      {/* Dialog chỉnh sửa Staff - Giống trang Profile */}
-      <Dialog 
-        open={staffEditDialogOpen} 
-        onClose={() => setStaffEditDialogOpen(false)} 
-        maxWidth="md" 
-        fullWidth
-      >
-        <DialogTitle>
-          Quản lý thông tin cá nhân và cài đặt công việc
-        </DialogTitle>
-        <DialogContent dividers>
-          {/* Header Card với Avatar và Stats */}
-          <Card sx={{ mb: 3, bgcolor: 'primary.50' }}>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <Avatar sx={{ width: 100, height: 100, mr: 3, bgcolor: 'primary.main', fontSize: 40 }}>
-                  {(form.firstName || 'N')[0].toUpperCase()}
-                </Avatar>
-                <Box sx={{ flex: 1 }}>
-                  <Typography variant="h5" fontWeight="bold">
-                    {form.firstName} {form.lastName}
-                  </Typography>
-                  <Typography variant="body1" color="text.secondary" gutterBottom>
-                    {form.position || 'Kỹ thuật viên trạm sạc'} • {form.department || 'Vận hành'}
-                  </Typography>
-                  <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
-                    <Chip icon={<Badge />} label={`ID: ${form.employeeId || 'ST001'}`} size="small" color="primary" />
-                    <Chip icon={<LocationOn />} label={form.location || 'Hà Nội'} size="small" color="info" />
-                  </Box>
-                </Box>
-              </Box>
+      <StaffEditDialog
+        open={staffEditDialogOpen}
+        onClose={() => setStaffEditDialogOpen(false)}
+        form={form}
+        setForm={setForm}
+        staffEditTab={staffEditTab}
+        setStaffEditTab={setStaffEditTab}
+        stations={stations}
+        selectedStation={selectedStation}
+        selectedStationId={selectedStationId}
+        toggleStationSelection={toggleStationSelection}
+        getStationManager={getStationManager}
+        isStationDisabled={isStationDisabled}
+        handleSaveStaff={handleSaveStaff}
+      />
 
-              {/* Stats Row */}
-              <Grid container spacing={2}>
-                <Grid item xs={3}>
-                  <Box sx={{ textAlign: 'center', p: 1.5, bgcolor: 'white', borderRadius: 1 }}>
-                    <Typography variant="h5" fontWeight="bold" color="success.main">8</Typography>
-                    <Typography variant="caption" color="text.secondary">Trạm quản lý</Typography>
-                  </Box>
-                </Grid>
-                <Grid item xs={3}>
-                  <Box sx={{ textAlign: 'center', p: 1.5, bgcolor: 'white', borderRadius: 1 }}>
-                    <Typography variant="h5" fontWeight="bold" color="primary.main">45</Typography>
-                    <Typography variant="caption" color="text.secondary">Bảo trì hoàn thành</Typography>
-                  </Box>
-                </Grid>
-                <Grid item xs={3}>
-                  <Box sx={{ textAlign: 'center', p: 1.5, bgcolor: 'white', borderRadius: 1 }}>
-                    <Typography variant="h5" fontWeight="bold" color="info.main">12m</Typography>
-                    <Typography variant="caption" color="text.secondary">Thời gian phản hồi TB</Typography>
-                  </Box>
-                </Grid>
-                <Grid item xs={3}>
-                  <Box sx={{ textAlign: 'center', p: 1.5, bgcolor: 'white', borderRadius: 1 }}>
-                    <Typography variant="h5" fontWeight="bold" color="warning.main">4.8/5</Typography>
-                    <Typography variant="caption" color="text.secondary">Đánh giá khách hàng</Typography>
-                  </Box>
-                </Grid>
-              </Grid>
-            </CardContent>
-          </Card>
-
-          {/* Tabs */}
-          <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
-            <Tabs value={staffEditTab} onChange={(e, v) => setStaffEditTab(v)}>
-              <Tab label="THÔNG TIN CÁ NHÂN & CÔNG VIỆC" />
-              <Tab label="PHÂN QUYỀN TRẠM SẠC" />
-              <Tab label="NHẬT KÝ HOẠT ĐỘNG" />
-            </Tabs>
-          </Box>
-
-          {/* Tab 0: Thông tin cá nhân & Công việc */}
-          {staffEditTab === 0 && (
-            <Box>
-              {/* Phần Thông tin cá nhân */}
-              <Typography variant="h6" fontWeight="bold" gutterBottom>
-                Thông tin cá nhân
-              </Typography>
-              <Grid container spacing={2} sx={{ mb: 3 }}>
-                <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    label="Họ"
-                    value={form.firstName}
-                    onChange={(e) => setForm({ ...form, firstName: e.target.value })}
-                    InputProps={{
-                      startAdornment: <Person sx={{ mr: 1, color: 'text.secondary' }} />
-                    }}
-                  />
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    label="Tên"
-                    value={form.lastName}
-                    onChange={(e) => setForm({ ...form, lastName: e.target.value })}
-                    InputProps={{
-                      startAdornment: <Person sx={{ mr: 1, color: 'text.secondary' }} />
-                    }}
-                  />
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    label="Email"
-                    value={form.email}
-                    onChange={(e) => setForm({ ...form, email: e.target.value })}
-                    InputProps={{
-                      startAdornment: <Email sx={{ mr: 1, color: 'text.secondary' }} />
-                    }}
-                  />
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    label="Số điện thoại"
-                    value={form.phone}
-                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                    InputProps={{
-                      startAdornment: <Phone sx={{ mr: 1, color: 'text.secondary' }} />
-                    }}
-                  />
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    label="Địa điểm"
-                    value={form.location}
-                    onChange={(e) => setForm({ ...form, location: e.target.value })}
-                    InputProps={{
-                      startAdornment: <LocationOn sx={{ mr: 1, color: 'text.secondary' }} />
-                    }}
-                  />
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    label="Ngày vào làm"
-                    type="date"
-                    value={form.joinDate}
-                    onChange={(e) => setForm({ ...form, joinDate: e.target.value })}
-                    InputLabelProps={{ shrink: true }}
-                    InputProps={{
-                      startAdornment: <CalendarToday sx={{ mr: 1, color: 'text.secondary' }} />
-                    }}
-                  />
-                </Grid>
-              </Grid>
-
-              {/* Divider */}
-              <Divider sx={{ my: 3 }}>
-                <Chip label="Chi tiết công việc" icon={<Work />} />
-              </Divider>
-
-              {/* Phần Chi tiết công việc */}
-              <Typography variant="h6" fontWeight="bold" gutterBottom>
-                Chi tiết công việc
-              </Typography>
-              <Grid container spacing={2}>
-                <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    label="Mã nhân viên"
-                    value={form.employeeId}
-                    onChange={(e) => setForm({ ...form, employeeId: e.target.value })}
-                    InputProps={{
-                      startAdornment: <Badge sx={{ mr: 1, color: 'text.secondary' }} />
-                    }}
-                  />
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    label="Phòng ban"
-                    value={form.department}
-                    onChange={(e) => setForm({ ...form, department: e.target.value })}
-                    InputProps={{
-                      startAdornment: <Work sx={{ mr: 1, color: 'text.secondary' }} />
-                    }}
-                  />
-                </Grid>
-                <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    label="Chức vụ"
-                    value={form.position}
-                    onChange={(e) => setForm({ ...form, position: e.target.value })}
-                    InputProps={{
-                      startAdornment: <Work sx={{ mr: 1, color: 'text.secondary' }} />
-                    }}
-                  />
-                </Grid>
-              </Grid>
-            </Box>
-          )}
-
-          {/* Tab 1: Phân quyền trạm sạc */}
-          {staffEditTab === 1 && (
-            <Box>
-              <Box sx={{ mb: 3 }}>
-                <Typography variant="h6" fontWeight="bold" gutterBottom>
-                  Phân quyền trạm sạc cho nhân viên
-                </Typography>
-                <Typography variant="body2" color="text.secondary" gutterBottom>
-                  Chọn trạm sạc mà nhân viên <strong>{form.firstName} {form.lastName}</strong> sẽ quản lý
-                </Typography>
-                <Chip 
-                  label={selectedStation ? `Trạm: ${selectedStation.name || selectedStation.stationName}` : "Chưa chọn trạm"} 
-                  color={selectedStation ? "success" : "default"} 
-                  size="small" 
-                  sx={{ mt: 1 }}
-                  icon={<CheckCircle />}
-                />
-              </Box>
-
-              {stations.length === 0 ? (
-                <Alert severity="info">Chưa có trạm sạc nào trong hệ thống</Alert>
-              ) : (
-                <Grid container spacing={2}>
-                  {stations.map((station) => {
-                    const stationKey = station.stationId ?? station.id;
-                    const manager = getStationManager(station);
-                    const disabled = isStationDisabled(station);
-                    const isSelected = selectedStationId === stationKey;
-                    const totalPorts = station.charging?.totalPorts ?? station.totalChargers ?? 0;
-                    const availablePorts = station.charging?.availablePorts ?? station.availablePosts ?? 0;
-
-                    return (
-                      <Grid item xs={12} sm={6} key={stationKey}>
-                        <Tooltip
-                          title={
-                            disabled && manager
-                              ? `Đã phân công cho ${manager.name || manager.email || "nhân viên khác"}`
-                              : ""
-                          }
-                          disableHoverListener={!disabled || isSelected}
-                        >
-                          <Box>
-                            <Card 
-                              variant="outlined"
-                              sx={{ 
-                                cursor: disabled ? 'not-allowed' : 'pointer',
-                                border: isSelected ? 2 : 1,
-                                borderColor: isSelected ? 'success.main' : 'divider',
-                                bgcolor: isSelected ? 'success.50' : 'transparent',
-                                opacity: disabled && !isSelected ? 0.6 : 1,
-                                transition: 'all 0.2s',
-                                '&:hover': disabled ? {} : {
-                                  borderColor: 'success.main',
-                                  transform: 'translateY(-2px)',
-                                  boxShadow: 2
-                                }
-                              }}
-                              onClick={() => {
-                                if (!disabled) {
-                                  toggleStationSelection(stationKey);
-                                }
-                              }}
-                            >
-                              <CardContent>
-                                <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-                                  <Box sx={{ flex: 1, pr: 1 }}>
-                                    <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
-                                      {station.name}
-                                    </Typography>
-                                    <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                      <LocationOn fontSize="inherit" />
-                                      {station.location?.address || station.address}
-                                    </Typography>
-                                    <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                                      <Chip 
-                                        label={`${totalPorts} cổng`} 
-                                        size="small" 
-                                        variant="outlined"
-                                      />
-                                      <Chip 
-                                        label={`Trống: ${availablePorts}`} 
-                                        size="small" 
-                                        variant="outlined"
-                                        color="info"
-                                      />
-                                    </Box>
-                                    <Chip
-                                      icon={<Person fontSize="small" />}
-                                      label={
-                                        manager
-                                          ? `Quản lý: ${manager.name || manager.email || "Nhân viên khác"}`
-                                          : "Chưa phân công nhân viên"
-                                      }
-                                      size="small"
-                                      color={manager ? (disabled && !isSelected ? "default" : "success") : "primary"}
-                                      variant={manager ? "filled" : "outlined"}
-                                      sx={{ mt: 1, maxWidth: '100%' }}
-                                    />
-                                  </Box>
-                                  {isSelected && (
-                                    <CheckCircle color="success" />
-                                  )}
-                                </Box>
-                              </CardContent>
-                            </Card>
-                          </Box>
-                        </Tooltip>
-                      </Grid>
-                    );
-                  })}
-                </Grid>
-              )}
-            </Box>
-          )}
-
-          {/* Tab 2: Nhật ký hoạt động */}
-          {staffEditTab === 2 && (
-            <Box>
-              <Typography variant="h6" fontWeight="bold" gutterBottom>
-                Hoạt động gần đây
-              </Typography>
-              <Alert severity="info" sx={{ mt: 2 }}>
-                Chức năng nhật ký hoạt động đang được phát triển.
-              </Alert>
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setStaffEditDialogOpen(false)}>Hủy</Button>
-          <Button 
-            variant="contained" 
-            onClick={handleSaveStaff}
-          >
-            Lưu thay đổi
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Snackbar Notifications */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={6000}
-        onClose={() => setSnackbar({ ...snackbar, open: false })}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        onClose={closeSnackbar}
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
       >
         <Alert
-          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          onClose={closeSnackbar}
           severity={snackbar.severity}
-          sx={{ width: '100%' }}
+          sx={{ width: "100%" }}
         >
           {snackbar.message}
         </Alert>

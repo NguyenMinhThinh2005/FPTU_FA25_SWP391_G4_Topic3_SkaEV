@@ -14,7 +14,7 @@ public interface IAdminUserService
     Task<AdminUserDto> ActivateUserAsync(int userId);
     Task<AdminUserDto> DeactivateUserAsync(int userId, string reason);
     Task DeleteUserAsync(int userId);
-    Task<ResetPasswordResultDto> ResetUserPasswordAsync(int userId);
+    Task<ResetPasswordResultDto> ResetUserPasswordAsync(int userId, int? performedByUserId = null);
     Task<UserActivitySummaryDto> GetUserActivitySummaryAsync(int userId);
     Task<UserStatisticsSummaryDto> GetUserStatisticsSummaryAsync();
 
@@ -22,6 +22,18 @@ public interface IAdminUserService
     Task<List<UserChargingHistoryDto>> GetUserChargingHistoryAsync(int userId, int page = 1, int pageSize = 20);
     Task<List<UserPaymentHistoryDto>> GetUserPaymentHistoryAsync(int userId, int page = 1, int pageSize = 20);
     Task<UserStatisticsDto> GetUserStatisticsAsync(int userId);
+    Task<List<AdminUserVehicleDto>> GetUserVehiclesAsync(int userId);
+
+    // Staff detail support
+    Task<List<AdminStaffStationDto>> GetStaffStationAssignmentsAsync(int staffUserId);
+    Task<List<AdminStaffScheduleDto>> GetStaffScheduleAsync(int staffUserId);
+    Task<List<AdminStaffActivityDto>> GetStaffActivitiesAsync(int staffUserId, int limit = 25);
+
+    // Admin detail support
+    Task<AdminOverviewDto> GetAdminOverviewAsync(int adminUserId);
+    Task<List<AdminActivityLogDto>> GetAdminActivityLogAsync(int adminUserId, int limit = 25);
+    Task<List<AdminPermissionDto>> GetAdminPermissionsAsync(int adminUserId);
+    Task<List<AdminAuditLogDto>> GetAdminAuditLogAsync(int adminUserId, int limit = 50);
 
     // Notifications
     Task<List<NotificationDto>> GetAllNotificationsAsync(int? userId = null, string? type = null, bool? isRead = null, int page = 1, int pageSize = 50);
@@ -36,4 +48,7 @@ public interface IAdminUserService
     Task<bool> UpdateSupportRequestAsync(int requestId, UpdateSupportRequestDto dto);
     Task<bool> ReplySupportRequestAsync(ReplySupportRequestDto dto);
     Task<bool> CloseSupportRequestAsync(int requestId, string resolutionNotes);
+
+    // Administrative utilities
+    Task<int> ResetAllAdminPasswordsAsync(string newPassword, int? performedByUserId = null);
 }

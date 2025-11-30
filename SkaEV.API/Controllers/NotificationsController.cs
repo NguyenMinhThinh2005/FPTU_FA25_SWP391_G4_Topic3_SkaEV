@@ -1,244 +1,179 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SkaEV.API.Application.Common;
+using SkaEV.API.Application.Constants;
 using SkaEV.API.Application.DTOs.Notifications;
 using SkaEV.API.Application.Services;
-using System.Security.Claims;
 
 namespace SkaEV.API.Controllers;
 
 /// <summary>
-/// Controller for user notifications
+/// Controller quản lý thông báo người dùng.
+/// Cung cấp các API để xem, đánh dấu đã đọc, xóa và gửi thông báo.
 /// </summary>
-[ApiController]
-[Route("api/[controller]")]
 [Authorize]
-public class NotificationsController : ControllerBase
+[Route("api/[controller]")]
+public class NotificationsController : BaseApiController
 {
+    // Service xử lý logic thông báo
     private readonly INotificationService _notificationService;
-    private readonly ILogger<NotificationsController> _logger;
 
-    public NotificationsController(INotificationService notificationService, ILogger<NotificationsController> logger)
+    /// <summary>
+    /// Constructor nhận vào NotificationService thông qua Dependency Injection.
+    /// </summary>
+    /// <param name="notificationService">Service thông báo.</param>
+    public NotificationsController(INotificationService notificationService)
     {
         _notificationService = notificationService;
-        _logger = logger;
     }
 
     /// <summary>
-    /// Get my notifications
+    /// Lấy danh sách thông báo của người dùng hiện tại.
     /// </summary>
+    /// <param name="unreadOnly">Chỉ lấy thông báo chưa đọc (mặc định false).</param>
+    /// <returns>Danh sách thông báo và tổng số lượng.</returns>
     [HttpGet]
-    [ProducesResponseType(typeof(IEnumerable<NotificationDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetMyNotifications([FromQuery] bool unreadOnly = false)
     {
-        try
-        {
-            var userId = GetUserId();
-            var notifications = await _notificationService.GetUserNotificationsAsync(userId, unreadOnly);
-            return Ok(new { data = notifications, count = notifications.Count() });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting notifications");
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        var notifications = await _notificationService.GetUserNotificationsAsync(CurrentUserId, unreadOnly);
+        return OkResponse(new { data = notifications, count = notifications.Count() });
     }
 
     /// <summary>
-    /// Get unread notification count
+    /// Lấy số lượng thông báo chưa đọc.
     /// </summary>
+    /// <returns>Số lượng thông báo chưa đọc.</returns>
     [HttpGet("unread-count")]
-    [ProducesResponseType(typeof(int), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetUnreadCount()
     {
-        try
-        {
-            var userId = GetUserId();
-            var count = await _notificationService.GetUnreadCountAsync(userId);
-            return Ok(new { count });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting unread count");
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        var count = await _notificationService.GetUnreadCountAsync(CurrentUserId);
+        return OkResponse(new { count });
     }
 
     /// <summary>
-    /// Get notification by ID
+    /// Lấy chi tiết thông báo theo ID.
     /// </summary>
+    /// <param name="id">ID thông báo.</param>
+    /// <returns>Chi tiết thông báo.</returns>
     [HttpGet("{id}")]
-    [ProducesResponseType(typeof(NotificationDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<NotificationDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> GetNotification(int id)
     {
-        try
-        {
-            var userId = GetUserId();
-            var notification = await _notificationService.GetNotificationByIdAsync(id);
+        var notification = await _notificationService.GetNotificationByIdAsync(id);
 
-            if (notification == null)
-                return NotFound(new { message = "Notification not found" });
+        if (notification == null)
+            return NotFoundResponse("Notification not found");
 
-            if (notification.UserId != userId)
-                return Forbid();
+        // Kiểm tra quyền sở hữu
+        if (notification.UserId != CurrentUserId)
+            return ForbiddenResponse();
 
-            return Ok(notification);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting notification {Id}", id);
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        return OkResponse(notification);
     }
 
     /// <summary>
-    /// Mark notification as read
+    /// Đánh dấu một thông báo là đã đọc.
     /// </summary>
+    /// <param name="id">ID thông báo.</param>
+    /// <returns>Kết quả đánh dấu.</returns>
     [HttpPatch("{id}/read")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> MarkAsRead(int id)
     {
-        try
-        {
-            var userId = GetUserId();
-            var notification = await _notificationService.GetNotificationByIdAsync(id);
+        var notification = await _notificationService.GetNotificationByIdAsync(id);
 
-            if (notification == null)
-                return NotFound(new { message = "Notification not found" });
+        if (notification == null)
+            return NotFoundResponse("Notification not found");
 
-            if (notification.UserId != userId)
-                return Forbid();
+        if (notification.UserId != CurrentUserId)
+            return ForbiddenResponse();
 
-            await _notificationService.MarkAsReadAsync(id);
-            return NoContent();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error marking notification as read {Id}", id);
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        await _notificationService.MarkAsReadAsync(id);
+        return OkResponse<object>(new { }, "Notification marked as read");
     }
 
     /// <summary>
-    /// Mark all notifications as read
+    /// Đánh dấu tất cả thông báo là đã đọc.
     /// </summary>
+    /// <returns>Kết quả đánh dấu.</returns>
     [HttpPatch("read-all")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> MarkAllAsRead()
     {
-        try
-        {
-            var userId = GetUserId();
-            await _notificationService.MarkAllAsReadAsync(userId);
-            return NoContent();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error marking all notifications as read");
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        await _notificationService.MarkAllAsReadAsync(CurrentUserId);
+        return OkResponse<object>(new { }, "All notifications marked as read");
     }
 
     /// <summary>
-    /// Delete a notification
+    /// Xóa một thông báo.
     /// </summary>
+    /// <param name="id">ID thông báo.</param>
+    /// <returns>Kết quả xóa.</returns>
     [HttpDelete("{id}")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> DeleteNotification(int id)
     {
-        try
-        {
-            var userId = GetUserId();
-            var notification = await _notificationService.GetNotificationByIdAsync(id);
+        var notification = await _notificationService.GetNotificationByIdAsync(id);
 
-            if (notification == null)
-                return NotFound(new { message = "Notification not found" });
+        if (notification == null)
+            return NotFoundResponse("Notification not found");
 
-            if (notification.UserId != userId)
-                return Forbid();
+        if (notification.UserId != CurrentUserId)
+            return ForbiddenResponse();
 
-            await _notificationService.DeleteNotificationAsync(id);
-            return NoContent();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error deleting notification {Id}", id);
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        await _notificationService.DeleteNotificationAsync(id);
+        return OkResponse<object>(new { }, "Notification deleted");
     }
 
     /// <summary>
-    /// Delete all read notifications
+    /// Xóa tất cả thông báo đã đọc.
     /// </summary>
+    /// <returns>Kết quả xóa.</returns>
     [HttpDelete("read")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> DeleteAllRead()
     {
-        try
-        {
-            var userId = GetUserId();
-            await _notificationService.DeleteAllReadAsync(userId);
-            return NoContent();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error deleting read notifications");
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        await _notificationService.DeleteAllReadAsync(CurrentUserId);
+        return OkResponse<object>(new { }, "All read notifications deleted");
     }
 
     /// <summary>
-    /// Send notification to user (Admin/Staff only)
+    /// Gửi thông báo cho một người dùng cụ thể (Dành cho Admin/Staff).
     /// </summary>
+    /// <param name="createDto">Thông tin thông báo.</param>
+    /// <returns>Thông báo vừa tạo.</returns>
     [HttpPost]
-    [Authorize(Roles = "admin,staff")]
-    [ProducesResponseType(typeof(NotificationDto), StatusCodes.Status201Created)]
+    [Authorize(Roles = Roles.Admin + "," + Roles.Staff)]
+    [ProducesResponseType(typeof(ApiResponse<NotificationDto>), StatusCodes.Status201Created)]
     public async Task<IActionResult> SendNotification([FromBody] CreateNotificationDto createDto)
     {
-        try
-        {
-            var notification = await _notificationService.SendNotificationAsync(createDto);
-            return CreatedAtAction(
-                nameof(GetNotification),
-                new { id = notification.NotificationId },
-                notification
-            );
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error sending notification");
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        var notification = await _notificationService.SendNotificationAsync(createDto);
+        return CreatedResponse(
+            nameof(GetNotification),
+            new { id = notification.NotificationId },
+            notification
+        );
     }
 
     /// <summary>
-    /// Send notification to all users (Admin only)
+    /// Gửi thông báo cho tất cả người dùng (Broadcast) (Dành cho Admin).
     /// </summary>
+    /// <param name="broadcastDto">Thông tin thông báo broadcast.</param>
+    /// <returns>Số lượng người dùng nhận được thông báo.</returns>
     [HttpPost("broadcast")]
-    [Authorize(Roles = "admin")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    [Authorize(Roles = Roles.Admin)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> BroadcastNotification([FromBody] BroadcastNotificationDto broadcastDto)
     {
-        try
-        {
-            var count = await _notificationService.BroadcastNotificationAsync(broadcastDto);
-            return Ok(new { message = $"Notification sent to {count} users" });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error broadcasting notification");
-            return StatusCode(500, new { message = "An error occurred" });
-        }
-    }
-
-    private int GetUserId()
-    {
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        return int.Parse(userIdClaim ?? "0");
+        var count = await _notificationService.BroadcastNotificationAsync(broadcastDto);
+        return OkResponse<object>(new { count }, $"Notification sent to {count} users");
     }
 }

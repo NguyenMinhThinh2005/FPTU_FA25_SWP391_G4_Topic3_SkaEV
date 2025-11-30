@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SkaEV.API.Application.Common;
+using SkaEV.API.Application.Constants;
 using SkaEV.API.Application.DTOs.Admin;
 using SkaEV.API.Application.Services;
 using System.Security.Claims;
@@ -7,16 +9,21 @@ using System.Security.Claims;
 namespace SkaEV.API.Controllers;
 
 /// <summary>
-/// Controller for admin user management
+/// Controller quản lý người dùng dành cho Admin.
+/// Bao gồm các chức năng: CRUD người dùng, quản lý vai trò, trạng thái, thông báo, và hỗ trợ khách hàng.
 /// </summary>
-[ApiController]
-[Route("api/admin/[controller]")]
-[Authorize(Roles = "admin")]
-public class AdminUsersController : ControllerBase
+[Authorize(Roles = Roles.Admin)]
+[Route("api/admin/adminusers")]
+public class AdminUsersController : BaseApiController
 {
+    // Service quản lý người dùng admin
     private readonly IAdminUserService _adminUserService;
     private readonly ILogger<AdminUsersController> _logger;
 
+    /// <summary>
+    /// Constructor nhận vào AdminUserService thông qua Dependency Injection.
+    /// </summary>
+    /// <param name="adminUserService">Service quản lý người dùng.</param>
     public AdminUsersController(IAdminUserService adminUserService, ILogger<AdminUsersController> logger)
     {
         _adminUserService = adminUserService;
@@ -24,10 +31,16 @@ public class AdminUsersController : ControllerBase
     }
 
     /// <summary>
-    /// Get all users with pagination and filtering
+    /// Lấy danh sách tất cả người dùng với phân trang và bộ lọc.
     /// </summary>
+    /// <param name="role">Lọc theo vai trò (Admin, Staff, User...).</param>
+    /// <param name="status">Lọc theo trạng thái (Active, Inactive...).</param>
+    /// <param name="search">Tìm kiếm theo tên hoặc email.</param>
+    /// <param name="page">Số trang hiện tại (mặc định 1).</param>
+    /// <param name="pageSize">Số lượng bản ghi trên mỗi trang (mặc định 20).</param>
+    /// <returns>Danh sách người dùng và thông tin phân trang.</returns>
     [HttpGet]
-    [ProducesResponseType(typeof(IEnumerable<AdminUserDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAllUsers(
         [FromQuery] string? role = null,
         [FromQuery] string? status = null,
@@ -40,7 +53,7 @@ public class AdminUsersController : ControllerBase
             var users = await _adminUserService.GetAllUsersAsync(role, status, search, page, pageSize);
             var totalCount = await _adminUserService.GetUserCountAsync(role, status, search);
 
-            return Ok(new
+            return OkResponse(new
             {
                 data = users,
                 pagination = new
@@ -54,225 +67,171 @@ public class AdminUsersController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting all users");
-            return StatusCode(500, new { message = "An error occurred" });
+            _logger.LogError(ex, "Error getting all users. Role: {Role}, Status: {Status}, Search: {Search}", role, status, search);
+            return StatusCode(500, new { message = "An error occurred while retrieving users", error = ex.Message });
         }
     }
 
     /// <summary>
-    /// Get user by ID
+    /// Lấy thông tin chi tiết của một người dùng theo ID.
     /// </summary>
+    /// <param name="userId">ID người dùng.</param>
+    /// <returns>Thông tin chi tiết người dùng.</returns>
     [HttpGet("{userId}")]
-    [ProducesResponseType(typeof(AdminUserDetailDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<AdminUserDetailDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetUser(int userId)
     {
-        try
-        {
-            var user = await _adminUserService.GetUserDetailAsync(userId);
+        var user = await _adminUserService.GetUserDetailAsync(userId);
 
-            if (user == null)
-                return NotFound(new { message = "User not found" });
+        if (user == null)
+            return NotFoundResponse("User not found");
 
-            return Ok(user);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting user {UserId}", userId);
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        return OkResponse(user);
     }
 
     /// <summary>
-    /// Create a new user
+    /// Tạo mới một người dùng.
     /// </summary>
+    /// <param name="createDto">Thông tin người dùng mới.</param>
+    /// <returns>Thông tin người dùng vừa tạo.</returns>
     [HttpPost]
-    [ProducesResponseType(typeof(AdminUserDto), StatusCodes.Status201Created)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<AdminUserDto>), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> CreateUser([FromBody] CreateUserDto createDto)
     {
-        try
-        {
-            var user = await _adminUserService.CreateUserAsync(createDto);
+        var user = await _adminUserService.CreateUserAsync(createDto);
 
-            return CreatedAtAction(
-                nameof(GetUser),
-                new { userId = user.UserId },
-                user
-            );
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error creating user");
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        return CreatedResponse(
+            nameof(GetUser),
+            new { userId = user.UserId },
+            user
+        );
     }
 
     /// <summary>
-    /// Update user information
+    /// Cập nhật thông tin người dùng.
     /// </summary>
+    /// <param name="userId">ID người dùng.</param>
+    /// <param name="updateDto">Thông tin cập nhật.</param>
+    /// <returns>Thông tin người dùng sau khi cập nhật.</returns>
     [HttpPut("{userId}")]
-    [ProducesResponseType(typeof(AdminUserDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<AdminUserDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateUser(int userId, [FromBody] UpdateUserDto updateDto)
     {
-        try
-        {
-            var existingUser = await _adminUserService.GetUserDetailAsync(userId);
+        var existingUser = await _adminUserService.GetUserDetailAsync(userId);
 
-            if (existingUser == null)
-                return NotFound(new { message = "User not found" });
+        if (existingUser == null)
+            return NotFoundResponse("User not found");
 
-            var updated = await _adminUserService.UpdateUserAsync(userId, updateDto);
-            return Ok(updated);
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error updating user {UserId}", userId);
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        var updated = await _adminUserService.UpdateUserAsync(userId, updateDto);
+        return OkResponse(updated);
     }
 
     /// <summary>
-    /// Update user role
+    /// Cập nhật vai trò của người dùng.
     /// </summary>
+    /// <param name="userId">ID người dùng.</param>
+    /// <param name="roleDto">Thông tin vai trò mới.</param>
+    /// <returns>Thông tin người dùng sau khi cập nhật vai trò.</returns>
     [HttpPatch("{userId}/role")]
-    [ProducesResponseType(typeof(AdminUserDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<AdminUserDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateUserRole(int userId, [FromBody] UpdateUserRoleDto roleDto)
     {
-        try
-        {
-            var existingUser = await _adminUserService.GetUserDetailAsync(userId);
+        var existingUser = await _adminUserService.GetUserDetailAsync(userId);
 
-            if (existingUser == null)
-                return NotFound(new { message = "User not found" });
+        if (existingUser == null)
+            return NotFoundResponse("User not found");
 
-            var updated = await _adminUserService.UpdateUserRoleAsync(userId, roleDto.Role);
-            return Ok(updated);
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error updating user role {UserId}", userId);
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        var updated = await _adminUserService.UpdateUserRoleAsync(userId, roleDto.Role);
+        return OkResponse(updated);
     }
 
     /// <summary>
-    /// Activate user account
+    /// Kích hoạt tài khoản người dùng.
     /// </summary>
+    /// <param name="userId">ID người dùng.</param>
+    /// <returns>Thông tin người dùng sau khi kích hoạt.</returns>
     [HttpPatch("{userId}/activate")]
-    [ProducesResponseType(typeof(AdminUserDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<AdminUserDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> ActivateUser(int userId)
     {
-        try
-        {
-            var existingUser = await _adminUserService.GetUserDetailAsync(userId);
+        var existingUser = await _adminUserService.GetUserDetailAsync(userId);
 
-            if (existingUser == null)
-                return NotFound(new { message = "User not found" });
+        if (existingUser == null)
+            return NotFoundResponse("User not found");
 
-            var updated = await _adminUserService.ActivateUserAsync(userId);
-            return Ok(updated);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error activating user {UserId}", userId);
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        var updated = await _adminUserService.ActivateUserAsync(userId);
+        return OkResponse(updated);
     }
 
     /// <summary>
-    /// Deactivate user account
+    /// Vô hiệu hóa tài khoản người dùng.
     /// </summary>
+    /// <param name="userId">ID người dùng.</param>
+    /// <param name="deactivateDto">Lý do vô hiệu hóa.</param>
+    /// <returns>Thông tin người dùng sau khi vô hiệu hóa.</returns>
     [HttpPatch("{userId}/deactivate")]
-    [ProducesResponseType(typeof(AdminUserDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<AdminUserDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeactivateUser(int userId, [FromBody] DeactivateUserDto deactivateDto)
     {
-        try
-        {
-            var existingUser = await _adminUserService.GetUserDetailAsync(userId);
+        var existingUser = await _adminUserService.GetUserDetailAsync(userId);
 
-            if (existingUser == null)
-                return NotFound(new { message = "User not found" });
+        if (existingUser == null)
+            return NotFoundResponse("User not found");
 
-            var updated = await _adminUserService.DeactivateUserAsync(userId, deactivateDto.Reason);
-            return Ok(updated);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error deactivating user {UserId}", userId);
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        var updated = await _adminUserService.DeactivateUserAsync(userId, deactivateDto.Reason);
+        return OkResponse(updated);
     }
 
     /// <summary>
-    /// Delete user account (soft delete)
+    /// Xóa tài khoản người dùng (xóa mềm).
     /// </summary>
+    /// <param name="userId">ID người dùng.</param>
+    /// <returns>Kết quả xóa.</returns>
     [HttpDelete("{userId}")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> DeleteUser(int userId)
     {
-        try
-        {
-            var currentUserId = GetUserId();
+        var currentUserId = GetUserId();
 
-            // Prevent self-deletion
-            if (userId == currentUserId)
-                return BadRequest(new { message = "Cannot delete your own account" });
+        // Ngăn chặn việc tự xóa tài khoản của chính mình
+        if (userId == currentUserId)
+            return BadRequestResponse("Cannot delete your own account");
 
-            var existingUser = await _adminUserService.GetUserDetailAsync(userId);
+        var existingUser = await _adminUserService.GetUserDetailAsync(userId);
 
-            if (existingUser == null)
-                return NotFound(new { message = "User not found" });
+        if (existingUser == null)
+            return NotFoundResponse("User not found");
 
-            await _adminUserService.DeleteUserAsync(userId);
-            return NoContent();
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error deleting user {UserId}", userId);
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        await _adminUserService.DeleteUserAsync(userId);
+        return OkResponse<object>(new { }, "User deleted successfully");
     }
 
     /// <summary>
-    /// Reset user password
+    /// Reset mật khẩu người dùng.
     /// </summary>
+    /// <param name="userId">ID người dùng.</param>
+    /// <returns>Kết quả reset mật khẩu.</returns>
     [HttpPost("{userId}/reset-password")]
-    [ProducesResponseType(typeof(ResetPasswordResultDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<ResetPasswordResultDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> ResetUserPassword(int userId)
     {
+        var existingUser = await _adminUserService.GetUserDetailAsync(userId);
+        if (existingUser == null)
+            return NotFoundResponse("User not found");
         try
         {
-            var existingUser = await _adminUserService.GetUserDetailAsync(userId);
-
-            if (existingUser == null)
-                return NotFound(new { message = "User not found" });
-
-            var result = await _adminUserService.ResetUserPasswordAsync(userId);
-            return Ok(result);
+            var performerId = GetUserId();
+            var result = await _adminUserService.ResetUserPasswordAsync(userId, performerId);
+            return OkResponse(result);
         }
         catch (Exception ex)
         {
@@ -282,104 +241,281 @@ public class AdminUsersController : ControllerBase
     }
 
     /// <summary>
-    /// Get user activity summary
+    /// Lấy tóm tắt hoạt động của người dùng.
     /// </summary>
+    /// <param name="userId">ID người dùng.</param>
+    /// <returns>Tóm tắt hoạt động.</returns>
     [HttpGet("{userId}/activity")]
-    [ProducesResponseType(typeof(UserActivitySummaryDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<UserActivitySummaryDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetUserActivity(int userId)
     {
-        try
-        {
-            var existingUser = await _adminUserService.GetUserDetailAsync(userId);
+        var existingUser = await _adminUserService.GetUserDetailAsync(userId);
 
-            if (existingUser == null)
-                return NotFound(new { message = "User not found" });
+        if (existingUser == null)
+            return NotFoundResponse("User not found");
 
-            var activity = await _adminUserService.GetUserActivitySummaryAsync(userId);
-            return Ok(activity);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting user activity {UserId}", userId);
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        var activity = await _adminUserService.GetUserActivitySummaryAsync(userId);
+        return OkResponse(activity);
     }
 
     /// <summary>
-    /// Get user statistics summary
+    /// Lấy thống kê tổng quan về người dùng.
     /// </summary>
+    /// <returns>Thống kê người dùng.</returns>
     [HttpGet("statistics")]
-    [ProducesResponseType(typeof(UserStatisticsSummaryDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<UserStatisticsSummaryDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetUserStatistics()
     {
-        try
-        {
-            var statistics = await _adminUserService.GetUserStatisticsSummaryAsync();
-            return Ok(statistics);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting user statistics");
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        var statistics = await _adminUserService.GetUserStatisticsSummaryAsync();
+        return OkResponse(statistics);
     }
 
     // ==================== PHASE 2: EXTENDED USER MANAGEMENT ====================
 
     /// <summary>
-    /// Get user charging history
+    /// Lấy lịch sử sạc của người dùng.
     /// </summary>
+    /// <param name="userId">ID người dùng.</param>
+    /// <param name="page">Trang hiện tại.</param>
+    /// <param name="pageSize">Số lượng bản ghi mỗi trang.</param>
+    /// <returns>Lịch sử sạc.</returns>
     [HttpGet("{userId}/charging-history")]
-    [ProducesResponseType(typeof(IEnumerable<UserChargingHistoryDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetUserChargingHistory(int userId, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
     {
-        try
-        {
-            var history = await _adminUserService.GetUserChargingHistoryAsync(userId, page, pageSize);
-            return Ok(new { success = true, data = history });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting user charging history {UserId}", userId);
-            return StatusCode(500, new { success = false, message = "An error occurred" });
-        }
+        var history = await _adminUserService.GetUserChargingHistoryAsync(userId, page, pageSize);
+        return OkResponse(new { data = history });
     }
 
     /// <summary>
-    /// Get user payment history
+    /// Lấy lịch sử thanh toán của người dùng.
     /// </summary>
+    /// <param name="userId">ID người dùng.</param>
+    /// <param name="page">Trang hiện tại.</param>
+    /// <param name="pageSize">Số lượng bản ghi mỗi trang.</param>
+    /// <returns>Lịch sử thanh toán.</returns>
     [HttpGet("{userId}/payment-history")]
-    [ProducesResponseType(typeof(IEnumerable<UserPaymentHistoryDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetUserPaymentHistory(int userId, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
     {
+        var history = await _adminUserService.GetUserPaymentHistoryAsync(userId, page, pageSize);
+        return OkResponse(new { data = history });
+    }
+
+    /// <summary>
+    /// Get user vehicles
+    /// </summary>
+    [HttpGet("{userId}/vehicles")]
+    [ProducesResponseType(typeof(IEnumerable<AdminUserVehicleDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetUserVehicles(int userId)
+    {
         try
         {
-            var history = await _adminUserService.GetUserPaymentHistoryAsync(userId, page, pageSize);
-            return Ok(new { success = true, data = history });
+            var vehicles = await _adminUserService.GetUserVehiclesAsync(userId);
+            return Ok(new { success = true, data = vehicles });
+        }
+        catch (ArgumentException ex)
+        {
+            _logger.LogWarning(ex, "User not found when fetching vehicles {UserId}", userId);
+            return NotFound(new { success = false, message = ex.Message });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting user payment history {UserId}", userId);
+            _logger.LogError(ex, "Error getting user vehicles {UserId}", userId);
             return StatusCode(500, new { success = false, message = "An error occurred" });
         }
     }
 
     /// <summary>
-    /// Get user statistics
+    /// Get station assignments for staff accounts
     /// </summary>
-    [HttpGet("{userId}/statistics")]
-    [ProducesResponseType(typeof(UserStatisticsDto), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetUserStatistics(int userId)
+    [HttpGet("{userId}/staff/stations")]
+    [ProducesResponseType(typeof(IEnumerable<AdminStaffStationDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetStaffStations(int userId)
     {
         try
         {
-            var stats = await _adminUserService.GetUserStatisticsAsync(userId);
-            return Ok(new { success = true, data = stats });
+            var user = await _adminUserService.GetUserDetailAsync(userId);
+
+            if (user == null)
+                return NotFound(new { success = false, message = "User not found" });
+
+            if (!string.Equals(user.Role, "staff", StringComparison.OrdinalIgnoreCase))
+                return BadRequest(new { success = false, message = "Chỉ áp dụng cho tài khoản nhân viên" });
+
+            var stations = await _adminUserService.GetStaffStationAssignmentsAsync(userId);
+            return Ok(new { success = true, data = stations });
+        }
+        catch (ArgumentException ex)
+        {
+            return NotFound(new { success = false, message = ex.Message });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting user statistics {UserId}", userId);
+            _logger.LogError(ex, "Error getting staff stations {UserId}", userId);
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
+    }
+
+    /// <summary>
+    /// Get upcoming schedule for staff accounts
+    /// </summary>
+    [HttpGet("{userId}/staff/schedule")]
+    [ProducesResponseType(typeof(IEnumerable<AdminStaffScheduleDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetStaffSchedule(int userId)
+    {
+        try
+        {
+            var user = await _adminUserService.GetUserDetailAsync(userId);
+
+            if (user == null)
+                return NotFound(new { success = false, message = "User not found" });
+
+            if (!string.Equals(user.Role, "staff", StringComparison.OrdinalIgnoreCase))
+                return BadRequest(new { success = false, message = "Chỉ áp dụng cho tài khoản nhân viên" });
+
+            var schedule = await _adminUserService.GetStaffScheduleAsync(userId);
+            return Ok(new { success = true, data = schedule });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting staff schedule {UserId}", userId);
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
+    }
+
+    /// <summary>
+    /// Get recent activities (incidents, maintenance) for staff accounts
+    /// </summary>
+    [HttpGet("{userId}/staff/activities")]
+    [ProducesResponseType(typeof(IEnumerable<AdminStaffActivityDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetStaffActivities(int userId, [FromQuery] int limit = 25)
+    {
+        try
+        {
+            var user = await _adminUserService.GetUserDetailAsync(userId);
+
+            if (user == null)
+                return NotFound(new { success = false, message = "User not found" });
+
+            if (!string.Equals(user.Role, "staff", StringComparison.OrdinalIgnoreCase))
+                return BadRequest(new { success = false, message = "Chỉ áp dụng cho tài khoản nhân viên" });
+
+            var activities = await _adminUserService.GetStaffActivitiesAsync(userId, limit);
+            return Ok(new { success = true, data = activities });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting staff activities {UserId}", userId);
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
+    }
+
+    /// <summary>
+    /// Get overview metrics for admin account
+    /// </summary>
+    [HttpGet("{userId}/admin/overview")]
+    [ProducesResponseType(typeof(AdminOverviewDto), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAdminOverview(int userId)
+    {
+        try
+        {
+            var user = await _adminUserService.GetUserDetailAsync(userId);
+
+            if (user == null)
+                return NotFound(new { success = false, message = "User not found" });
+
+            if (!string.Equals(user.Role, "admin", StringComparison.OrdinalIgnoreCase))
+                return BadRequest(new { success = false, message = "Chỉ áp dụng cho tài khoản quản trị" });
+
+            var overview = await _adminUserService.GetAdminOverviewAsync(userId);
+            return Ok(new { success = true, data = overview });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting admin overview {UserId}", userId);
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
+    }
+
+    /// <summary>
+    /// Get recent system activities associated with admin account
+    /// </summary>
+    [HttpGet("{userId}/admin/activity-log")]
+    [ProducesResponseType(typeof(IEnumerable<AdminActivityLogDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAdminActivityLog(int userId, [FromQuery] int limit = 25)
+    {
+        try
+        {
+            var user = await _adminUserService.GetUserDetailAsync(userId);
+
+            if (user == null)
+                return NotFound(new { success = false, message = "User not found" });
+
+            if (!string.Equals(user.Role, "admin", StringComparison.OrdinalIgnoreCase))
+                return BadRequest(new { success = false, message = "Chỉ áp dụng cho tài khoản quản trị" });
+
+            var logs = await _adminUserService.GetAdminActivityLogAsync(userId, limit);
+            return Ok(new { success = true, data = logs });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting admin activity log {UserId}", userId);
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
+    }
+
+    /// <summary>
+    /// Get permission matrix for admin account
+    /// </summary>
+    [HttpGet("{userId}/admin/permissions")]
+    [ProducesResponseType(typeof(IEnumerable<AdminPermissionDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAdminPermissions(int userId)
+    {
+        try
+        {
+            var user = await _adminUserService.GetUserDetailAsync(userId);
+
+            if (user == null)
+                return NotFound(new { success = false, message = "User not found" });
+
+            if (!string.Equals(user.Role, "admin", StringComparison.OrdinalIgnoreCase))
+                return BadRequest(new { success = false, message = "Chỉ áp dụng cho tài khoản quản trị" });
+
+            var permissions = await _adminUserService.GetAdminPermissionsAsync(userId);
+            return Ok(new { success = true, data = permissions });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting admin permissions {UserId}", userId);
+            return StatusCode(500, new { success = false, message = "An error occurred" });
+        }
+    }
+
+    /// <summary>
+    /// Get audit log focused on security/high severity entries for admin account
+    /// </summary>
+    [HttpGet("{userId}/admin/audit-log")]
+    [ProducesResponseType(typeof(IEnumerable<AdminAuditLogDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAdminAuditLog(int userId, [FromQuery] int limit = 50)
+    {
+        try
+        {
+            var user = await _adminUserService.GetUserDetailAsync(userId);
+
+            if (user == null)
+                return NotFound(new { success = false, message = "User not found" });
+
+            if (!string.Equals(user.Role, "admin", StringComparison.OrdinalIgnoreCase))
+                return BadRequest(new { success = false, message = "Chỉ áp dụng cho tài khoản quản trị" });
+
+            var logs = await _adminUserService.GetAdminAuditLogAsync(userId, limit);
+            return Ok(new { success = true, data = logs });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting admin audit log {UserId}", userId);
             return StatusCode(500, new { success = false, message = "An error occurred" });
         }
     }
@@ -387,10 +523,16 @@ public class AdminUsersController : ControllerBase
     // ==================== NOTIFICATIONS ====================
 
     /// <summary>
-    /// Get all notifications
+    /// Lấy danh sách thông báo.
     /// </summary>
+    /// <param name="userId">Lọc theo ID người dùng.</param>
+    /// <param name="type">Lọc theo loại thông báo.</param>
+    /// <param name="isRead">Lọc theo trạng thái đã đọc.</param>
+    /// <param name="page">Trang hiện tại.</param>
+    /// <param name="pageSize">Số lượng bản ghi mỗi trang.</param>
+    /// <returns>Danh sách thông báo.</returns>
     [HttpGet("notifications")]
-    [ProducesResponseType(typeof(IEnumerable<NotificationDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetNotifications(
         [FromQuery] int? userId = null,
         [FromQuery] string? type = null,
@@ -398,203 +540,157 @@ public class AdminUsersController : ControllerBase
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 50)
     {
-        try
-        {
-            var notifications = await _adminUserService.GetAllNotificationsAsync(userId, type, isRead, page, pageSize);
-            return Ok(new { success = true, data = notifications });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting notifications");
-            return StatusCode(500, new { success = false, message = "An error occurred" });
-        }
+        var notifications = await _adminUserService.GetAllNotificationsAsync(userId, type, isRead, page, pageSize);
+        return OkResponse(new { data = notifications });
     }
 
     /// <summary>
-    /// Send notification to user(s)
+    /// Gửi thông báo cho người dùng.
     /// </summary>
+    /// <param name="dto">Thông tin thông báo.</param>
+    /// <returns>Số lượng người dùng nhận được thông báo.</returns>
     [HttpPost("notifications")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> SendNotification([FromBody] CreateNotificationDto dto)
     {
-        try
-        {
-            var count = await _adminUserService.SendNotificationAsync(dto);
-            return Ok(new { success = true, message = $"Notification sent to {count} user(s)", data = count });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error sending notification");
-            return StatusCode(500, new { success = false, message = "An error occurred" });
-        }
+        var count = await _adminUserService.SendNotificationAsync(dto);
+        return OkResponse<object>(new { count }, $"Notification sent to {count} user(s)");
     }
 
     /// <summary>
-    /// Send promotion to targeted users
+    /// Gửi khuyến mãi cho nhóm người dùng mục tiêu.
     /// </summary>
+    /// <param name="dto">Thông tin khuyến mãi.</param>
+    /// <returns>Số lượng người dùng nhận được khuyến mãi.</returns>
     [HttpPost("notifications/promotions")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> SendPromotion([FromBody] SendPromotionDto dto)
     {
-        try
-        {
-            var count = await _adminUserService.SendPromotionAsync(dto);
-            return Ok(new { success = true, message = $"Promotion sent to {count} user(s)", data = count });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error sending promotion");
-            return StatusCode(500, new { success = false, message = "An error occurred" });
-        }
+        var count = await _adminUserService.SendPromotionAsync(dto);
+        return OkResponse<object>(new { count }, $"Promotion sent to {count} user(s)");
     }
 
     /// <summary>
-    /// Mark notification as read
+    /// Đánh dấu thông báo là đã đọc.
     /// </summary>
+    /// <param name="notificationId">ID thông báo.</param>
+    /// <returns>Kết quả đánh dấu.</returns>
     [HttpPatch("notifications/{notificationId}/read")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> MarkNotificationAsRead(int notificationId)
     {
-        try
-        {
-            var success = await _adminUserService.MarkNotificationAsReadAsync(notificationId);
-            return Ok(new { success, message = success ? "Notification marked as read" : "Notification not found" });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error marking notification as read");
-            return StatusCode(500, new { success = false, message = "An error occurred" });
-        }
+        var success = await _adminUserService.MarkNotificationAsReadAsync(notificationId);
+        return OkResponse<object>(new { success }, success ? "Notification marked as read" : "Notification not found");
     }
 
     // ==================== SUPPORT REQUESTS ====================
 
     /// <summary>
-    /// Get support requests with filtering
+    /// Lấy danh sách yêu cầu hỗ trợ với bộ lọc.
     /// </summary>
+    /// <param name="filter">Bộ lọc yêu cầu hỗ trợ.</param>
+    /// <returns>Danh sách yêu cầu hỗ trợ.</returns>
     [HttpGet("support-requests")]
-    [ProducesResponseType(typeof(IEnumerable<SupportRequestDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetSupportRequests([FromQuery] SupportRequestFilterDto filter)
     {
-        try
-        {
-            var (requests, totalCount) = await _adminUserService.GetSupportRequestsAsync(filter);
+        var (requests, totalCount) = await _adminUserService.GetSupportRequestsAsync(filter);
 
-            return Ok(new
-            {
-                success = true,
-                data = requests,
-                pagination = new
-                {
-                    page = filter.PageNumber,
-                    pageSize = filter.PageSize,
-                    totalCount,
-                    totalPages = (int)Math.Ceiling(totalCount / (double)filter.PageSize)
-                }
-            });
-        }
-        catch (Exception ex)
+        return OkResponse(new
         {
-            _logger.LogError(ex, "Error getting support requests");
-            return StatusCode(500, new { success = false, message = "An error occurred" });
-        }
+            data = requests,
+            pagination = new
+            {
+                page = filter.PageNumber,
+                pageSize = filter.PageSize,
+                totalCount,
+                totalPages = (int)Math.Ceiling(totalCount / (double)filter.PageSize)
+            }
+        });
     }
 
     /// <summary>
-    /// Get support request detail
+    /// Lấy chi tiết yêu cầu hỗ trợ.
     /// </summary>
+    /// <param name="requestId">ID yêu cầu.</param>
+    /// <returns>Chi tiết yêu cầu hỗ trợ.</returns>
     [HttpGet("support-requests/{requestId}")]
-    [ProducesResponseType(typeof(SupportRequestDetailDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<SupportRequestDetailDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetSupportRequestDetail(int requestId)
     {
-        try
-        {
-            var request = await _adminUserService.GetSupportRequestDetailAsync(requestId);
+        var request = await _adminUserService.GetSupportRequestDetailAsync(requestId);
 
-            if (request == null)
-                return NotFound(new { success = false, message = "Support request not found" });
+        if (request == null)
+            return NotFoundResponse("Support request not found");
 
-            return Ok(new { success = true, data = request });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting support request detail");
-            return StatusCode(500, new { success = false, message = "An error occurred" });
-        }
+        return OkResponse(request);
     }
 
     /// <summary>
-    /// Update support request
+    /// Cập nhật yêu cầu hỗ trợ.
     /// </summary>
+    /// <param name="requestId">ID yêu cầu.</param>
+    /// <param name="dto">Thông tin cập nhật.</param>
+    /// <returns>Kết quả cập nhật.</returns>
     [HttpPatch("support-requests/{requestId}")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateSupportRequest(int requestId, [FromBody] UpdateSupportRequestDto dto)
     {
-        try
-        {
-            var success = await _adminUserService.UpdateSupportRequestAsync(requestId, dto);
+        var success = await _adminUserService.UpdateSupportRequestAsync(requestId, dto);
 
-            if (!success)
-                return NotFound(new { success = false, message = "Support request not found" });
+        if (!success)
+            return NotFoundResponse("Support request not found");
 
-            return Ok(new { success = true, message = "Support request updated successfully" });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error updating support request");
-            return StatusCode(500, new { success = false, message = "An error occurred" });
-        }
+        return OkResponse(new { }, "Support request updated successfully");
     }
 
     /// <summary>
-    /// Reply to support request
+    /// Phản hồi yêu cầu hỗ trợ.
     /// </summary>
+    /// <param name="requestId">ID yêu cầu.</param>
+    /// <param name="dto">Nội dung phản hồi.</param>
+    /// <returns>Kết quả phản hồi.</returns>
     [HttpPost("support-requests/{requestId}/reply")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> ReplySupportRequest(int requestId, [FromBody] ReplySupportRequestDto dto)
     {
-        try
-        {
-            dto.RequestId = requestId;
-            dto.StaffId = GetUserId();
+        dto.RequestId = requestId;
+        dto.StaffId = GetUserId();
 
-            var success = await _adminUserService.ReplySupportRequestAsync(dto);
+        var success = await _adminUserService.ReplySupportRequestAsync(dto);
 
-            if (!success)
-                return NotFound(new { success = false, message = "Support request not found" });
+        if (!success)
+            return NotFoundResponse("Support request not found");
 
-            return Ok(new { success = true, message = "Reply sent successfully" });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error replying to support request");
-            return StatusCode(500, new { success = false, message = "An error occurred" });
-        }
+        return OkResponse(new { }, "Reply sent successfully");
     }
 
     /// <summary>
-    /// Close support request
+    /// Đóng yêu cầu hỗ trợ.
     /// </summary>
+    /// <param name="requestId">ID yêu cầu.</param>
+    /// <param name="resolutionNotes">Ghi chú giải quyết.</param>
+    /// <returns>Kết quả đóng yêu cầu.</returns>
     [HttpPost("support-requests/{requestId}/close")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> CloseSupportRequest(int requestId, [FromBody] string resolutionNotes)
     {
-        try
-        {
-            var success = await _adminUserService.CloseSupportRequestAsync(requestId, resolutionNotes);
+        var success = await _adminUserService.CloseSupportRequestAsync(requestId, resolutionNotes);
 
-            if (!success)
-                return NotFound(new { success = false, message = "Support request not found" });
+        if (!success)
+            return NotFoundResponse("Support request not found");
 
-            return Ok(new { success = true, message = "Support request closed successfully" });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error closing support request");
-            return StatusCode(500, new { success = false, message = "An error occurred" });
-        }
+        return OkResponse(new { }, "Support request closed successfully");
     }
 
+    /// <summary>
+    /// Lấy ID người dùng hiện tại từ token.
+    /// </summary>
+    /// <returns>ID người dùng.</returns>
     private int GetUserId()
     {
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;

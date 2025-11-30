@@ -2,57 +2,89 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SkaEV.API.Infrastructure.Data;
 using SkaEV.API.Domain.Entities;
+using SkaEV.API.Application.Constants;
 
 namespace SkaEV.API.Controllers;
 
-[ApiController]
-[Route("api/[controller]")]
-public class StationStaffController : ControllerBase
+/// <summary>
+/// Controller quản lý nhân viên trạm sạc.
+/// </summary>
+public class StationStaffController : BaseApiController
 {
     private readonly SkaEVDbContext _context;
     private readonly ILogger<StationStaffController> _logger;
 
+    /// <summary>
+    /// Constructor nhận vào DbContext và Logger.
+    /// </summary>
+    /// <param name="context">Database context.</param>
+    /// <param name="logger">Logger hệ thống.</param>
     public StationStaffController(SkaEVDbContext context, ILogger<StationStaffController> logger)
     {
         _context = context;
         _logger = logger;
     }
 
+    /// <summary>
+    /// Lấy danh sách nhân viên khả dụng (Role Staff và đang hoạt động).
+    /// </summary>
+    /// <returns>Danh sách nhân viên.</returns>
     // GET: api/StationStaff/available-staff
     [HttpGet("available-staff")]
     public async Task<IActionResult> GetAvailableStaff()
     {
         try
         {
+            // Return only canonical staff users: active users with role 'staff' who have at least one
+            // StationStaff record (i.e., managed / created via admin workflows). This avoids showing
+            // legacy/test/team accounts in UI dropdowns that should list operational staff only.
+            // Build per-user assigned stations and only include users who actually have
+            // at least one assigned station record with a resolvable station name.
             var staffUsers = await _context.Users
-                .Where(u => u.Role == "staff" && u.IsActive)
+                .Where(u => u.Role == "staff" && u.IsActive && _context.StationStaff.Any(ss => ss.StaffUserId == u.UserId && ss.IsActive))
                 .Select(u => new
                 {
                     u.UserId,
-                    u.FullName,
+                    // Clean up legacy name markers for UI display
+                    FullName = (u.FullName ?? string.Empty)
+                        .Replace(" (Staff)", string.Empty)
+                        .Replace(" (staff)", string.Empty)
+                        .Replace(" (Đã nghỉ)", string.Empty)
+                        .Trim(),
                     u.Email,
                     u.PhoneNumber,
                     AssignedStations = _context.StationStaff
                         .Where(ss => ss.StaffUserId == u.UserId && ss.IsActive)
-                        .Select(ss => new
-                        {
-                            ss.StationId,
-                            StationName = ss.ChargingStation.StationName
-                        })
+                        // Join to ChargingStations to ensure the station exists and has a name
+                        .Join(_context.ChargingStations,
+                              ss => ss.StationId,
+                              cs => cs.StationId,
+                              (ss, cs) => new
+                              {
+                                  ss.StationId,
+                                  StationName = cs.StationName
+                              })
                         .ToList()
                 })
+                // Only keep users who have at least one assigned station (non-empty list)
+                .Where(u => u.AssignedStations.Count > 0)
                 .OrderBy(u => u.FullName)
                 .ToListAsync();
 
-            return Ok(staffUsers);
+            return OkResponse(staffUsers);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error fetching available staff");
-            return StatusCode(500, new { message = "Error fetching staff list" });
+            return ServerErrorResponse("Error fetching staff list");
         }
     }
 
+    /// <summary>
+    /// Lấy danh sách nhân viên được phân công cho một trạm.
+    /// </summary>
+    /// <param name="stationId">ID trạm sạc.</param>
+    /// <returns>Danh sách nhân viên của trạm.</returns>
     // GET: api/StationStaff/station/{stationId}
     [HttpGet("station/{stationId}")]
     public async Task<IActionResult> GetStationStaff(int stationId)
@@ -75,15 +107,20 @@ public class StationStaffController : ControllerBase
                 .OrderBy(ss => ss.StaffName)
                 .ToListAsync();
 
-            return Ok(assignments);
+            return OkResponse(assignments);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error fetching station staff for station {StationId}", stationId);
-            return StatusCode(500, new { message = "Error fetching station staff" });
+            return ServerErrorResponse("Error fetching station staff");
         }
     }
 
+    /// <summary>
+    /// Phân công nhân viên vào trạm.
+    /// </summary>
+    /// <param name="request">Thông tin phân công.</param>
+    /// <returns>Kết quả phân công.</returns>
     // POST: api/StationStaff/assign
     [HttpPost("assign")]
     public async Task<IActionResult> AssignStaff([FromBody] AssignStaffRequest request)
@@ -92,11 +129,11 @@ public class StationStaffController : ControllerBase
         {
             // Validate staff user exists and has staff role
             var staffUser = await _context.Users
-                .FirstOrDefaultAsync(u => u.UserId == request.StaffUserId && u.Role == "staff" && u.IsActive);
+                .FirstOrDefaultAsync(u => u.UserId == request.StaffUserId && u.Role == Roles.Staff && u.IsActive);
 
             if (staffUser == null)
             {
-                return BadRequest(new { message = "Invalid staff user or user is not active" });
+                return BadRequestResponse("Invalid staff user or user is not active");
             }
 
             // Validate station exists
@@ -105,7 +142,7 @@ public class StationStaffController : ControllerBase
 
             if (station == null)
             {
-                return NotFound(new { message = "Station not found" });
+                return NotFoundResponse("Station not found");
             }
 
             // Check if assignment already exists
@@ -116,7 +153,7 @@ public class StationStaffController : ControllerBase
 
             if (existingAssignment != null)
             {
-                return BadRequest(new { message = "Staff is already assigned to this station" });
+                return BadRequestResponse("Staff is already assigned to this station");
             }
 
             // Create new assignment
@@ -134,7 +171,7 @@ public class StationStaffController : ControllerBase
             _logger.LogInformation("Staff {StaffUserId} assigned to station {StationId}",
                 request.StaffUserId, request.StationId);
 
-            return Ok(new
+            return OkResponse(new
             {
                 message = "Staff assigned successfully",
                 assignmentId = assignment.AssignmentId,
@@ -145,10 +182,15 @@ public class StationStaffController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error assigning staff");
-            return StatusCode(500, new { message = "Error assigning staff" });
+            return ServerErrorResponse("Error assigning staff");
         }
     }
 
+    /// <summary>
+    /// Hủy phân công nhân viên khỏi trạm.
+    /// </summary>
+    /// <param name="assignmentId">ID phân công.</param>
+    /// <returns>Kết quả hủy phân công.</returns>
     // DELETE: api/StationStaff/unassign/{assignmentId}
     [HttpDelete("unassign/{assignmentId}")]
     public async Task<IActionResult> UnassignStaff(int assignmentId)
@@ -160,7 +202,7 @@ public class StationStaffController : ControllerBase
 
             if (assignment == null)
             {
-                return NotFound(new { message = "Assignment not found" });
+                return NotFoundResponse("Assignment not found");
             }
 
             // Soft delete - set IsActive to false
@@ -169,16 +211,19 @@ public class StationStaffController : ControllerBase
 
             _logger.LogInformation("Staff assignment {AssignmentId} deactivated", assignmentId);
 
-            return Ok(new { message = "Staff unassigned successfully" });
+            return OkResponse(new { message = "Staff unassigned successfully" });
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error unassigning staff");
-            return StatusCode(500, new { message = "Error unassigning staff" });
+            return ServerErrorResponse("Error unassigning staff");
         }
     }
 }
 
+/// <summary>
+/// Model yêu cầu phân công nhân viên.
+/// </summary>
 public class AssignStaffRequest
 {
     public int StaffUserId { get; set; }

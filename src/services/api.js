@@ -34,8 +34,23 @@ axiosInstance.interceptors.request.use(
 // Response interceptor - Handle errors globally
 axiosInstance.interceptors.response.use(
   (response) => {
-    // Return data directly
-    return response.data;
+    const data = response.data;
+    // Check if it's our ApiResponse format (has success and data properties)
+    if (
+      data &&
+      typeof data === "object" &&
+      "success" in data &&
+      "data" in data
+    ) {
+      if (data.success) {
+        return data.data;
+      } else {
+        // It's a failure but with 200 OK (shouldn't happen often with current setup)
+        return Promise.reject(new Error(data.message || "Operation failed"));
+      }
+    }
+    // Return data directly (legacy behavior)
+    return data;
   },
   async (error) => {
     const originalRequest = error.config;
@@ -98,8 +113,8 @@ export const authAPI = {
     const response = await axiosInstance.post("/auth/login", credentials);
     // Store tokens
     if (response.token) {
-      localStorage.setItem("token", response.token);
-      localStorage.setItem("refreshToken", response.refreshToken || "");
+      sessionStorage.setItem("token", response.token);
+      sessionStorage.setItem("refreshToken", response.refreshToken || "");
     }
     return response;
   },
@@ -109,8 +124,8 @@ export const authAPI = {
   },
 
   logout: () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("refreshToken");
+    sessionStorage.removeItem("token");
+    sessionStorage.removeItem("refreshToken");
     return axiosInstance.post("/auth/logout");
   },
 
@@ -124,6 +139,14 @@ export const authAPI = {
 
   updateProfile: (profileData) => {
     return axiosInstance.put("/UserProfiles/me", profileData);
+<<<<<<< HEAD
+=======
+  },
+
+  // Get user statistics
+  getStatistics: () => {
+    return axiosInstance.get("/UserProfiles/me/statistics");
+>>>>>>> origin/develop
   },
 };
 
@@ -146,6 +169,19 @@ export const stationsAPI = {
     return axiosInstance.get(`/stations/${id}/availability`);
   },
 
+  getAvailableSlots: (stationId) => {
+    return axiosInstance.get(`/stations/${stationId}/slots`);
+  },
+
+  // Alias for getAvailableSlots - used by stationStore
+  getStationSlots: (stationId) => {
+    return axiosInstance.get(`/stations/${stationId}/slots`);
+  },
+
+  getAvailablePosts: (stationId) => {
+    return axiosInstance.get(`/stations/${stationId}/posts`);
+  },
+
   create: (stationData) => {
     return axiosInstance.post("/stations", stationData);
   },
@@ -163,11 +199,6 @@ export const stationsAPI = {
       params: { q: searchQuery },
     });
   },
-
-  // Get station slots (poles/ports) with real-time status
-  getStationSlots: (stationId) => {
-    return axiosInstance.get(`/stations/${stationId}/slots`);
-  },
 };
 
 export const bookingsAPI = {
@@ -175,12 +206,18 @@ export const bookingsAPI = {
     return axiosInstance.get("/bookings", { params });
   },
 
+  // Backwards-compatible alias used in some hooks/components
+  get: (params) => {
+    return axiosInstance.get("/bookings", { params });
+  },
+
   getById: (id) => {
     return axiosInstance.get(`/bookings/${id}`);
   },
 
-  getUserBookings: () => {
-    return axiosInstance.get("/bookings/my-bookings");
+  getUserBookings: (params = {}) => {
+    // Backend GET /bookings returns user's own bookings (auth required)
+    return axiosInstance.get("/bookings", { params });
   },
 
   create: (bookingData) => {
@@ -195,6 +232,11 @@ export const bookingsAPI = {
     return axiosInstance.post(`/bookings/${id}/cancel`, { reason });
   },
 
+  start: (id) => {
+    // Start charging session
+    return axiosInstance.put(`/bookings/${id}/start`);
+  },
+
   complete: (id, completeData) => {
     // Backend expects: { finalSoc, totalEnergyKwh, unitPrice }
     return axiosInstance.put(`/bookings/${id}/complete`, completeData);
@@ -203,6 +245,12 @@ export const bookingsAPI = {
   // Get available slots for a station
   getAvailableSlots: (stationId) => {
     return axiosInstance.get(`/stations/${stationId}/slots`);
+  },
+
+  // Scan QR code to create instant booking
+  scanQRCode: (qrScanData) => {
+    // qrScanData: { qrData, vehicleId }
+    return axiosInstance.post("/bookings/qr-scan", qrScanData);
   },
 };
 
@@ -307,6 +355,61 @@ export const paymentsAPI = {
   },
 };
 
+export const paymentMethodsAPI = {
+  getMine: () => {
+    return axiosInstance.get("/paymentmethods");
+  },
+
+  getById: (id) => {
+    return axiosInstance.get(`/paymentmethods/${id}`);
+  },
+
+  create: (payload) => {
+    return axiosInstance.post("/paymentmethods", payload);
+  },
+
+  update: (id, payload) => {
+    return axiosInstance.put(`/paymentmethods/${id}`, payload);
+  },
+
+  remove: (id) => {
+    return axiosInstance.delete(`/paymentmethods/${id}`);
+  },
+
+  setDefault: (id) => {
+    return axiosInstance.patch(`/paymentmethods/${id}/set-default`);
+  },
+
+  getDefault: () => {
+    return axiosInstance.get("/paymentmethods/default");
+  },
+};
+
+export const invoicesAPI = {
+  getMyInvoices: (params) => {
+    return axiosInstance.get("/invoices/my-invoices", { params });
+  },
+
+  getById: (id) => {
+    return axiosInstance.get(`/invoices/${id}`);
+  },
+
+  getByBooking: (bookingId) => {
+    return axiosInstance.get(`/invoices/booking/${bookingId}`);
+  },
+
+  download: (id) => {
+    return axiosInstance.get(`/invoices/${id}/download`, {
+      responseType: "blob",
+      headers: { Accept: "application/pdf" },
+    });
+  },
+
+  getPaymentHistory: (id) => {
+    return axiosInstance.get(`/invoices/${id}/payment-history`);
+  },
+};
+
 export const vehiclesAPI = {
   getAll: (params) => {
     return axiosInstance.get("/vehicles", { params });
@@ -317,7 +420,7 @@ export const vehiclesAPI = {
   },
 
   getUserVehicles: () => {
-    return axiosInstance.get("/vehicles/my-vehicles");
+    return axiosInstance.get("/vehicles"); // GET /api/vehicles returns user's vehicles
   },
 
   create: (vehicleData) => {
@@ -333,7 +436,115 @@ export const vehiclesAPI = {
   },
 
   setDefault: (id) => {
-    return axiosInstance.post(`/vehicles/${id}/set-default`);
+    return axiosInstance.patch(`/vehicles/${id}/set-default`);
+  },
+};
+
+export const reviewsAPI = {
+  getStationReviews: (stationId, params = {}) => {
+    return axiosInstance.get(`/reviews/station/${stationId}`, { params });
+  },
+
+  getStationSummary: (stationId) => {
+    return axiosInstance.get(`/reviews/station/${stationId}/summary`);
+  },
+
+  getMyReviews: (params = {}) => {
+    return axiosInstance.get("/reviews/my-reviews", { params });
+  },
+
+  getById: (reviewId) => {
+    return axiosInstance.get(`/reviews/${reviewId}`);
+  },
+
+  create: (payload) => {
+    return axiosInstance.post("/reviews", payload);
+  },
+
+  update: (reviewId, payload) => {
+    return axiosInstance.put(`/reviews/${reviewId}`, payload);
+  },
+
+  delete: (reviewId) => {
+    return axiosInstance.delete(`/reviews/${reviewId}`);
+  },
+};
+
+export const incidentsAPI = {
+  getAll: (params) => {
+    return axiosInstance.get("/StaffIssues", { params });
+  },
+
+  getMyIssues: (params) => {
+    return axiosInstance.get("/StaffIssues/my-issues", { params });
+  },
+
+  getById: (id) => {
+    return axiosInstance.get(`/StaffIssues/${id}`);
+  },
+
+  create: (issueData) => {
+    return axiosInstance.post("/StaffIssues", issueData);
+  },
+
+  update: (id, issueData) => {
+    return axiosInstance.put(`/StaffIssues/${id}`, issueData);
+  },
+
+  assign: (id, assignData) => {
+    return axiosInstance.patch(`/StaffIssues/${id}/assign`, assignData);
+  },
+
+  updateStatus: (id, statusData) => {
+    return axiosInstance.patch(`/StaffIssues/${id}/status`, statusData);
+  },
+
+  addComment: (id, commentData) => {
+    return axiosInstance.post(`/StaffIssues/${id}/comments`, commentData);
+  },
+
+  uploadAttachment: (id, formData) => {
+    return axiosInstance.post(`/StaffIssues/${id}/attachments`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
+
+  delete: (id) => {
+    return axiosInstance.delete(`/StaffIssues/${id}`);
+  },
+
+  getStatistics: (params) => {
+    return axiosInstance.get("/StaffIssues/statistics", { params });
+  },
+
+  getMaintenanceSchedule: (params) => {
+    return axiosInstance.get("/StaffIssues/maintenance-schedule", { params });
+  },
+};
+
+export const plansAPI = {
+  getAll: (params) => {
+    return axiosInstance.get("/ServicePlans", { params });
+  },
+
+  getById: (id) => {
+    return axiosInstance.get(`/ServicePlans/${id}`);
+  },
+
+  create: (planData) => {
+    return axiosInstance.post("/ServicePlans", planData);
+  },
+
+  update: (id, planData) => {
+    return axiosInstance.put(`/ServicePlans/${id}`, planData);
+  },
+
+  delete: (id) => {
+    return axiosInstance.delete(`/ServicePlans/${id}`);
+  },
+
+  toggleStatus: (id) => {
+    return axiosInstance.patch(`/ServicePlans/${id}/toggle-status`);
   },
 };
 
@@ -386,6 +597,40 @@ export const chargingAPI = {
   completeCharging: (bookingId, completeData) => {
     // completeData: { finalSoc, totalEnergyKwh, unitPrice }
     return axiosInstance.put(`/bookings/${bookingId}/complete`, completeData);
+  },
+};
+
+// Mock Payment API - Simple payment processing without external gateway
+export const mockPaymentAPI = {
+  // Process payment immediately
+  processPayment: (paymentData) => {
+    // paymentData: { invoiceId }
+    return axiosInstance.post("/mock-payment/process", paymentData);
+  },
+};
+
+// VNPay Payment Gateway API (Deprecated - kept for backward compatibility)
+export const vnpayAPI = {
+  // Create VNPay payment URL
+  createPaymentUrl: (paymentData) => {
+    // paymentData: { invoiceId, amount, orderDescription, bankCode? }
+    return axiosInstance.post("/vnpay/create-payment-url", paymentData);
+  },
+};
+
+// Wallet API
+export const walletAPI = {
+  getBalance: () => {
+    return axiosInstance.get("/wallet/balance");
+  },
+  getTransactions: () => {
+    return axiosInstance.get("/wallet/transactions");
+  },
+  topup: (amount) => {
+    return axiosInstance.post("/wallet/topup", { amount });
+  },
+  payInvoice: (bookingId) => {
+    return axiosInstance.post("/wallet/pay-invoice", { bookingId });
   },
 };
 

@@ -41,7 +41,7 @@ vi.mock('@stripe/stripe-js', () => ({
 // These tests expect a payment processing form but the actual component is a payment history table
 // TODO: Rewrite tests to match PaymentHistory component or create separate payment form tests
 describe.skip('PaymentPage', () => {
-  const mockChargingSession = {
+  const _mockChargingSession = {
     sessionId: 'SESSION-456',
     bookingId: 'BOOK123',
     totalAmount: 150000,
@@ -270,8 +270,8 @@ describe.skip('PaymentPage', () => {
     // If project uses Stripe or similar SDK
     const user = userEvent.setup();
     
-    // Mock Stripe createToken
-    const mockStripe = {
+    // Mock Stripe createToken (unused in current skipped tests) - keep as _mockStripe to avoid unused-var warning
+    const _mockStripe = {
       createToken: vi.fn(() => Promise.resolve({ token: { id: 'tok_123' } })),
     };
 

@@ -1,5 +1,8 @@
 namespace SkaEV.API.Domain.Entities;
 
+/// <summary>
+/// Thực thể đại diện cho một khe sạc (đầu sạc).
+/// </summary>
 public class ChargingSlot
 {
     public int SlotId { get; set; }
@@ -11,6 +14,7 @@ public class ChargingSlot
     public int? CurrentBookingId { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? DeletedAt { get; set; }
 
     // Navigation properties
     public ChargingPost ChargingPost { get; set; } = null!;

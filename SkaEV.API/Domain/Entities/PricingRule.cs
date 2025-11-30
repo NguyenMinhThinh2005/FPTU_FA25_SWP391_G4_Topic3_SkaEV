@@ -1,5 +1,8 @@
 namespace SkaEV.API.Domain.Entities;
 
+/// <summary>
+/// Thực thể quy tắc định giá.
+/// </summary>
 public class PricingRule
 {
     public int RuleId { get; set; }

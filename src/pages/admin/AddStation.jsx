@@ -153,42 +153,30 @@ const AddStation = () => {
     setLoading(true);
     
     try {
+      // Build payload matching backend CreateStationDto
       const stationData = {
-        name: formData.name,
-        description: formData.description,
-        location: {
-          address: formData.address,
-          city: "TP. Hồ Chí Minh", // Default city
-          province: "TP. Hồ Chí Minh", // Default province
-          coordinates: {
-            lat: 10.7769, // Default coordinates for Ho Chi Minh City
-            lng: 106.7009,
-          },
-        },
-        charging: {
-          totalPorts: parseInt(formData.totalPorts),
-          availablePorts: parseInt(formData.totalPorts),
-          fastChargePorts: parseInt(formData.fastChargePorts),
-          standardPorts: parseInt(formData.standardPorts),
-          pricePerKwh: parseFloat(formData.pricePerKwh),
-        },
+        stationName: formData.name,
+        address: formData.address,
+        city: "TP. Hồ Chí Minh", // Default city
+        latitude: 10.7769, // Default coordinates for Ho Chi Minh City
+        longitude: 106.7009,
         operatingHours: formData.operatingHours,
         amenities: formData.amenities,
+        stationImageUrl: null,
         status: formData.status,
-        contact: {
-          phone: formData.contactPhone,
-          email: formData.contactEmail,
-          manager: formData.managerName,
-        },
-        createdAt: new Date().toISOString(),
-        lastUpdated: new Date().toISOString(),
+        totalPorts: Number(formData.totalPorts) || 0,
+        fastChargePorts: Number(formData.fastChargePorts) || 0,
+        standardPorts: Number(formData.standardPorts) || 0,
+        pricePerKwh: Number(formData.pricePerKwh) || 0,
+        fastChargePowerKw: formData.fastChargePorts > 0 ? 120 : null,
+        standardChargePowerKw: formData.standardPorts > 0 ? 22 : null,
       };
 
       await addStation(stationData);
       
-      // Show success message and navigate back
+      // Show success message and navigate back to Station Management
       alert("Trạm sạc đã được thêm thành công!");
-      navigate("/admin/dashboard");
+      navigate("/admin/stations");
       
     } catch (error) {
       console.error("Error adding station:", error);
@@ -492,7 +480,7 @@ const AddStation = () => {
     <Box>
       {/* Header */}
       <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-        <IconButton onClick={() => navigate("/admin/dashboard")} sx={{ mr: 2 }}>
+        <IconButton onClick={() => navigate("/admin/stations")} sx={{ mr: 2 }}>
           <ArrowBack />
         </IconButton>
         <Box>

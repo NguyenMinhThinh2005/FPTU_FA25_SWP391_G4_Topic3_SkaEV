@@ -53,18 +53,24 @@ import {
   StationTable,
   StationCard,
 } from "../../components/staff";
+import useStationStore from '../../store/stationStore';
+import useAuthStore from '../../store/authStore';
 
 const StationManagement = () => {
   const location = useLocation();
   const navigate = useNavigate();
   
-  // States
+  // Stores
+  const stationStore = useStationStore();
+  const authStore = useAuthStore();
+
+  // Local helper states
   const [viewMode, setViewMode] = useState("table"); // table | card | map
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [locationFilter, setLocationFilter] = useState("all");
   const [selectedStations, setSelectedStations] = useState([]);
-  const [stations, setStations] = useState([]);
+  const { stations, loading } = stationStore;
   const [selectedStation, setSelectedStation] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [page, setPage] = useState(0);
@@ -75,11 +81,18 @@ const StationManagement = () => {
   const [maintenanceDialog, setMaintenanceDialog] = useState({ open: false, station: null });
   const [deleteDialog, setDeleteDialog] = useState({ open: false, station: null });
 
-  // Mock assigned station IDs
-  const assignedStationIds = [1, 2, 3];
+  // If staff/admin, load appropriate stations from store
 
   useEffect(() => {
-    loadStations();
+    const load = async () => {
+      if (authStore && typeof authStore.isAdmin === 'function' && authStore.isAdmin()) {
+        await stationStore.fetchAdminStations();
+      } else {
+        await stationStore.fetchStations();
+      }
+    };
+
+    load();
     
     // Check if navigated from dashboard with selected station
     if (location.state?.selectedStation) {
@@ -92,69 +105,9 @@ const StationManagement = () => {
     }
   }, []);
 
-  const loadStations = async () => {
-    // TODO: Replace with real API
-    const mockData = [
-      {
-        id: 1,
-        name: "Trạm sạc FPT Complex",
-        location: { address: "Lô E2a-7, D1, KCN Cao, Q9, HCM" },
-        status: "operational",
-        statusLabel: "Đang hoạt động",
-        charging: { availablePorts: 2, totalPorts: 4 },
-        alerts: [],
-        monthlyRevenue: 45000000,
-      },
-      {
-        id: 2,
-        name: "Trạm sạc Landmark 81",
-        location: { address: "720A Điện Biên Phủ, Bình Thạnh, HCM" },
-        status: "maintenance",
-        statusLabel: "Bảo trì",
-        charging: { availablePorts: 0, totalPorts: 2 },
-        alerts: [{ type: "maintenance", message: "Đang bảo trì định kỳ" }],
-        monthlyRevenue: 38000000,
-      },
-      {
-        id: 3,
-        name: "Trạm sạc Vincom Center",
-        location: { address: "72 Lê Thánh Tôn, Q1, HCM" },
-        status: "operational",
-        statusLabel: "Đang hoạt động",
-        charging: { availablePorts: 1, totalPorts: 2 },
-        alerts: [],
-        monthlyRevenue: 52000000,
-      },
-      {
-        id: 4,
-        name: "Trạm sạc Crescent Mall",
-        location: { address: "101 Tôn Dật Tiên, Q7, HCM" },
-        status: "warning",
-        statusLabel: "Cảnh báo",
-        charging: { availablePorts: 2, totalPorts: 3 },
-        alerts: [{ type: "warning", message: "Công suất cao" }],
-        monthlyRevenue: 31000000,
-      },
-      {
-        id: 5,
-        name: "Trạm sạc Saigon Centre",
-        location: { address: "65 Lê Lợi, Q1, HCM" },
-        status: "offline",
-        statusLabel: "Offline",
-        charging: { availablePorts: 0, totalPorts: 4 },
-        alerts: [{ type: "error", message: "Mất kết nối" }],
-        monthlyRevenue: 0,
-      },
-    ];
+  // Station data is loaded from store (see useEffect)
 
-    // Filter by assigned stations
-    const filteredData = mockData.filter((s) =>
-      assignedStationIds.includes(s.id)
-    );
-    setStations(filteredData);
-  };
-
-  const filteredStations = stations.filter((station) => {
+  const filteredStations = (stations || []).filter((station) => {
     const matchSearch =
       !searchQuery ||
       station.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -237,7 +190,18 @@ const StationManagement = () => {
       message: `Đã xóa trạm ${deleteDialog.station.name}`,
       severity: "success",
     });
-    setStations(stations.filter((s) => s.id !== deleteDialog.station.id));
+    (async () => {
+      try {
+        await stationStore.deleteStation(deleteDialog.station.id);
+        if (authStore && typeof authStore.isAdmin === 'function' && authStore.isAdmin()) {
+          await stationStore.fetchAdminStations();
+        } else {
+          await stationStore.fetchStations();
+        }
+      } catch (err) {
+        console.error('Delete station failed:', err);
+      }
+    })();
     setDeleteDialog({ open: false, station: null });
   };
 
@@ -261,7 +225,7 @@ const StationManagement = () => {
     setLocationFilter("all");
   };
 
-  const locations = [...new Set(stations.map((s) => s.location.address.split(",").pop().trim()))];
+  const locations = [...new Set((stations || []).map((s) => (s.location?.address || '').split(",").pop().trim()))];
 
   return (
     <Container maxWidth="xl">
@@ -273,7 +237,7 @@ const StationManagement = () => {
               Quản lý trạm sạc
             </Typography>
             <Typography variant="body1" color="text.secondary">
-              Quản lý chi tiết {assignedStationIds.length} trạm được phân công
+              Quản lý chi tiết {(stations || []).length} trạm
             </Typography>
           </Box>
           <Stack direction="row" spacing={2}>
@@ -590,13 +554,13 @@ const StationManagement = () => {
         >
           <DialogTitle>Xác nhận xóa</DialogTitle>
           <DialogContent>
-            <Alert severity="warning" sx={{ mb: 2 }}>
-              Hành động này không thể hoàn tác!
-            </Alert>
-            <Typography>
-              Bạn có chắc chắn muốn xóa trạm{" "}
-              <strong>{deleteDialog.station?.name}</strong>?
-            </Typography>
+              <Alert severity="warning" sx={{ mb: 2 }}>
+                Hành động này sẽ đưa trạm vào trạng thái đã xóa (lưu trữ) — có thể khôi phục được từ trang quản trị.
+              </Alert>
+              <Typography>
+                Bạn có chắc chắn muốn xóa (lưu trữ) trạm{" "}
+                <strong>{deleteDialog.station?.name}</strong>?
+              </Typography>
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setDeleteDialog({ open: false, station: null })}>

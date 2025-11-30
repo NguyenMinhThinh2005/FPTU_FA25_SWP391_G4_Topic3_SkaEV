@@ -14,46 +14,25 @@ import {
   Paper,
   Chip,
   Alert,
-  LinearProgress,
-  IconButton,
-  Tooltip
+  LinearProgress
 } from '@mui/material';
-import {
-  EvStation,
-  LocationOn,
-  Phone,
-  CheckCircle,
-  Warning,
-  Visibility
-} from '@mui/icons-material';
+import { EvStation, LocationOn } from '@mui/icons-material';
 import axiosInstance from '../../services/axiosConfig';
 
 const StaffDetailTabs = ({ userId, currentTab }) => {
   const [assignedStations, setAssignedStations] = useState([]);
   const [schedule, setSchedule] = useState([]);
-  const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(false);
 
   const fetchAssignedStations = async () => {
     try {
       setLoading(true);
-      // Get assigned stations for this staff member
-      const response = await axiosInstance.get(`/admin/staff/${userId}/stations`);
-      setAssignedStations(response.data || []);
+      const response = await axiosInstance.get(`/admin/AdminUsers/${userId}/staff/stations`);
+      const payload = response?.data?.data ?? response?.data ?? [];
+      setAssignedStations(Array.isArray(payload) ? payload : []);
     } catch (error) {
       console.error('Error fetching assigned stations:', error);
-      // Mock data for now
-      setAssignedStations([
-        {
-          stationId: 1,
-          stationName: 'Trạm sạc Lotte Mart Vũng Tàu',
-          address: '01 Đường 3/2, Phường 8, TP Vũng Tàu',
-          totalPosts: 10,
-          totalSlots: 20,
-          status: 'active',
-          assignedDate: new Date('2024-01-15')
-        }
-      ]);
+      setAssignedStations([]);
     } finally {
       setLoading(false);
     }
@@ -62,83 +41,12 @@ const StaffDetailTabs = ({ userId, currentTab }) => {
   const fetchSchedule = async () => {
     try {
       setLoading(true);
-      // Mock schedule data - replace with real API
-      setSchedule([
-        {
-          id: 1,
-          dayOfWeek: 'Thứ Hai',
-          shift: 'Sáng',
-          timeRange: '08:00 - 12:00',
-          stationName: 'Trạm sạc Lotte Mart Vũng Tàu'
-        },
-        {
-          id: 2,
-          dayOfWeek: 'Thứ Ba',
-          shift: 'Chiều',
-          timeRange: '13:00 - 17:00',
-          stationName: 'Trạm sạc Lotte Mart Vũng Tàu'
-        },
-        {
-          id: 3,
-          dayOfWeek: 'Thứ Tư',
-          shift: 'Sáng',
-          timeRange: '08:00 - 12:00',
-          stationName: 'Trạm sạc Lotte Mart Vũng Tàu'
-        },
-        {
-          id: 4,
-          dayOfWeek: 'Thứ Năm',
-          shift: 'Chiều',
-          timeRange: '13:00 - 17:00',
-          stationName: 'Trạm sạc Lotte Mart Vũng Tàu'
-        },
-        {
-          id: 5,
-          dayOfWeek: 'Thứ Sáu',
-          shift: 'Sáng',
-          timeRange: '08:00 - 12:00',
-          stationName: 'Trạm sạc Lotte Mart Vũng Tàu'
-        }
-      ]);
+      const response = await axiosInstance.get(`/admin/AdminUsers/${userId}/staff/schedule`);
+      const payload = response?.data?.data ?? response?.data ?? [];
+      setSchedule(Array.isArray(payload) ? payload : []);
     } catch (error) {
       console.error('Error fetching schedule:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchActivities = async () => {
-    try {
-      setLoading(true);
-      // Mock activities data - replace with real API
-      setActivities([
-        {
-          id: 1,
-          type: 'maintenance',
-          description: 'Bảo trì trụ sạc Post 5',
-          stationName: 'Trạm sạc Lotte Mart Vũng Tàu',
-          timestamp: new Date('2024-11-05T10:30:00'),
-          status: 'completed'
-        },
-        {
-          id: 2,
-          type: 'support',
-          description: 'Hỗ trợ khách hàng tại Slot 12',
-          stationName: 'Trạm sạc Lotte Mart Vũng Tàu',
-          timestamp: new Date('2024-11-05T14:15:00'),
-          status: 'completed'
-        },
-        {
-          id: 3,
-          type: 'inspection',
-          description: 'Kiểm tra an toàn định kỳ',
-          stationName: 'Trạm sạc Lotte Mart Vũng Tàu',
-          timestamp: new Date('2024-11-04T09:00:00'),
-          status: 'completed'
-        }
-      ]);
-    } catch (error) {
-      console.error('Error fetching activities:', error);
+      setSchedule([]);
     } finally {
       setLoading(false);
     }
@@ -147,21 +55,12 @@ const StaffDetailTabs = ({ userId, currentTab }) => {
   useEffect(() => {
     if (currentTab === 0) fetchAssignedStations();
     if (currentTab === 1) fetchSchedule();
-    if (currentTab === 2) fetchActivities();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentTab, userId]);
 
-  const getActivityTypeChip = (type) => {
-    const config = {
-      maintenance: { label: 'Bảo trì', color: 'warning' },
-      support: { label: 'Hỗ trợ', color: 'info' },
-      inspection: { label: 'Kiểm tra', color: 'success' }
-    };
-    const { label, color } = config[type] || { label: type, color: 'default' };
-    return <Chip label={label} color={color} size="small" />;
-  };
-
   const formatDate = (date) => {
+    if (!date) return '-';
+
     return new Date(date).toLocaleDateString('vi-VN', {
       year: 'numeric',
       month: '2-digit',
@@ -169,6 +68,13 @@ const StaffDetailTabs = ({ userId, currentTab }) => {
       hour: '2-digit',
       minute: '2-digit'
     });
+  };
+
+  const formatCurrency = (value) => {
+    return new Intl.NumberFormat('vi-VN', {
+      style: 'currency',
+      currency: 'VND'
+    }).format(Number(value) || 0);
   };
 
   if (loading) return <LinearProgress />;
@@ -217,7 +123,7 @@ const StaffDetailTabs = ({ userId, currentTab }) => {
                             Số trụ sạc
                           </Typography>
                           <Typography variant="h6" fontWeight="bold">
-                            {station.totalPosts}
+                            {station.totalPosts ?? 0}
                           </Typography>
                         </Grid>
                         <Grid item xs={6}>
@@ -225,15 +131,67 @@ const StaffDetailTabs = ({ userId, currentTab }) => {
                             Số cổng sạc
                           </Typography>
                           <Typography variant="h6" fontWeight="bold">
-                            {station.totalSlots}
+                            {station.totalSlots ?? 0}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Typography variant="caption" color="text.secondary">
+                            Đang sạc
+                          </Typography>
+                          <Typography variant="body1" fontWeight="medium" color="info.main">
+                            {station.activeSessions ?? 0}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Typography variant="caption" color="text.secondary">
+                            Khả dụng
+                          </Typography>
+                          <Typography variant="body1" fontWeight="medium">
+                            {station.availableSlots ?? 0}
                           </Typography>
                         </Grid>
                       </Grid>
 
                       <Box sx={{ mt: 2, pt: 2, borderTop: 1, borderColor: 'divider' }}>
-                        <Typography variant="caption" color="text.secondary">
-                          Ngày bắt đầu: {new Date(station.assignedDate).toLocaleDateString('vi-VN')}
-                        </Typography>
+                        <Grid container spacing={1}>
+                          <Grid item xs={6}>
+                            <Typography variant="caption" color="text.secondary">
+                              Hoàn thành hôm nay
+                            </Typography>
+                            <Typography variant="body2" fontWeight="medium" color="success.main">
+                              {station.completedSessionsToday ?? 0}
+                            </Typography>
+                          </Grid>
+                          <Grid item xs={6}>
+                            <Typography variant="caption" color="text.secondary">
+                              Doanh thu hôm nay
+                            </Typography>
+                            <Typography variant="body2" fontWeight="medium">
+                              {formatCurrency(station.revenueToday)}
+                            </Typography>
+                          </Grid>
+                          <Grid item xs={6}>
+                            <Typography variant="caption" color="text.secondary">
+                              Sự cố mở
+                            </Typography>
+                            <Typography variant="body2" fontWeight="medium" color="error.main">
+                              {station.openIncidents ?? 0}
+                            </Typography>
+                          </Grid>
+                          <Grid item xs={6}>
+                            <Typography variant="caption" color="text.secondary">
+                              Gán cho bạn
+                            </Typography>
+                            <Typography variant="body2" fontWeight="medium">
+                              {station.assignedIncidents ?? 0}
+                            </Typography>
+                          </Grid>
+                          <Grid item xs={12}>
+                            <Typography variant="caption" color="text.secondary">
+                              Ngày phân công: {station.assignedAt ? formatDate(station.assignedAt) : '-'}
+                            </Typography>
+                          </Grid>
+                        </Grid>
                       </Box>
                     </CardContent>
                   </Card>
@@ -258,15 +216,18 @@ const StaffDetailTabs = ({ userId, currentTab }) => {
               <Table>
                 <TableHead>
                   <TableRow>
-                    <TableCell>Ngày</TableCell>
-                    <TableCell>Ca làm</TableCell>
-                    <TableCell>Giờ làm việc</TableCell>
-                    <TableCell>Trạm</TableCell>
+                        <TableCell>Ngày</TableCell>
+                        <TableCell>Ca</TableCell>
+                        <TableCell>Giờ</TableCell>
+                        <TableCell>Trạm</TableCell>
+                        <TableCell>Phương tiện</TableCell>
+                        <TableCell>Điểm sạc</TableCell>
+                        <TableCell align="center">Trạng thái</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {schedule.map((item) => (
-                    <TableRow key={item.id} hover>
+                      {schedule.map((item) => (
+                        <TableRow key={item.bookingId} hover>
                       <TableCell>
                         <Typography variant="body2" fontWeight="medium">
                           {item.dayOfWeek}
@@ -274,74 +235,30 @@ const StaffDetailTabs = ({ userId, currentTab }) => {
                       </TableCell>
                       <TableCell>
                         <Chip
-                          label={item.shift}
-                          color={item.shift === 'Sáng' ? 'primary' : 'secondary'}
+                              label={item.shift}
+                              color={item.shift === 'Ca sáng' ? 'primary' : item.shift === 'Ca chiều' ? 'secondary' : 'default'}
                           size="small"
                         />
                       </TableCell>
                       <TableCell>
-                        <Typography variant="body2">{item.timeRange}</Typography>
+                            <Typography variant="body2">{item.timeRange}</Typography>
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2" color="text.secondary">
                           {item.stationName}
                         </Typography>
                       </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          )}
-        </Box>
-      )}
-
-      {/* Tab 2: Activities */}
-      {currentTab === 2 && (
-        <Box>
-          <Typography variant="h6" fontWeight="bold" gutterBottom>
-            Hoạt động gần đây ({activities.length})
-          </Typography>
-
-          {activities.length === 0 ? (
-            <Alert severity="info">Chưa có hoạt động nào</Alert>
-          ) : (
-            <TableContainer component={Paper} variant="outlined">
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Loại</TableCell>
-                    <TableCell>Mô tả</TableCell>
-                    <TableCell>Trạm</TableCell>
-                    <TableCell>Thời gian</TableCell>
-                    <TableCell align="center">Trạng thái</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {activities.map((activity) => (
-                    <TableRow key={activity.id} hover>
-                      <TableCell>{getActivityTypeChip(activity.type)}</TableCell>
-                      <TableCell>
-                        <Typography variant="body2">{activity.description}</Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" color="text.secondary">
-                          {activity.stationName}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="caption" color="text.secondary">
-                          {formatDate(activity.timestamp)}
-                        </Typography>
-                      </TableCell>
-                      <TableCell align="center">
-                        <Chip
-                          icon={<CheckCircle fontSize="small" />}
-                          label="Hoàn thành"
-                          color="success"
-                          size="small"
-                        />
-                      </TableCell>
+                          <TableCell>
+                            <Typography variant="body2">{item.vehicle || '—'}</Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body2" color="text.secondary">
+                              {item.slotLabel || '—'}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="center">
+                            <Chip label={item.status} size="small" color={item.status === 'completed' ? 'success' : item.status === 'in_progress' ? 'info' : 'default'} />
+                          </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

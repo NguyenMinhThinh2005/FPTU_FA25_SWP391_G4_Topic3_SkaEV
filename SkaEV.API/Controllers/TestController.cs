@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SkaEV.API.Infrastructure.Data;
@@ -6,6 +7,7 @@ namespace SkaEV.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize(Roles = "admin")]
 public class TestController : ControllerBase
 {
     private readonly SkaEVDbContext _context;
@@ -15,6 +17,15 @@ public class TestController : ControllerBase
         _context = context;
     }
 
+    /// <summary>
+    /// Lấy danh sách trụ sạc của một trạm (Test)
+    /// </summary>
+    /// <remarks>
+    /// API này dùng để kiểm tra việc lấy dữ liệu trụ sạc và khe sạc của một trạm cụ thể.
+    /// Sử dụng Eager Loading (Include) để lấy dữ liệu liên quan.
+    /// </remarks>
+    /// <param name="id">ID của trạm sạc</param>
+    /// <returns>Thông tin trạm và danh sách trụ sạc</returns>
     [HttpGet("station/{id}/posts")]
     public async Task<IActionResult> GetStationPosts(int id)
     {
@@ -25,7 +36,7 @@ public class TestController : ControllerBase
             .FirstOrDefaultAsync();
 
         if (station == null)
-            return NotFound();
+            return NotFound("Station not found");
 
         return Ok(new
         {
@@ -43,27 +54,39 @@ public class TestController : ControllerBase
         });
     }
 
+    /// <summary>
+    /// So sánh các phương pháp lấy dữ liệu trụ sạc (Test)
+    /// </summary>
+    /// <remarks>
+    /// API này so sánh hiệu năng và kết quả của các phương pháp truy vấn khác nhau:
+    /// - Không dùng Include (Lazy Loading hoặc null)
+    /// - Dùng Include (Eager Loading)
+    /// - Dùng AsNoTracking (Tối ưu hiệu năng đọc)
+    /// - Dùng SQL trực tiếp (Raw SQL)
+    /// </remarks>
+    /// <param name="id">ID của trạm sạc</param>
+    /// <returns>Kết quả so sánh các phương pháp truy vấn</returns>
     [HttpGet("station/{id}/posts-raw")]
     public async Task<IActionResult> GetStationPostsRaw(int id)
     {
-        // Try without Include first
+        // Thử không dùng Include trước
         var postsNoInclude = await _context.ChargingPosts
             .Where(p => p.StationId == id)
             .ToListAsync();
 
-        // Try with Include
+        // Thử dùng Include
         var postsWithInclude = await _context.ChargingPosts
             .Include(p => p.ChargingSlots)
             .Where(p => p.StationId == id)
             .ToListAsync();
 
-        // Try AsNoTracking
+        // Thử dùng AsNoTracking
         var postsNoTracking = await _context.ChargingPosts
             .AsNoTracking()
             .Where(p => p.StationId == id)
             .ToListAsync();
 
-        // Try direct SQL
+        // Thử dùng SQL trực tiếp
         var postsSql = await _context.ChargingPosts
             .FromSqlInterpolated($"SELECT * FROM charging_posts WHERE station_id = {id}")
             .ToListAsync();

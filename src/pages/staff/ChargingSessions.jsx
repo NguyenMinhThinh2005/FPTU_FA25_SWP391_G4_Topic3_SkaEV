@@ -35,8 +35,12 @@ import {
   Stop, 
   Payment,
   Info,
+<<<<<<< HEAD
   Print,
   PlayArrow
+=======
+  Print 
+>>>>>>> origin/develop
 } from "@mui/icons-material";
 
 const ChargingSessionsSimple = () => {
@@ -48,8 +52,12 @@ const ChargingSessionsSimple = () => {
   // Dialog states
   const [stopDialogOpen, setStopDialogOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+<<<<<<< HEAD
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [resumeDialogOpen, setResumeDialogOpen] = useState(false); // Thêm resume dialog
+=======
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false); // Thêm detail dialog
+>>>>>>> origin/develop
   const [selectedSession, setSelectedSession] = useState(null);
   
   // Payment form data
@@ -57,6 +65,16 @@ const ChargingSessionsSimple = () => {
     finalSoc: '',
     totalEnergyKwh: '',
     paymentMethod: 'cash'
+<<<<<<< HEAD
+=======
+  });
+  
+  // Snackbar notification
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success'
+>>>>>>> origin/develop
   });
   
   // Snackbar notification
@@ -116,6 +134,7 @@ const ChargingSessionsSimple = () => {
       
       // Extract sessions from connectors
       const allSessions = [];
+<<<<<<< HEAD
       
       if (dashboardData?.connectors && Array.isArray(dashboardData.connectors)) {
         dashboardData.connectors.forEach((connector) => {
@@ -179,6 +198,62 @@ const ChargingSessionsSimple = () => {
       });
       setSessions(allSessions);
       
+=======
+      
+      if (dashboardData?.connectors && Array.isArray(dashboardData.connectors)) {
+        dashboardData.connectors.forEach((connector) => {
+          // Map connector data to session format
+          const session = {
+            // Basic connector info
+            id: connector.slotId || connector.connectorCode,
+            connectorCode: connector.connectorCode || 'N/A',
+            connectorType: connector.connectorType || 'N/A',
+            maxPower: connector.maxPower || 0,
+            
+            // Status from backend
+            technicalStatus: connector.technicalStatus || 'unknown',
+            operationalStatus: connector.operationalStatus || 'Available',
+            
+            // Technical readings
+            voltage: connector.voltage,
+            current: connector.current,
+            temperature: connector.temperature,
+            
+            // Booking/Session info (null if no active session)
+            activeSession: connector.activeSession,
+          };
+          
+          // If has active session, add customer & vehicle info
+          if (connector.activeSession) {
+            const activeSession = connector.activeSession;
+            session.bookingId = activeSession.bookingId;
+            session.customerId = activeSession.customerId;
+            session.customerName = activeSession.customerName || 'N/A';
+            session.vehicleInfo = activeSession.vehicleInfo || 'N/A';
+            session.startedAt = activeSession.startedAt;
+            session.currentSoc = activeSession.currentSoc;
+            session.power = activeSession.power;
+            session.energyDelivered = activeSession.energyDelivered || 0;
+            
+            // Calculate charging duration
+            if (activeSession.startedAt) {
+              const startTime = new Date(activeSession.startedAt);
+              const now = new Date();
+              const durationMs = now - startTime;
+              const hours = Math.floor(durationMs / (1000 * 60 * 60));
+              const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
+              session.duration = `${hours}h ${minutes}m`;
+            }
+          }
+          
+          allSessions.push(session);
+        });
+      }
+      
+      console.log("✅ Processed sessions:", allSessions);
+      setSessions(allSessions);
+      
+>>>>>>> origin/develop
     } catch (err) {
       console.error("❌ Error loading sessions:", err);
       setError(err.message || "Không thể tải dữ liệu phiên sạc");
@@ -285,6 +360,7 @@ const ChargingSessionsSimple = () => {
     setPaymentDialogOpen(true);
   };
 
+<<<<<<< HEAD
   // Handle resume from maintenance
   const handleResumeFromMaintenance = (session) => {
     setSelectedSession(session);
@@ -338,12 +414,27 @@ const ChargingSessionsSimple = () => {
         method: paymentForm.paymentMethod,
         amount: paymentAmount,
         notes: `Thanh toán tại quầy - Booking #${selectedSession.bookingId}`
+=======
+  // Process payment
+  const processPayment = async () => {
+    try {
+      console.log("💰 Processing payment for booking:", selectedSession.bookingId);
+      
+      // Process payment
+      await staffAPI.processPayment(selectedSession.bookingId, {
+        method: paymentForm.paymentMethod,
+        amount: calculateCost(paymentForm.totalEnergyKwh)
+>>>>>>> origin/develop
       });
       
       setPaymentDialogOpen(false);
       setSnackbar({
         open: true,
+<<<<<<< HEAD
         message: `✅ Thanh toán thành công ${paymentAmount.toLocaleString('vi-VN')}₫ cho phiên sạc #${selectedSession.bookingId}!`,
+=======
+        message: `Thanh toán thành công cho phiên sạc #${selectedSession.bookingId}!`,
+>>>>>>> origin/develop
         severity: 'success'
       });
       
@@ -354,7 +445,11 @@ const ChargingSessionsSimple = () => {
       console.error("❌ Error processing payment:", err);
       setSnackbar({
         open: true,
+<<<<<<< HEAD
         message: err.response?.data?.message || err.message || "Không thể xử lý thanh toán",
+=======
+        message: err.message || "Không thể xử lý thanh toán",
+>>>>>>> origin/develop
         severity: 'error'
       });
     }
@@ -709,6 +804,7 @@ const ChargingSessionsSimple = () => {
                           </Button>
                         )}
                         
+<<<<<<< HEAD
                         {/* Hoạt động lại button - Show for maintenance slots */}
                         {!isActive && session.operationalStatus?.toLowerCase() === 'maintenance' && (
                           <Button 
@@ -724,6 +820,10 @@ const ChargingSessionsSimple = () => {
                         
                         {/* Empty state for inactive connectors */}
                         {!isActive && session.operationalStatus?.toLowerCase() !== 'maintenance' && (
+=======
+                        {/* Empty state for inactive connectors */}
+                        {!isActive && (
+>>>>>>> origin/develop
                           <Typography variant="caption" color="text.secondary">
                             -
                           </Typography>
@@ -1034,6 +1134,7 @@ const ChargingSessionsSimple = () => {
         </DialogActions>
       </Dialog>
 
+<<<<<<< HEAD
       {/* Resume from Maintenance Dialog */}
       <Dialog 
         open={resumeDialogOpen} 
@@ -1087,6 +1188,8 @@ const ChargingSessionsSimple = () => {
         </DialogActions>
       </Dialog>
 
+=======
+>>>>>>> origin/develop
       {/* Snackbar Notification */}
       <Snackbar
         open={snackbar.open}

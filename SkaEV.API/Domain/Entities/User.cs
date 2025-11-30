@@ -1,5 +1,8 @@
 namespace SkaEV.API.Domain.Entities;
 
+/// <summary>
+/// Thực thể người dùng.
+/// </summary>
 public class User
 {
     public int UserId { get; set; }
@@ -8,6 +11,10 @@ public class User
     public string FullName { get; set; } = string.Empty;
     public string? PhoneNumber { get; set; }
     public string Role { get; set; } = "customer"; // customer, staff, admin
+    
+    [System.ComponentModel.DataAnnotations.Schema.Column(TypeName = "decimal(18, 2)")]
+    public decimal WalletBalance { get; set; } = 0;
+
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;

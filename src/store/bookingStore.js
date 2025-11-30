@@ -143,17 +143,9 @@ const useBookingStore = create(
       },
 
       createBooking: async (bookingData) => {
-        // API is enabled - database has sp_create_booking stored procedure
-        const ENABLE_API = true; // Database is ready with stored procedure
+        console.log("📝 Creating booking via API:", bookingData);
 
-        console.log(
-          "📝 Creating booking (API " +
-            (ENABLE_API ? "ENABLED" : "DISABLED") +
-            "):",
-          bookingData
-        );
-
-        // Create local booking data
+        // Create local booking data structure for optimistic update or fallback display
         const cleanData = {
           stationId: bookingData.stationId,
           stationName: bookingData.stationName,
@@ -190,7 +182,7 @@ const useBookingStore = create(
 
         let booking = {
           ...cleanData,
-          id: `BOOK${Date.now()}`,
+          id: `BOOK${Date.now()}`, // Temporary ID until API response
           status:
             cleanData.schedulingType === "scheduled" ? "scheduled" : "pending",
           createdAt: new Date().toISOString(),
@@ -202,28 +194,26 @@ const useBookingStore = create(
           chargingStarted: false,
         };
 
-        // Try API if enabled
-        if (ENABLE_API) {
-          try {
-            set({ loading: true, error: null });
+        try {
+          set({ loading: true, error: null });
 
-            // Use real slot ID from database if available, otherwise fallback
-            let slotId = bookingData.port?.slotId || 3; // Use real slotId or default to 3
-            
-            if (bookingData.port?.slotId) {
-              console.log('✅ Using real slot ID from database:', slotId);
-            } else {
-              console.warn('⚠️ No real slot ID, using fallback slot:', slotId);
-              // Fallback: Extract from port ID format "stationId-slotX"
-              if (bookingData.port?.id) {
-                const portStr = bookingData.port.id.toString();
-                const slotMatch = portStr.match(/slot(\d+)/);
-                if (slotMatch) {
-                  slotId = parseInt(slotMatch[1]);
-                  console.log('🎯 Extracted slot ID from port string:', slotId);
-                }
+          // Use real slot ID from database if available, otherwise fallback
+          let slotId = bookingData.port?.slotId || 3; // Use real slotId or default to 3
+          
+          if (bookingData.port?.slotId) {
+            console.log('✅ Using real slot ID from database:', slotId);
+          } else {
+            console.warn('⚠️ No real slot ID, using fallback slot:', slotId);
+            // Fallback: Extract from port ID format "stationId-slotX"
+            if (bookingData.port?.id) {
+              const portStr = bookingData.port.id.toString();
+              const slotMatch = portStr.match(/slot(\d+)/);
+              if (slotMatch) {
+                slotId = parseInt(slotMatch[1]);
+                console.log('🎯 Extracted slot ID from port string:', slotId);
               }
             }
+<<<<<<< HEAD
 
             const apiPayload = {
               stationId: parseInt(bookingData.stationId) || 1,
@@ -269,7 +259,49 @@ const useBookingStore = create(
             );
             set({ loading: false, error: error.message });
             console.warn("⚠️ Using local booking as fallback");
+=======
+>>>>>>> origin/develop
           }
+
+          const apiPayload = {
+            stationId: parseInt(bookingData.stationId) || 1,
+            slotId: slotId, // Use mapped slot ID
+            vehicleId: 5, // Use actual vehicle ID from database (user has vehicle_id=5,6)
+            scheduledStartTime:
+              bookingData.scheduledDateTime || new Date().toISOString(),
+            estimatedArrival:
+              bookingData.scheduledDateTime ||
+              new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+            estimatedDuration: parseInt(bookingData.estimatedDuration) || 60,
+            schedulingType:
+              bookingData.schedulingType === "scheduled"
+                ? "scheduled"
+                : "immediate",
+            targetSoc: bookingData.targetSOC || 80,
+          };
+
+          console.log("📤 API Payload:", apiPayload);
+          const response = await bookingsAPI.create(apiPayload);
+          console.log("✅ API Response:", response);
+
+          // Merge API response
+          booking = {
+            ...booking,
+            id: response.bookingId || response.id, // Use numeric ID from API
+            bookingCode: booking.id, // Keep BOOK... string as code for display
+            apiId: response.bookingId || response.id, // Keep for backward compatibility
+            status: response.status || booking.status,
+            createdAt: response.createdAt || booking.createdAt,
+          };
+
+          set({ loading: false });
+        } catch (error) {
+          console.error(
+            "❌ API Error:",
+            error.response?.data || error.message
+          );
+          set({ loading: false, error: error.message });
+          throw error; // Re-throw to prevent fallback to mock
         }
 
         // Save to store
@@ -355,11 +387,7 @@ const useBookingStore = create(
         try {
           const booking = get().bookings.find((b) => b.id === bookingId);
 
-          // API call should be done by caller (ChargingFlow), not here
-          // This method only updates local state
-          const ENABLE_COMPLETE_API = false; // Disabled - caller handles API
-
-          if (booking && booking.apiId && ENABLE_COMPLETE_API) {
+          if (booking && booking.apiId) {
             console.log(
               "📤 Completing booking via API:",
               booking.apiId,
@@ -378,8 +406,8 @@ const useBookingStore = create(
             // Call API to complete charging
             await bookingsAPI.complete(booking.apiId, completePayload);
             console.log("✅ Booking completed via API");
-          } else if (booking && booking.apiId) {
-            console.log("⚠️ Complete API skipped - requires staff/admin role");
+          } else {
+            console.warn("⚠️ Cannot complete booking via API: Missing booking or API ID");
           }
 
           // Update local state with session data
@@ -433,9 +461,14 @@ const useBookingStore = create(
           // Call API to start charging if we have API ID
           if (booking.apiId) {
             console.log("📤 Starting charging via API:", booking.apiId);
-            // Note: Backend requires staff/admin role for this endpoint
-            // await bookingsAPI.start(booking.apiId);
-            console.log("⚠️ Skipping API call (requires staff role)");
+            try {
+              await bookingsAPI.start(booking.apiId);
+              console.log("✅ Charging started via API");
+            } catch (apiError) {
+              console.error("⚠️ API Start Charging failed:", apiError.message);
+              // Continue with local simulation if API fails (e.g. permission issues)
+              // This is allowed per "SoC charging" exception
+            }
           }
 
           const chargingSession = {

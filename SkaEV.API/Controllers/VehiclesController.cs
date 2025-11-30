@@ -1,18 +1,17 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SkaEV.API.Application.Common;
+using SkaEV.API.Application.Constants;
 using SkaEV.API.Application.DTOs.Vehicles;
 using SkaEV.API.Application.Services;
-using System.Security.Claims;
 
 namespace SkaEV.API.Controllers;
 
 /// <summary>
-/// Controller for user vehicle management
+/// Controller quản lý phương tiện của người dùng
 /// </summary>
-[ApiController]
-[Route("api/[controller]")]
-[Authorize(Roles = "customer")]
-public class VehiclesController : ControllerBase
+[Authorize(Roles = Roles.Customer)]
+public class VehiclesController : BaseApiController
 {
     private readonly IVehicleService _vehicleService;
     private readonly ILogger<VehiclesController> _logger;
@@ -24,67 +23,69 @@ public class VehiclesController : ControllerBase
     }
 
     /// <summary>
-    /// Get all vehicles for the authenticated user
+    /// Lấy danh sách phương tiện của tôi
     /// </summary>
+    /// <remarks>
+    /// API này trả về danh sách tất cả các phương tiện đã đăng ký của người dùng hiện tại.
+    /// </remarks>
+    /// <returns>Danh sách phương tiện</returns>
+    /// <response code="200">Trả về danh sách thành công</response>
     [HttpGet]
-    [ProducesResponseType(typeof(IEnumerable<VehicleDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<IEnumerable<VehicleDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetMyVehicles()
     {
-        try
-        {
-            var userId = GetUserId();
-            var vehicles = await _vehicleService.GetUserVehiclesAsync(userId);
-            return Ok(new { data = vehicles, count = vehicles.Count() });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting vehicles");
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        var vehicles = await _vehicleService.GetUserVehiclesAsync(CurrentUserId);
+        return OkResponse(vehicles);
     }
 
     /// <summary>
-    /// Get vehicle by ID
+    /// Lấy thông tin phương tiện theo ID
     /// </summary>
+    /// <remarks>
+    /// API này trả về chi tiết một phương tiện cụ thể.
+    /// Chỉ chủ sở hữu mới có thể xem thông tin.
+    /// </remarks>
+    /// <param name="id">ID của phương tiện</param>
+    /// <returns>Thông tin chi tiết phương tiện</returns>
+    /// <response code="200">Trả về thông tin thành công</response>
+    /// <response code="403">Không có quyền truy cập (Không phải chủ sở hữu)</response>
+    /// <response code="404">Không tìm thấy phương tiện</response>
     [HttpGet("{id}")]
-    [ProducesResponseType(typeof(VehicleDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<VehicleDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> GetVehicle(int id)
     {
-        try
-        {
-            var userId = GetUserId();
-            var vehicle = await _vehicleService.GetVehicleByIdAsync(id);
+        var vehicle = await _vehicleService.GetVehicleByIdAsync(id);
 
-            if (vehicle == null)
-                return NotFound(new { message = "Vehicle not found" });
+        if (vehicle == null)
+            return NotFoundResponse("Vehicle not found");
 
-            if (vehicle.UserId != userId)
-                return Forbid();
+        if (vehicle.UserId != CurrentUserId)
+            return ForbiddenResponse();
 
-            return Ok(vehicle);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting vehicle {Id}", id);
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        return OkResponse(vehicle);
     }
 
     /// <summary>
-    /// Add a new vehicle
+    /// Thêm phương tiện mới
     /// </summary>
+    /// <remarks>
+    /// API này cho phép người dùng thêm một phương tiện mới vào tài khoản.
+    /// </remarks>
+    /// <param name="createDto">Thông tin phương tiện mới</param>
+    /// <returns>Phương tiện vừa tạo</returns>
+    /// <response code="201">Tạo thành công</response>
+    /// <response code="400">Dữ liệu không hợp lệ</response>
     [HttpPost]
-    [ProducesResponseType(typeof(VehicleDto), StatusCodes.Status201Created)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<VehicleDto>), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> AddVehicle([FromBody] CreateVehicleDto createDto)
     {
         try
         {
-            var userId = GetUserId();
+            var userId = CurrentUserId;
             var vehicle = await _vehicleService.CreateVehicleAsync(userId, createDto);
-            
             return CreatedAtAction(
                 nameof(GetVehicle),
                 new { id = vehicle.VehicleId },
@@ -103,57 +104,68 @@ public class VehiclesController : ControllerBase
     }
 
     /// <summary>
-    /// Update an existing vehicle
+    /// Cập nhật phương tiện
     /// </summary>
+    /// <remarks>
+    /// API này cho phép cập nhật thông tin của một phương tiện hiện có.
+    /// </remarks>
+    /// <param name="id">ID của phương tiện</param>
+    /// <param name="updateDto">Thông tin cập nhật</param>
+    /// <returns>Phương tiện sau khi cập nhật</returns>
+    /// <response code="200">Cập nhật thành công</response>
+    /// <response code="403">Không có quyền truy cập</response>
+    /// <response code="404">Không tìm thấy phương tiện</response>
     [HttpPut("{id}")]
-    [ProducesResponseType(typeof(VehicleDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<VehicleDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> UpdateVehicle(int id, [FromBody] UpdateVehicleDto updateDto)
     {
-        try
-        {
-            var userId = GetUserId();
-            var existingVehicle = await _vehicleService.GetVehicleByIdAsync(id);
+        var existingVehicle = await _vehicleService.GetVehicleByIdAsync(id);
 
-            if (existingVehicle == null)
-                return NotFound(new { message = "Vehicle not found" });
+        if (existingVehicle == null)
+            return NotFoundResponse("Vehicle not found");
 
-            if (existingVehicle.UserId != userId)
-                return Forbid();
+        if (existingVehicle.UserId != CurrentUserId)
+            return ForbiddenResponse();
 
-            var updated = await _vehicleService.UpdateVehicleAsync(id, updateDto);
-            return Ok(updated);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error updating vehicle {Id}", id);
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        var updated = await _vehicleService.UpdateVehicleAsync(id, updateDto);
+        return OkResponse(updated, "Vehicle updated successfully");
     }
 
     /// <summary>
-    /// Delete a vehicle
+    /// Xóa phương tiện
     /// </summary>
+    /// <remarks>
+    /// API này cho phép xóa một phương tiện khỏi tài khoản.
+    /// </remarks>
+    /// <param name="id">ID của phương tiện cần xóa</param>
+    /// <returns>Kết quả xóa</returns>
+    /// <response code="200">Xóa thành công</response>
+    /// <response code="403">Không có quyền truy cập</response>
+    /// <response code="404">Không tìm thấy phương tiện</response>
     [HttpDelete("{id}")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> DeleteVehicle(int id)
     {
+        var existingVehicle = await _vehicleService.GetVehicleByIdAsync(id);
+
+        if (existingVehicle == null)
+            return NotFoundResponse("Vehicle not found");
+
+        if (existingVehicle.UserId != CurrentUserId)
+            return ForbiddenResponse();
+
         try
         {
-            var userId = GetUserId();
-            var existingVehicle = await _vehicleService.GetVehicleByIdAsync(id);
-
-            if (existingVehicle == null)
-                return NotFound(new { message = "Vehicle not found" });
-
-            if (existingVehicle.UserId != userId)
-                return Forbid();
-
             await _vehicleService.DeleteVehicleAsync(id);
             return NoContent();
+        }
+        catch (ArgumentException ex)
+        {
+            return Conflict(new { message = ex.Message });
         }
         catch (Exception ex)
         {
@@ -163,32 +175,21 @@ public class VehiclesController : ControllerBase
     }
 
     /// <summary>
-    /// Set a vehicle as default
+    /// Đặt phương tiện mặc định
     /// </summary>
+    /// <remarks>
+    /// API này đặt một phương tiện làm phương tiện mặc định cho người dùng.
+    /// </remarks>
+    /// <param name="id">ID của phương tiện</param>
+    /// <returns>Phương tiện được đặt làm mặc định</returns>
+    /// <response code="200">Thành công</response>
+    /// <response code="404">Không tìm thấy phương tiện</response>
     [HttpPatch("{id}/set-default")]
-    [ProducesResponseType(typeof(VehicleDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<VehicleDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> SetDefaultVehicle(int id)
     {
-        try
-        {
-            var userId = GetUserId();
-            var vehicle = await _vehicleService.SetDefaultVehicleAsync(userId, id);
-            return Ok(vehicle);
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { message = ex.Message });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error setting default vehicle {Id}", id);
-            return StatusCode(500, new { message = "An error occurred" });
-        }
-    }
-
-    private int GetUserId()
-    {
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        return int.Parse(userIdClaim ?? "0");
+        var vehicle = await _vehicleService.SetDefaultVehicleAsync(CurrentUserId, id);
+        return OkResponse(vehicle, "Default vehicle set successfully");
     }
 }

@@ -30,15 +30,15 @@ const Header = () => {
     setAnchorEl(null);
   };
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     navigate("/");
     handleClose();
   };
 
   const handleDashboard = () => {
     const dashboardPath = {
-      admin: "/admin/dashboard",
+      admin: "/admin/stations", // Admin goes to Station Management
       staff: "/staff/dashboard",
       customer: "/customer/charging",
     }[user?.role];

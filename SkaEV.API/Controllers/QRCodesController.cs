@@ -1,241 +1,171 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SkaEV.API.Application.Common;
+using SkaEV.API.Application.Constants;
 using SkaEV.API.Application.DTOs.QRCodes;
 using SkaEV.API.Application.Services;
-using System.Security.Claims;
 
 namespace SkaEV.API.Controllers;
 
 /// <summary>
-/// Controller for QR code generation and validation
+/// Controller quản lý mã QR.
+/// Xử lý tạo, xác thực và sử dụng mã QR cho việc sạc nhanh.
 /// </summary>
-[ApiController]
 [Route("api/[controller]")]
-public class QRCodesController : ControllerBase
+public class QRCodesController : BaseApiController
 {
     private readonly IQRCodeService _qrCodeService;
-    private readonly ILogger<QRCodesController> _logger;
 
-    public QRCodesController(IQRCodeService qrCodeService, ILogger<QRCodesController> logger)
+    /// <summary>
+    /// Constructor nhận vào QRCodeService.
+    /// </summary>
+    /// <param name="qrCodeService">Service mã QR.</param>
+    public QRCodesController(IQRCodeService qrCodeService)
     {
         _qrCodeService = qrCodeService;
-        _logger = logger;
     }
 
     /// <summary>
-    /// Generate QR code for instant charging
+    /// Tạo mã QR để sạc ngay lập tức.
     /// </summary>
+    /// <param name="generateDto">Thông tin tạo mã QR.</param>
+    /// <returns>Mã QR vừa tạo.</returns>
     [HttpPost("generate")]
-    [Authorize(Roles = "customer")]
-    [ProducesResponseType(typeof(QRCodeDto), StatusCodes.Status201Created)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [Authorize(Roles = Roles.Customer)]
+    [ProducesResponseType(typeof(ApiResponse<QRCodeDto>), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GenerateQRCode([FromBody] GenerateQRCodeDto generateDto)
     {
-        try
-        {
-            var userId = GetUserId();
-            var qrCode = await _qrCodeService.GenerateQRCodeAsync(userId, generateDto);
-            
-            return CreatedAtAction(
-                nameof(GetQRCode),
-                new { id = qrCode.QRCodeId },
-                qrCode
-            );
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error generating QR code");
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        var qrCode = await _qrCodeService.GenerateQRCodeAsync(CurrentUserId, generateDto);
+        
+        return CreatedResponse(
+            nameof(GetQRCode),
+            new { id = qrCode.QRCodeId },
+            qrCode
+        );
     }
 
     /// <summary>
-    /// Get QR code by ID
+    /// Lấy thông tin mã QR theo ID.
     /// </summary>
+    /// <param name="id">ID mã QR.</param>
+    /// <returns>Chi tiết mã QR.</returns>
     [HttpGet("{id}")]
-    [Authorize(Roles = "customer,staff")]
-    [ProducesResponseType(typeof(QRCodeDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [Authorize(Roles = Roles.Customer + "," + Roles.Staff + "," + Roles.Admin)]
+    [ProducesResponseType(typeof(ApiResponse<QRCodeDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> GetQRCode(int id)
     {
-        try
-        {
-            var userId = GetUserId();
-            var userRole = GetUserRole();
-            var qrCode = await _qrCodeService.GetQRCodeByIdAsync(id);
+        var qrCode = await _qrCodeService.GetQRCodeByIdAsync(id);
 
-            if (qrCode == null)
-                return NotFound(new { message = "QR code not found" });
+        if (qrCode == null)
+            return NotFoundResponse("QR code not found");
 
-            // Only owner or staff can view
-            if (userRole != "staff" && userRole != "admin" && qrCode.UserId != userId)
-                return Forbid();
+        // Chỉ chủ sở hữu hoặc nhân viên/admin mới có thể xem
+        if (CurrentUserRole != Roles.Staff && CurrentUserRole != Roles.Admin && qrCode.UserId != CurrentUserId)
+            return ForbiddenResponse();
 
-            return Ok(qrCode);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting QR code {Id}", id);
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        return OkResponse(qrCode);
     }
 
     /// <summary>
-    /// Get my active QR codes
+    /// Lấy danh sách mã QR đang hoạt động của người dùng hiện tại.
     /// </summary>
+    /// <returns>Danh sách mã QR.</returns>
     [HttpGet("my-qrcodes")]
-    [Authorize(Roles = "customer")]
-    [ProducesResponseType(typeof(IEnumerable<QRCodeDto>), StatusCodes.Status200OK)]
+    [Authorize(Roles = Roles.Customer)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetMyQRCodes()
     {
-        try
-        {
-            var userId = GetUserId();
-            var qrCodes = await _qrCodeService.GetUserActiveQRCodesAsync(userId);
-            return Ok(new { data = qrCodes, count = qrCodes.Count() });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting user QR codes");
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        var qrCodes = await _qrCodeService.GetUserActiveQRCodesAsync(CurrentUserId);
+        return OkResponse(new { data = qrCodes, count = qrCodes.Count() });
     }
 
     /// <summary>
-    /// Validate QR code (Staff only)
+    /// Xác thực mã QR (Chỉ Staff/Admin).
     /// </summary>
+    /// <param name="validateDto">Dữ liệu mã QR cần xác thực.</param>
+    /// <returns>Kết quả xác thực.</returns>
     [HttpPost("validate")]
-    [Authorize(Roles = "staff,admin")]
-    [ProducesResponseType(typeof(QRCodeValidationResultDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [Authorize(Roles = Roles.Staff + "," + Roles.Admin)]
+    [ProducesResponseType(typeof(ApiResponse<QRCodeValidationResultDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> ValidateQRCode([FromBody] ValidateQRCodeDto validateDto)
     {
-        try
-        {
-            var result = await _qrCodeService.ValidateQRCodeAsync(validateDto.QRCodeData);
-            return Ok(result);
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error validating QR code");
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        var result = await _qrCodeService.ValidateQRCodeAsync(validateDto.QRCodeData);
+        return OkResponse(result);
     }
 
     /// <summary>
-    /// Use QR code to start charging (Staff only)
+    /// Sử dụng mã QR để bắt đầu sạc (Chỉ Staff/Admin).
     /// </summary>
+    /// <param name="id">ID mã QR.</param>
+    /// <param name="useDto">Thông tin sử dụng.</param>
+    /// <returns>Mã QR sau khi sử dụng.</returns>
     [HttpPost("{id}/use")]
-    [Authorize(Roles = "staff,admin")]
-    [ProducesResponseType(typeof(QRCodeDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [Authorize(Roles = Roles.Staff + "," + Roles.Admin)]
+    [ProducesResponseType(typeof(ApiResponse<QRCodeDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UseQRCode(int id, [FromBody] UseQRCodeDto useDto)
     {
-        try
-        {
-            var qrCode = await _qrCodeService.GetQRCodeByIdAsync(id);
+        var qrCode = await _qrCodeService.GetQRCodeByIdAsync(id);
 
-            if (qrCode == null)
-                return NotFound(new { message = "QR code not found" });
+        if (qrCode == null)
+            return NotFoundResponse("QR code not found");
 
-            var updatedQRCode = await _qrCodeService.UseQRCodeAsync(id, useDto);
-            return Ok(updatedQRCode);
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error using QR code {Id}", id);
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        var updatedQRCode = await _qrCodeService.UseQRCodeAsync(id, useDto);
+        return OkResponse(updatedQRCode);
     }
 
     /// <summary>
-    /// Cancel/revoke QR code
+    /// Hủy/Thu hồi mã QR.
     /// </summary>
+    /// <param name="id">ID mã QR.</param>
+    /// <returns>Kết quả hủy.</returns>
     [HttpDelete("{id}")]
-    [Authorize(Roles = "customer,staff,admin")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [Authorize(Roles = Roles.Customer + "," + Roles.Staff + "," + Roles.Admin)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> CancelQRCode(int id)
     {
-        try
-        {
-            var userId = GetUserId();
-            var userRole = GetUserRole();
-            var qrCode = await _qrCodeService.GetQRCodeByIdAsync(id);
+        var qrCode = await _qrCodeService.GetQRCodeByIdAsync(id);
 
-            if (qrCode == null)
-                return NotFound(new { message = "QR code not found" });
+        if (qrCode == null)
+            return NotFoundResponse("QR code not found");
 
-            // Only owner or staff/admin can cancel
-            if (userRole != "staff" && userRole != "admin" && qrCode.UserId != userId)
-                return Forbid();
+        // Chỉ chủ sở hữu hoặc nhân viên/admin mới có thể hủy
+        if (CurrentUserRole != Roles.Staff && CurrentUserRole != Roles.Admin && qrCode.UserId != CurrentUserId)
+            return ForbiddenResponse();
 
-            await _qrCodeService.CancelQRCodeAsync(id);
-            return NoContent();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error canceling QR code {Id}", id);
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        await _qrCodeService.CancelQRCodeAsync(id);
+        return OkResponse<object>(new { }, "QR code cancelled");
     }
 
     /// <summary>
-    /// Get QR code image (Staff only)
+    /// Lấy hình ảnh mã QR (Chỉ Staff/Admin hoặc chủ sở hữu).
     /// </summary>
+    /// <param name="id">ID mã QR.</param>
+    /// <returns>File hình ảnh QR code.</returns>
     [HttpGet("{id}/image")]
-    [Authorize(Roles = "customer,staff,admin")]
+    [Authorize(Roles = Roles.Customer + "," + Roles.Staff + "," + Roles.Admin)]
     [ProducesResponseType(typeof(FileResult), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> GetQRCodeImage(int id)
     {
-        try
-        {
-            var userId = GetUserId();
-            var userRole = GetUserRole();
-            var qrCode = await _qrCodeService.GetQRCodeByIdAsync(id);
+        var qrCode = await _qrCodeService.GetQRCodeByIdAsync(id);
 
-            if (qrCode == null)
-                return NotFound(new { message = "QR code not found" });
+        if (qrCode == null)
+            return NotFoundResponse("QR code not found");
 
-            // Only owner or staff can view image
-            if (userRole != "staff" && userRole != "admin" && qrCode.UserId != userId)
-                return Forbid();
+        // Chỉ chủ sở hữu hoặc nhân viên/admin mới có thể xem ảnh
+        if (CurrentUserRole != Roles.Staff && CurrentUserRole != Roles.Admin && qrCode.UserId != CurrentUserId)
+            return ForbiddenResponse();
 
-            var imageBytes = await _qrCodeService.GenerateQRCodeImageAsync(id);
-            return File(imageBytes, "image/png");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting QR code image {Id}", id);
-            return StatusCode(500, new { message = "An error occurred" });
-        }
-    }
-
-    private int GetUserId()
-    {
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        return int.Parse(userIdClaim ?? "0");
-    }
-
-    private string GetUserRole()
-    {
-        return User.FindFirst(ClaimTypes.Role)?.Value ?? "customer";
+        var imageBytes = await _qrCodeService.GenerateQRCodeImageAsync(id);
+        return File(imageBytes, "image/png");
     }
 }

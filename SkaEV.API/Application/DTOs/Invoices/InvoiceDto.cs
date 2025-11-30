@@ -1,5 +1,8 @@
 namespace SkaEV.API.Application.DTOs.Invoices;
 
+/// <summary>
+/// DTO thông tin hóa đơn.
+/// </summary>
 public class InvoiceDto
 {
     public int InvoiceId { get; set; }
@@ -17,8 +20,18 @@ public class InvoiceDto
     public DateTime CreatedAt { get; set; }
     public DateTime? DueDate { get; set; }
     public string? Notes { get; set; }
+    
+    // Booking details for payment history
+    public string? StationName { get; set; }
+    public decimal? EnergyDelivered { get; set; }
+    public int? ChargingDuration { get; set; }
+    public DateTime? StartTime { get; set; }
+    public DateTime? EndTime { get; set; }
 }
 
+/// <summary>
+/// DTO xử lý thanh toán.
+/// </summary>
 public class ProcessPaymentDto
 {
     /// <summary>
@@ -48,12 +61,18 @@ public class ProcessPaymentDto
     public string? Notes { get; set; }
 }
 
+/// <summary>
+/// DTO cập nhật trạng thái thanh toán.
+/// </summary>
 public class UpdatePaymentStatusDto
 {
     public string Status { get; set; } = string.Empty;
     public string? Notes { get; set; }
 }
 
+/// <summary>
+/// DTO lịch sử thanh toán.
+/// </summary>
 public class PaymentHistoryDto
 {
     public int PaymentId { get; set; }

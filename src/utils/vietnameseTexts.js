@@ -45,7 +45,7 @@ export const VIETNAMESE_TEXTS = {
     rememberMe: "Ghi nhớ đăng nhập",
     loginTitle: "Đăng nhập vào SkaEV",
     registerTitle: "Tạo tài khoản SkaEV",
-    loginSubtitle: "Hệ thống quản lý trạm sạc xe điện",
+    loginSubtitle: "Hệ thống đặt sạc xe điện",
     registerSubtitle: "Tham gia mạng lưới sạc xe điện thông minh",
     alreadyHaveAccount: "Đã có tài khoản?",
     dontHaveAccount: "Chưa có tài khoản?",
@@ -75,7 +75,7 @@ export const VIETNAMESE_TEXTS = {
     stationManagement: "Quản lý trạm sạc",
     userManagement: "Quản lý người dùng",
     analytics: "Phân tích",
-    advancedAnalytics: "Phân tích nâng cao",
+    advancedAnalytics: "Phân tích tổng quan",
     settings: "Cài đặt",
     welcome: "Chào mừng",
     home: "Trang chủ",
@@ -117,7 +117,7 @@ export const VIETNAMESE_TEXTS = {
     whyChoose: "Tại sao chọn SkaEV?",
     whyChooseSubtitle:
       "Các tính năng tiên tiến cho quản lý sạc xe điện hiện đại",
-  readyToStart: "Đang sẵn sàng bắt đầu sạc?",
+    readyToStart: "Đang sẵn sàng bắt đầu sạc?",
     readyToStartSubtitle:
       "Tham gia cùng hàng nghìn tài xế xe điện đang sử dụng mạng lưới sạc SkaEV",
     goToDashboard: "Vào Dashboard",

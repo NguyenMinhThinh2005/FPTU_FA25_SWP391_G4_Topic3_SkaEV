@@ -5,6 +5,9 @@ using NetTopologySuite.Geometries;
 
 namespace SkaEV.API.Infrastructure.Data;
 
+/// <summary>
+/// DbContext chính của ứng dụng SkaEV.
+/// </summary>
 public class SkaEVDbContext : DbContext
 {
     public SkaEVDbContext(DbContextOptions<SkaEVDbContext> options) : base(options)
@@ -31,8 +34,13 @@ public class SkaEVDbContext : DbContext
     public DbSet<Payment> Payments { get; set; }
     public DbSet<ServicePlan> ServicePlans { get; set; }
     public DbSet<Incident> Incidents { get; set; }
+<<<<<<< HEAD
     public DbSet<Issue> Issues { get; set; }
     public DbSet<IssueComment> IssueComments { get; set; }
+=======
+    public DbSet<MaintenanceTeam> MaintenanceTeams { get; set; }
+    public DbSet<WalletTransaction> WalletTransactions { get; set; }
+>>>>>>> origin/develop
 
     // DbSets - Views (read-only)
     public DbSet<UserCostReport> UserCostReports { get; set; }
@@ -47,6 +55,7 @@ public class SkaEVDbContext : DbContext
         base.OnModelCreating(modelBuilder);
 
         // Configure table names to match database
+<<<<<<< HEAD
         modelBuilder.Entity<User>().ToTable("users");
         modelBuilder.Entity<UserProfile>().ToTable("user_profiles");
         modelBuilder.Entity<Vehicle>().ToTable("vehicles");
@@ -65,6 +74,76 @@ public class SkaEVDbContext : DbContext
         modelBuilder.Entity<ServicePlan>().ToTable("service_plans");
         modelBuilder.Entity<Incident>().ToTable("incidents");
         modelBuilder.Entity<Issue>().ToTable("issues");
+=======
+        modelBuilder.Entity<User>().ToTable("users", tb =>
+        {
+            tb.HasTrigger("trg_users_updated_at");
+        });
+        modelBuilder.Entity<UserProfile>().ToTable("user_profiles", tb =>
+        {
+            tb.HasTrigger("trg_user_profiles_updated_at");
+        });
+        modelBuilder.Entity<Vehicle>().ToTable("vehicles", tb =>
+        {
+            tb.HasTrigger("trg_vehicles_updated_at");
+        });
+        modelBuilder.Entity<ChargingStation>().ToTable("charging_stations", tb =>
+        {
+            tb.HasTrigger("trg_charging_stations_updated_at");
+        });
+        modelBuilder.Entity<ChargingPost>().ToTable("charging_posts", tb =>
+        {
+            tb.HasTrigger("trg_charging_posts_updated_at");
+        });
+        modelBuilder.Entity<ChargingSlot>().ToTable("charging_slots", tb =>
+        {
+            tb.HasTrigger("trg_charging_slots_updated_at");
+        });
+        modelBuilder.Entity<Booking>().ToTable("bookings", tb =>
+        {
+            tb.HasTrigger("trg_bookings_updated_at");
+        });
+        modelBuilder.Entity<SocTracking>().ToTable("soc_tracking", tb =>
+        {
+            tb.HasTrigger("trg_soc_tracking_updated_at");
+        });
+        modelBuilder.Entity<Invoice>().ToTable("invoices", tb =>
+        {
+            tb.HasTrigger("trg_invoices_updated_at");
+        });
+        modelBuilder.Entity<QRCode>().ToTable("qr_codes", tb =>
+        {
+            tb.HasTrigger("trg_qr_codes_updated_at");
+        });
+        modelBuilder.Entity<Notification>().ToTable("notifications", tb =>
+        {
+            tb.HasTrigger("trg_notifications_updated_at");
+        });
+        modelBuilder.Entity<SystemLog>().ToTable("system_logs", tb =>
+        {
+            tb.HasTrigger("trg_system_logs_updated_at");
+        });
+        modelBuilder.Entity<Review>().ToTable("reviews", tb =>
+        {
+            tb.HasTrigger("trg_reviews_updated_at");
+        });
+        modelBuilder.Entity<PricingRule>().ToTable("pricing_rules", tb =>
+        {
+            tb.HasTrigger("trg_pricing_rules_updated_at");
+        });
+        modelBuilder.Entity<StationStaff>().ToTable("station_staff", tb =>
+        {
+            tb.HasTrigger("trg_station_staff_updated_at");
+        });
+        modelBuilder.Entity<ServicePlan>().ToTable("service_plans", tb =>
+        {
+            tb.HasTrigger("trg_service_plans_updated_at");
+        });
+        modelBuilder.Entity<Incident>().ToTable("incidents", tb =>
+        {
+            tb.HasTrigger("trg_incidents_updated_at");
+        });
+>>>>>>> origin/develop
 
         // User configuration
         modelBuilder.Entity<User>(entity =>
@@ -112,11 +191,17 @@ public class SkaEVDbContext : DbContext
             entity.HasKey(e => e.VehicleId);
             entity.Property(e => e.VehicleId).HasColumnName("vehicle_id");
             entity.Property(e => e.UserId).HasColumnName("user_id");
-            entity.Property(e => e.VehicleType).HasColumnName("vehicle_type").HasMaxLength(50).IsRequired();
+            entity.Property(e => e.VehicleName).HasColumnName("vehicle_name").HasMaxLength(120).IsRequired();
+            entity.Property(e => e.VehicleType).HasColumnName("vehicle_type").HasMaxLength(40).IsRequired();
             entity.Property(e => e.Brand).HasColumnName("brand").HasMaxLength(100);
-            entity.Property(e => e.Model).HasColumnName("model").HasMaxLength(100);
-            entity.Property(e => e.LicensePlate).HasColumnName("license_plate").HasMaxLength(20);
+            entity.Property(e => e.Model).HasColumnName("model").HasMaxLength(120);
+            entity.Property(e => e.VehicleYear).HasColumnName("vehicle_year");
+            entity.Property(e => e.Vin).HasColumnName("vin").HasMaxLength(32);
+            entity.Property(e => e.LicensePlate).HasColumnName("license_plate").HasMaxLength(32);
+            entity.Property(e => e.Color).HasColumnName("color").HasMaxLength(50);
             entity.Property(e => e.BatteryCapacity).HasColumnName("battery_capacity").HasColumnType("decimal(10,2)");
+            entity.Property(e => e.MaxChargingSpeed).HasColumnName("max_charging_speed").HasColumnType("decimal(10,2)");
+            entity.Property(e => e.ConnectorTypes).HasColumnName("connector_types");
             entity.Property(e => e.ChargingPortType).HasColumnName("charging_port_type").HasMaxLength(50);
             entity.Property(e => e.IsPrimary).HasColumnName("is_primary");
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").IsRequired();
@@ -128,7 +213,12 @@ public class SkaEVDbContext : DbContext
                 .HasForeignKey(e => e.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            entity.HasIndex(e => e.LicensePlate).IsUnique();
+            entity.HasIndex(e => e.LicensePlate)
+                .IsUnique()
+                .HasFilter("[license_plate] IS NOT NULL");
+            entity.HasIndex(e => e.Vin)
+                .IsUnique()
+                .HasFilter("[vin] IS NOT NULL");
             entity.HasQueryFilter(e => e.DeletedAt == null); // Global query filter for soft delete
         });
 
@@ -150,7 +240,12 @@ public class SkaEVDbContext : DbContext
             }
             else
             {
-                entity.Property(e => e.Location).HasColumnName("location").HasColumnType("geography");
+                // The `location` column in the database is computed (geography point from lat/lon).
+                // Mark it as value-generated so EF Core does not attempt to set/modify it during inserts/updates.
+                entity.Property(e => e.Location)
+                    .HasColumnName("location")
+                    .HasColumnType("geography")
+                    .ValueGeneratedOnAddOrUpdate();
             }
             entity.Property(e => e.TotalPosts).HasColumnName("total_posts");
             entity.Property(e => e.AvailablePosts).HasColumnName("available_posts");
@@ -162,7 +257,33 @@ public class SkaEVDbContext : DbContext
             entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").IsRequired();
             entity.Property(e => e.DeletedAt).HasColumnName("deleted_at");
 
+            // Temporarily ignore ActiveSessions as it's not in the database schema
+            entity.Ignore(e => e.ActiveSessions);
+
             entity.HasQueryFilter(e => e.DeletedAt == null); // Global query filter for soft delete
+        });
+
+        // ChargingSlot configuration
+        modelBuilder.Entity<ChargingSlot>(entity =>
+        {
+            entity.HasKey(e => e.SlotId);
+            entity.Property(e => e.SlotId).HasColumnName("slot_id");
+            entity.Property(e => e.PostId).HasColumnName("post_id");
+            entity.Property(e => e.SlotNumber).HasColumnName("slot_number").HasMaxLength(50).IsRequired();
+            entity.Property(e => e.ConnectorType).HasColumnName("connector_type").HasMaxLength(50).IsRequired();
+            entity.Property(e => e.MaxPower).HasColumnName("max_power").HasColumnType("decimal(10,2)").IsRequired();
+            entity.Property(e => e.Status).HasColumnName("status").HasMaxLength(50).IsRequired();
+            entity.Property(e => e.CurrentBookingId).HasColumnName("current_booking_id");
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at").IsRequired();
+            entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").IsRequired();
+            entity.Property(e => e.DeletedAt).HasColumnName("deleted_at");
+
+            entity.HasQueryFilter(e => e.DeletedAt == null); // Global query filter for soft delete
+
+            entity.HasOne(e => e.ChargingPost)
+                .WithMany(p => p.ChargingSlots)
+                .HasForeignKey(e => e.PostId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         // ChargingPost configuration
@@ -180,30 +301,13 @@ public class SkaEVDbContext : DbContext
             entity.Property(e => e.Status).HasColumnName("status").HasMaxLength(50).IsRequired();
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").IsRequired();
             entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").IsRequired();
+            entity.Property(e => e.DeletedAt).HasColumnName("deleted_at");
+
+            entity.HasQueryFilter(e => e.DeletedAt == null); // Global query filter for soft delete
 
             entity.HasOne(e => e.ChargingStation)
                 .WithMany(s => s.ChargingPosts)
                 .HasForeignKey(e => e.StationId)
-                .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        // ChargingSlot configuration
-        modelBuilder.Entity<ChargingSlot>(entity =>
-        {
-            entity.HasKey(e => e.SlotId);
-            entity.Property(e => e.SlotId).HasColumnName("slot_id");
-            entity.Property(e => e.PostId).HasColumnName("post_id");
-            entity.Property(e => e.SlotNumber).HasColumnName("slot_number").HasMaxLength(50).IsRequired();
-            entity.Property(e => e.ConnectorType).HasColumnName("connector_type").HasMaxLength(50).IsRequired();
-            entity.Property(e => e.MaxPower).HasColumnName("max_power").HasColumnType("decimal(10,2)").IsRequired();
-            entity.Property(e => e.Status).HasColumnName("status").HasMaxLength(50).IsRequired();
-            entity.Property(e => e.CurrentBookingId).HasColumnName("current_booking_id");
-            entity.Property(e => e.CreatedAt).HasColumnName("created_at").IsRequired();
-            entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").IsRequired();
-
-            entity.HasOne(e => e.ChargingPost)
-                .WithMany(p => p.ChargingSlots)
-                .HasForeignKey(e => e.PostId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
@@ -347,11 +451,14 @@ public class SkaEVDbContext : DbContext
             entity.Property(e => e.IsRead).HasColumnName("is_read");
             entity.Property(e => e.RelatedBookingId).HasColumnName("related_booking_id");
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").IsRequired();
+            entity.Property(e => e.DeletedAt).HasColumnName("deleted_at");
 
             entity.HasOne(e => e.User)
                 .WithMany(u => u.Notifications)
                 .HasForeignKey(e => e.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasQueryFilter(e => e.DeletedAt == null);
         });
 
         // SystemLog configuration
@@ -386,6 +493,7 @@ public class SkaEVDbContext : DbContext
             entity.Property(e => e.Comment).HasColumnName("comment");
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").IsRequired();
             entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").IsRequired();
+            entity.Property(e => e.DeletedAt).HasColumnName("deleted_at");
 
             entity.HasOne(e => e.Booking)
                 .WithOne(b => b.Review)
@@ -401,6 +509,8 @@ public class SkaEVDbContext : DbContext
                 .WithMany(s => s.Reviews)
                 .HasForeignKey(e => e.StationId)
                 .OnDelete(DeleteBehavior.NoAction);
+
+            entity.HasQueryFilter(e => e.DeletedAt == null);
         });
 
         // PricingRule configuration
@@ -544,6 +654,7 @@ public class SkaEVDbContext : DbContext
             entity.Property(e => e.Description).HasColumnName("description");
             entity.Property(e => e.ResolutionNotes).HasColumnName("resolution_notes");
             entity.Property(e => e.AssignedToStaffId).HasColumnName("assigned_to_staff_id");
+            entity.Property(e => e.AssignedToTeamId).HasColumnName("assigned_to_team_id");
             entity.Property(e => e.ReportedAt).HasColumnName("reported_at").IsRequired();
             entity.Property(e => e.AcknowledgedAt).HasColumnName("acknowledged_at");
             entity.Property(e => e.ResolvedAt).HasColumnName("resolved_at");
@@ -576,6 +687,24 @@ public class SkaEVDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.AssignedToStaffId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(e => e.AssignedToTeam)
+                .WithMany()
+                .HasForeignKey(e => e.AssignedToTeamId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // MaintenanceTeam configuration
+        modelBuilder.Entity<MaintenanceTeam>(entity =>
+        {
+            entity.HasKey(e => e.MaintenanceTeamId);
+            entity.ToTable("maintenance_teams");
+            entity.Property(e => e.MaintenanceTeamId).HasColumnName("maintenance_team_id");
+            entity.Property(e => e.Name).HasColumnName("name").HasMaxLength(255).IsRequired();
+            entity.Property(e => e.ContactPerson).HasColumnName("contact_person").HasMaxLength(255);
+            entity.Property(e => e.ContactPhone).HasColumnName("contact_phone").HasMaxLength(50);
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at").IsRequired();
+            entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").IsRequired();
         });
 
         // Issue configuration

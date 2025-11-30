@@ -1,6 +1,11 @@
 ﻿import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { authAPI } from "../services/api";
+import axiosInstance from "../services/api";
+
+// Import stores for logout cleanup (lazy import to avoid circular dependency)
+let bookingStoreModule = null;
+let customerStoreModule = null;
 
 const useAuthStore = create(
   persist(
@@ -135,10 +140,67 @@ const useAuthStore = create(
           console.error("Logout API error:", error);
           // Continue with local logout even if API fails
         } finally {
-          // Clear tokens from sessionStorage
+          // Clear tokens from both sessionStorage and localStorage
           sessionStorage.removeItem("token");
           sessionStorage.removeItem("refreshToken");
+          localStorage.removeItem("token");
+          localStorage.removeItem("refreshToken");
 
+          // Clear persist storage of authStore
+          sessionStorage.removeItem("skaev-auth-storage");
+          localStorage.removeItem("skaev-auth-storage");
+
+          // Clear persist storage of bookingStore
+          sessionStorage.removeItem("booking-store");
+          localStorage.removeItem("booking-store");
+
+          // Clear persist storage of customerStore
+          sessionStorage.removeItem("customer-unified-store");
+          localStorage.removeItem("customer-unified-store");
+
+          // Clear charging session data from sessionStorage
+          sessionStorage.removeItem("chargingCurrentBooking");
+          sessionStorage.removeItem("chargingCurrentBookingData");
+          sessionStorage.removeItem("chargingSession");
+          sessionStorage.removeItem("chargingSessionData");
+
+          // Reset booking store state (if available)
+          try {
+            if (!bookingStoreModule) {
+              bookingStoreModule = await import("./bookingStore");
+            }
+            const bookingState = bookingStoreModule.default.getState();
+            if (bookingState.resetFlowState) {
+              bookingState.resetFlowState();
+            }
+            // Also clear booking history and current booking
+            bookingStoreModule.default.setState({
+              currentBooking: null,
+              chargingSession: null,
+              bookings: [],
+              bookingHistory: [],
+              socTracking: {},
+            });
+          } catch (err) {
+            console.warn("Could not reset booking store:", err);
+          }
+
+          // Reset customer store state (if available)
+          try {
+            if (!customerStoreModule) {
+              customerStoreModule = await import("./customerStore");
+            }
+            customerStoreModule.default.setState({
+              initialized: false,
+              lastSync: null,
+              loading: false,
+              error: null,
+            });
+          } catch (err) {
+            console.warn("Could not reset customer store:", err);
+          }
+
+          // Reset auth store state
           set({
             user: null,
             isAuthenticated: false,
@@ -156,6 +218,7 @@ const useAuthStore = create(
         set({ user: userData });
       },
 
+<<<<<<< HEAD
       updateProfile: (profileData) => {
         const currentUser = get().user;
         if (currentUser) {
@@ -165,6 +228,43 @@ const useAuthStore = create(
               ...profileData,
             },
           });
+=======
+      updateProfile: async (profileData) => {
+        const currentUser = get().user;
+        if (!currentUser) {
+          return { success: false, error: "No user logged in" };
+        }
+
+        try {
+          // Call API to update profile
+          const response = await axiosInstance.put(
+            "/auth/profile",
+            profileData
+          );
+
+          if (response.data?.success && response.data?.data) {
+            // Update local state with response data
+            set({
+              user: {
+                ...currentUser,
+                ...response.data.data,
+              },
+            });
+            return { success: true, data: response.data.data };
+          }
+
+          return {
+            success: false,
+            error: response.data?.message || "Update failed",
+          };
+        } catch (error) {
+          console.error("❌ Update profile error:", error);
+          return {
+            success: false,
+            error:
+              error.response?.data?.message || error.message || "Network error",
+          };
+>>>>>>> origin/develop
         }
       },
 

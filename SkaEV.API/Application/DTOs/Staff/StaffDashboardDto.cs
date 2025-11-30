@@ -1,5 +1,8 @@
 namespace SkaEV.API.Application.DTOs.Staff;
 
+/// <summary>
+/// DTO bảng điều khiển dành cho nhân viên.
+/// </summary>
 public class StaffDashboardDto
 {
     public bool HasAssignment { get; set; }
@@ -11,6 +14,9 @@ public class StaffDashboardDto
     public DateTime GeneratedAtUtc { get; set; } = DateTime.UtcNow;
 }
 
+/// <summary>
+/// DTO thông tin trạm của nhân viên.
+/// </summary>
 public class StaffStationDto
 {
     public int StationId { get; set; }
@@ -23,6 +29,9 @@ public class StaffStationDto
     public string Status { get; set; } = string.Empty;
 }
 
+/// <summary>
+/// DTO hồ sơ nhân viên.
+/// </summary>
 public class StaffProfileDto
 {
     public int UserId { get; set; }
@@ -31,6 +40,9 @@ public class StaffProfileDto
     public string? PhoneNumber { get; set; }
 }
 
+/// <summary>
+/// DTO thông tin đầu nối sạc (connector) dành cho nhân viên.
+/// </summary>
 public class StaffConnectorDto
 {
     public int SlotId { get; set; }
@@ -47,6 +59,9 @@ public class StaffConnectorDto
     public StaffConnectorSessionDto? ActiveSession { get; set; }
 }
 
+/// <summary>
+/// DTO phiên sạc trên đầu nối dành cho nhân viên.
+/// </summary>
 public class StaffConnectorSessionDto
 {
     public int BookingId { get; set; }
@@ -59,6 +74,9 @@ public class StaffConnectorSessionDto
     public decimal? EnergyDelivered { get; set; }
 }
 
+/// <summary>
+/// DTO thống kê hàng ngày của nhân viên.
+/// </summary>
 public class StaffDailyStatsDto
 {
     public decimal Revenue { get; set; }
@@ -68,6 +86,9 @@ public class StaffDailyStatsDto
     public int PendingPayments { get; set; }
 }
 
+/// <summary>
+/// DTO cảnh báo dành cho nhân viên.
+/// </summary>
 public class StaffAlertDto
 {
     public int AlertId { get; set; }

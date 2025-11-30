@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Data.SqlClient;
@@ -7,21 +8,30 @@ namespace SkaEV.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize(Roles = "admin")]
 public class DiagnosticController : ControllerBase
 {
     private readonly SkaEVDbContext _context;
 
+    /// <summary>
+    /// Constructor nhận vào DbContext.
+    /// </summary>
+    /// <param name="context">Database context.</param>
     public DiagnosticController(SkaEVDbContext context)
     {
         _context = context;
     }
 
+    /// <summary>
+    /// Lấy thông tin kết nối cơ sở dữ liệu (đã che giấu thông tin nhạy cảm).
+    /// </summary>
+    /// <returns>Thông tin kết nối.</returns>
     [HttpGet("connection-info")]
     public IActionResult GetConnectionInfo()
     {
         var connectionString = _context.Database.GetConnectionString();
 
-        // Parse to hide sensitive info
+        // Parse để ẩn thông tin nhạy cảm
         var builder = new SqlConnectionStringBuilder(connectionString ?? "");
 
         return Ok(new
@@ -32,10 +42,14 @@ public class DiagnosticController : ControllerBase
         });
     }
 
+    /// <summary>
+    /// Đếm số lượng trụ sạc trong hệ thống.
+    /// </summary>
+    /// <returns>Số lượng trụ sạc tổng và theo trạm.</returns>
     [HttpGet("posts-count")]
     public async Task<IActionResult> GetPostsCount()
     {
-        // Clear change tracker to ensure fresh data
+        // Xóa change tracker để đảm bảo dữ liệu mới nhất
         _context.ChangeTracker.Clear();
 
         var totalPosts = await _context.ChargingPosts.AsNoTracking().CountAsync();
@@ -50,6 +64,11 @@ public class DiagnosticController : ControllerBase
         });
     }
 
+    /// <summary>
+    /// Thực hiện truy vấn SQL thô để kiểm tra dữ liệu trụ sạc.
+    /// </summary>
+    /// <param name="stationId">ID trạm sạc.</param>
+    /// <returns>Kết quả truy vấn thô.</returns>
     [HttpGet("raw-query-test/{stationId}")]
     public async Task<IActionResult> RawQueryTest(int stationId)
     {
@@ -67,6 +86,9 @@ public class DiagnosticController : ControllerBase
     }
 }
 
+/// <summary>
+/// Class kết quả cho truy vấn thô.
+/// </summary>
 public class PostResult
 {
     public int post_id { get; set; }

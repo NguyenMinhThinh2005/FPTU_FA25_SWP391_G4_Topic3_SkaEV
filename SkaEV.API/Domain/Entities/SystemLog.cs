@@ -1,5 +1,8 @@
 namespace SkaEV.API.Domain.Entities;
 
+/// <summary>
+/// Thực thể nhật ký hệ thống.
+/// </summary>
 public class SystemLog
 {
     public int LogId { get; set; }

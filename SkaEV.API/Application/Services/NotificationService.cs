@@ -5,6 +5,9 @@ using SkaEV.API.Infrastructure.Data;
 
 namespace SkaEV.API.Application.Services;
 
+/// <summary>
+/// Dịch vụ quản lý thông báo cho người dùng.
+/// </summary>
 public class NotificationService : INotificationService
 {
     private readonly SkaEVDbContext _context;
@@ -16,6 +19,12 @@ public class NotificationService : INotificationService
         _logger = logger;
     }
 
+    /// <summary>
+    /// Lấy danh sách thông báo của người dùng.
+    /// </summary>
+    /// <param name="userId">ID người dùng.</param>
+    /// <param name="unreadOnly">Chỉ lấy thông báo chưa đọc.</param>
+    /// <returns>Danh sách thông báo.</returns>
     public async Task<IEnumerable<NotificationDto>> GetUserNotificationsAsync(int userId, bool unreadOnly = false)
     {
         var query = _context.Notifications
@@ -30,6 +39,11 @@ public class NotificationService : INotificationService
             .ToListAsync();
     }
 
+    /// <summary>
+    /// Đếm số lượng thông báo chưa đọc của người dùng.
+    /// </summary>
+    /// <param name="userId">ID người dùng.</param>
+    /// <returns>Số lượng thông báo chưa đọc.</returns>
     public async Task<int> GetUnreadCountAsync(int userId)
     {
         return await _context.Notifications
@@ -37,6 +51,11 @@ public class NotificationService : INotificationService
             .CountAsync();
     }
 
+    /// <summary>
+    /// Lấy chi tiết một thông báo theo ID.
+    /// </summary>
+    /// <param name="notificationId">ID thông báo.</param>
+    /// <returns>Thông tin thông báo hoặc null nếu không tìm thấy.</returns>
     public async Task<NotificationDto?> GetNotificationByIdAsync(int notificationId)
     {
         var notification = await _context.Notifications
@@ -45,6 +64,10 @@ public class NotificationService : INotificationService
         return notification == null ? null : MapToDto(notification);
     }
 
+    /// <summary>
+    /// Đánh dấu một thông báo là đã đọc.
+    /// </summary>
+    /// <param name="notificationId">ID thông báo.</param>
     public async Task MarkAsReadAsync(int notificationId)
     {
         var notification = await _context.Notifications
@@ -59,6 +82,10 @@ public class NotificationService : INotificationService
         _logger.LogInformation("Marked notification {NotificationId} as read", notificationId);
     }
 
+    /// <summary>
+    /// Đánh dấu tất cả thông báo của người dùng là đã đọc.
+    /// </summary>
+    /// <param name="userId">ID người dùng.</param>
     public async Task MarkAllAsReadAsync(int userId)
     {
         var notifications = await _context.Notifications
@@ -75,6 +102,10 @@ public class NotificationService : INotificationService
         _logger.LogInformation("Marked all notifications as read for user {UserId}", userId);
     }
 
+    /// <summary>
+    /// Xóa một thông báo.
+    /// </summary>
+    /// <param name="notificationId">ID thông báo.</param>
     public async Task DeleteNotificationAsync(int notificationId)
     {
         var notification = await _context.Notifications
@@ -83,24 +114,40 @@ public class NotificationService : INotificationService
         if (notification == null)
             throw new ArgumentException("Notification not found");
 
-        _context.Notifications.Remove(notification);
+        // Soft-delete notification
+        notification.DeletedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
 
-        _logger.LogInformation("Deleted notification {NotificationId}", notificationId);
+        _logger.LogInformation("Soft-deleted notification {NotificationId}", notificationId);
     }
 
+    /// <summary>
+    /// Xóa tất cả thông báo đã đọc của người dùng.
+    /// </summary>
+    /// <param name="userId">ID người dùng.</param>
     public async Task DeleteAllReadAsync(int userId)
     {
         var notifications = await _context.Notifications
             .Where(n => n.UserId == userId && n.IsRead)
             .ToListAsync();
 
-        _context.Notifications.RemoveRange(notifications);
+        // Soft-delete read notifications in bulk
+        var now = DateTime.UtcNow;
+        foreach (var n in notifications)
+        {
+            n.DeletedAt = now;
+        }
+
         await _context.SaveChangesAsync();
 
-        _logger.LogInformation("Deleted {Count} read notifications for user {UserId}", notifications.Count, userId);
+        _logger.LogInformation("Soft-deleted {Count} read notifications for user {UserId}", notifications.Count, userId);
     }
 
+    /// <summary>
+    /// Gửi thông báo cho một người dùng cụ thể.
+    /// </summary>
+    /// <param name="createDto">Thông tin thông báo.</param>
+    /// <returns>Thông tin thông báo vừa gửi.</returns>
     public async Task<NotificationDto> SendNotificationAsync(CreateNotificationDto createDto)
     {
         var notification = new Notification
@@ -121,6 +168,11 @@ public class NotificationService : INotificationService
         return MapToDto(notification);
     }
 
+    /// <summary>
+    /// Gửi thông báo hàng loạt cho nhiều người dùng.
+    /// </summary>
+    /// <param name="broadcastDto">Thông tin thông báo broadcast.</param>
+    /// <returns>Số lượng người dùng nhận được thông báo.</returns>
     public async Task<int> BroadcastNotificationAsync(BroadcastNotificationDto broadcastDto)
     {
         var userQuery = _context.Users.Where(u => u.IsActive);

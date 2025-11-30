@@ -1,5 +1,6 @@
 ﻿import { create } from "zustand";
 import { stationsAPI } from "../services/api";
+import adminStationAPI from "../services/adminStationAPI";
 import { calculateDistance } from "../utils/helpers";
 
 // Transform API response to frontend format
@@ -7,8 +8,9 @@ const transformStationData = (apiStation, slotsData = null) => {
   try {
     // API may still provide legacy totals named 'totalPosts' / 'availablePosts'.
     // Map them to frontend-friendly pole/port names and keep backwards fallback.
-  let totalPoles = apiStation.totalPoles ?? apiStation.totalPosts ?? 0;
-  let availablePoles = apiStation.availablePoles ?? apiStation.availablePosts ?? 0;
+    let totalPoles = apiStation.totalPoles ?? apiStation.totalPosts ?? 0;
+    let availablePoles =
+      apiStation.availablePoles ?? apiStation.availablePosts ?? 0;
 
     let poles = [];
 
@@ -20,18 +22,38 @@ const transformStationData = (apiStation, slotsData = null) => {
         // Backend returns maxPower instead of powerKw
         const powerKw = slot.powerKw || slot.maxPower || 0;
         const postId = slot.chargingPostId || slot.postId;
+<<<<<<< HEAD
         const postNumber = slot.postNumber || `POST-${postId}`;
         
+=======
+        const slotPower = Number(slot.maxPower ?? slot.powerKw ?? 0);
+        const connectorFromDb = slot.connectorType ?? undefined;
+        const slotConnector =
+          connectorFromDb ?? (slotPower >= 50 ? "DC" : "AC");
+        const isDc =
+          (slotConnector || "").toUpperCase().includes("DC") || slotPower >= 50;
+>>>>>>> origin/develop
         if (!postMap.has(postId)) {
           postMap.set(postId, {
             id: `${apiStation.stationId}-post${postId}`,
             poleId: `${apiStation.stationId}-post${postId}`,
+<<<<<<< HEAD
             name: postNumber,
             poleNumber: postId,
             type: powerKw >= 50 ? "DC" : "AC",
             power: powerKw,
             voltage: powerKw >= 50 ? 400 : 220,
             status: slot.status || "active",
+=======
+            name: slot.postNumber
+              ? `Trụ ${slot.postNumber}`
+              : `Trụ sạc ${postId}`,
+            poleNumber: slot.postNumber ?? postId,
+            type: isDc ? "DC" : "AC",
+            power: slotPower,
+            voltage: isDc ? 400 : 220,
+            status: slot.status || "available",
+>>>>>>> origin/develop
             ports: [],
             totalPorts: 0,
             availablePorts: 0,
@@ -43,27 +65,40 @@ const transformStationData = (apiStation, slotsData = null) => {
           id: `${apiStation.stationId}-slot${slot.slotId}`,
           portId: `${apiStation.stationId}-slot${slot.slotId}`,
           slotId: slot.slotId,
+<<<<<<< HEAD
           portNumber: slot.slotNumber || slot.slotId,
           connectorType:
             slot.connectorType || (powerKw >= 50 ? "CCS2" : "Type 2"),
           maxPower: powerKw,
           status: slot.status === "available" ? "available" : "occupied",
           currentRate: powerKw >= 50 ? 5000 : 3000,
+=======
+          portNumber: slot.slotNumber ?? slot.slotId,
+          connectorType: slotConnector,
+          maxPower: slotPower,
+          status:
+            (slot.status || "available").toLowerCase() === "available"
+              ? "available"
+              : "occupied",
+          currentRate: null,
+>>>>>>> origin/develop
         });
+        post.power = Math.max(post.power, slotPower);
+        post.status = slot.status || post.status;
         post.totalPorts += 1;
-        if (slot.status === "available") {
+        if ((slot.status || "").toLowerCase() === "available") {
           post.availablePorts += 1;
         }
       });
 
       poles = Array.from(postMap.values());
-      console.log(
-        `✅ Loaded ${poles.length} poles from real database slots for station ${apiStation.stationId}`
-      );
     }
 
     let totalPorts = poles.reduce((sum, pole) => sum + pole.totalPorts, 0);
-    let availablePorts = poles.reduce((sum, pole) => sum + pole.availablePorts, 0);
+    let availablePorts = poles.reduce(
+      (sum, pole) => sum + pole.availablePorts,
+      0
+    );
 
     if (poles.length === 0) {
       const aggregatedTotalPorts =
@@ -129,10 +164,46 @@ const transformStationData = (apiStation, slotsData = null) => {
         .filter(Boolean)
         .forEach((c) => connectorTypesSet.add(c));
     } else if (Array.isArray(apiConnectorTypes)) {
-      apiConnectorTypes.filter(Boolean).forEach((c) => connectorTypesSet.add(c));
+      apiConnectorTypes
+        .filter(Boolean)
+        .forEach((c) => connectorTypesSet.add(c));
     }
 
     const connectorTypes = Array.from(connectorTypesSet);
+
+    const utilizationRate = Number(
+      Number.isFinite(apiStation.utilizationRate)
+        ? apiStation.utilizationRate
+        : apiStation.utilization || 0
+    );
+
+    const monthlyRevenue = Number(
+      apiStation.monthlyRevenue ??
+        apiStation.revenue ??
+        apiStation.todayRevenue ??
+        0
+    );
+
+    const monthlyCompletedSessions =
+      apiStation.monthlyCompletedSessions ??
+      apiStation.monthlyBookings ??
+      apiStation.todayCompletedSessions ??
+      0;
+
+    const averageSessionMinutes = Number(
+      apiStation.averageSessionDurationMinutes ?? apiStation.avgSessionTime ?? 0
+    );
+
+    const todayRevenue = Number(apiStation.todayRevenue ?? 0);
+    const todayCompletedSessions =
+      apiStation.todayCompletedSessions ?? apiStation.todaySessionCount ?? 0;
+
+    const basePrice = Number(
+      apiStation.basePricePerKwh ??
+        apiStation.pricePerKwh ??
+        apiStation.basePrice ??
+        0
+    );
 
     const managerUserId =
       apiStation.managerUserId ??
@@ -146,9 +217,7 @@ const transformStationData = (apiStation, slotsData = null) => {
       apiStation.managerFullName ??
       null;
     const managerEmail =
-      apiStation.managerEmail ??
-      apiStation.manager?.email ??
-      null;
+      apiStation.managerEmail ?? apiStation.manager?.email ?? null;
     const managerPhone =
       apiStation.managerPhoneNumber ??
       apiStation.manager?.phone ??
@@ -164,6 +233,7 @@ const transformStationData = (apiStation, slotsData = null) => {
             phone: managerPhone ?? null,
           }
         : null;
+<<<<<<< HEAD
     
     // Debug log to check final values
     console.log(`🔍 Station ${apiStation.stationId} - Final values:`, {
@@ -174,6 +244,21 @@ const transformStationData = (apiStation, slotsData = null) => {
       polesCount: poles.length
     });
     
+=======
+
+    // Normalize and expose a few canonical metrics for UI and services
+    const occupied = Math.max(
+      0,
+      Math.min(totalPorts - availablePorts, totalPorts)
+    );
+    const normalizedUtilization =
+      totalPorts > 0 ? (occupied / totalPorts) * 100 : utilizationRate || 0;
+    const derivedActiveSessions =
+      Number.isFinite(totalPorts) && Number.isFinite(availablePorts)
+        ? Math.max(0, totalPorts - availablePorts)
+        : 0;
+
+>>>>>>> origin/develop
     return {
       id: apiStation.stationId,
       stationId: apiStation.stationId,
@@ -196,19 +281,44 @@ const transformStationData = (apiStation, slotsData = null) => {
         maxPower,
         connectorTypes,
         pricing: {
-          acRate: 3500,
-          dcRate: 5000,
-          dcFastRate: 7000,
+          baseRate: basePrice > 0 ? basePrice : 0,
+          acRate: basePrice > 0 ? basePrice : 0,
+          dcRate: basePrice > 0 ? basePrice : 0,
+          dcFastRate: basePrice > 0 ? basePrice : 0,
         },
+        pricePerKwh: basePrice > 0 ? basePrice : null,
       },
       stats: {
         total: totalPorts,
         available: availablePorts,
-        occupied: Math.max(totalPorts - availablePorts, 0),
+        occupied,
       },
+      // Pass through backend calculated fields directly
+      totalPosts: apiStation.totalPosts || 0,
+      availablePosts: apiStation.availablePosts || 0,
+      totalSlots: apiStation.totalSlots || 0,
+      availableSlots: apiStation.availableSlots || 0,
+      occupiedSlots: apiStation.occupiedSlots || 0,
+      // Canonical active sessions: prefer explicit realtime value, fall back to derived occupied ports
+      activeSessions: apiStation.activeSessions ?? derivedActiveSessions,
+      utilizationRate,
+      utilization:
+        Math.round((normalizedUtilization + Number.EPSILON) * 100) / 100,
+      todayRevenue,
+      todayCompletedSessions,
+      todaySessionCount: todayCompletedSessions,
+      revenue: monthlyRevenue,
+      monthlyRevenue,
+      monthlyBookings: monthlyCompletedSessions,
+      monthlyCompletedSessions,
+      avgSessionTime: averageSessionMinutes,
+      averageSessionDurationMinutes: averageSessionMinutes,
+      currentPowerUsageKw: apiStation.currentPowerUsageKw || 0,
+      totalPowerCapacityKw: apiStation.totalPowerCapacityKw || 0,
       amenities: apiStation.amenities || [],
       operatingHours: apiStation.operatingHours || "00:00-24:00",
       imageUrl: apiStation.stationImageUrl,
+      basePricePerKwh: basePrice > 0 ? basePrice : null,
       ratings: {
         overall: 4.5,
         totalReviews: 0,
@@ -296,6 +406,7 @@ const useStationStore = create((set, get) => ({
           rawStations.map(async (station) => {
             try {
               // Try to fetch slots for each station
+<<<<<<< HEAD
               // axios interceptor returns response.data, so slotsResponse = {success: true, data: [...]}
               const slotsResponse = await stationsAPI.getStationSlots(station.stationId);
               
@@ -311,6 +422,24 @@ const useStationStore = create((set, get) => ({
               }
             } catch (slotError) {
               console.warn(`⚠️ Could not fetch slots for station ${station.stationId}:`, slotError.message);
+=======
+              console.log(
+                `🔌 Fetching slots for station ${station.stationId}...`
+              );
+              const slotsResponse = await stationsAPI.getStationSlots(
+                station.stationId
+              );
+              const slotsData = slotsResponse.data || slotsResponse.slots || [];
+              console.log(
+                `✅ Loaded ${slotsData.length} slots for station ${station.stationId}`
+              );
+              return transformStationData(station, slotsData);
+            } catch (slotError) {
+              console.warn(
+                `⚠️ Could not fetch slots for station ${station.stationId}, using fallback:`,
+                slotError.message
+              );
+>>>>>>> origin/develop
               return transformStationData(station, null);
             }
           })
@@ -337,6 +466,42 @@ const useStationStore = create((set, get) => ({
       
       // IMPORTANT: Do NOT clear existing stations on error - preserve current data
       set({ error: errorMessage, loading: false });
+      return { success: false, error: errorMessage };
+    }
+  },
+
+  fetchAdminStations: async (filters = {}) => {
+    set({ loading: true, error: null });
+    try {
+      console.log("📡 Fetching admin stations from API...");
+      const response = await adminStationAPI.getStations(filters);
+
+      if (response?.success && Array.isArray(response.data)) {
+        const stations = response.data.map((station) =>
+          transformStationData(station, null)
+        );
+
+        console.log("✅ Admin stations loaded:", stations.length);
+        if (stations.length > 0) {
+          console.log("🔍 Admin station sample:", stations[0]);
+        }
+        set({ stations, loading: false });
+        return {
+          success: true,
+          data: stations,
+          pagination: response.pagination,
+        };
+      }
+
+      console.error("❌ Admin stations response invalid:", response);
+      throw new Error(
+        response?.message || "Không thể tải danh sách trạm quản trị"
+      );
+    } catch (error) {
+      const errorMessage =
+        error.message || "Đã xảy ra lỗi khi tải trạm quản trị";
+      console.error("❌ Fetch admin stations error:", errorMessage);
+      set({ error: errorMessage, loading: false, stations: [] });
       return { success: false, error: errorMessage };
     }
   },
@@ -423,8 +588,12 @@ const useStationStore = create((set, get) => ({
 
       if (connectorFilters.length > 0) {
         const stationConnectors = station.charging?.connectorTypes || [];
-        console.log(`   - Filter connectors: ${JSON.stringify(connectorFilters)}`);
-        console.log(`   - Station connectors: ${JSON.stringify(stationConnectors)}`);
+        console.log(
+          `   - Filter connectors: ${JSON.stringify(connectorFilters)}`
+        );
+        console.log(
+          `   - Station connectors: ${JSON.stringify(stationConnectors)}`
+        );
 
         const hasMatchingConnector = connectorFilters.some((filterType) => {
           const match = stationConnectors.includes(filterType);
@@ -432,7 +601,9 @@ const useStationStore = create((set, get) => ({
           return match;
         });
 
-        console.log(`   - Has matching connector: ${hasMatchingConnector ? "✅" : "❌"}`);
+        console.log(
+          `   - Has matching connector: ${hasMatchingConnector ? "✅" : "❌"}`
+        );
         if (!hasMatchingConnector) return false;
       }
 
@@ -495,15 +666,49 @@ const useStationStore = create((set, get) => ({
   },
 
   remoteDisableStation: async (stationId) => {
-    await new Promise((r) => setTimeout(r, 300));
-    get().setStationStatus(stationId, "offline");
-    return { success: true };
+    try {
+      // Call backend admin control to disable whole station
+      const resp = await adminStationAPI.controlStation(
+        stationId,
+        "disable_all",
+        "Disabled from Admin UI"
+      );
+      // Expect backend to return { success: true } or similar
+      if (resp && (resp.success === true || resp === true)) {
+        get().setStationStatus(stationId, "offline");
+        return { success: true };
+      }
+
+      const msg =
+        (resp && resp.message) || "Unknown response from controlStation";
+      console.error("❌ Failed to disable station:", stationId, msg);
+      return { success: false, error: msg };
+    } catch (error) {
+      console.error("❌ remoteDisableStation error:", error);
+      return { success: false, error: error?.message || String(error) };
+    }
   },
 
   remoteEnableStation: async (stationId) => {
-    await new Promise((r) => setTimeout(r, 300));
-    get().setStationStatus(stationId, "active");
-    return { success: true };
+    try {
+      const resp = await adminStationAPI.controlStation(
+        stationId,
+        "enable_all",
+        "Enabled from Admin UI"
+      );
+      if (resp && (resp.success === true || resp === true)) {
+        get().setStationStatus(stationId, "active");
+        return { success: true };
+      }
+
+      const msg =
+        (resp && resp.message) || "Unknown response from controlStation";
+      console.error("❌ Failed to enable station:", stationId, msg);
+      return { success: false, error: msg };
+    } catch (error) {
+      console.error("❌ remoteEnableStation error:", error);
+      return { success: false, error: error?.message || String(error) };
+    }
   },
 
   // Add new station (Admin only)
@@ -511,20 +716,47 @@ const useStationStore = create((set, get) => ({
     set({ loading: true, error: null });
     try {
       const response = await stationsAPI.create(stationData);
+      const creationSucceeded = response?.success !== false;
+      const createdPayload = response?.data ?? response?.station ?? response;
 
-      if (response.success && response.data) {
-        const newStation = response.data;
-
-        set((state) => ({
-          stations: [...state.stations, newStation],
-          loading: false,
-        }));
-
-        console.log("✅ New station added:", newStation.name);
-        return { success: true, station: newStation };
-      } else {
-        throw new Error(response.message || "Không thể thêm trạm mới");
+      if (!creationSucceeded || !createdPayload) {
+        throw new Error(response?.message || "Không thể thêm trạm mới");
       }
+
+      const stationId = createdPayload.stationId ?? createdPayload.id;
+      if (!stationId) {
+        throw new Error("Phản hồi tạo trạm không hợp lệ");
+      }
+
+      let normalizedStation = null;
+      try {
+        const [stationDetail, slotsResponse] = await Promise.all([
+          stationsAPI.getById(stationId),
+          stationsAPI.getStationSlots(stationId).catch(() => null),
+        ]);
+
+        const stationDto = stationDetail?.data ?? stationDetail;
+        const slotsData = slotsResponse?.data ?? slotsResponse?.slots ?? [];
+        normalizedStation = transformStationData(stationDto, slotsData);
+      } catch (refreshError) {
+        console.error(
+          "⚠️ Không thể tải lại dữ liệu trạm vừa tạo:",
+          refreshError
+        );
+        normalizedStation = transformStationData(createdPayload, null);
+      }
+
+      set((state) => ({
+        stations: [
+          ...state.stations.filter(
+            (station) => station.stationId !== normalizedStation.stationId
+          ),
+          normalizedStation,
+        ],
+        loading: false,
+      }));
+
+      return { success: true, station: normalizedStation };
     } catch (error) {
       const errorMessage = error.message || "Đã xảy ra lỗi khi thêm trạm";
       set({ error: errorMessage, loading: false });
@@ -537,26 +769,29 @@ const useStationStore = create((set, get) => ({
     set({ loading: true, error: null });
     try {
       const response = await stationsAPI.update(stationId, stationData);
+      const updateSucceeded = response?.success !== false;
 
-      if (response.success) {
-        set((state) => ({
-          stations: state.stations.map((station) =>
-            station.id === stationId
-              ? {
-                  ...station,
-                  ...stationData,
-                  lastUpdated: new Date().toISOString(),
-                }
-              : station
-          ),
-          loading: false,
-        }));
-
-        console.log("✅ Station updated successfully:", stationId);
-        return { success: true };
-      } else {
-        throw new Error(response.message || "Không thể cập nhật trạm");
+      if (!updateSucceeded) {
+        throw new Error(response?.message || "Không thể cập nhật trạm");
       }
+
+      const [stationDetail, slotsResponse] = await Promise.all([
+        stationsAPI.getById(stationId),
+        stationsAPI.getStationSlots(stationId).catch(() => null),
+      ]);
+
+      const stationDto = stationDetail?.data ?? stationDetail;
+      const slotsData = slotsResponse?.data ?? slotsResponse?.slots ?? [];
+      const normalizedStation = transformStationData(stationDto, slotsData);
+
+      set((state) => ({
+        stations: state.stations.map((station) =>
+          station.stationId === stationId ? normalizedStation : station
+        ),
+        loading: false,
+      }));
+
+      return { success: true };
     } catch (error) {
       const errorMessage = error.message || "Đã xảy ra lỗi khi cập nhật trạm";
       set({ error: errorMessage, loading: false });
@@ -564,13 +799,14 @@ const useStationStore = create((set, get) => ({
     }
   },
 
-  // Delete station (Admin only)
+  // Delete station (Admin only) — use admin API to perform a soft-delete
   deleteStation: async (stationId) => {
     set({ loading: true, error: null });
     try {
-      const response = await stationsAPI.delete(stationId);
+      // Use admin endpoint to avoid hard-delete foreign key conflicts
+      const response = await adminStationAPI.deleteStation(stationId);
 
-      if (response.success) {
+      if (response && (response.success === true || response === true)) {
         set((state) => ({
           stations: state.stations.filter(
             (station) => station.id !== stationId
@@ -578,13 +814,14 @@ const useStationStore = create((set, get) => ({
           loading: false,
         }));
 
-        console.log("✅ Station deleted:", stationId);
+        console.log("✅ Station soft-deleted via admin API:", stationId);
         return { success: true };
       } else {
-        throw new Error(response.message || "Không thể xóa trạm");
+        throw new Error(response?.message || "Không thể xóa trạm");
       }
     } catch (error) {
-      const errorMessage = error.message || "Đã xảy ra lỗi khi xóa trạm";
+      const errorMessage = error?.message || "Đã xảy ra lỗi khi xóa trạm";
+      console.error("❌ deleteStation error:", error);
       set({ error: errorMessage, loading: false });
       return { success: false, error: errorMessage };
     }

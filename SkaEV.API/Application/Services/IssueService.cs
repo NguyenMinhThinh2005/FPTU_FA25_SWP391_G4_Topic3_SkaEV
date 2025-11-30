@@ -5,6 +5,9 @@ using SkaEV.API.Infrastructure.Data;
 
 namespace SkaEV.API.Application.Services;
 
+/// <summary>
+/// Dịch vụ quản lý vấn đề (Issue).
+/// </summary>
 public class IssueService : IIssueService
 {
     private readonly SkaEVDbContext _context;
@@ -16,8 +19,12 @@ public class IssueService : IIssueService
         _logger = logger;
     }
 
-    public async Task<IEnumerable<IssueDto>> GetIssuesAsync(string? status, string? priority, int? stationId, int? assignedToUserId, int page, int pageSize)
+    /// <summary>
+    /// Lấy danh sách vấn đề với bộ lọc và phân trang.
+    /// </summary>
+    public Task<IEnumerable<IssueDto>> GetIssuesAsync(string? status, string? priority, int? stationId, int? assignedToUserId, int page, int pageSize)
     {
+<<<<<<< HEAD
         try
         {
             var query = _context.Issues
@@ -89,10 +96,19 @@ public class IssueService : IIssueService
             _logger.LogError(ex, "Error getting issues");
             return new List<IssueDto>();
         }
+=======
+        // Note: This requires the Issues table from 08_ADD_ISSUES_TABLE.sql
+        // Returning empty list if table doesn't exist
+        return Task.FromResult<IEnumerable<IssueDto>>(new List<IssueDto>());
+>>>>>>> origin/develop
     }
 
-    public async Task<int> GetIssueCountAsync(string? status, string? priority, int? stationId, int? assignedToUserId)
+    /// <summary>
+    /// Đếm số lượng vấn đề theo bộ lọc.
+    /// </summary>
+    public Task<int> GetIssueCountAsync(string? status, string? priority, int? stationId, int? assignedToUserId)
     {
+<<<<<<< HEAD
         try
         {
             var query = _context.Issues.AsQueryable();
@@ -123,10 +139,17 @@ public class IssueService : IIssueService
         {
             return 0;
         }
+=======
+        return Task.FromResult(0); // Placeholder
+>>>>>>> origin/develop
     }
 
-    public async Task<IEnumerable<IssueDto>> GetUserAssignedIssuesAsync(int userId, string? status)
+    /// <summary>
+    /// Lấy danh sách vấn đề được giao cho người dùng.
+    /// </summary>
+    public Task<IEnumerable<IssueDto>> GetUserAssignedIssuesAsync(int userId, string? status)
     {
+<<<<<<< HEAD
         try
         {
             var query = _context.Issues
@@ -177,10 +200,17 @@ public class IssueService : IIssueService
             _logger.LogError(ex, "Error getting user assigned issues");
             return new List<IssueDto>();
         }
+=======
+        return Task.FromResult<IEnumerable<IssueDto>>(new List<IssueDto>()); // Placeholder
+>>>>>>> origin/develop
     }
 
-    public async Task<IssueDetailDto?> GetIssueDetailAsync(int issueId)
+    /// <summary>
+    /// Lấy chi tiết vấn đề theo ID.
+    /// </summary>
+    public Task<IssueDetailDto?> GetIssueDetailAsync(int issueId)
     {
+<<<<<<< HEAD
         try
         {
             var issue = await _context.Issues
@@ -226,10 +256,17 @@ public class IssueService : IIssueService
             _logger.LogError(ex, "Error getting issue detail {IssueId}", issueId);
             return null;
         }
+=======
+        return Task.FromResult<IssueDetailDto?>(null); // Placeholder
+>>>>>>> origin/develop
     }
 
-    public async Task<IssueDto> CreateIssueAsync(int reportedByUserId, CreateIssueDto createDto)
+    /// <summary>
+    /// Tạo mới vấn đề.
+    /// </summary>
+    public Task<IssueDto> CreateIssueAsync(int reportedByUserId, CreateIssueDto createDto)
     {
+<<<<<<< HEAD
         try
         {
             // Verify station exists
@@ -290,33 +327,52 @@ public class IssueService : IIssueService
             _logger.LogError(ex, "Error creating issue");
             throw;
         }
+=======
+        return Task.FromException<IssueDto>(new NotImplementedException("Issues table not yet created. Run 08_ADD_ISSUES_TABLE.sql first."));
+>>>>>>> origin/develop
     }
 
-    public async Task<IssueDto> UpdateIssueAsync(int issueId, UpdateIssueDto updateDto)
+    /// <summary>
+    /// Cập nhật thông tin vấn đề.
+    /// </summary>
+    public Task<IssueDto> UpdateIssueAsync(int issueId, UpdateIssueDto updateDto)
     {
-        throw new NotImplementedException("Issues table not yet created. Run 08_ADD_ISSUES_TABLE.sql first.");
+        return Task.FromException<IssueDto>(new NotImplementedException("Issues table not yet created. Run 08_ADD_ISSUES_TABLE.sql first."));
     }
 
-    public async Task<IssueDto> AssignIssueAsync(int issueId, int assignedToUserId)
+    /// <summary>
+    /// Giao vấn đề cho nhân viên.
+    /// </summary>
+    public Task<IssueDto> AssignIssueAsync(int issueId, int assignedToUserId)
     {
-        throw new NotImplementedException("Issues table not yet created. Run 08_ADD_ISSUES_TABLE.sql first.");
+        return Task.FromException<IssueDto>(new NotImplementedException("Issues table not yet created. Run 08_ADD_ISSUES_TABLE.sql first."));
     }
 
-    public async Task<IssueDto> UpdateIssueStatusAsync(int issueId, string status, string? resolution)
+    /// <summary>
+    /// Cập nhật trạng thái vấn đề.
+    /// </summary>
+    public Task<IssueDto> UpdateIssueStatusAsync(int issueId, string status, string? resolution)
     {
-        throw new NotImplementedException("Issues table not yet created. Run 08_ADD_ISSUES_TABLE.sql first.");
+        return Task.FromException<IssueDto>(new NotImplementedException("Issues table not yet created. Run 08_ADD_ISSUES_TABLE.sql first."));
     }
 
-    public async Task<IssueCommentDto> AddCommentAsync(int issueId, int userId, string comment)
+    /// <summary>
+    /// Thêm bình luận vào vấn đề.
+    /// </summary>
+    public Task<IssueCommentDto> AddCommentAsync(int issueId, int userId, string comment)
     {
-        throw new NotImplementedException("Issues table not yet created. Run 08_ADD_ISSUES_TABLE.sql first.");
+        return Task.FromException<IssueCommentDto>(new NotImplementedException("Issues table not yet created. Run 08_ADD_ISSUES_TABLE.sql first."));
     }
 
-    public async Task<IssueAttachmentDto> AddAttachmentAsync(int issueId, int userId, IFormFile file, string? description)
+    /// <summary>
+    /// Thêm tệp đính kèm vào vấn đề.
+    /// </summary>
+    public Task<IssueAttachmentDto> AddAttachmentAsync(int issueId, int userId, IFormFile file, string? description)
     {
-        throw new NotImplementedException("Issues table not yet created. Run 08_ADD_ISSUES_TABLE.sql first.");
+        return Task.FromException<IssueAttachmentDto>(new NotImplementedException("Issues table not yet created. Run 08_ADD_ISSUES_TABLE.sql first."));
     }
 
+<<<<<<< HEAD
     public async Task<bool> HasAdminResponseAsync(int issueId)
     {
         try
@@ -356,11 +412,22 @@ public class IssueService : IIssueService
             await _context.SaveChangesAsync();
             _logger.LogInformation("Deleted issue {IssueId}", issueId);
         }
+=======
+    /// <summary>
+    /// Xóa vấn đề.
+    /// </summary>
+    public Task DeleteIssueAsync(int issueId)
+    {
+        return Task.FromException(new NotImplementedException("Issues table not yet created. Run 08_ADD_ISSUES_TABLE.sql first."));
+>>>>>>> origin/develop
     }
 
-    public async Task<IssueStatisticsDto> GetIssueStatisticsAsync(int? stationId)
+    /// <summary>
+    /// Lấy thống kê vấn đề.
+    /// </summary>
+    public Task<IssueStatisticsDto> GetIssueStatisticsAsync(int? stationId)
     {
-        return new IssueStatisticsDto
+        return Task.FromResult(new IssueStatisticsDto
         {
             TotalIssues = 0,
             OpenIssues = 0,
@@ -371,11 +438,14 @@ public class IssueService : IIssueService
             MediumPriorityIssues = 0,
             LowPriorityIssues = 0,
             AverageResolutionTimeHours = 0
-        };
+        });
     }
 
-    public async Task<IEnumerable<MaintenanceScheduleDto>> GetMaintenanceScheduleAsync(int? stationId, DateTime? startDate, DateTime? endDate)
+    /// <summary>
+    /// Lấy lịch bảo trì.
+    /// </summary>
+    public Task<IEnumerable<MaintenanceScheduleDto>> GetMaintenanceScheduleAsync(int? stationId, DateTime? startDate, DateTime? endDate)
     {
-        return new List<MaintenanceScheduleDto>(); // Placeholder
+        return Task.FromResult<IEnumerable<MaintenanceScheduleDto>>(new List<MaintenanceScheduleDto>()); // Placeholder
     }
 }

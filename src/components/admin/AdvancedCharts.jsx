@@ -8,8 +8,13 @@ import {
   CircularProgress,
   Alert,
   Tabs,
-  Tab
+  Tab,
+  TextField,
+  Button
 } from '@mui/material';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import {
   LineChart,
   Line,
@@ -26,14 +31,33 @@ import {
   ResponsiveContainer
 } from 'recharts';
 import stationAnalyticsAPI from '../../services/stationAnalyticsAPI';
+import reportsAPI from '../../services/api/reportsAPI';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
 
-const AdvancedCharts = ({ stationId }) => {
+const AdvancedCharts = ({ stationId, showEnergy = true }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [analytics, setAnalytics] = useState(null);
   const [currentTab, setCurrentTab] = useState(0);
+  
+  // Date range state (local to this component)
+  const [dateRange, setDateRange] = useState({
+    startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    endDate: new Date().toISOString().split('T')[0]
+  });
+  const [appliedDateRange, setAppliedDateRange] = useState({
+    startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    endDate: new Date().toISOString().split('T')[0]
+  });
+  
+  // Time-series data state
+  const [timeSeriesData, setTimeSeriesData] = useState([]);
+  const [loadingTimeSeries, setLoadingTimeSeries] = useState(false);
+
+  const handleApplyDateRange = () => {
+    setAppliedDateRange({ ...dateRange });
+  };
 
   const loadAnalytics = async () => {
     try {
@@ -49,10 +73,37 @@ const AdvancedCharts = ({ stationId }) => {
     }
   };
 
+  const loadTimeSeriesData = async (start, end) => {
+    try {
+      setLoadingTimeSeries(true);
+      const data = await reportsAPI.getStationDailyAnalytics(stationId, start, end);
+      
+      // Transform data for chart
+      const chartData = data.map(day => ({
+        date: new Date(day.date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }),
+        energyKwh: day.totalEnergyKwh,
+        sessions: day.totalBookings,
+        revenue: day.totalRevenue,
+        completedSessions: day.completedSessions
+      }));
+      
+      setTimeSeriesData(chartData);
+    } catch (err) {
+      console.error('Error loading time series data:', err);
+      setError('Không thể tải dữ liệu theo thời gian. ' + err.message);
+    } finally {
+      setLoadingTimeSeries(false);
+    }
+  };
+
   useEffect(() => {
     loadAnalytics();
+    // Load time-series data when appliedDateRange changes
+    if (appliedDateRange?.startDate && appliedDateRange?.endDate) {
+      loadTimeSeriesData(appliedDateRange.startDate, appliedDateRange.endDate);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stationId]);
+  }, [stationId, appliedDateRange]);
 
   if (loading) {
     return (
@@ -78,13 +129,6 @@ const AdvancedCharts = ({ stationId }) => {
     );
   }
 
-  // Transform power usage data for chart
-  const powerUsageData = analytics.powerUsage.labels.map((label, index) => ({
-    date: label,
-    energy: analytics.powerUsage.datasets[0].data[index],
-    sessions: analytics.powerUsage.datasets[1].data[index]
-  }));
-
   // Transform slot utilization data for chart
   const slotUtilizationData = analytics.slotUtilization.labels.map((label, index) => ({
     slot: label,
@@ -106,6 +150,35 @@ const AdvancedCharts = ({ stationId }) => {
 
   return (
     <Box>
+      {/* Date Range Picker - use MUI DatePicker for calendar popover */}
+      <Box sx={{ display: 'flex', gap: 2, mb: 3, alignItems: 'center' }}>
+        <LocalizationProvider dateAdapter={AdapterDateFns}>
+          <DatePicker
+            label="Từ ngày"
+            value={dateRange.startDate ? new Date(dateRange.startDate) : null}
+            onChange={(d) => setDateRange({ ...dateRange, startDate: d ? d.toISOString().split('T')[0] : '' })}
+            maxDate={new Date()}
+            renderInput={(params) => <TextField {...params} size="small" />}
+          />
+
+          <DatePicker
+            label="Đến ngày"
+            value={dateRange.endDate ? new Date(dateRange.endDate) : null}
+            onChange={(d) => setDateRange({ ...dateRange, endDate: d ? d.toISOString().split('T')[0] : '' })}
+            maxDate={new Date()}
+            renderInput={(params) => <TextField {...params} size="small" />}
+          />
+        </LocalizationProvider>
+
+        <Button 
+          variant="contained" 
+          onClick={handleApplyDateRange}
+          disabled={loadingTimeSeries}
+        >
+          Áp dụng
+        </Button>
+      </Box>
+
       {/* Summary Stats */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
         <Grid item xs={12} sm={6} md={3}>
@@ -173,36 +246,53 @@ const AdvancedCharts = ({ stationId }) => {
       {/* Charts Tabs */}
       <Card>
         <Tabs value={currentTab} onChange={(e, v) => setCurrentTab(v)}>
-          <Tab label="Năng lượng tiêu thụ" />
-          <Tab label="Sử dụng Slot" />
-          <Tab label="Doanh thu" />
-          <Tab label="Phân bố theo giờ" />
+          {showEnergy && <Tab label="NĂNG LƯỢNG TIÊU THỤ" />}
+          <Tab label="SỬ DỤNG SLOT" />
+          <Tab label="DOANH THU" />
+          <Tab label="PHÂN BỐ THEO GIỜ" />
         </Tabs>
 
         <CardContent>
-          {/* Power Usage Chart */}
-          {currentTab === 0 && (
+          {/* Tab contents (index order follows the rendered Tabs above) */}
+
+          {/* Energy tab (only when showEnergy is true) */}
+          {showEnergy && currentTab === 0 && (
             <Box>
               <Typography variant="h6" gutterBottom>
-                Năng lượng tiêu thụ 30 ngày qua
+                Năng lượng tiêu thụ 
               </Typography>
-              <ResponsiveContainer width="100%" height={400}>
-                <LineChart data={powerUsageData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis yAxisId="left" label={{ value: 'kWh', angle: -90, position: 'insideLeft' }} />
-                  <YAxis yAxisId="right" orientation="right" label={{ value: 'Phiên sạc', angle: 90, position: 'insideRight' }} />
-                  <Tooltip />
-                  <Legend />
-                  <Line yAxisId="left" type="monotone" dataKey="energy" stroke="#8884d8" name="Năng lượng (kWh)" strokeWidth={2} />
-                  <Line yAxisId="right" type="monotone" dataKey="sessions" stroke="#82ca9d" name="Số phiên sạc" strokeWidth={2} />
-                </LineChart>
-              </ResponsiveContainer>
+
+              {loadingTimeSeries ? (
+                <Box display="flex" justifyContent="center" p={4}>
+                  <CircularProgress />
+                </Box>
+              ) : timeSeriesData.length === 0 ? (
+                <Alert severity="info">Không có dữ liệu trong khoảng thời gian này</Alert>
+              ) : (
+                <ResponsiveContainer width="100%" height={400}>
+                  <LineChart data={timeSeriesData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" />
+                    <YAxis yAxisId="left" label={{ value: 'kWh', angle: -90, position: 'insideLeft' }} />
+                    <YAxis yAxisId="right" orientation="right" label={{ value: 'Số phiên sạc', angle: 90, position: 'insideRight' }} />
+                    <Tooltip 
+                      formatter={(value, name) => {
+                        if (name === 'Năng lượng (kWh)') return value.toFixed(2) + ' kWh';
+                        return value;
+                      }}
+                    />
+                    <Legend />
+                    <Line yAxisId="left" type="monotone" dataKey="energyKwh" stroke="#8884d8" name="Năng lượng (kWh)" strokeWidth={2} dot={{ r: 4 }} />
+                    <Line yAxisId="right" type="monotone" dataKey="sessions" stroke="#82ca9d" name="Số phiên sạc" strokeWidth={2} dot={{ r: 4 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
             </Box>
           )}
 
           {/* Slot Utilization Chart */}
-          {currentTab === 1 && (
+          {/* Note: When showEnergy is false this becomes tab index 0 */}
+          {((showEnergy && currentTab === 1) || (!showEnergy && currentTab === 0)) && (
             <Box>
               <Typography variant="h6" gutterBottom>
                 Tỷ lệ sử dụng theo Slot
@@ -229,7 +319,7 @@ const AdvancedCharts = ({ stationId }) => {
           )}
 
           {/* Revenue Breakdown Chart */}
-          {currentTab === 2 && (
+          {((showEnergy && currentTab === 2) || (!showEnergy && currentTab === 1)) && (
             <Box>
               <Typography variant="h6" gutterBottom>
                 Phân bổ doanh thu theo phương thức thanh toán
@@ -262,7 +352,7 @@ const AdvancedCharts = ({ stationId }) => {
           )}
 
           {/* Session Patterns Chart */}
-          {currentTab === 3 && (
+          {((showEnergy && currentTab === 3) || (!showEnergy && currentTab === 2)) && (
             <Box>
               <Typography variant="h6" gutterBottom>
                 Phân bố phiên sạc theo giờ

@@ -1,5 +1,8 @@
 namespace SkaEV.API.Domain.Entities;
 
+/// <summary>
+/// Thực thể đại diện cho một hóa đơn.
+/// </summary>
 public class Invoice
 {
     public int InvoiceId { get; set; }

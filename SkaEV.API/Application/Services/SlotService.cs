@@ -5,6 +5,9 @@ using SkaEV.API.Infrastructure.Data;
 
 namespace SkaEV.API.Application.Services;
 
+/// <summary>
+/// Dịch vụ quản lý các khe sạc (Charging Slots).
+/// </summary>
 public class SlotService : ISlotService
 {
     private readonly SkaEVDbContext _context;
@@ -16,6 +19,11 @@ public class SlotService : ISlotService
         _logger = logger;
     }
 
+    /// <summary>
+    /// Lấy danh sách khe sạc của một trụ sạc.
+    /// </summary>
+    /// <param name="postId">ID trụ sạc.</param>
+    /// <returns>Danh sách khe sạc.</returns>
     public async Task<IEnumerable<SlotDto>> GetPostSlotsAsync(int postId)
     {
         return await _context.ChargingSlots
@@ -26,10 +34,17 @@ public class SlotService : ISlotService
             .ToListAsync();
     }
 
+    /// <summary>
+    /// Lấy danh sách khe sạc khả dụng trong khoảng thời gian.
+    /// </summary>
+    /// <param name="postId">ID trụ sạc.</param>
+    /// <param name="startDate">Thời gian bắt đầu.</param>
+    /// <param name="endDate">Thời gian kết thúc.</param>
+    /// <returns>Danh sách khe sạc khả dụng.</returns>
     public async Task<IEnumerable<SlotDto>> GetAvailableSlotsAsync(int postId, DateTime startDate, DateTime endDate)
     {
-        // Note: Current schema doesn't have time-based slots
-        // This implementation returns slots with 'available' status
+        // Lưu ý: Schema hiện tại chưa hỗ trợ slot theo khung giờ chi tiết
+        // Implementation này trả về các slot có trạng thái 'available'
         return await _context.ChargingSlots
             .Include(s => s.ChargingPost)
                 .ThenInclude(p => p.ChargingStation)
@@ -38,6 +53,11 @@ public class SlotService : ISlotService
             .ToListAsync();
     }
 
+    /// <summary>
+    /// Lấy chi tiết một khe sạc theo ID.
+    /// </summary>
+    /// <param name="slotId">ID khe sạc.</param>
+    /// <returns>Thông tin khe sạc hoặc null nếu không tìm thấy.</returns>
     public async Task<SlotDto?> GetSlotByIdAsync(int slotId)
     {
         var slot = await _context.ChargingSlots
@@ -48,6 +68,11 @@ public class SlotService : ISlotService
         return slot == null ? null : MapToDto(slot);
     }
 
+    /// <summary>
+    /// Tạo mới các khe sạc.
+    /// </summary>
+    /// <param name="createDto">Thông tin tạo khe sạc.</param>
+    /// <returns>Danh sách khe sạc vừa tạo.</returns>
     public async Task<IEnumerable<SlotDto>> CreateSlotsAsync(CreateSlotsDto createDto)
     {
         var post = await _context.ChargingPosts
@@ -57,13 +82,12 @@ public class SlotService : ISlotService
             throw new ArgumentException("Post not found");
 
         var slots = new List<ChargingSlot>();
-        
         // Create a single slot (current schema doesn't support time-based scheduling)
         var slot = new ChargingSlot
         {
             PostId = createDto.PostId,
             SlotNumber = $"SLOT-{DateTime.Now.Ticks}",
-            ConnectorType = "Type2", // Default
+            ConnectorType = "Type2", // Mặc định
             MaxPower = post.PowerOutput,
             Status = "available",
             CreatedAt = DateTime.UtcNow,
@@ -72,16 +96,15 @@ public class SlotService : ISlotService
 
         slots.Add(slot);
         _context.ChargingSlots.AddRange(slots);
-        
         // Update post slot counts
         post.TotalSlots += slots.Count;
         post.AvailableSlots += slots.Count;
-        
+
         await _context.SaveChangesAsync();
 
         _logger.LogInformation("Created {Count} slots for post {PostId}", slots.Count, createDto.PostId);
 
-        // Reload with navigation properties
+        // Reload để lấy thông tin navigation properties
         var slotIds = slots.Select(s => s.SlotId).ToList();
         return await _context.ChargingSlots
             .Include(s => s.ChargingPost)
@@ -91,6 +114,12 @@ public class SlotService : ISlotService
             .ToListAsync();
     }
 
+    /// <summary>
+    /// Cập nhật thông tin khe sạc.
+    /// </summary>
+    /// <param name="slotId">ID khe sạc.</param>
+    /// <param name="updateDto">Thông tin cập nhật.</param>
+    /// <returns>Thông tin khe sạc sau khi cập nhật.</returns>
     public async Task<SlotDto> UpdateSlotAsync(int slotId, UpdateSlotDto updateDto)
     {
         var slot = await _context.ChargingSlots
@@ -106,7 +135,7 @@ public class SlotService : ISlotService
             var validStatuses = new[] { "available", "occupied", "reserved", "maintenance" };
             if (!validStatuses.Contains(updateDto.Status))
                 throw new ArgumentException("Invalid status");
-            
+
             slot.Status = updateDto.Status;
         }
 
@@ -118,6 +147,10 @@ public class SlotService : ISlotService
         return MapToDto(slot);
     }
 
+    /// <summary>
+    /// Xóa khe sạc.
+    /// </summary>
+    /// <param name="slotId">ID khe sạc.</param>
     public async Task DeleteSlotAsync(int slotId)
     {
         var slot = await _context.ChargingSlots
@@ -127,24 +160,46 @@ public class SlotService : ISlotService
         if (slot == null)
             throw new ArgumentException("Slot not found");
 
-        // Check if slot is in use
+        // Kiểm tra nếu slot đang được sử dụng
         if (slot.Status == "occupied" || slot.Status == "reserved")
             throw new ArgumentException("Cannot delete slot that is in use");
 
+        // Prevent deleting a slot with any bookings (preserve historical bookings)
+        var hasBookings = await _context.Bookings
+            .Where(b => b.SlotId == slotId)
+            .AnyAsync();
+
+        if (hasBookings)
+            throw new ArgumentException("Cannot delete slot that has bookings. Archive slot or remove bookings first.");
+
         var post = slot.ChargingPost;
-        
-        _context.ChargingSlots.Remove(slot);
-        
+        // Soft-delete slot instead of hard removing
+        var utcNow = DateTime.UtcNow;
+        slot.DeletedAt = utcNow;
+        var wasAvailable = slot.Status == "available";
+        slot.Status = "inactive";
+        slot.UpdatedAt = utcNow;
+
         // Update post slot counts
-        post.TotalSlots--;
-        if (slot.Status == "available")
-            post.AvailableSlots--;
-        
+        if (post != null)
+        {
+            post.TotalSlots = Math.Max(0, post.TotalSlots - 1);
+            if (wasAvailable)
+                post.AvailableSlots = Math.Max(0, post.AvailableSlots - 1);
+            post.UpdatedAt = utcNow;
+        }
         await _context.SaveChangesAsync();
 
-        _logger.LogInformation("Deleted slot {SlotId}", slotId);
+        _logger.LogInformation("Soft-deleted slot {SlotId}", slotId);
     }
 
+    /// <summary>
+    /// Chuyển đổi trạng thái khóa/mở khóa khe sạc (bảo trì).
+    /// </summary>
+    /// <param name="slotId">ID khe sạc.</param>
+    /// <param name="isBlocked">Trạng thái khóa (true = bảo trì).</param>
+    /// <param name="reason">Lý do khóa.</param>
+    /// <returns>Thông tin khe sạc sau khi thay đổi.</returns>
     public async Task<SlotDto> ToggleSlotBlockAsync(int slotId, bool isBlocked, string? reason)
     {
         var slot = await _context.ChargingSlots
@@ -159,7 +214,7 @@ public class SlotService : ISlotService
         slot.Status = isBlocked ? "maintenance" : "available";
         slot.UpdatedAt = DateTime.UtcNow;
 
-        // Update post available slots count
+        // Cập nhật số lượng slot khả dụng của trụ sạc
         var post = await _context.ChargingPosts.FirstAsync(p => p.PostId == slot.PostId);
         if (isBlocked && oldStatus == "available")
             post.AvailableSlots--;
@@ -172,6 +227,13 @@ public class SlotService : ISlotService
         return MapToDto(slot);
     }
 
+    /// <summary>
+    /// Lấy lịch trình trạng thái của các khe sạc.
+    /// </summary>
+    /// <param name="postId">ID trụ sạc.</param>
+    /// <param name="startDate">Ngày bắt đầu.</param>
+    /// <param name="endDate">Ngày kết thúc.</param>
+    /// <returns>Lịch trình slot.</returns>
     public async Task<SlotCalendarDto> GetSlotCalendarAsync(int postId, DateTime startDate, DateTime endDate)
     {
         var slots = await _context.ChargingSlots
@@ -182,7 +244,6 @@ public class SlotService : ISlotService
             .ToListAsync();
 
         var availabilityByDate = new Dictionary<string, int>();
-        
         // Current schema doesn't support time-based scheduling
         // Return current availability
         var currentDate = DateTime.UtcNow.Date;
@@ -198,6 +259,11 @@ public class SlotService : ISlotService
         };
     }
 
+    /// <summary>
+    /// Tạo hàng loạt khe sạc.
+    /// </summary>
+    /// <param name="bulkDto">Thông tin tạo hàng loạt.</param>
+    /// <returns>Danh sách khe sạc vừa tạo.</returns>
     public async Task<IEnumerable<SlotDto>> BulkCreateSlotsAsync(BulkCreateSlotsDto bulkDto)
     {
         var post = await _context.ChargingPosts
@@ -208,7 +274,6 @@ public class SlotService : ISlotService
 
         var slots = new List<ChargingSlot>();
         var currentDate = bulkDto.StartDate.Date;
-        
         // Create slots for each day in the range
         while (currentDate <= bulkDto.EndDate.Date)
         {
@@ -216,28 +281,27 @@ public class SlotService : ISlotService
             {
                 PostId = bulkDto.PostId,
                 SlotNumber = $"SLOT-{currentDate:yyyyMMdd}-{slots.Count + 1}",
-                ConnectorType = "Type2", // Default
+                ConnectorType = "Type2", // Mặc định
                 MaxPower = post.PowerOutput,
                 Status = "available",
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
-            
+
             slots.Add(slot);
             currentDate = currentDate.AddDays(1);
         }
 
         _context.ChargingSlots.AddRange(slots);
-        
         // Update post slot counts
         post.TotalSlots += slots.Count;
         post.AvailableSlots += slots.Count;
-        
+
         await _context.SaveChangesAsync();
 
         _logger.LogInformation("Bulk created {Count} slots for post {PostId}", slots.Count, bulkDto.PostId);
 
-        // Reload with navigation properties
+        // Reload để lấy thông tin navigation properties
         var slotIds = slots.Select(s => s.SlotId).ToList();
         return await _context.ChargingSlots
             .Include(s => s.ChargingPost)
@@ -280,12 +344,12 @@ public class SlotService : ISlotService
             PostName = slot.ChargingPost?.PostNumber ?? "Unknown",
             StationId = slot.ChargingPost?.StationId ?? 0,
             StationName = slot.ChargingPost?.ChargingStation?.StationName ?? "Unknown",
-            StartTime = DateTime.UtcNow, // Current schema doesn't have time slots
+            StartTime = DateTime.UtcNow, // Schema hiện tại chưa có time slots
             EndTime = DateTime.UtcNow.AddHours(1),
             Status = slot.Status,
             IsBlocked = slot.Status == "maintenance",
             BlockReason = slot.Status == "maintenance" ? "Under maintenance" : null,
-            Price = null, // Would come from pricing rules
+            Price = null, // Sẽ lấy từ quy tắc giá
             CreatedAt = slot.CreatedAt
         };
     }

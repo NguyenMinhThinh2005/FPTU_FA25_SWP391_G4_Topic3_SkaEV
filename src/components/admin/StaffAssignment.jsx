@@ -22,6 +22,8 @@ import {
 } from '@mui/material';
 import { Add, Delete, Person, Email, Phone } from '@mui/icons-material';
 import stationStaffAPI from '../../services/stationStaffAPI';
+import useUserStore from '../../store/userStore';
+import { usersAPI } from '../../services/api';
 
 const StaffAssignment = ({ stationId, stationName }) => {
   const [availableStaff, setAvailableStaff] = useState([]);
@@ -35,13 +37,30 @@ const StaffAssignment = ({ stationId, stationName }) => {
     try {
       setLoading(true);
       setError(null);
-      
+
       const [staffList, assignments] = await Promise.all([
         stationStaffAPI.getAvailableStaff(),
         stationStaffAPI.getStationStaff(stationId)
       ]);
-      
-      setAvailableStaff(staffList);
+
+      // Fetch canonical staff via admin users API to ensure we match the user management listing.
+      // Request a large pageSize to include all staff in dev/demo environments.
+      let canonicalStaff = [];
+      try {
+        const usersResp = await usersAPI.getAll({ role: 'staff', page: 1, pageSize: 1000 });
+        canonicalStaff = usersResp?.data || [];
+      } catch (uErr) {
+        // If admin users API fails (auth etc), fall back to local userStore users if available
+        console.warn('Could not load canonical staff from admin API, falling back to user store', uErr);
+        canonicalStaff = users || [];
+      }
+
+      const canonicalStaffIds = new Set((canonicalStaff || []).map(u => u.userId));
+      const filteredStaff = canonicalStaffIds.size > 0
+        ? (staffList || []).filter(s => canonicalStaffIds.has(s.userId))
+        : (staffList || []);
+
+      setAvailableStaff(filteredStaff);
       setAssignedStaff(assignments);
     } catch (err) {
       setError('Không thể tải danh sách nhân viên: ' + err.message);
@@ -57,6 +76,14 @@ const StaffAssignment = ({ stationId, stationName }) => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stationId]);
+
+  // Ensure canonical users are loaded so we can filter availableStaff
+  const { users, fetchUsers } = useUserStore();
+  React.useEffect(() => {
+    // fetchUsers is idempotent in the store
+    fetchUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleAssignStaff = async () => {
     if (!selectedStaffId) {
@@ -106,10 +133,39 @@ const StaffAssignment = ({ stationId, stationName }) => {
     }
   };
 
-  // Filter out already assigned staff
-  const unassignedStaff = availableStaff.filter(
-    staff => !assignedStaff.some(assigned => assigned.staffUserId === staff.userId)
-  );
+  // Filter out already assigned staff, dedupe, and ensure the user exists and has role === 'staff'.
+  // Also exclude obvious group/team accounts to avoid cluttering the dropdown.
+  const seen = new Set();
+  const unassignedStaff = availableStaff
+    .filter((staff) => {
+      // Normalize id (backend may return userId or UserId depending on serializer)
+      const id = staff.userId ?? staff.UserId ?? null;
+      if (!id) return false;
+
+      if (seen.has(id)) return false;
+      seen.add(id);
+
+      const isAssigned = assignedStaff.some((assigned) => assigned.staffUserId === id);
+      if (isAssigned) return false;
+
+      const canonical = users.find((u) => u.userId === id);
+      if (!canonical) return false;
+      if (canonical.role !== 'staff') return false;
+      if (canonical.isActive === false) return false;
+
+      const name = (staff.fullName || staff.FullName || '').toString().toLowerCase();
+      // Exclude generic team/group accounts that should not be assigned as individuals
+      if (name.includes('team') || name.includes('(team)') || name.includes('on-call') || name.includes('team -')) return false;
+
+      return true;
+    })
+    .map((s) => ({
+      userId: s.userId ?? s.UserId,
+      fullName: s.fullName ?? s.FullName,
+      email: s.email ?? s.Email,
+      phoneNumber: s.phoneNumber ?? s.PhoneNumber,
+      assignedStations: s.assignedStations ?? s.AssignedStations ?? []
+    }));
 
   return (
     <Box>

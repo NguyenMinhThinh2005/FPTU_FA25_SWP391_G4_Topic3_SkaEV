@@ -1,5 +1,8 @@
 namespace SkaEV.API.Application.DTOs.Slots;
 
+/// <summary>
+/// DTO thông tin khe sạc (slot).
+/// </summary>
 public class SlotDto
 {
     public int SlotId { get; set; }
@@ -16,6 +19,9 @@ public class SlotDto
     public DateTime CreatedAt { get; set; }
 }
 
+/// <summary>
+/// DTO tạo các khe sạc.
+/// </summary>
 public class CreateSlotsDto
 {
     public int PostId { get; set; }
@@ -24,6 +30,9 @@ public class CreateSlotsDto
     public decimal? Price { get; set; }
 }
 
+/// <summary>
+/// DTO cập nhật khe sạc.
+/// </summary>
 public class UpdateSlotDto
 {
     public DateTime? StartTime { get; set; }
@@ -32,12 +41,18 @@ public class UpdateSlotDto
     public decimal? Price { get; set; }
 }
 
+/// <summary>
+/// DTO chặn/mở chặn khe sạc.
+/// </summary>
 public class BlockSlotDto
 {
     public bool IsBlocked { get; set; }
     public string? Reason { get; set; }
 }
 
+/// <summary>
+/// DTO lịch khe sạc.
+/// </summary>
 public class SlotCalendarDto
 {
     public int PostId { get; set; }
@@ -47,6 +62,9 @@ public class SlotCalendarDto
     public Dictionary<string, int> AvailabilityByDate { get; set; } = new();
 }
 
+/// <summary>
+/// DTO tạo hàng loạt khe sạc.
+/// </summary>
 public class BulkCreateSlotsDto
 {
     public int PostId { get; set; }
@@ -58,6 +76,9 @@ public class BulkCreateSlotsDto
     public decimal? Price { get; set; }
 }
 
+/// <summary>
+/// DTO chi tiết khe sạc.
+/// </summary>
 public class SlotDetailDto
 {
     public int SlotId { get; set; }

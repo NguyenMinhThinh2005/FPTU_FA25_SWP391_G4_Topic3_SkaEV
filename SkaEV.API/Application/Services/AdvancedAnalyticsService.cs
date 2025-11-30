@@ -3,14 +3,35 @@ using Microsoft.EntityFrameworkCore;
 
 namespace SkaEV.API.Application.Services
 {
+    /// <summary>
+    /// Giao diện dịch vụ phân tích nâng cao.
+    /// </summary>
     public interface IAdvancedAnalyticsService
     {
+        /// <summary>
+        /// Phân tích hành vi người dùng.
+        /// </summary>
         Task<UserBehaviorAnalysis> AnalyzeUserBehaviorAsync(int userId);
+
+        /// <summary>
+        /// Phân tích mô hình sạc.
+        /// </summary>
         Task<ChargingPatternAnalysis> AnalyzeChargingPatternsAsync();
+
+        /// <summary>
+        /// Phân tích hiệu quả trạm sạc.
+        /// </summary>
         Task<StationEfficiencyAnalysis> AnalyzeStationEfficiencyAsync(int stationId);
+
+        /// <summary>
+        /// Lấy danh sách đề xuất cho người dùng.
+        /// </summary>
         Task<List<Recommendation>> GetRecommendationsAsync(int userId);
     }
 
+    /// <summary>
+    /// Dịch vụ phân tích nâng cao.
+    /// </summary>
     public class AdvancedAnalyticsService : IAdvancedAnalyticsService
     {
         private readonly SkaEVDbContext _context;
@@ -21,8 +42,10 @@ namespace SkaEV.API.Application.Services
         }
 
         /// <summary>
-        /// Analyze user charging behavior patterns
+        /// Phân tích hành vi sạc của người dùng.
         /// </summary>
+        /// <param name="userId">ID người dùng.</param>
+        /// <returns>Kết quả phân tích hành vi.</returns>
         public async Task<UserBehaviorAnalysis> AnalyzeUserBehaviorAsync(int userId)
         {
             var last90Days = DateTime.UtcNow.AddDays(-90);
@@ -49,12 +72,12 @@ namespace SkaEV.API.Application.Services
             var avgEnergy = totalEnergy / userBookings.Count;
             var avgSessionDuration = userBookings
                 .Where(b => b.ActualStartTime != null && b.ActualEndTime != null)
-                .Average(b => (b.ActualEndTime.Value - b.ActualStartTime.Value).TotalMinutes);
+                .Average(b => (b.ActualEndTime!.Value - b.ActualStartTime!.Value).TotalMinutes);
 
             // Preferred time of day
             var hourDistribution = userBookings
                 .Where(b => b.ActualStartTime != null)
-                .GroupBy(b => b.ActualStartTime.Value.Hour)
+                .GroupBy(b => b.ActualStartTime!.Value.Hour)
                 .Select(g => new { Hour = g.Key, Count = g.Count() })
                 .OrderByDescending(x => x.Count)
                 .FirstOrDefault();
@@ -76,7 +99,7 @@ namespace SkaEV.API.Application.Services
 
             // Frequency analysis
             var firstBooking = userBookings.Where(b => b.ActualStartTime != null).Min(b => b.ActualStartTime);
-            var daysSinceFirst = firstBooking != null ? (DateTime.UtcNow - firstBooking.Value).TotalDays : 0;
+            var daysSinceFirst = firstBooking != null ? (DateTime.UtcNow - firstBooking!.Value).TotalDays : 0;
             var avgDaysBetweenBookings = daysSinceFirst / Math.Max(1, userBookings.Count - 1);
 
             // User category
@@ -100,8 +123,9 @@ namespace SkaEV.API.Application.Services
         }
 
         /// <summary>
-        /// Analyze overall charging patterns across the system
+        /// Phân tích mô hình sạc tổng thể trên toàn hệ thống.
         /// </summary>
+        /// <returns>Kết quả phân tích mô hình sạc.</returns>
         public async Task<ChargingPatternAnalysis> AnalyzeChargingPatternsAsync()
         {
             var last30Days = DateTime.UtcNow.AddDays(-30);
@@ -124,12 +148,12 @@ namespace SkaEV.API.Application.Services
             // Hourly distribution
             var hourlyPattern = bookings
                 .Where(b => b.ActualStartTime != null && b.ActualEndTime != null)
-                .GroupBy(b => b.ActualStartTime.Value.Hour)
+                .GroupBy(b => b.ActualStartTime!.Value.Hour)
                 .Select(g => new HourlyPattern
                 {
                     Hour = g.Key,
                     Count = g.Count(),
-                    AvgDuration = Math.Round(g.Average(b => (b.ActualEndTime.Value - b.ActualStartTime.Value).TotalMinutes), 2),
+                    AvgDuration = Math.Round(g.Average(b => (b.ActualEndTime!.Value - b.ActualStartTime!.Value).TotalMinutes), 2),
                     AvgEnergy = Math.Round((double)g.Average(b => b.Invoice?.TotalEnergyKwh ?? 0), 2)
                 })
                 .OrderBy(x => x.Hour)
@@ -138,7 +162,7 @@ namespace SkaEV.API.Application.Services
             // Day of week pattern
             var weekdayPattern = bookings
                 .Where(b => b.ActualStartTime != null)
-                .GroupBy(b => b.ActualStartTime.Value.DayOfWeek)
+                .GroupBy(b => b.ActualStartTime!.Value.DayOfWeek)
                 .Select(g => new DayPattern
                 {
                     DayOfWeek = g.Key.ToString(),
@@ -166,7 +190,7 @@ namespace SkaEV.API.Application.Services
             {
                 AnalysisPeriod = "Last 30 days",
                 TotalSessions = bookings.Count,
-                AvgSessionDuration = completedBookings.Any() ? Math.Round(completedBookings.Average(b => (b.ActualEndTime.Value - b.ActualStartTime.Value).TotalMinutes), 2) : 0,
+                AvgSessionDuration = completedBookings.Any() ? Math.Round(completedBookings.Average(b => (b.ActualEndTime!.Value - b.ActualStartTime!.Value).TotalMinutes), 2) : 0,
                 AvgEnergyPerSession = Math.Round((double)bookings.Average(b => b.Invoice?.TotalEnergyKwh ?? 0), 2),
                 HourlyPatterns = hourlyPattern,
                 WeekdayPatterns = weekdayPattern,
@@ -175,8 +199,10 @@ namespace SkaEV.API.Application.Services
         }
 
         /// <summary>
-        /// Analyze station efficiency metrics
+        /// Phân tích các chỉ số hiệu quả của trạm sạc.
         /// </summary>
+        /// <param name="stationId">ID trạm sạc.</param>
+        /// <returns>Kết quả phân tích hiệu quả.</returns>
         public async Task<StationEfficiencyAnalysis> AnalyzeStationEfficiencyAsync(int stationId)
         {
             var last30Days = DateTime.UtcNow.AddDays(-30);
@@ -199,7 +225,7 @@ namespace SkaEV.API.Application.Services
             var totalSlots = station.ChargingPosts.SelectMany(p => p.ChargingSlots).Count();
             var totalHoursInPeriod = 30 * 24 * totalSlots; // Total possible slot-hours
             var completedBookings = bookings.Where(b => b.ActualStartTime != null && b.ActualEndTime != null).ToList();
-            var usedHours = completedBookings.Sum(b => (b.ActualEndTime.Value - b.ActualStartTime.Value).TotalHours);
+            var usedHours = completedBookings.Sum(b => (b.ActualEndTime!.Value - b.ActualStartTime!.Value).TotalHours);
             var utilizationRate = totalHoursInPeriod > 0 ? (usedHours / totalHoursInPeriod) * 100 : 0;
 
             // Revenue analysis
@@ -213,7 +239,7 @@ namespace SkaEV.API.Application.Services
             // Peak efficiency hours
             var peakHours = bookings
                 .Where(b => b.ActualStartTime != null)
-                .GroupBy(b => b.ActualStartTime.Value.Hour)
+                .GroupBy(b => b.ActualStartTime!.Value.Hour)
                 .Select(g => new { Hour = g.Key, Count = g.Count() })
                 .OrderByDescending(x => x.Count)
                 .Take(3)
@@ -237,8 +263,10 @@ namespace SkaEV.API.Application.Services
         }
 
         /// <summary>
-        /// Generate personalized recommendations for a user
+        /// Tạo các đề xuất cá nhân hóa cho người dùng.
         /// </summary>
+        /// <param name="userId">ID người dùng.</param>
+        /// <returns>Danh sách đề xuất.</returns>
         public async Task<List<Recommendation>> GetRecommendationsAsync(int userId)
         {
             var recommendations = new List<Recommendation>();
@@ -265,7 +293,7 @@ namespace SkaEV.API.Application.Services
             var avgEnergy = userBookings.Average(b => b.Invoice?.TotalEnergyKwh ?? 0);
             var preferredHour = userBookings
                 .Where(b => b.ActualStartTime != null)
-                .GroupBy(b => b.ActualStartTime.Value.Hour)
+                .GroupBy(b => b.ActualStartTime!.Value.Hour)
                 .OrderByDescending(g => g.Count())
                 .FirstOrDefault()?.Key ?? 12;
 
@@ -284,7 +312,7 @@ namespace SkaEV.API.Application.Services
 
             // Recommend nearby stations
             var lastBooking = userBookings.OrderByDescending(b => b.ActualStartTime).FirstOrDefault();
-            if (lastBooking != null)
+            if (lastBooking != null && lastBooking.StationId > 0)
             {
                 var lastStation = await _context.ChargingStations
                     .FirstOrDefaultAsync(s => s.StationId == lastBooking.StationId);

@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SkaEV.API.Infrastructure.Data;
@@ -7,15 +8,24 @@ namespace SkaEV.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize(Roles = "admin")]
 public class DebugController : ControllerBase
 {
     private readonly SkaEVDbContext _context;
 
+    /// <summary>
+    /// Constructor nhận vào DbContext.
+    /// </summary>
+    /// <param name="context">Database context.</param>
     public DebugController(SkaEVDbContext context)
     {
         _context = context;
     }
 
+    /// <summary>
+    /// Tạo một trụ sạc thử nghiệm.
+    /// </summary>
+    /// <returns>Thông tin trụ sạc vừa tạo.</returns>
     [HttpPost("create-test-post")]
     public async Task<IActionResult> CreateTestPost()
     {
@@ -39,6 +49,10 @@ public class DebugController : ControllerBase
         return Ok(new { message = "Test post created", postId = testPost.PostId });
     }
 
+    /// <summary>
+    /// Kiểm tra các trụ sạc thử nghiệm đã tạo.
+    /// </summary>
+    /// <returns>Danh sách các trụ sạc thử nghiệm.</returns>
     [HttpGet("verify-test-post")]
     public async Task<IActionResult> VerifyTestPost()
     {
@@ -59,6 +73,10 @@ public class DebugController : ControllerBase
         });
     }
 
+    /// <summary>
+    /// Lấy danh sách tất cả trụ sạc (raw data).
+    /// </summary>
+    /// <returns>Danh sách trụ sạc.</returns>
     [HttpGet("all-posts-raw")]
     public async Task<IActionResult> GetAllPostsRaw()
     {

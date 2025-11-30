@@ -1,9 +1,11 @@
+using System.Collections.Generic;
+
 namespace SkaEV.API.Application.DTOs.Admin;
 
 // ==================== USER HISTORY & STATISTICS ====================
 
 /// <summary>
-/// User charging history details
+/// DTO chi tiết lịch sử sạc của người dùng.
 /// </summary>
 public class UserChargingHistoryDto
 {
@@ -23,7 +25,7 @@ public class UserChargingHistoryDto
 }
 
 /// <summary>
-/// User payment history details
+/// DTO chi tiết lịch sử thanh toán của người dùng.
 /// </summary>
 public class UserPaymentHistoryDto
 {
@@ -39,7 +41,7 @@ public class UserPaymentHistoryDto
 }
 
 /// <summary>
-/// User statistics for admin dashboard
+/// DTO thống kê người dùng cho bảng điều khiển Admin.
 /// </summary>
 public class UserStatisticsDto
 {
@@ -56,10 +58,151 @@ public class UserStatisticsDto
     public int TotalVehicles { get; set; }
 }
 
+// ==================== USER VEHICLES ====================
+
+/// <summary>
+/// Vehicle information for admin user detail view
+/// </summary>
+public class AdminUserVehicleDto
+{
+    public int VehicleId { get; set; }
+    public string VehicleType { get; set; } = string.Empty;
+    public string? Brand { get; set; }
+    public string? Model { get; set; }
+    public string LicensePlate { get; set; } = string.Empty;
+    public decimal? BatteryCapacity { get; set; }
+    public string? ConnectorType { get; set; }
+    public bool IsDefault { get; set; }
+    public string Status { get; set; } = "active";
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}
+
+// ==================== STAFF DETAIL SUPPORT ====================
+
+/// <summary>
+/// Station assignment overview for staff accounts
+/// </summary>
+public class AdminStaffStationDto
+{
+    public int StationId { get; set; }
+    public string StationName { get; set; } = string.Empty;
+    public string Address { get; set; } = string.Empty;
+    public string City { get; set; } = string.Empty;
+    public int TotalPosts { get; set; }
+    public int TotalSlots { get; set; }
+    public int AvailableSlots { get; set; }
+    public int ActiveSessions { get; set; }
+    public int CompletedSessionsToday { get; set; }
+    public decimal RevenueToday { get; set; }
+    public int OpenIncidents { get; set; }
+    public int AssignedIncidents { get; set; }
+    public DateTime AssignedAt { get; set; }
+    public bool IsPrimaryAssignment { get; set; }
+}
+
+/// <summary>
+/// Upcoming schedule entry for staff detail view
+/// </summary>
+public class AdminStaffScheduleDto
+{
+    public int BookingId { get; set; }
+    public string DayOfWeek { get; set; } = string.Empty;
+    public string Shift { get; set; } = string.Empty;
+    public string TimeRange { get; set; } = string.Empty;
+    public string StationName { get; set; } = string.Empty;
+    public string Status { get; set; } = string.Empty;
+    public string Vehicle { get; set; } = string.Empty;
+    public string SlotLabel { get; set; } = string.Empty;
+    public DateTime StartTime { get; set; }
+    public DateTime? EndTime { get; set; }
+}
+
+/// <summary>
+/// Recent activity (incident, maintenance, alert) handled by staff
+/// </summary>
+public class AdminStaffActivityDto
+{
+    public int IncidentId { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string IncidentType { get; set; } = string.Empty;
+    public string StationName { get; set; } = string.Empty;
+    public string Status { get; set; } = string.Empty;
+    public string Severity { get; set; } = string.Empty;
+    public DateTime ReportedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}
+
+// ==================== ADMIN DETAIL SUPPORT ====================
+
+/// <summary>
+/// High-level metrics for an admin account
+/// </summary>
+public class AdminOverviewDto
+{
+    public int UserId { get; set; }
+    public int TotalUsers { get; set; }
+    public int ActiveUsers { get; set; }
+    public int TotalStations { get; set; }
+    public int ActiveStations { get; set; }
+    public int TotalBookings30Days { get; set; }
+    public decimal Revenue30Days { get; set; }
+    public int NewUsers30Days { get; set; }
+    public int OpenIncidents { get; set; }
+    public DateTime? LastLoginAt { get; set; }
+    public List<AdminOverviewStationDto> TopStations { get; set; } = new();
+}
+
+public class AdminOverviewStationDto
+{
+    public int StationId { get; set; }
+    public string StationName { get; set; } = string.Empty;
+    public int CompletedSessions { get; set; }
+    public decimal Revenue { get; set; }
+}
+
+/// <summary>
+/// Activity log entry for admin detail view
+/// </summary>
+public class AdminActivityLogDto
+{
+    public int LogId { get; set; }
+    public string Category { get; set; } = string.Empty;
+    public string Severity { get; set; } = string.Empty;
+    public string Message { get; set; } = string.Empty;
+    public string? Endpoint { get; set; }
+    public string? IpAddress { get; set; }
+    public DateTime CreatedAt { get; set; }
+}
+
+/// <summary>
+/// Permission matrix entry for admin account
+/// </summary>
+public class AdminPermissionDto
+{
+    public string ModuleKey { get; set; } = string.Empty;
+    public string ModuleName { get; set; } = string.Empty;
+    public List<string> Permissions { get; set; } = new();
+}
+
+/// <summary>
+/// Audit trail entry for admin activity
+/// </summary>
+public class AdminAuditLogDto
+{
+    public int LogId { get; set; }
+    public string Category { get; set; } = string.Empty;
+    public string Severity { get; set; } = string.Empty;
+    public string Message { get; set; } = string.Empty;
+    public string? Endpoint { get; set; }
+    public string? IpAddress { get; set; }
+    public DateTime CreatedAt { get; set; }
+}
+
 // ==================== NOTIFICATIONS ====================
 
 /// <summary>
-/// Notification DTO for list display
+/// DTO hiển thị danh sách thông báo.
 /// </summary>
 public class NotificationDto
 {
@@ -78,7 +221,7 @@ public class NotificationDto
 }
 
 /// <summary>
-/// Create notification DTO
+/// DTO tạo thông báo mới.
 /// </summary>
 public class CreateNotificationDto
 {
@@ -91,7 +234,7 @@ public class CreateNotificationDto
 }
 
 /// <summary>
-/// Send promotion DTO
+/// DTO gửi khuyến mãi.
 /// </summary>
 public class SendPromotionDto
 {
@@ -107,7 +250,7 @@ public class SendPromotionDto
 // ==================== SUPPORT REQUESTS ====================
 
 /// <summary>
-/// Support request DTO for list
+/// DTO danh sách yêu cầu hỗ trợ.
 /// </summary>
 public class SupportRequestDto
 {
@@ -131,7 +274,7 @@ public class SupportRequestDto
 }
 
 /// <summary>
-/// Support request detail DTO
+/// DTO chi tiết yêu cầu hỗ trợ.
 /// </summary>
 public class SupportRequestDetailDto : SupportRequestDto
 {
@@ -141,7 +284,7 @@ public class SupportRequestDetailDto : SupportRequestDto
 }
 
 /// <summary>
-/// Support request message DTO
+/// DTO tin nhắn trong yêu cầu hỗ trợ.
 /// </summary>
 public class SupportRequestMessageDto
 {
@@ -156,7 +299,7 @@ public class SupportRequestMessageDto
 }
 
 /// <summary>
-/// Create support request DTO (from user)
+/// DTO tạo yêu cầu hỗ trợ (từ người dùng).
 /// </summary>
 public class CreateSupportRequestDto
 {
@@ -171,7 +314,7 @@ public class CreateSupportRequestDto
 }
 
 /// <summary>
-/// Update support request DTO (admin action)
+/// DTO cập nhật yêu cầu hỗ trợ (hành động của Admin).
 /// </summary>
 public class UpdateSupportRequestDto
 {
@@ -182,7 +325,7 @@ public class UpdateSupportRequestDto
 }
 
 /// <summary>
-/// Reply to support request DTO
+/// DTO trả lời yêu cầu hỗ trợ.
 /// </summary>
 public class ReplySupportRequestDto
 {
@@ -193,7 +336,7 @@ public class ReplySupportRequestDto
 }
 
 /// <summary>
-/// Support request filter DTO
+/// DTO bộ lọc yêu cầu hỗ trợ.
 /// </summary>
 public class SupportRequestFilterDto
 {
@@ -211,7 +354,7 @@ public class SupportRequestFilterDto
 // ==================== SERVICE PLANS (Optional for Phase 2) ====================
 
 /// <summary>
-/// Service plan DTO
+/// DTO gói dịch vụ.
 /// </summary>
 public class ServicePlanDto
 {
@@ -228,7 +371,7 @@ public class ServicePlanDto
 }
 
 /// <summary>
-/// User subscription DTO
+/// DTO đăng ký gói dịch vụ của người dùng.
 /// </summary>
 public class UserSubscriptionDto
 {

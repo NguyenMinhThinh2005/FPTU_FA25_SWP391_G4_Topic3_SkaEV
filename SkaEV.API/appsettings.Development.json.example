@@ -10,6 +10,18 @@
   "ConnectionStrings": {
     "DefaultConnection": "Server=YOUR_SERVER_NAME\\YOUR_INSTANCE;Database=SkaEV_DB;Trusted_Connection=True;TrustServerCertificate=True;MultipleActiveResultSets=true"
   },
+  "GoogleMaps": {
+    "DirectionsApiKey": "YOUR_GOOGLE_MAPS_DIRECTIONS_API_KEY"
+  },
+  "VNPay": {
+    "TmnCode": "YOUR_VNPAY_TMN_CODE",
+    "HashSecret": "YOUR_VNPAY_HASH_SECRET",
+    "BaseUrl": "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html",
+    "CallbackUrl": "http://localhost:5173/payment/vnpay-return",
+    "IpnUrl": "http://localhost:5000/api/vnpay/ipn",
+    "Version": "2.1.0",
+    "OrderType": "electric_vehicle"
+  },
   "DetailedErrors": true,
   "AllowedHosts": "*"
 }

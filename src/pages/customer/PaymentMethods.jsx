@@ -1,4 +1,4 @@
-﻿import React, { useState } from "react";
+﻿import React, { useState, useEffect } from "react";
 import {
   Box,
   Typography,
@@ -28,6 +28,8 @@ import {
   Container,
   Stack,
   Paper,
+  CircularProgress,
+  Snackbar,
 } from "@mui/material";
 import {
   CreditCard,
@@ -40,10 +42,15 @@ import {
   Warning,
 } from "@mui/icons-material";
 import { getText } from "../../utils/vietnameseTexts";
+import { paymentMethodsAPI } from "../../services/api";
 
 const PaymentMethods = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedMethod, setSelectedMethod] = useState(null);
+  const [paymentMethods, setPaymentMethods] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null);
   const [formData, setFormData] = useState({
     type: "credit_card",
     cardNumber: "",
@@ -53,8 +60,25 @@ const PaymentMethods = () => {
     isDefault: false,
   });
 
-  // TODO: Fetch payment methods from backend API
-  const [paymentMethods, setPaymentMethods] = useState([]);
+  // Fetch payment methods on mount
+  useEffect(() => {
+    fetchPaymentMethods();
+  }, []);
+
+  const fetchPaymentMethods = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await paymentMethodsAPI.getMine();
+      const methods = response?.data || response || [];
+      setPaymentMethods(Array.isArray(methods) ? methods : []);
+    } catch (err) {
+      console.error("Error fetching payment methods:", err);
+      setError(err.message || "Không thể tải danh sách phương thức thanh toán");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleAddNew = () => {
     setSelectedMethod(null);
@@ -71,79 +95,129 @@ const PaymentMethods = () => {
 
   const handleEdit = (method) => {
     setSelectedMethod(method);
+    const type = method.paymentType || method.type || "credit_card";
+    const lastFour = method.lastFourDigits || method.lastFour || "";
+    const expiryMonth = method.expiryMonth;
+    const expiryYear = method.expiryYear;
+    const expiryDate = expiryMonth && expiryYear 
+      ? `${String(expiryMonth).padStart(2, '0')}/${String(expiryYear).slice(-2)}`
+      : method.expiryDate || "";
+    
     setFormData({
-      type: method.type,
-      cardNumber:
-        method.type === "credit_card"
-          ? `****-****-****-${method.lastFour}`
-          : "",
-      expiryDate: method.expiryDate || "",
+      type: type,
+      cardNumber: type === "credit_card" || type === "CreditCard" 
+        ? `****-****-****-${lastFour}` 
+        : "",
+      expiryDate: expiryDate,
       cvv: "",
-      cardholderName: method.cardholderName || "",
-      isDefault: method.isDefault,
+      cardholderName: method.cardHolderName || method.cardholderName || "",
+      isDefault: method.isDefault || false,
     });
     setDialogOpen(true);
   };
 
-  const handleDelete = (methodId) => {
-    setPaymentMethods((prev) =>
-      prev.filter((method) => method.id !== methodId)
-    );
-  };
-
-  const handleSetDefault = (methodId) => {
-    setPaymentMethods((prev) =>
-      prev.map((method) => ({
-        ...method,
-        isDefault: method.id === methodId,
-      }))
-    );
-  };
-
-  const handleSave = () => {
-    if (selectedMethod) {
-      // Update existing method
-      setPaymentMethods((prev) =>
-        prev.map((method) =>
-          method.id === selectedMethod.id ? { ...method, ...formData } : method
-        )
-      );
-    } else {
-      // Add new method
-      const newMethod = {
-        id: Date.now().toString(),
-        ...formData,
-        lastFour: formData.cardNumber.slice(-4),
-        brand: formData.cardNumber.startsWith("4") ? "Visa" : "Mastercard",
-        isExpired: false,
-      };
-      setPaymentMethods((prev) => [...prev, newMethod]);
+  const handleDelete = async (methodId) => {
+    if (!confirm("Bạn có chắc muốn xóa phương thức thanh toán này?")) {
+      return;
     }
-    setDialogOpen(false);
+
+    setLoading(true);
+    try {
+      await paymentMethodsAPI.remove(methodId);
+      setSuccessMessage("Đã xóa phương thức thanh toán");
+      fetchPaymentMethods(); // Reload list
+    } catch (err) {
+      console.error("Error deleting payment method:", err);
+      setError(err.message || "Không thể xóa phương thức thanh toán");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSetDefault = async (methodId) => {
+    setLoading(true);
+    try {
+      await paymentMethodsAPI.setDefault(methodId);
+      setSuccessMessage("Đã đặt phương thức thanh toán mặc định");
+      fetchPaymentMethods(); // Reload list
+    } catch (err) {
+      console.error("Error setting default payment method:", err);
+      setError(err.message || "Không thể đặt phương thức mặc định");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      // Build payload
+      const payload = {
+        paymentType: formData.type,
+        cardNumber: formData.cardNumber,
+        expiryMonth: formData.expiryDate ? parseInt(formData.expiryDate.split('/')[0]) : null,
+        expiryYear: formData.expiryDate ? parseInt('20' + formData.expiryDate.split('/')[1]) : null,
+        cardHolderName: formData.cardholderName,
+        isDefault: formData.isDefault,
+      };
+
+      if (selectedMethod) {
+        // Update existing method
+        await paymentMethodsAPI.update(selectedMethod.id, payload);
+        setSuccessMessage("Đã cập nhật phương thức thanh toán");
+      } else {
+        // Add new method
+        await paymentMethodsAPI.create(payload);
+        setSuccessMessage("Đã thêm phương thức thanh toán mới");
+      }
+
+      setDialogOpen(false);
+      fetchPaymentMethods(); // Reload list
+    } catch (err) {
+      console.error("Error saving payment method:", err);
+      setError(err.message || "Không thể lưu phương thức thanh toán");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const getMethodIcon = (method) => {
-    if (method.type === "credit_card") {
+    const type = method.paymentType || method.type;
+    if (type === "credit_card" || type === "CreditCard") {
       return <CreditCard />;
-    } else if (method.type === "wallet") {
+    } else if (type === "wallet" || type === "Wallet") {
       return <AccountBalanceWallet />;
     }
     return <CreditCard />;
   };
 
   const getMethodTitle = (method) => {
-    if (method.type === "credit_card") {
-      return `${method.brand} •••• ${method.lastFour}`;
-    } else if (method.type === "wallet") {
-      return `${method.provider} ${method.accountNumber}`;
+    const type = method.paymentType || method.type;
+    const lastFour = method.lastFourDigits || method.lastFour;
+    const brand = method.cardBrand || method.brand || "Card";
+    
+    if (type === "credit_card" || type === "CreditCard") {
+      return `${brand} •••• ${lastFour}`;
+    } else if (type === "wallet" || type === "Wallet") {
+      return `${method.provider || "Wallet"} ${method.accountNumber || ""}`;
     }
     return "Phương thức thanh toán";
   };
 
   const getMethodSubtitle = (method) => {
-    if (method.type === "credit_card") {
-      return `Hết hạn ${method.expiryDate} • ${method.cardholderName}`;
-    } else if (method.type === "wallet") {
+    const type = method.paymentType || method.type;
+    
+    if (type === "credit_card" || type === "CreditCard") {
+      const expiryMonth = method.expiryMonth;
+      const expiryYear = method.expiryYear;
+      const expiryDate = expiryMonth && expiryYear 
+        ? `${String(expiryMonth).padStart(2, '0')}/${String(expiryYear).slice(-2)}`
+        : method.expiryDate || "";
+      const cardHolder = method.cardHolderName || method.cardholderName || "";
+      return `Hết hạn ${expiryDate}${cardHolder ? ` • ${cardHolder}` : ""}`;
+    } else if (type === "wallet" || type === "Wallet") {
       return "Ví điện tử";
     }
     return "";
@@ -151,6 +225,41 @@ const PaymentMethods = () => {
 
   return (
     <Container maxWidth="lg" sx={{ py: 3 }}>
+      {/* Loading Overlay */}
+      {loading && (
+        <Box
+          sx={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            bgcolor: 'rgba(0,0,0,0.3)',
+            zIndex: 9999,
+          }}
+        >
+          <CircularProgress />
+        </Box>
+      )}
+
+      {/* Success Message */}
+      <Snackbar
+        open={!!successMessage}
+        autoHideDuration={3000}
+        onClose={() => setSuccessMessage(null)}
+        message={successMessage}
+      />
+
+      {/* Error Alert */}
+      {error && (
+        <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 3 }}>
+          {error}
+        </Alert>
+      )}
+
       {/* Modern Payment Header */}
       <Paper
         elevation={0}
@@ -238,7 +347,14 @@ const PaymentMethods = () => {
             {getText("payment.paymentMethods")}
           </Typography>
 
-          {paymentMethods.length === 0 ? (
+          {loading && paymentMethods.length === 0 ? (
+            <Box sx={{ textAlign: "center", py: 8 }}>
+              <CircularProgress />
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                Đang tải phương thức thanh toán...
+              </Typography>
+            </Box>
+          ) : paymentMethods.length === 0 ? (
             <Box sx={{ textAlign: "center", py: 8 }}>
               <CreditCard sx={{ fontSize: 60, color: "grey.400", mb: 2 }} />
               <Typography variant="h6" color="text.secondary">

@@ -4,7 +4,6 @@ import userEvent from '@testing-library/user-event';
 import { renderWithRouter } from '../../../tests/utils/renderWithRouter';
 import { mockLocalStorage } from '../../../tests/utils/mockLocalStorage';
 import RegisterPage from '../Register';
-import { authAPI } from '../../../services/api';
 
 // Mock dependencies
 const mockRegister = vi.fn();

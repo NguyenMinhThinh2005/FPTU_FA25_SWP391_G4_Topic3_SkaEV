@@ -1,0 +1,9 @@
+vehicle_name,license_plate,vehicle_model,vehicle_make,vehicle_type,vehicle_year,battery_capacity,connector_type
+VinFast VF e34,29A-12345,VF e34,VinFast,car,2024,42.0,CCS2
+Tesla Model 3,30B-67890,Model 3,Tesla,car,2023,60.0,CCS2
+VinFast VF 8,51G-11111,VF 8,VinFast,car,2024,87.7,CCS2
+Honda Dream,59C-22222,Dream,Honda,motorcycle,2023,1.5,Type 2
+VinFast Klara,60D-33333,Klara A2,VinFast,motorcycle,2024,1.2,Type 2
+BMW i3,29E-44444,i3,BMW,car,2022,42.2,CCS2
+Audi e-tron,30F-55555,e-tron,Audi,car,2023,95.0,CCS2
+Nissan Leaf,51H-66666,Leaf,Nissan,car,2023,62.0,CHAdeMO

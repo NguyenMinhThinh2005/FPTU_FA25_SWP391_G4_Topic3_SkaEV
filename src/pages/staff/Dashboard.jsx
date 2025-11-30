@@ -13,6 +13,7 @@ import {
   Chip,
   Divider,
   Stack,
+<<<<<<< HEAD
   Dialog,
   DialogTitle,
   DialogContent,
@@ -20,6 +21,8 @@ import {
   DialogActions,
   TextField,
   CircularProgress,
+=======
+>>>>>>> origin/develop
 } from "@mui/material";
 import {
   ElectricCar,
@@ -37,8 +40,11 @@ import {
   Cancel,
   Construction,
 } from "@mui/icons-material";
+<<<<<<< HEAD
 import staffAPI from "../../services/api/staffAPI";
 import signalRService from "../../services/signalRService"; // 🔥 Import SignalR
+=======
+>>>>>>> origin/develop
 
 const StaffDashboard = () => {
   const navigate = useNavigate();
@@ -53,6 +59,7 @@ const StaffDashboard = () => {
   });
   const [alerts, setAlerts] = useState([]);
   const [error, setError] = useState(null);
+<<<<<<< HEAD
 
   // Dialog states for Maintenance only
   const [maintenanceDialog, setMaintenanceDialog] = useState({ open: false, connector: null });
@@ -100,6 +107,8 @@ const StaffDashboard = () => {
 
     initSignalR();
   }, [stationInfo?.id]);
+=======
+>>>>>>> origin/develop
 
   useEffect(() => {
     loadDashboardData();

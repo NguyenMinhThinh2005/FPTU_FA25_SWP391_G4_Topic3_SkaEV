@@ -202,16 +202,18 @@ const Monitoring = () => {
 
   const mapIssueStatus = (status = "") => {
     const normalized = status.toLowerCase();
+    // Map backend status values into a simplified 3-state model used in the UI
+    // UI keys: 'open' (Chưa xử lý), 'in_progress' (Đang xử lý), 'resolved' (Đã xử lý)
     switch (normalized) {
       case "resolved":
-        return { key: "completed", label: "Đã xử lý" };
+      case "closed":
+        return { key: "resolved", label: "Đã xử lý" };
       case "in_progress":
       case "in-progress":
+      case "processing":
         return { key: "in_progress", label: "Đang xử lý" };
-      case "closed":
-        return { key: "completed", label: "Đã đóng" };
       default:
-        return { key: "pending", label: "Chờ xử lý" };
+        return { key: "open", label: "Chưa xử lý" };
     }
   };
 
@@ -667,6 +669,7 @@ const Monitoring = () => {
       </Typography>
       <Card>
         <CardContent>
+<<<<<<< HEAD
           {incidents.length === 0 ? (
             <Box sx={{ textAlign: 'center', py: 4 }}>
               <Typography variant="body1" color="text.secondary">
@@ -688,6 +691,62 @@ const Monitoring = () => {
                     <TableCell>Phản hồi Admin</TableCell>
                     <TableCell>Thời gian báo cáo</TableCell>
                     <TableCell align="center">Hành động</TableCell>
+=======
+          <TableContainer component={Paper}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Mã sự cố</TableCell>
+                  <TableCell>Trạm</TableCell>
+                  <TableCell>Loại sự cố</TableCell>
+                  <TableCell>Mô tả</TableCell>
+                  <TableCell align="center">Ưu tiên</TableCell>
+                  <TableCell align="center">Trạng thái</TableCell>
+                  <TableCell>Gán cho</TableCell>
+                  <TableCell>Phản hồi</TableCell>
+                  <TableCell>Thời gian</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {incidents.map((incident) => (
+                  <TableRow key={incident.id} hover>
+                    <TableCell fontWeight={600}>{incident.id}</TableCell>
+                    <TableCell>{incident.stationName || incident.connectorId}</TableCell>
+                    <TableCell>{incident.type}</TableCell>
+                    <TableCell>{incident.description}</TableCell>
+                    <TableCell align="center">
+                      <Chip
+                        label={priorityLevels.find((p) => p.value === incident.priority)?.label}
+                        color={priorityLevels.find((p) => p.value === incident.priority)?.color}
+                        size="small"
+                      />
+                    </TableCell>
+                    <TableCell align="center">
+                      <Chip 
+                        label={incident.statusLabel} 
+                        color={incident.status === "resolved" ? "success" : "warning"}
+                        size="small" 
+                      />
+                    </TableCell>
+                    <TableCell>{incident.assignedTo || "Chưa phân công"}</TableCell>
+                    <TableCell>
+                      {incident.adminResponse ? (
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          color="primary"
+                          onClick={() => handleViewDetail(incident)}
+                        >
+                          Xem chi tiết
+                        </Button>
+                      ) : (
+                        <Typography variant="body2" color="text.secondary" fontStyle="italic">
+                          Chưa có phản hồi
+                        </Typography>
+                      )}
+                    </TableCell>
+                    <TableCell>{incident.reportedAt.toLocaleString("vi-VN")}</TableCell>
+>>>>>>> origin/develop
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -907,6 +966,21 @@ const Monitoring = () => {
                         size="small"
                       />
                     </Grid>
+<<<<<<< HEAD
+=======
+                    <Grid item xs={12}>
+                      <Typography variant="caption" color="text.secondary">Mô tả:</Typography>
+                      <Typography variant="body1">{selectedIncident.description}</Typography>
+                    </Grid>
+                    <Grid item xs={6}>
+                      <Typography variant="caption" color="text.secondary">Trạng thái:</Typography>
+                      <Chip 
+                        label={selectedIncident.statusLabel} 
+                        color={selectedIncident.status === "resolved" ? "success" : "warning"}
+                        size="small" 
+                      />
+                    </Grid>
+>>>>>>> origin/develop
                     <Grid item xs={6}>
                       <Typography variant="caption" color="text.secondary">Người báo cáo:</Typography>
                       <Typography variant="body1">{selectedIncident.reportedBy || "Không rõ"}</Typography>

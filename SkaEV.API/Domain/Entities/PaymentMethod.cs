@@ -1,7 +1,7 @@
 namespace SkaEV.API.Domain.Entities;
 
 /// <summary>
-/// Payment method entity
+/// Thực thể phương thức thanh toán.
 /// </summary>
 public class PaymentMethod
 {
@@ -24,7 +24,7 @@ public class PaymentMethod
 }
 
 /// <summary>
-/// Payment transaction entity
+/// Thực thể giao dịch thanh toán.
 /// </summary>
 public class Payment
 {

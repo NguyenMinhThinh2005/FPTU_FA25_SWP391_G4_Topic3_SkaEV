@@ -1,0 +1,95 @@
+[
+  {
+    "controller": "AdminUsersController",
+    "baseRoute": "/api/admin/adminusers",
+    "authorizedRoles": ["admin"],
+    "endpoints": [
+      { "method": "GET", "path": "", "desc": "Get all users (filter, paging)", "response": "{ data: AdminUserDto[], pagination: {...} }" },
+      { "method": "GET", "path": "{userId}", "desc": "Get user by id", "response": "AdminUserDetailDto" },
+      { "method": "POST", "path": "", "desc": "Create user", "body": "CreateUserDto", "response": "AdminUserDto" },
+      { "method": "PUT", "path": "{userId}", "desc": "Update user", "body": "UpdateUserDto" },
+      { "method": "PATCH", "path": "{userId}/role", "desc": "Update user role", "body": "{ role: string }" },
+      { "method": "PATCH", "path": "{userId}/activate", "desc": "Activate account" },
+      { "method": "PATCH", "path": "{userId}/deactivate", "desc": "Deactivate account", "body": "{ reason: string }" },
+      { "method": "DELETE", "path": "{userId}", "desc": "Soft-delete user" },
+      { "method": "POST", "path": "{userId}/reset-password", "desc": "Reset user password (creates audit)" },
+      { "method": "GET", "path": "{userId}/activity", "desc": "User activity summary" },
+      { "method": "GET", "path": "statistics", "desc": "Global user statistics" },
+      { "method": "GET", "path": "{userId}/charging-history", "desc": "Charging history" },
+      { "method": "GET", "path": "{userId}/payment-history", "desc": "Payment history" },
+      { "method": "GET", "path": "{userId}/statistics", "desc": "User statistics" },
+      { "method": "GET", "path": "{userId}/vehicles", "desc": "Get user vehicles" },
+      { "method": "GET", "path": "{userId}/staff/stations", "desc": "Station assignments for staff" },
+      { "method": "GET", "path": "{userId}/staff/schedule", "desc": "Staff schedule" },
+      { "method": "GET", "path": "{userId}/staff/activities", "desc": "Staff recent activities" },
+      { "method": "GET", "path": "{userId}/admin/overview", "desc": "Admin overview metrics" },
+      { "method": "GET", "path": "{userId}/admin/activity-log", "desc": "Admin activity log" },
+      { "method": "GET", "path": "{userId}/admin/permissions", "desc": "Admin permission matrix" },
+      { "method": "GET", "path": "{userId}/admin/audit-log", "desc": "Admin audit log" },
+      { "method": "GET", "path": "notifications", "desc": "Get notifications" },
+      { "method": "POST", "path": "notifications", "desc": "Send notification" },
+      { "method": "POST", "path": "notifications/promotions", "desc": "Send promotion" },
+      { "method": "PATCH", "path": "notifications/{notificationId}/read", "desc": "Mark notification read" },
+      { "method": "GET", "path": "support-requests", "desc": "List support requests" },
+      { "method": "GET", "path": "support-requests/{requestId}", "desc": "Support request detail" },
+      { "method": "PATCH", "path": "support-requests/{requestId}", "desc": "Update support request" },
+      { "method": "POST", "path": "support-requests/{requestId}/reply", "desc": "Reply to support request" },
+      { "method": "POST", "path": "support-requests/{requestId}/close", "desc": "Close support request" }
+    ]
+  },
+  {
+    "controller": "AdminReportsController",
+    "baseRoute": "/api/admin/adminreports",
+    "authorizedRoles": ["admin","staff"],
+    "endpoints": [
+      { "method": "GET", "path": "revenue", "desc": "Revenue reports", "response": "{ data: RevenueReportDto[], summary: {...} }" },
+      { "method": "GET", "path": "usage", "desc": "Usage reports" },
+      { "method": "GET", "path": "test-view", "desc": "Debug view access (dev only)" },
+      { "method": "GET", "path": "station-performance", "desc": "Station performance metrics" },
+      { "method": "GET", "path": "top-stations", "desc": "Top stations by revenue" },
+      { "method": "GET", "path": "dashboard", "desc": "Dashboard summary" },
+      { "method": "GET", "path": "payment-methods-stats", "desc": "Payment methods stats" },
+      { "method": "GET", "path": "revenue/export", "desc": "Export revenue CSV" },
+      { "method": "GET", "path": "peak-hours", "desc": "Peak hours analysis" },
+      { "method": "GET", "path": "revenue-by-connector", "desc": "Revenue by connector" },
+      { "method": "POST", "path": "seed-demo", "desc": "Seed demo data (Development only)" },
+      { "method": "GET", "path": "system-health", "desc": "System health metrics" },
+      { "method": "GET", "path": "user-growth", "desc": "User growth analytics" },
+      { "method": "GET", "path": "stations/{stationId}/detailed-analytics", "desc": "Station detailed analytics" },
+      { "method": "GET", "path": "stations/{stationId}/daily", "desc": "Daily analytics" },
+      { "method": "GET", "path": "stations/{stationId}/monthly", "desc": "Monthly analytics" },
+      { "method": "GET", "path": "stations/{stationId}/yearly", "desc": "Yearly analytics" },
+      { "method": "GET", "path": "stations/{stationId}/time-series", "desc": "Time-series data" }
+    ]
+  },
+  {
+    "controller": "AdminStationsController",
+    "baseRoute": "/api/admin/stations",
+    "authorizedRoles": ["admin","staff"],
+    "endpoints": [
+      { "method": "GET", "path": "", "desc": "List stations (filter/paging)" },
+      { "method": "GET", "path": "{stationId}", "desc": "Station detail" },
+      { "method": "GET", "path": "{stationId}/realtime", "desc": "Realtime monitoring data" },
+      { "method": "POST", "path": "posts/{postId}/control", "desc": "Control charging point", "authorizedRoles": ["admin"] },
+      { "method": "POST", "path": "{stationId}/control", "desc": "Control station", "authorizedRoles": ["admin"] },
+      { "method": "PUT", "path": "posts/{postId}/config", "desc": "Configure charging point", "authorizedRoles": ["admin"] },
+      { "method": "GET", "path": "{stationId}/errors", "desc": "Get station error logs" },
+      { "method": "PATCH", "path": "errors/{logId}/resolve", "desc": "Resolve error log", "authorizedRoles": ["admin","staff"] },
+      { "method": "POST", "path": "{stationId}/errors", "desc": "Log station error" },
+      { "method": "POST", "path": "", "desc": "Create station", "authorizedRoles": ["admin"] },
+      { "method": "PUT", "path": "{stationId}", "desc": "Update station", "authorizedRoles": ["admin"] },
+      { "method": "DELETE", "path": "{stationId}", "desc": "Delete station", "authorizedRoles": ["admin"] },
+      { "method": "POST", "path": "{stationId}/posts", "desc": "Create charging post", "authorizedRoles": ["admin"] },
+      { "method": "PUT", "path": "{stationId}/manager", "desc": "Update manager assignment", "authorizedRoles": ["admin"] },
+      { "method": "GET", "path": "analytics", "desc": "Legacy station analytics" }
+    ]
+  },
+  {
+    "controller": "AdminController",
+    "baseRoute": "/api/admin/admin",
+    "authorizedRoles": ["admin"],
+    "endpoints": [
+      { "method": "POST", "path": "reset-all-passwords", "desc": "Reset all admin passwords (dangerous)" }
+    ]
+  }
+]

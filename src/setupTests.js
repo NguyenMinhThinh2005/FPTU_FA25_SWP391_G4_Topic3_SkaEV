@@ -27,7 +27,7 @@ Object.defineProperty(window, 'matchMedia', {
 });
 
 // Mock IntersectionObserver
-global.IntersectionObserver = class IntersectionObserver {
+globalThis.IntersectionObserver = class IntersectionObserver {
   constructor() {}
   disconnect() {}
   observe() {}
@@ -41,13 +41,13 @@ global.IntersectionObserver = class IntersectionObserver {
 window.scrollTo = vi.fn();
 
 // Mock navigator.geolocation
-global.navigator.geolocation = {
+globalThis.navigator.geolocation = {
   getCurrentPosition: vi.fn(),
   watchPosition: vi.fn(),
 };
 
 // Mock QR Reader camera
-global.navigator.mediaDevices = {
+globalThis.navigator.mediaDevices = {
   getUserMedia: vi.fn(() => 
     Promise.resolve({
       getTracks: () => [{ stop: vi.fn() }]

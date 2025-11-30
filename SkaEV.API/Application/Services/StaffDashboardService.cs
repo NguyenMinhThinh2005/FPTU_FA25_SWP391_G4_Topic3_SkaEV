@@ -4,11 +4,20 @@ using SkaEV.API.Infrastructure.Data;
 
 namespace SkaEV.API.Application.Services;
 
+/// <summary>
+/// Giao diện dịch vụ bảng điều khiển nhân viên.
+/// </summary>
 public interface IStaffDashboardService
 {
+    /// <summary>
+    /// Lấy thông tin bảng điều khiển cho nhân viên.
+    /// </summary>
     Task<StaffDashboardDto> GetDashboardAsync(int userId, CancellationToken cancellationToken = default);
 }
 
+/// <summary>
+/// Dịch vụ bảng điều khiển nhân viên.
+/// </summary>
 public class StaffDashboardService : IStaffDashboardService
 {
     private readonly SkaEVDbContext _context;
@@ -20,6 +29,12 @@ public class StaffDashboardService : IStaffDashboardService
         _logger = logger;
     }
 
+    /// <summary>
+    /// Lấy thông tin bảng điều khiển cho nhân viên.
+    /// </summary>
+    /// <param name="userId">ID nhân viên.</param>
+    /// <param name="cancellationToken">Token hủy tác vụ.</param>
+    /// <returns>Thông tin bảng điều khiển.</returns>
     public async Task<StaffDashboardDto> GetDashboardAsync(int userId, CancellationToken cancellationToken = default)
     {
         var dashboard = new StaffDashboardDto

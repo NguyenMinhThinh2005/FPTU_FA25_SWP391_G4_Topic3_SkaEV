@@ -1,7 +1,5 @@
 import { create } from 'zustand';
-import axios from 'axios';
-
-const API_URL = 'http://localhost:5000/api';
+import axiosInstance from '../services/axiosConfig';
 
 const incidentStore = create((set, get) => ({
   incidents: [],
@@ -11,7 +9,7 @@ const incidentStore = create((set, get) => ({
   error: null,
   filters: {
     status: null,
-    severity: null,
+    priority: null,
     stationId: null
   },
 
@@ -19,14 +17,25 @@ const incidentStore = create((set, get) => ({
   fetchIncidents: async () => {
     set({ isLoading: true, error: null });
     try {
-      const { status, severity, stationId } = get().filters;
-      const params = new URLSearchParams();
-      if (status) params.append('status', status);
-      if (severity) params.append('severity', severity);
-      if (stationId) params.append('stationId', stationId);
+      const { status, priority, stationId } = get().filters;
+      const params = {};
+      if (status) params.status = status;
+      if (priority) params.priority = priority;
+      if (stationId) params.stationId = stationId;
 
-      const response = await axios.get(`${API_URL}/incident?${params.toString()}`);
-      set({ incidents: response.data, isLoading: false });
+      const response = await axiosInstance.get(`/incident?${params.toString()}`);
+      let data = response.data?.data || response.data || [];
+      // Normalize legacy severity values (map 'high' -> 'critical') and normalize status
+      // so UI always works with the 3-state model: open, in_progress, resolved
+      if (Array.isArray(data)) {
+        data = data.map((it) => ({
+          ...it,
+          severity: (it.severity === 'high') ? 'critical' : it.severity,
+          // map legacy/alternate status values into the simplified UI model
+          status: (it.status === 'closed') ? 'resolved' : it.status
+        }));
+      }
+      set({ incidents: Array.isArray(data) ? data : [], isLoading: false });
     } catch (error) {
       set({ error: error.message, isLoading: false });
       console.error('Error fetching incidents:', error);
@@ -37,8 +46,13 @@ const incidentStore = create((set, get) => ({
   fetchIncidentById: async (id) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await axios.get(`${API_URL}/incident/${id}`);
-      set({ selectedIncident: response.data, isLoading: false });
+  const response = await axiosInstance.get(`/incident/${id}`);
+  let data = response.data?.data || response.data;
+  if (data) {
+    if (data.severity === 'high') data.severity = 'critical';
+    if (data.status === 'closed') data.status = 'resolved';
+  }
+  set({ selectedIncident: data, isLoading: false });
     } catch (error) {
       set({ error: error.message, isLoading: false });
       console.error('Error fetching incident:', error);
@@ -49,8 +63,9 @@ const incidentStore = create((set, get) => ({
   fetchIncidentsByStation: async (stationId) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await axios.get(`${API_URL}/incident/station/${stationId}`);
-      set({ incidents: response.data, isLoading: false });
+  const response = await axiosInstance.get(`/incident/station/${stationId}`);
+  const data = response.data?.data || response.data || [];
+  set({ incidents: Array.isArray(data) ? data : [], isLoading: false });
     } catch (error) {
       set({ error: error.message, isLoading: false });
       console.error('Error fetching station incidents:', error);
@@ -61,10 +76,10 @@ const incidentStore = create((set, get) => ({
   createIncident: async (incidentData) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await axios.post(`${API_URL}/incident`, incidentData);
-      await get().fetchIncidents(); // Refresh list
-      set({ isLoading: false });
-      return response.data;
+  const response = await axiosInstance.post('/incident', incidentData);
+  await get().fetchIncidents(); // Refresh list
+  set({ isLoading: false });
+  return response.data?.data || response.data;
     } catch (error) {
       set({ error: error.message, isLoading: false });
       console.error('Error creating incident:', error);
@@ -76,10 +91,11 @@ const incidentStore = create((set, get) => ({
   updateIncident: async (id, updateData) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await axios.put(`${API_URL}/incident/${id}`, updateData);
-      await get().fetchIncidents(); // Refresh list
-      set({ selectedIncident: response.data, isLoading: false });
-      return response.data;
+  const response = await axiosInstance.put(`/incident/${id}`, updateData);
+  await get().fetchIncidents(); // Refresh list
+  const data = response.data?.data || response.data;
+  set({ selectedIncident: data, isLoading: false });
+  return data;
     } catch (error) {
       set({ error: error.message, isLoading: false });
       console.error('Error updating incident:', error);
@@ -91,9 +107,10 @@ const incidentStore = create((set, get) => ({
   fetchStats: async (stationId = null) => {
     set({ isLoading: true, error: null });
     try {
-      const params = stationId ? `?stationId=${stationId}` : '';
-      const response = await axios.get(`${API_URL}/incident/stats${params}`);
-      set({ stats: response.data, isLoading: false });
+  const params = stationId ? `?stationId=${stationId}` : '';
+  const response = await axiosInstance.get(`/incident/stats${params}`);
+  const data = response.data?.data || response.data;
+  set({ stats: data, isLoading: false });
     } catch (error) {
       set({ error: error.message, isLoading: false });
       console.error('Error fetching stats:', error);
@@ -108,7 +125,7 @@ const incidentStore = create((set, get) => ({
 
   // Clear filters
   clearFilters: () => {
-    set({ filters: { status: null, severity: null, stationId: null } });
+    set({ filters: { status: null, priority: null, stationId: null } });
     get().fetchIncidents();
   },
 

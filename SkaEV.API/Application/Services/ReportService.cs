@@ -3,23 +3,33 @@ using SkaEV.API.Application.DTOs.Reports;
 using SkaEV.API.Domain.Entities.Views;
 using SkaEV.API.Infrastructure.Data;
 using System.Text;
+using System.Text.Json;
 
 namespace SkaEV.API.Application.Services;
 
 /// <summary>
-/// Service for reporting and analytics operations
+/// Dịch vụ xử lý báo cáo và phân tích dữ liệu.
 /// </summary>
 public class ReportService : IReportService
 {
     private readonly SkaEVDbContext _context;
+    private readonly ILogger<ReportService> _logger;
 
-    public ReportService(SkaEVDbContext context)
+    public ReportService(SkaEVDbContext context, ILogger<ReportService> logger)
     {
         _context = context;
+        _logger = logger;
     }
 
     #region Customer Reports
 
+    /// <summary>
+    /// Lấy báo cáo chi phí sử dụng của người dùng.
+    /// </summary>
+    /// <param name="userId">ID người dùng.</param>
+    /// <param name="year">Năm (tùy chọn).</param>
+    /// <param name="month">Tháng (tùy chọn).</param>
+    /// <returns>Danh sách báo cáo chi phí.</returns>
     public async Task<IEnumerable<UserCostReportDto>> GetUserCostReportsAsync(int userId, int? year = null, int? month = null)
     {
         var query = _context.UserCostReports
@@ -55,6 +65,11 @@ public class ReportService : IReportService
         });
     }
 
+    /// <summary>
+    /// Lấy thông tin thói quen sạc của người dùng.
+    /// </summary>
+    /// <param name="userId">ID người dùng.</param>
+    /// <returns>Thông tin thói quen sạc hoặc null nếu không có dữ liệu.</returns>
     public async Task<ChargingHabitsDto?> GetUserChargingHabitsAsync(int userId)
     {
         var habit = await _context.UserChargingHabits
@@ -80,6 +95,13 @@ public class ReportService : IReportService
         };
     }
 
+    /// <summary>
+    /// Lấy tóm tắt hoạt động trong tháng của người dùng.
+    /// </summary>
+    /// <param name="userId">ID người dùng.</param>
+    /// <param name="year">Năm.</param>
+    /// <param name="month">Tháng.</param>
+    /// <returns>Thông tin tóm tắt tháng.</returns>
     public async Task<MonthlySummaryDto> GetMonthlySummaryAsync(int userId, int year, int month)
     {
         var report = await _context.UserCostReports
@@ -111,6 +133,12 @@ public class ReportService : IReportService
         };
     }
 
+    /// <summary>
+    /// Lấy tóm tắt hoạt động từ đầu năm đến hiện tại của người dùng.
+    /// </summary>
+    /// <param name="userId">ID người dùng.</param>
+    /// <param name="year">Năm.</param>
+    /// <returns>Thông tin tóm tắt năm.</returns>
     public async Task<YearToDateSummaryDto> GetYearToDateSummaryAsync(int userId, int year)
     {
         var reports = await _context.UserCostReports
@@ -141,6 +169,13 @@ public class ReportService : IReportService
 
     #region Admin Reports
 
+    /// <summary>
+    /// Lấy báo cáo doanh thu (Admin).
+    /// </summary>
+    /// <param name="stationId">ID trạm sạc (tùy chọn).</param>
+    /// <param name="year">Năm (tùy chọn).</param>
+    /// <param name="month">Tháng (tùy chọn).</param>
+    /// <returns>Danh sách báo cáo doanh thu.</returns>
     public async Task<IEnumerable<RevenueReportDto>> GetRevenueReportsAsync(int? stationId = null, int? year = null, int? month = null)
     {
         try
@@ -190,28 +225,55 @@ public class ReportService : IReportService
 
             return grouped;
         }
-        catch
+        catch (Exception ex)
         {
-            // Return empty list if no data or error
+            _logger.LogError(ex, "Error getting revenue reports. StationId: {StationId}, Year: {Year}, Month: {Month}", 
+                stationId, year, month);
+            // Return empty list if error occurs, but log it for debugging
             return new List<RevenueReportDto>();
         }
     }
 
+    /// <summary>
+    /// Lấy báo cáo mức độ sử dụng trạm sạc (Admin).
+    /// </summary>
+    /// <param name="stationId">ID trạm sạc (tùy chọn).</param>
+    /// <param name="year">Năm (tùy chọn).</param>
+    /// <param name="month">Tháng (tùy chọn).</param>
+    /// <returns>Danh sách báo cáo sử dụng.</returns>
     public async Task<IEnumerable<UsageReportDto>> GetUsageReportsAsync(int? stationId = null, int? year = null, int? month = null)
     {
-        // Use brand new SQL connection - completely bypass EF Core
+        // Sử dụng kết nối SQL trực tiếp để bypass EF Core và tối ưu hiệu năng cho báo cáo phức tạp
         try
         {
-            using var connection = new Microsoft.Data.SqlClient.SqlConnection("Server=ADMIN-PC\\MSSQLSERVER01;Database=SkaEV_DB;TrustServerCertificate=True;Integrated Security=True;");
+            // Use the application's configured DB connection string to avoid hardcoding
+            var connectionString = _context.Database.GetDbConnection().ConnectionString;
+            using var connection = new Microsoft.Data.SqlClient.SqlConnection(connectionString);
             await connection.OpenAsync();
 
             using var command = connection.CreateCommand();
 
-            var sql = "SELECT station_id, station_name, year, month, total_bookings, completed_sessions, cancelled_sessions, no_show_sessions, total_usage_minutes, avg_session_duration_minutes, peak_usage_hour, utilization_rate_percent FROM v_admin_usage_reports WHERE year IS NOT NULL";
+            // Use explicit aliases matching DTO/property names to avoid any schema casing/order issues
+            var sql = new StringBuilder();
+            sql.AppendLine("SELECT\n");
+            sql.AppendLine("    StationId = station_id,\n");
+            sql.AppendLine("    StationName = station_name,\n");
+            sql.AppendLine("    Year = year,\n");
+            sql.AppendLine("    Month = month,\n");
+            sql.AppendLine("    TotalBookings = total_bookings,\n");
+            sql.AppendLine("    CompletedSessions = completed_sessions,\n");
+            sql.AppendLine("    CancelledSessions = cancelled_sessions,\n");
+            sql.AppendLine("    NoShowSessions = no_show_sessions,\n");
+            sql.AppendLine("    TotalUsageMinutes = total_usage_minutes,\n");
+            sql.AppendLine("    AvgSessionDurationMinutes = avg_session_duration_minutes,\n");
+            sql.AppendLine("    PeakUsageHour = peak_usage_hour,\n");
+            sql.AppendLine("    UtilizationRatePercent = utilization_rate_percent\n");
+            sql.AppendLine("FROM v_admin_usage_reports\n");
+            sql.AppendLine("WHERE year IS NOT NULL");
 
             if (stationId.HasValue)
             {
-                sql += " AND station_id = @stationId";
+                sql.AppendLine(" AND station_id = @stationId");
                 var param = command.CreateParameter();
                 param.ParameterName = "@stationId";
                 param.Value = stationId.Value;
@@ -219,7 +281,7 @@ public class ReportService : IReportService
             }
             if (year.HasValue)
             {
-                sql += " AND year = @year";
+                sql.AppendLine(" AND year = @year");
                 var param = command.CreateParameter();
                 param.ParameterName = "@year";
                 param.Value = year.Value;
@@ -227,15 +289,15 @@ public class ReportService : IReportService
             }
             if (month.HasValue)
             {
-                sql += " AND month = @month";
+                sql.AppendLine(" AND month = @month");
                 var param = command.CreateParameter();
                 param.ParameterName = "@month";
                 param.Value = month.Value;
                 command.Parameters.Add(param);
             }
 
-            sql += " ORDER BY total_bookings DESC";
-            command.CommandText = sql;
+            sql.AppendLine("ORDER BY total_bookings DESC");
+            command.CommandText = sql.ToString();
 
             var results = new List<UsageReportDto>();
             using var reader = await command.ExecuteReaderAsync();
@@ -245,14 +307,14 @@ public class ReportService : IReportService
                 results.Add(new UsageReportDto
                 {
                     StationId = reader.GetInt32(0),
-                    StationName = reader.IsDBNull(1) ? "" : reader.GetString(1),
+                    StationName = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
                     Year = reader.IsDBNull(2) ? null : reader.GetInt32(2),
                     Month = reader.IsDBNull(3) ? null : reader.GetInt32(3),
-                    TotalBookings = reader.GetInt32(4),
-                    CompletedSessions = reader.GetInt32(5),
-                    CancelledSessions = reader.GetInt32(6),
-                    NoShowSessions = reader.GetInt32(7),
-                    TotalUsageMinutes = reader.GetInt32(8),
+                    TotalBookings = reader.IsDBNull(4) ? 0 : reader.GetInt32(4),
+                    CompletedSessions = reader.IsDBNull(5) ? 0 : reader.GetInt32(5),
+                    CancelledSessions = reader.IsDBNull(6) ? 0 : reader.GetInt32(6),
+                    NoShowSessions = reader.IsDBNull(7) ? 0 : reader.GetInt32(7),
+                    TotalUsageMinutes = reader.IsDBNull(8) ? 0 : reader.GetInt32(8),
                     AvgSessionDurationMinutes = reader.IsDBNull(9) ? null : reader.GetInt32(9),
                     PeakUsageHour = reader.IsDBNull(10) ? null : reader.GetInt32(10),
                     UtilizationRatePercent = reader.IsDBNull(11) ? null : reader.GetDecimal(11)
@@ -262,13 +324,13 @@ public class ReportService : IReportService
             if (results.Count > 0)
                 return results;
         }
-        catch
+        catch (Exception ex)
         {
-            // If fails, return empty
+            _logger?.LogError(ex, "Error reading usage reports from view v_admin_usage_reports");
             return new List<UsageReportDto>();
         }
 
-        // Fallback: calculate usage metrics directly from bookings when the view returns no rows
+        // Fallback: tính toán thủ công từ bảng bookings nếu view không trả về dữ liệu
         var (startDate, endDate) = CalculateUsageDateRange(year, month);
 
         var bookingsQuery = _context.Bookings.AsQueryable();
@@ -433,11 +495,16 @@ public class ReportService : IReportService
             .ToList();
     }
 
+    /// <summary>
+    /// Lấy hiệu suất hoạt động của trạm sạc.
+    /// </summary>
+    /// <param name="stationId">ID trạm sạc (tùy chọn).</param>
+    /// <returns>Danh sách hiệu suất trạm sạc.</returns>
     public async Task<IEnumerable<StationPerformanceDto>> GetStationPerformanceAsync(int? stationId = null)
     {
         try
         {
-            // Try using the view first
+            // Thử sử dụng view trước
             var query = _context.StationPerformances.AsQueryable();
 
             if (stationId.HasValue)
@@ -508,7 +575,7 @@ public class ReportService : IReportService
         }
         catch
         {
-            // Fallback: Calculate manually if view doesn't exist
+            // Fallback: Tính toán thủ công nếu view không tồn tại
             var today = DateTime.Today;
             var stationsQuery = _context.ChargingStations.AsQueryable();
 
@@ -582,6 +649,10 @@ public class ReportService : IReportService
         }
     }
 
+    /// <summary>
+    /// Lấy dữ liệu tổng quan cho Dashboard Admin.
+    /// </summary>
+    /// <returns>Dữ liệu dashboard.</returns>
     public async Task<AdminDashboardDto> GetAdminDashboardAsync()
     {
         var today = DateTime.Today;
@@ -629,6 +700,10 @@ public class ReportService : IReportService
         };
     }
 
+    /// <summary>
+    /// Lấy thống kê theo phương thức thanh toán.
+    /// </summary>
+    /// <returns>Danh sách thống kê phương thức thanh toán.</returns>
     public async Task<IEnumerable<PaymentMethodStatsDto>> GetPaymentMethodsStatsAsync()
     {
         var stats = await _context.Invoices
@@ -648,6 +723,80 @@ public class ReportService : IReportService
         return stats;
     }
 
+    /// <summary>
+    /// Lấy doanh thu theo loại connector (CCS2, Type2, etc.).
+    /// </summary>
+    /// <param name="stationId">ID trạm sạc (tùy chọn).</param>
+    /// <param name="startDate">Ngày bắt đầu (tùy chọn).</param>
+    /// <param name="endDate">Ngày kết thúc (tùy chọn).</param>
+    /// <returns>Danh sách doanh thu theo loại connector.</returns>
+    public async Task<IEnumerable<ConnectorRevenueDto>> GetRevenueByConnectorAsync(int? stationId = null, DateTime? startDate = null, DateTime? endDate = null)
+    {
+        try
+        {
+            var query = from invoice in _context.Invoices
+                        join booking in _context.Bookings on invoice.BookingId equals booking.BookingId
+                        join slot in _context.ChargingSlots on booking.SlotId equals slot.SlotId
+                        join post in _context.ChargingPosts on slot.PostId equals post.PostId
+                        where invoice.PaymentStatus == "paid"
+                        select new
+                        {
+                            invoice,
+                            booking,
+                            post.ConnectorTypes,
+                            booking.StationId
+                        };
+
+            // Apply filters
+            if (stationId.HasValue)
+                query = query.Where(x => x.StationId == stationId.Value);
+
+            if (startDate.HasValue)
+                query = query.Where(x => x.invoice.CreatedAt >= startDate.Value);
+
+            if (endDate.HasValue)
+                query = query.Where(x => x.invoice.CreatedAt <= endDate.Value);
+
+            var data = await query.ToListAsync();
+
+            // Flatten connector types and group
+            var flattenedData = data
+                .SelectMany(x => DeserializeConnectorTypes(x.ConnectorTypes)
+                    .Select(connectorType => new
+                    {
+                        ConnectorType = connectorType,
+                        x.invoice.TotalAmount,
+                        x.invoice.TotalEnergyKwh
+                    }))
+                .ToList();
+
+            var grouped = flattenedData
+                .GroupBy(x => x.ConnectorType)
+                .Select(g => new ConnectorRevenueDto
+                {
+                    ConnectorType = g.Key,
+                    TotalRevenue = g.Sum(x => x.TotalAmount),
+                    TotalEnergyKwh = g.Sum(x => x.TotalEnergyKwh),
+                    TotalTransactions = g.Count()
+                })
+                .OrderByDescending(r => r.TotalRevenue)
+                .ToList();
+
+            return grouped;
+        }
+        catch
+        {
+            // Return empty list if no data or error
+            return new List<ConnectorRevenueDto>();
+        }
+    }
+
+    /// <summary>
+    /// Phân tích giờ cao điểm sử dụng trạm sạc.
+    /// </summary>
+    /// <param name="stationId">ID trạm sạc (tùy chọn).</param>
+    /// <param name="dateRange">Khoảng thời gian (ví dụ: "last30days").</param>
+    /// <returns>Dữ liệu phân tích giờ cao điểm.</returns>
     public async Task<object> GetPeakHoursAnalysisAsync(int? stationId = null, string? dateRange = "last30days")
     {
         var (startDate, endDate) = CalculateDateRange(dateRange);
@@ -679,6 +828,10 @@ public class ReportService : IReportService
         };
     }
 
+    /// <summary>
+    /// Lấy thông tin sức khỏe hệ thống (System Health).
+    /// </summary>
+    /// <returns>Danh sách các chỉ số sức khỏe hệ thống.</returns>
     public async Task<IEnumerable<object>> GetSystemHealthAsync()
     {
         // System uptime calculation (based on completed vs failed bookings)
@@ -719,6 +872,11 @@ public class ReportService : IReportService
         };
     }
 
+    /// <summary>
+    /// Lấy thống kê tăng trưởng người dùng.
+    /// </summary>
+    /// <param name="dateRange">Khoảng thời gian.</param>
+    /// <returns>Dữ liệu tăng trưởng người dùng.</returns>
     public async Task<IEnumerable<object>> GetUserGrowthAsync(string? dateRange = "last30days")
     {
         var (startDate, endDate) = CalculateDateRange(dateRange);
@@ -825,10 +983,48 @@ public class ReportService : IReportService
         return "critical";
     }
 
+    private static IReadOnlyList<string> DeserializeConnectorTypes(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return Array.Empty<string>();
+        }
+
+        try
+        {
+            var parsed = JsonSerializer.Deserialize<List<string>>(raw);
+            if (parsed == null)
+            {
+                return Array.Empty<string>();
+            }
+
+            return parsed
+                .Where(p => !string.IsNullOrWhiteSpace(p))
+                .Select(p => p.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+        catch
+        {
+            // Backwards compatibility for comma-separated values
+            return raw
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+    }
+
     #endregion
 
     #region Station-Specific Detailed Analytics
 
+    /// <summary>
+    /// Lấy phân tích chi tiết cho một trạm sạc cụ thể.
+    /// </summary>
+    /// <param name="stationId">ID trạm sạc.</param>
+    /// <param name="startDate">Ngày bắt đầu.</param>
+    /// <param name="endDate">Ngày kết thúc.</param>
+    /// <returns>Dữ liệu phân tích chi tiết.</returns>
     public async Task<StationDetailedAnalyticsDto> GetStationDetailedAnalyticsAsync(int stationId, DateTime? startDate = null, DateTime? endDate = null)
     {
         // Set default date range if not provided (last 30 days)
@@ -954,6 +1150,9 @@ public class ReportService : IReportService
         };
     }
 
+    /// <summary>
+    /// Lấy phân tích hàng ngày cho trạm sạc.
+    /// </summary>
     public async Task<List<DailyAnalyticsDto>> GetStationDailyAnalyticsAsync(int stationId, DateTime? startDate = null, DateTime? endDate = null)
     {
         endDate ??= DateTime.UtcNow;
@@ -1028,6 +1227,9 @@ public class ReportService : IReportService
         return result;
     }
 
+    /// <summary>
+    /// Lấy phân tích hàng tháng cho trạm sạc.
+    /// </summary>
     public async Task<MonthlyAnalyticsDto> GetStationMonthlyAnalyticsAsync(int stationId, int year, int month)
     {
         var station = await _context.ChargingStations
@@ -1094,6 +1296,9 @@ public class ReportService : IReportService
         };
     }
 
+    /// <summary>
+    /// Lấy phân tích hàng năm cho trạm sạc.
+    /// </summary>
     public async Task<YearlyAnalyticsDto> GetStationYearlyAnalyticsAsync(int stationId, int year)
     {
         var station = await _context.ChargingStations
@@ -1201,6 +1406,9 @@ public class ReportService : IReportService
         };
     }
 
+    /// <summary>
+    /// Lấy dữ liệu chuỗi thời gian cho biểu đồ.
+    /// </summary>
     public async Task<List<TimeSeriesDataPointDto>> GetStationTimeSeriesAsync(
         int stationId,
         string granularity,
@@ -1336,6 +1544,9 @@ public class ReportService : IReportService
 
     #region Export
 
+    /// <summary>
+    /// Xuất báo cáo doanh thu ra định dạng CSV.
+    /// </summary>
     public async Task<string> ExportRevenueReportToCsvAsync(int? stationId = null, int? year = null, int? month = null)
     {
         var reports = await GetRevenueReportsAsync(stationId, year, month);

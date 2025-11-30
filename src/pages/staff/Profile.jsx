@@ -10,6 +10,16 @@ import {
   Divider,
   Chip,
   Alert,
+<<<<<<< HEAD
+=======
+  Tab,
+  Tabs,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemSecondaryAction,
+  IconButton,
+>>>>>>> origin/develop
   CircularProgress,
 } from "@mui/material";
 import {
@@ -27,12 +37,23 @@ import useAuthStore from "../../store/authStore";
 import { authAPI } from "../../services/api.js";
 
 const StaffProfile = () => {
+<<<<<<< HEAD
   const [loading, setLoading] = useState(true);
   
   // Get user from authStore
   const { user: authUser } = useAuthStore();
   
   // State for profile data
+=======
+  const [editMode, setEditMode] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saveMessage, setSaveMessage] = useState(null);
+  const [saveError, setSaveError] = useState(null);
+  const [tabValue, setTabValue] = useState(0);
+  
+  // Get user from authStore
+  const { user: authUser, updateProfile: updateAuthProfile } = useAuthStore();
+>>>>>>> origin/develop
   const [profileData, setProfileData] = useState({
     firstName: "",
     lastName: "",
@@ -45,8 +66,11 @@ const StaffProfile = () => {
     location: "",
     avatar: "",
   });
+<<<<<<< HEAD
   
   // State for work statistics
+=======
+>>>>>>> origin/develop
   const [workStats, setWorkStats] = useState({
     totalStationsManaged: 0,
     maintenanceCompleted: 0,
@@ -54,6 +78,7 @@ const StaffProfile = () => {
     totalConnectors: 0,
   });
 
+<<<<<<< HEAD
   const loadStaffProfile = useCallback(async () => {
     setLoading(true);
     try {
@@ -77,6 +102,104 @@ const StaffProfile = () => {
       // Get dashboard data for work stats
       const dashboardData = await staffAPI.getDashboardOverview();
       console.log("📊 Dashboard Data:", dashboardData);
+=======
+  // Mock data for certifications and activities
+  const certifications = [];
+  const recentActivities = [];
+
+  const getCertificationColor = (status) => {
+    switch (status) {
+      case "active": return "success";
+      case "expired": return "error";
+      default: return "default";
+    }
+  };
+
+  const getActivityColor = (status) => {
+    switch (status) {
+      case "success": return "success";
+      case "info": return "info";
+      case "warning": return "warning";
+      case "error": return "error";
+      default: return "default";
+    }
+  };
+
+  const loadStaffProfile = useCallback(async () => {
+    setLoading(true);
+    try {
+      console.log("📋 Loading profile - Auth User from store:", authUser);
+
+      // Get dashboard data for work stats
+      const dashboardData = await staffAPI.getDashboardOverview();
+      console.log("📊 Dashboard Data:", dashboardData);
+
+      // Set profile data from authStore user (the logged-in staff)
+      if (authUser && authUser.full_name) {
+        console.log("✓ Parsing name from:", authUser.full_name);
+        
+        // Parse full name into first and last name
+        const fullName = authUser.full_name.trim();
+        const nameParts = fullName.split(" ");
+        const lastName = nameParts.pop() || ""; // Last word is the last name (Tên)
+        const firstName = nameParts.join(" ") || ""; // Rest is first name + middle name (Họ và tên đệm)
+
+        console.log("✓ Parsed - firstName:", firstName, "lastName:", lastName);
+
+        setProfileData({
+          firstName: firstName,
+          lastName: lastName,
+          email: authUser.email || "",
+          phone: authUser.phone_number || authUser.phoneNumber || "",
+          employeeId: authUser.user_id ? `ST${String(authUser.user_id).padStart(3, '0')}` : "",
+          department: "Vận hành",
+          position: "Kỹ thuật viên trạm sạc",
+          joinDate: authUser.created_at ? new Date(authUser.created_at).toISOString().split('T')[0] : "2025-01-15",
+          location: dashboardData?.station?.city || authUser.address || "TP.HCM",
+          avatar: authUser.avatar || authUser.profile_image || "",
+        });
+      }
+
+      // Calculate work stats from dashboard
+      if (dashboardData) {
+        const stats = dashboardData.dailyStats || {};
+        
+        // Total stations managed (the assigned station)
+        const totalStations = dashboardData.station ? 1 : 0;
+        
+        // Completed sessions today
+        const completedToday = stats.completedSessions || 0;
+        
+        // Active sessions right now
+        const activeNow = stats.activeSessions || 0;
+        
+        setWorkStats({
+          totalStationsManaged: totalStations,
+          maintenanceCompleted: completedToday,
+          activeSessionsNow: activeNow,
+          totalConnectors: dashboardData.connectors?.length || 0,
+        });
+      }
+
+    } catch (error) {
+      console.error("❌ Error loading staff profile:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [authUser]);
+
+  // Load staff profile data on mount
+  useEffect(() => {
+    loadStaffProfile();
+  }, [loadStaffProfile]);
+
+  // Reload when authUser full_name or phone_number changes (after update)
+  useEffect(() => {
+    if (authUser) {
+      console.log("🔄 AuthUser data changed, profile will reload automatically");
+    }
+  }, [authUser?.full_name, authUser?.phone_number]);
+>>>>>>> origin/develop
 
       // Set profile data from API response (preferred) or authStore user (fallback)
       if (authUser) {
@@ -88,6 +211,7 @@ const StaffProfile = () => {
         const lastName = nameParts.pop() || ""; // Last word is the last name (Tên)
         const firstName = nameParts.join(" ") || ""; // Rest is first name + middle name (Họ và tên đệm)
 
+<<<<<<< HEAD
         console.log("✓ Parsed - firstName:", firstName, "lastName:", lastName);
         
         // Backend returns PhoneNumber (capital P) not phoneNumber
@@ -150,6 +274,78 @@ const StaffProfile = () => {
   useEffect(() => {
     loadStaffProfile();
   }, [loadStaffProfile]);
+=======
+  const handleProfileChange = (field, value) => {
+    setProfileData({ ...profileData, [field]: value });
+    // Clear any previous save messages when user makes changes
+    setSaveMessage(null);
+    setSaveError(null);
+  };
+
+  const handleSaveProfile = async () => {
+    try {
+      setSaveMessage(null);
+      setSaveError(null);
+      setLoading(true);
+
+      // Prepare data to send to backend
+      // Backend UpdateProfileDto only supports: FullName, PhoneNumber
+      const updateData = {
+        fullName: `${profileData.firstName} ${profileData.lastName}`.trim(),
+        phoneNumber: profileData.phone,
+      };
+
+      console.log("💾 Saving profile data:", updateData);
+
+      // Call API to update profile - using correct endpoint
+      const response = await authAPI.updateProfile(updateData);
+      console.log("✅ Profile updated:", response);
+
+      // Update authStore with new data from response
+      if (response.data) {
+        const updatedUserData = {
+          full_name: response.data.fullName,
+          phone_number: response.data.phoneNumber,
+        };
+        
+        console.log("🔄 Updating authStore with:", updatedUserData);
+        updateAuthProfile(updatedUserData);
+        
+        // Verify update
+        setTimeout(() => {
+          const currentUser = useAuthStore.getState().user;
+          console.log("✓ AuthStore after update:", currentUser);
+        }, 100);
+
+        // Update local profileData to reflect changes immediately
+        const fullName = response.data.fullName.trim();
+        const nameParts = fullName.split(" ");
+        const lastName = nameParts.pop() || "";
+        const firstName = nameParts.join(" ") || "";
+
+        setProfileData(prev => ({
+          ...prev,
+          firstName: firstName,
+          lastName: lastName,
+          phone: response.data.phoneNumber || prev.phone,
+        }));
+      }
+
+      // Show success message
+      setSaveMessage("Thông tin đã được cập nhật thành công!");
+      setEditMode(false);
+
+    } catch (error) {
+      console.error("❌ Error saving profile:", error);
+      setSaveError(
+        error.response?.data?.message || 
+        "Không thể lưu thông tin. Vui lòng thử lại!"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+>>>>>>> origin/develop
 
   return (
     <Box sx={{ p: 3 }}>
@@ -169,10 +365,24 @@ const StaffProfile = () => {
         </Box>
       ) : (
         <>
+<<<<<<< HEAD
           {/* Info Alert - Staff can only view */}
           <Alert severity="info" icon={<Info />} sx={{ mb: 3 }}>
             Thông tin cá nhân và công việc chỉ có thể được chỉnh sửa bởi quản trị viên. Nếu bạn cần cập nhật thông tin, vui lòng liên hệ admin.
           </Alert>
+=======
+          {/* Success/Error Messages */}
+          {saveMessage && (
+            <Alert severity="success" sx={{ mb: 3 }} onClose={() => setSaveMessage(null)}>
+              {saveMessage}
+            </Alert>
+          )}
+          {saveError && (
+            <Alert severity="error" sx={{ mb: 3 }} onClose={() => setSaveError(null)}>
+              {saveError}
+            </Alert>
+          )}
+>>>>>>> origin/develop
 
           {/* Profile Overview Card */}
           <Card sx={{ mb: 3 }}>
@@ -204,6 +414,28 @@ const StaffProfile = () => {
                     color="primary"
                   />
                 </Box>
+<<<<<<< HEAD
+=======
+                <Button
+                  startIcon={editMode ? <Save /> : <Edit />}
+                  variant={editMode ? "contained" : "outlined"}
+                  onClick={editMode ? handleSaveProfile : () => setEditMode(true)}
+                >
+                  {editMode ? "Lưu" : "Chỉnh sửa hồ sơ"}
+                </Button>
+                {editMode && (
+                  <Button
+                    startIcon={<Cancel />}
+                    onClick={() => {
+                      setEditMode(false);
+                      loadStaffProfile(); // Reload data to reset
+                    }}
+                    sx={{ ml: 1 }}
+                  >
+                    Hủy
+                  </Button>
+                )}
+>>>>>>> origin/develop
               </Box>
 
               {/* Quick Stats - CHỈ 4 CHỈ SỐ THỰC TẾ */}
@@ -264,10 +496,17 @@ const StaffProfile = () => {
                   fullWidth
                   label="Họ"
                   value={profileData.firstName}
+<<<<<<< HEAD
                   disabled
                   InputProps={{
                     readOnly: true,
                   }}
+=======
+                  onChange={(e) =>
+                    handleProfileChange("firstName", e.target.value)
+                  }
+                  disabled={!editMode}
+>>>>>>> origin/develop
                 />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -275,10 +514,17 @@ const StaffProfile = () => {
                   fullWidth
                   label="Tên"
                   value={profileData.lastName}
+<<<<<<< HEAD
                   disabled
                   InputProps={{
                     readOnly: true,
                   }}
+=======
+                  onChange={(e) =>
+                    handleProfileChange("lastName", e.target.value)
+                  }
+                  disabled={!editMode}
+>>>>>>> origin/develop
                 />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -287,9 +533,15 @@ const StaffProfile = () => {
                 label="Email"
                 type="email"
                 value={profileData.email}
+<<<<<<< HEAD
                 disabled
                 InputProps={{
                   readOnly: true,
+=======
+                onChange={(e) => handleProfileChange("email", e.target.value)}
+                disabled
+                InputProps={{
+>>>>>>> origin/develop
                   startAdornment: (
                     <Email sx={{ mr: 1, color: "text.secondary" }} />
                   ),
@@ -301,9 +553,15 @@ const StaffProfile = () => {
                 fullWidth
                 label="Số điện thoại"
                 value={profileData.phone}
+<<<<<<< HEAD
                 disabled
                 InputProps={{
                   readOnly: true,
+=======
+                onChange={(e) => handleProfileChange("phone", e.target.value)}
+                disabled={!editMode}
+                InputProps={{
+>>>>>>> origin/develop
                   startAdornment: (
                     <Phone sx={{ mr: 1, color: "text.secondary" }} />
                   ),
@@ -315,9 +573,17 @@ const StaffProfile = () => {
                 fullWidth
                 label="Địa điểm"
                 value={profileData.location}
+<<<<<<< HEAD
                 disabled
                 InputProps={{
                   readOnly: true,
+=======
+                onChange={(e) =>
+                  handleProfileChange("location", e.target.value)
+                }
+                disabled
+                InputProps={{
+>>>>>>> origin/develop
                   startAdornment: (
                     <LocationOn sx={{ mr: 1, color: "text.secondary" }} />
                   ),
@@ -331,7 +597,10 @@ const StaffProfile = () => {
                 value={profileData.joinDate}
                 disabled
                 InputProps={{
+<<<<<<< HEAD
                   readOnly: true,
+=======
+>>>>>>> origin/develop
                   startAdornment: (
                     <CalendarToday sx={{ mr: 1, color: "text.secondary" }} />
                   ),
@@ -353,7 +622,10 @@ const StaffProfile = () => {
                 value={profileData.employeeId}
                 disabled
                 InputProps={{
+<<<<<<< HEAD
                   readOnly: true,
+=======
+>>>>>>> origin/develop
                   startAdornment: (
                     <Badge sx={{ mr: 1, color: "text.secondary" }} />
                   ),
@@ -367,7 +639,10 @@ const StaffProfile = () => {
                 value={profileData.department}
                 disabled
                 InputProps={{
+<<<<<<< HEAD
                   readOnly: true,
+=======
+>>>>>>> origin/develop
                   startAdornment: (
                     <Work sx={{ mr: 1, color: "text.secondary" }} />
                   ),
@@ -381,7 +656,10 @@ const StaffProfile = () => {
                 value={profileData.position}
                 disabled
                 InputProps={{
+<<<<<<< HEAD
                   readOnly: true,
+=======
+>>>>>>> origin/develop
                   startAdornment: (
                     <Work sx={{ mr: 1, color: "text.secondary" }} />
                   ),
@@ -391,10 +669,232 @@ const StaffProfile = () => {
           </Grid>
         </CardContent>
       </Card>
+<<<<<<< HEAD
         </>
       )}
     </Box>
   );
+=======
+
+      {/* Tabs */}
+      <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
+        <Tabs value={tabValue} onChange={handleTabChange}>
+          <Tab label="Thông tin cá nhân & Công việc" />
+          <Tab label="Nhật ký hoạt động" />
+        </Tabs>
+      </Box>
+
+      {/* Tab Content */}
+      {tabValue === 0 && (
+        <Card>
+          <CardContent>
+            <Typography variant="h6" fontWeight="bold" gutterBottom>
+              Thông tin cá nhân
+            </Typography>
+            <Grid container spacing={3}>
+              <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    label="Họ"
+                    value={profileData.firstName}
+                    onChange={(e) =>
+                      handleProfileChange("firstName", e.target.value)
+                    }
+                    disabled
+                  />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    label="Tên"
+                    value={profileData.lastName}
+                    onChange={(e) =>
+                      handleProfileChange("lastName", e.target.value)
+                    }
+                    disabled
+                  />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Email"
+                  type="email"
+                  value={profileData.email}
+                  onChange={(e) => handleProfileChange("email", e.target.value)}
+                  disabled={!editMode}
+                  InputProps={{
+                    startAdornment: (
+                      <Email sx={{ mr: 1, color: "text.secondary" }} />
+                    ),
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Số điện thoại"
+                  value={profileData.phone}
+                  onChange={(e) => handleProfileChange("phone", e.target.value)}
+                  disabled={!editMode}
+                  InputProps={{
+                    startAdornment: (
+                      <Phone sx={{ mr: 1, color: "text.secondary" }} />
+                    ),
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Địa điểm"
+                  value={profileData.location}
+                  onChange={(e) =>
+                    handleProfileChange("location", e.target.value)
+                  }
+                  disabled={!editMode}
+                  InputProps={{
+                    startAdornment: (
+                      <LocationOn sx={{ mr: 1, color: "text.secondary" }} />
+                    ),
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Ngày vào làm"
+                  value={profileData.joinDate}
+                  disabled
+                  InputProps={{
+                    startAdornment: (
+                      <CalendarToday sx={{ mr: 1, color: "text.secondary" }} />
+                    ),
+                  }}
+                />
+              </Grid>
+
+              {/* Phần Chi tiết công việc - GỘP VÀO ĐÂY */}
+              <Grid item xs={12} sx={{ mt: 2 }}>
+                <Divider />
+                <Typography variant="h6" fontWeight="bold" gutterBottom sx={{ mt: 2 }}>
+                  Chi tiết công việc
+                </Typography>
+              </Grid>
+              
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Mã nhân viên"
+                  value={profileData.employeeId}
+                  disabled
+                  InputProps={{
+                    startAdornment: (
+                      <Badge sx={{ mr: 1, color: "text.secondary" }} />
+                    ),
+                  }}
+                />
+              </Grid>
+              
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Phòng ban"
+                  value={profileData.department}
+                  disabled
+                  InputProps={{
+                    startAdornment: (
+                      <Work sx={{ mr: 1, color: "text.secondary" }} />
+                    ),
+                  }}
+                />
+              </Grid>
+              
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Chức vụ"
+                  value={profileData.position}
+                  disabled
+                  InputProps={{
+                    startAdornment: (
+                      <Work sx={{ mr: 1, color: "text.secondary" }} />
+                    ),
+                  }}
+                />
+              </Grid>
+              
+              {/* Certifications - render if present to avoid unused variable eslint warnings */}
+              {certifications && certifications.length > 0 && (
+                <Grid item xs={12} sx={{ mt: 2 }}>
+                  <Divider />
+                  <Typography variant="h6" fontWeight="bold" gutterBottom sx={{ mt: 2 }}>
+                    Chứng chỉ
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                    {certifications.map((cert, idx) => (
+                      <Chip
+                        key={idx}
+                        label={cert.name}
+                        size="small"
+                        color={getCertificationColor(cert.status)}
+                      />
+                    ))}
+                  </Box>
+                </Grid>
+              )}
+            </Grid>
+          </CardContent>
+        </Card>
+      )}
+
+      {tabValue === 1 && (
+        <Card>
+          <CardContent>
+            <Typography variant="h6" fontWeight="bold" gutterBottom>
+              Hoạt động gần đây
+            </Typography>
+            <List>
+              {recentActivities.map((activity) => (
+                <ListItem key={activity.id} divider>
+                  <ListItemText
+                    primary={activity.action}
+                    secondary={
+                      <Box>
+                        <Typography variant="body2" color="text.secondary">
+                          {activity.location}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {activity.time}
+                        </Typography>
+                      </Box>
+                    }
+                  />
+                  <ListItemSecondaryAction>
+                    <Chip
+                      label={
+                        activity.status === "success"
+                          ? "Thành công"
+                          : activity.status === "info"
+                          ? "Thông tin"
+                          : activity.status === "warning"
+                          ? "Cảnh báo"
+                          : activity.status
+                      }
+                      color={getActivityColor(activity.status)}
+                      size="small"
+                    />
+                  </ListItemSecondaryAction>
+                </ListItem>
+              ))}
+            </List>
+          </CardContent>
+        </Card>
+        )}
+      </>
+    )}
+  </Box>
+);
+>>>>>>> origin/develop
 };
 
 export default StaffProfile;

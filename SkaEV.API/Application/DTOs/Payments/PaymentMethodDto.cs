@@ -1,7 +1,7 @@
 namespace SkaEV.API.Application.DTOs.Payments;
 
 /// <summary>
-/// Payment method data transfer object
+/// DTO thông tin phương thức thanh toán.
 /// </summary>
 public class PaymentMethodDto
 {
@@ -20,7 +20,7 @@ public class PaymentMethodDto
 }
 
 /// <summary>
-/// DTO for creating a new payment method
+/// DTO tạo phương thức thanh toán mới.
 /// </summary>
 public class CreatePaymentMethodDto
 {
@@ -41,7 +41,7 @@ public class CreatePaymentMethodDto
 }
 
 /// <summary>
-/// DTO for updating a payment method
+/// DTO cập nhật phương thức thanh toán.
 /// </summary>
 public class UpdatePaymentMethodDto
 {

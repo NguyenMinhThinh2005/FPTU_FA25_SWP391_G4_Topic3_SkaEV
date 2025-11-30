@@ -5,6 +5,9 @@ using SkaEV.API.Infrastructure.Data;
 
 namespace SkaEV.API.Application.Services;
 
+/// <summary>
+/// Dịch vụ quản lý sự cố.
+/// </summary>
 public class IncidentService
 {
     private readonly SkaEVDbContext _context;
@@ -14,6 +17,13 @@ public class IncidentService
         _context = context;
     }
 
+    /// <summary>
+    /// Lấy danh sách tất cả sự cố với bộ lọc.
+    /// </summary>
+    /// <param name="status">Trạng thái sự cố.</param>
+    /// <param name="severity">Mức độ nghiêm trọng.</param>
+    /// <param name="stationId">ID trạm sạc.</param>
+    /// <returns>Danh sách sự cố.</returns>
     public async Task<List<IncidentListDto>> GetAllIncidentsAsync(string? status = null, string? severity = null, int? stationId = null)
     {
         var query = _context.Incidents
@@ -22,10 +32,21 @@ public class IncidentService
             .Include(i => i.ChargingSlot)
             .Include(i => i.ReportedByUser)
             .Include(i => i.AssignedToStaff)
+            .Include(i => i.AssignedToTeam)
             .AsQueryable();
 
         if (!string.IsNullOrEmpty(status))
-            query = query.Where(i => i.Status == status);
+        {
+            // Normalize status filter from UI: treat "resolved" as including both resolved and closed
+            if (string.Equals(status, "resolved", StringComparison.OrdinalIgnoreCase))
+            {
+                query = query.Where(i => i.Status == "resolved" || i.Status == "closed");
+            }
+            else
+            {
+                query = query.Where(i => i.Status == status);
+            }
+        }
 
         if (!string.IsNullOrEmpty(severity))
             query = query.Where(i => i.Severity == severity);
@@ -47,10 +68,16 @@ public class IncidentService
             Status = i.Status,
             Title = i.Title,
             ReportedAt = i.ReportedAt,
-            AssignedToStaffName = i.AssignedToStaff != null ? i.AssignedToStaff.FullName : null
+            AssignedToStaffName = i.AssignedToStaff != null ? i.AssignedToStaff.FullName : null,
+            AssignedToTeamName = i.AssignedToTeam != null ? i.AssignedToTeam.Name : null
         }).ToList();
     }
 
+    /// <summary>
+    /// Lấy chi tiết sự cố theo ID.
+    /// </summary>
+    /// <param name="incidentId">ID sự cố.</param>
+    /// <returns>Chi tiết sự cố.</returns>
     public async Task<IncidentDto?> GetIncidentByIdAsync(int incidentId)
     {
         var incident = await _context.Incidents
@@ -59,6 +86,7 @@ public class IncidentService
             .Include(i => i.ChargingSlot)
             .Include(i => i.ReportedByUser)
             .Include(i => i.AssignedToStaff)
+            .Include(i => i.AssignedToTeam)
             .FirstOrDefaultAsync(i => i.IncidentId == incidentId);
 
         if (incident == null)
@@ -83,6 +111,8 @@ public class IncidentService
             ResolutionNotes = incident.ResolutionNotes,
             AssignedToStaffId = incident.AssignedToStaffId,
             AssignedToStaffName = incident.AssignedToStaff?.FullName ?? null,
+            AssignedToTeamId = incident.AssignedToTeamId,
+            AssignedToTeamName = incident.AssignedToTeam?.Name ?? null,
             ReportedAt = incident.ReportedAt,
             AcknowledgedAt = incident.AcknowledgedAt,
             ResolvedAt = incident.ResolvedAt,
@@ -92,11 +122,17 @@ public class IncidentService
         };
     }
 
+    /// <summary>
+    /// Lấy danh sách sự cố theo trạm sạc.
+    /// </summary>
+    /// <param name="stationId">ID trạm sạc.</param>
+    /// <returns>Danh sách sự cố.</returns>
     public async Task<List<IncidentListDto>> GetIncidentsByStationAsync(int stationId)
     {
         var incidents = await _context.Incidents
             .Include(i => i.ChargingStation)
             .Include(i => i.AssignedToStaff)
+            .Include(i => i.AssignedToTeam)
             .Where(i => i.StationId == stationId)
             .OrderByDescending(i => i.ReportedAt)
             .ToListAsync();
@@ -112,9 +148,16 @@ public class IncidentService
             Title = i.Title,
             ReportedAt = i.ReportedAt,
             AssignedToStaffName = i.AssignedToStaff != null ? i.AssignedToStaff.FullName : null
+            ,
+            AssignedToTeamName = i.AssignedToTeam != null ? i.AssignedToTeam.Name : null
         }).ToList();
     }
 
+    /// <summary>
+    /// Tạo mới sự cố.
+    /// </summary>
+    /// <param name="createDto">Thông tin sự cố mới.</param>
+    /// <returns>Chi tiết sự cố vừa tạo.</returns>
     public async Task<IncidentDto> CreateIncidentAsync(CreateIncidentDto createDto)
     {
         var incident = new Incident
@@ -139,6 +182,12 @@ public class IncidentService
         return createdIncident!;
     }
 
+    /// <summary>
+    /// Cập nhật thông tin sự cố.
+    /// </summary>
+    /// <param name="incidentId">ID sự cố.</param>
+    /// <param name="updateDto">Thông tin cập nhật.</param>
+    /// <returns>Chi tiết sự cố sau khi cập nhật.</returns>
     public async Task<IncidentDto?> UpdateIncidentAsync(int incidentId, UpdateIncidentDto updateDto)
     {
         var incident = await _context.Incidents.FindAsync(incidentId);
@@ -161,14 +210,28 @@ public class IncidentService
         if (!string.IsNullOrEmpty(updateDto.ResolutionNotes))
             incident.ResolutionNotes = updateDto.ResolutionNotes;
 
-        if (updateDto.AssignedToStaffId.HasValue)
+        // Assignment rules: if AssignedToTeamId provided => assign to team and clear staff assignment
+        if (updateDto.AssignedToTeamId.HasValue)
+        {
+            incident.AssignedToTeamId = updateDto.AssignedToTeamId.Value;
+            incident.AssignedToStaffId = null;
+        }
+        else if (updateDto.AssignedToStaffId.HasValue)
+        {
             incident.AssignedToStaffId = updateDto.AssignedToStaffId.Value;
+            incident.AssignedToTeamId = null;
+        }
 
         await _context.SaveChangesAsync();
 
         return await GetIncidentByIdAsync(incidentId);
     }
 
+    /// <summary>
+    /// Lấy thống kê sự cố.
+    /// </summary>
+    /// <param name="stationId">ID trạm sạc (tùy chọn).</param>
+    /// <returns>Thống kê sự cố.</returns>
     public async Task<IncidentStatsDto> GetIncidentStatsAsync(int? stationId = null)
     {
         var query = _context.Incidents.AsQueryable();
@@ -183,7 +246,9 @@ public class IncidentService
             TotalIncidents = incidents.Count,
             OpenIncidents = incidents.Count(i => i.Status == "open"),
             InProgressIncidents = incidents.Count(i => i.Status == "in_progress"),
-            ResolvedIncidents = incidents.Count(i => i.Status == "resolved"),
+            // Treat both "resolved" and legacy "closed" as resolved for admin summary
+            ResolvedIncidents = incidents.Count(i => i.Status == "resolved" || i.Status == "closed"),
+            // Keep closed count for backward compatibility but it's not used in UI anymore
             ClosedIncidents = incidents.Count(i => i.Status == "closed"),
             CriticalIncidents = incidents.Count(i => i.Severity == "critical"),
             HighSeverityIncidents = incidents.Count(i => i.Severity == "high"),

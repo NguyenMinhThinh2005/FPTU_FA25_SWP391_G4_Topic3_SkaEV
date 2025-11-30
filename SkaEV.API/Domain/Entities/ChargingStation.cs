@@ -2,6 +2,9 @@ using NetTopologySuite.Geometries;
 
 namespace SkaEV.API.Domain.Entities;
 
+/// <summary>
+/// Thực thể đại diện cho một trạm sạc.
+/// </summary>
 public class ChargingStation
 {
     public int StationId { get; set; }
@@ -13,6 +16,8 @@ public class ChargingStation
     public Point? Location { get; set; } // Spatial type for geography
     public int TotalPosts { get; set; } = 0;
     public int AvailablePosts { get; set; } = 0;
+    // Derived / persisted metric: number of active sessions currently observed
+    public int ActiveSessions { get; set; } = 0;
     public string? OperatingHours { get; set; }
     public string? Amenities { get; set; } // JSON array
     public string? StationImageUrl { get; set; }

@@ -3,12 +3,12 @@ using Microsoft.AspNetCore.SignalR;
 namespace SkaEV.API.Hubs
 {
     /// <summary>
-    /// SignalR Hub for real-time station and slot monitoring
+    /// SignalR Hub để giám sát trạm và khe sạc theo thời gian thực.
     /// </summary>
     public class StationMonitoringHub : Hub
     {
         /// <summary>
-        /// Send station status update to all connected clients
+        /// Gửi cập nhật trạng thái trạm đến tất cả các client đã kết nối.
         /// </summary>
         public async Task BroadcastStationStatus(object statusUpdate)
         {
@@ -16,7 +16,7 @@ namespace SkaEV.API.Hubs
         }
 
         /// <summary>
-        /// Send slot status update to all connected clients
+        /// Gửi cập nhật trạng thái khe sạc đến tất cả các client đã kết nối.
         /// </summary>
         public async Task BroadcastSlotStatus(object slotUpdate)
         {
@@ -24,7 +24,7 @@ namespace SkaEV.API.Hubs
         }
 
         /// <summary>
-        /// Send alert/notification to all connected clients
+        /// Gửi cảnh báo/thông báo đến tất cả các client đã kết nối.
         /// </summary>
         public async Task BroadcastAlert(object alert)
         {
@@ -32,7 +32,7 @@ namespace SkaEV.API.Hubs
         }
 
         /// <summary>
-        /// Client subscribes to specific station updates
+        /// Client đăng ký nhận cập nhật của một trạm cụ thể.
         /// </summary>
         public async Task SubscribeToStation(int stationId)
         {
@@ -40,7 +40,7 @@ namespace SkaEV.API.Hubs
         }
 
         /// <summary>
-        /// Client unsubscribes from specific station updates
+        /// Client hủy đăng ký nhận cập nhật của một trạm cụ thể.
         /// </summary>
         public async Task UnsubscribeFromStation(int stationId)
         {
@@ -48,7 +48,7 @@ namespace SkaEV.API.Hubs
         }
 
         /// <summary>
-        /// Send update to specific station group
+        /// Gửi cập nhật đến nhóm trạm cụ thể.
         /// </summary>
         public async Task SendToStation(int stationId, object update)
         {

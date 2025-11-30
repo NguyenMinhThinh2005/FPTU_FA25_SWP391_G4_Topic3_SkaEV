@@ -5,6 +5,9 @@ using SkaEV.API.Infrastructure.Data;
 
 namespace SkaEV.API.Application.Services;
 
+/// <summary>
+/// Dịch vụ quản lý trụ sạc (Charging Post).
+/// </summary>
 public class PostService : IPostService
 {
     private readonly SkaEVDbContext _context;
@@ -16,6 +19,11 @@ public class PostService : IPostService
         _logger = logger;
     }
 
+    /// <summary>
+    /// Lấy danh sách trụ sạc của một trạm.
+    /// </summary>
+    /// <param name="stationId">ID trạm sạc.</param>
+    /// <returns>Danh sách trụ sạc.</returns>
     public async Task<IEnumerable<PostDto>> GetStationPostsAsync(int stationId)
     {
         return await _context.ChargingPosts
@@ -25,6 +33,11 @@ public class PostService : IPostService
             .ToListAsync();
     }
 
+    /// <summary>
+    /// Lấy danh sách trụ sạc đang khả dụng của một trạm.
+    /// </summary>
+    /// <param name="stationId">ID trạm sạc.</param>
+    /// <returns>Danh sách trụ sạc khả dụng.</returns>
     public async Task<IEnumerable<PostDto>> GetAvailablePostsAsync(int stationId)
     {
         return await _context.ChargingPosts
@@ -34,6 +47,11 @@ public class PostService : IPostService
             .ToListAsync();
     }
 
+    /// <summary>
+    /// Lấy chi tiết trụ sạc theo ID.
+    /// </summary>
+    /// <param name="postId">ID trụ sạc.</param>
+    /// <returns>Chi tiết trụ sạc.</returns>
     public async Task<PostDto?> GetPostByIdAsync(int postId)
     {
         var post = await _context.ChargingPosts
@@ -43,6 +61,11 @@ public class PostService : IPostService
         return post == null ? null : MapToDto(post);
     }
 
+    /// <summary>
+    /// Tạo mới trụ sạc.
+    /// </summary>
+    /// <param name="createDto">Thông tin trụ sạc mới.</param>
+    /// <returns>Chi tiết trụ sạc vừa tạo.</returns>
     public async Task<PostDto> CreatePostAsync(CreatePostDto createDto)
     {
         var post = new ChargingPost
@@ -71,6 +94,12 @@ public class PostService : IPostService
         return MapToDto(post);
     }
 
+    /// <summary>
+    /// Cập nhật thông tin trụ sạc.
+    /// </summary>
+    /// <param name="postId">ID trụ sạc.</param>
+    /// <param name="updateDto">Thông tin cập nhật.</param>
+    /// <returns>Chi tiết trụ sạc sau khi cập nhật.</returns>
     public async Task<PostDto> UpdatePostAsync(int postId, UpdatePostDto updateDto)
     {
         var post = await _context.ChargingPosts
@@ -97,20 +126,67 @@ public class PostService : IPostService
         return MapToDto(post);
     }
 
+    /// <summary>
+    /// Xóa trụ sạc.
+    /// </summary>
+    /// <param name="postId">ID trụ sạc.</param>
     public async Task DeletePostAsync(int postId)
     {
         var post = await _context.ChargingPosts
+            .Include(p => p.ChargingSlots)
+            .Include(p => p.ChargingStation)
             .FirstOrDefaultAsync(p => p.PostId == postId);
 
         if (post == null)
             throw new ArgumentException("Post not found");
 
-        _context.ChargingPosts.Remove(post);
+        // If any slot has bookings, prevent permanent deletion - encourage archive
+        var slotIds = post.ChargingSlots.Select(s => s.SlotId).ToList();
+        if (slotIds.Count > 0)
+        {
+            var hasBookings = await _context.Bookings
+                .Where(b => slotIds.Contains(b.SlotId))
+                .AnyAsync();
+
+            if (hasBookings)
+            {
+                throw new ArgumentException("Cannot delete charging post that has bookings. Archive post instead.");
+            }
+        }
+
+        // Soft-delete the post and its slots so history remains in DB
+        var utcNow = DateTime.UtcNow;
+        post.DeletedAt = utcNow;
+        post.Status = "inactive";
+
+        // Update station counts where applicable
+        var station = post.ChargingStation;
+        if (station != null && station.TotalPosts > 0)
+        {
+            station.TotalPosts = Math.Max(0, station.TotalPosts - 1);
+            if (post.Status == "available")
+                station.AvailablePosts = Math.Max(0, station.AvailablePosts - 1);
+            station.UpdatedAt = utcNow;
+        }
+
+        foreach (var slot in post.ChargingSlots)
+        {
+            slot.DeletedAt = utcNow;
+            slot.Status = "inactive";
+            slot.UpdatedAt = utcNow;
+        }
+
         await _context.SaveChangesAsync();
 
-        _logger.LogInformation("Deleted charging post {PostId}", postId);
+        _logger.LogInformation("Soft-deleted charging post {PostId}", postId);
     }
 
+    /// <summary>
+    /// Cập nhật trạng thái trụ sạc.
+    /// </summary>
+    /// <param name="postId">ID trụ sạc.</param>
+    /// <param name="status">Trạng thái mới.</param>
+    /// <returns>Chi tiết trụ sạc sau khi cập nhật.</returns>
     public async Task<PostDto> UpdatePostStatusAsync(int postId, string status)
     {
         var post = await _context.ChargingPosts
@@ -133,6 +209,11 @@ public class PostService : IPostService
         return MapToDto(post);
     }
 
+    /// <summary>
+    /// Lấy tóm tắt tình trạng khả dụng của các trụ sạc tại trạm.
+    /// </summary>
+    /// <param name="stationId">ID trạm sạc.</param>
+    /// <returns>Tóm tắt tình trạng khả dụng.</returns>
     public async Task<PostAvailabilitySummaryDto> GetAvailabilitySummaryAsync(int stationId)
     {
         var posts = await _context.ChargingPosts

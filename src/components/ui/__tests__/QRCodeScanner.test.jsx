@@ -57,7 +57,7 @@ describe.skip('QRCodeScanner', () => {
     vi.clearAllMocks();
     
     // Mock camera permissions
-    global.navigator.mediaDevices = {
+    globalThis.navigator.mediaDevices = {
       getUserMedia: vi.fn(() =>
         Promise.resolve({
           getTracks: () => [{ stop: vi.fn() }],
@@ -80,7 +80,7 @@ describe.skip('QRCodeScanner', () => {
     );
 
     await waitFor(() => {
-      expect(global.navigator.mediaDevices.getUserMedia).toHaveBeenCalledWith({ video: true });
+      expect(globalThis.navigator.mediaDevices.getUserMedia).toHaveBeenCalledWith({ video: true });
     });
   });
 
@@ -216,7 +216,7 @@ describe.skip('QRCodeScanner', () => {
 
   it('handles camera permission denied', async () => {
     // Mock permission denied
-    global.navigator.mediaDevices.getUserMedia = vi.fn(() =>
+    globalThis.navigator.mediaDevices.getUserMedia = vi.fn(() =>
       Promise.reject(new Error('Permission denied'))
     );
 

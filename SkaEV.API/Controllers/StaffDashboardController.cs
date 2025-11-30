@@ -1,22 +1,27 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using SkaEV.API.Application.Services;
+using SkaEV.API.Application.Common;
+using SkaEV.API.Application.Constants;
 using SkaEV.API.Application.DTOs.Staff;
-using System.Security.Claims;
+using SkaEV.API.Application.Services;
 
 namespace SkaEV.API.Controllers;
 
 /// <summary>
-/// Provides staff-specific operational dashboard data.
+/// Controller cung cấp dữ liệu dashboard cho nhân viên.
 /// </summary>
-[ApiController]
 [Route("api/staff/dashboard")]
-[Authorize(Roles = "staff,admin")]
-public class StaffDashboardController : ControllerBase
+[Authorize(Roles = Roles.Staff + "," + Roles.Admin)]
+public class StaffDashboardController : BaseApiController
 {
     private readonly IStaffDashboardService _dashboardService;
     private readonly ILogger<StaffDashboardController> _logger;
 
+    /// <summary>
+    /// Constructor nhận vào StaffDashboardService và Logger.
+    /// </summary>
+    /// <param name="dashboardService">Service dashboard nhân viên.</param>
+    /// <param name="logger">Logger hệ thống.</param>
     public StaffDashboardController(IStaffDashboardService dashboardService, ILogger<StaffDashboardController> logger)
     {
         _dashboardService = dashboardService;
@@ -24,33 +29,15 @@ public class StaffDashboardController : ControllerBase
     }
 
     /// <summary>
-    /// Get real-time dashboard data for the authenticated staff member.
+    /// Lấy dữ liệu dashboard thời gian thực cho nhân viên đang đăng nhập.
     /// </summary>
+    /// <param name="cancellationToken">Token hủy request.</param>
+    /// <returns>Dữ liệu dashboard.</returns>
     [HttpGet]
-    [ProducesResponseType(typeof(StaffDashboardDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<StaffDashboardDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetDashboard(CancellationToken cancellationToken)
     {
-        try
-        {
-            var userId = GetUserId();
-            var dashboard = await _dashboardService.GetDashboardAsync(userId, cancellationToken);
-            return Ok(dashboard);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to load staff dashboard");
-            return StatusCode(500, new { message = "Không thể tải dữ liệu dashboard. Vui lòng thử lại sau." });
-        }
-    }
-
-    private int GetUserId()
-    {
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (int.TryParse(userIdClaim, out var userId))
-        {
-            return userId;
-        }
-
-        throw new UnauthorizedAccessException("Invalid user identifier");
+        var dashboard = await _dashboardService.GetDashboardAsync(CurrentUserId, cancellationToken);
+        return OkResponse(dashboard);
     }
 }

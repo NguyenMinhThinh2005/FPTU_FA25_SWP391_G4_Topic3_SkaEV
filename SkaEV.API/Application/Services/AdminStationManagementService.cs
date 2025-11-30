@@ -2,58 +2,116 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using SkaEV.API.Application.DTOs.Admin;
 using SkaEV.API.Domain.Entities;
 using SkaEV.API.Infrastructure.Data;
 
 namespace SkaEV.API.Application.Services;
 
+/// <summary>
+/// Giao diện dịch vụ quản lý trạm sạc dành cho Admin.
+/// </summary>
 public interface IAdminStationManagementService
 {
     // List & Search
+    /// <summary>
+    /// Lấy danh sách trạm sạc với bộ lọc.
+    /// </summary>
     Task<(List<StationListDto> Stations, int TotalCount)> GetStationsAsync(StationFilterDto filter);
 
     // Detail
+    /// <summary>
+    /// Lấy chi tiết trạm sạc.
+    /// </summary>
     Task<StationDetailDto?> GetStationDetailAsync(int stationId);
 
     // Real-time Monitoring
+    /// <summary>
+    /// Lấy dữ liệu giám sát thời gian thực của trạm sạc.
+    /// </summary>
     Task<StationRealTimeMonitoringDto?> GetStationRealTimeDataAsync(int stationId);
 
     // Control
+    /// <summary>
+    /// Điều khiển trụ sạc (Start/Stop/Restart).
+    /// </summary>
     Task<ControlCommandResultDto> ControlChargingPointAsync(ChargingPointControlDto command);
+
+    /// <summary>
+    /// Điều khiển toàn bộ trạm sạc.
+    /// </summary>
     Task<ControlCommandResultDto> ControlStationAsync(StationControlDto command);
 
     // Configuration
+    /// <summary>
+    /// Cấu hình trụ sạc.
+    /// </summary>
     Task<bool> ConfigureChargingPointAsync(ChargingPointConfigDto config);
 
     // Error Management
+    /// <summary>
+    /// Lấy danh sách lỗi của trạm sạc.
+    /// </summary>
     Task<List<StationErrorLogDto>> GetStationErrorsAsync(int stationId, bool includeResolved = false);
+
+    /// <summary>
+    /// Xử lý lỗi trạm sạc.
+    /// </summary>
     Task<bool> ResolveErrorAsync(int logId, string resolvedBy, string resolution);
+
+    /// <summary>
+    /// Ghi log lỗi trạm sạc.
+    /// </summary>
     Task<int> LogStationErrorAsync(int stationId, int? postId, int? slotId, string severity, string errorType, string message, string? details = null);
 
     // CRUD Operations
+    /// <summary>
+    /// Tạo mới trạm sạc.
+    /// </summary>
     Task<StationDetailDto> CreateStationAsync(CreateUpdateStationDto dto);
+
+    /// <summary>
+    /// Cập nhật thông tin trạm sạc.
+    /// </summary>
     Task<bool> UpdateStationAsync(int stationId, CreateUpdateStationDto dto);
+
+    /// <summary>
+    /// Xóa trạm sạc (Soft delete).
+    /// </summary>
     Task<bool> DeleteStationAsync(int stationId);
+
+    /// <summary>
+    /// Tạo mới trụ sạc.
+    /// </summary>
     Task<ChargingPointDetailDto> CreateChargingPostAsync(CreateChargingPostDto dto);
+
+    /// <summary>
+    /// Cập nhật người quản lý trạm sạc.
+    /// </summary>
     Task<bool> UpdateStationManagerAsync(int stationId, int? managerUserId);
 }
 
-internal record StationCapacityMetrics(
-    int TotalPosts,
-    int AvailablePosts,
-    int MaintenancePosts,
-    int TotalSlots,
-    int AvailableSlots,
-    int OccupiedSlots,
-    decimal TotalPowerCapacityKw,
-    decimal CurrentPowerUsageKw,
-    decimal UtilizationRate);
 
+
+internal record StationCompletedSessionSummary(
+    int StationId,
+    DateTime CreatedAt,
+    DateTime? ActualStartTime,
+    DateTime? ActualEndTime,
+    decimal Revenue);
+
+/// <summary>
+/// Dịch vụ quản lý trạm sạc dành cho Admin.
+/// </summary>
 public class AdminStationManagementService : IAdminStationManagementService
 {
     private readonly SkaEVDbContext _context;
     private readonly ILogger<AdminStationManagementService> _logger;
+    private readonly IConfiguration _configuration;
+    private readonly bool _enableAutoDisableOnCritical;
+    private readonly int _recentErrorWindowMinutes;
+    private readonly int _recentErrorThreshold;
 
     private static readonly StringComparer StatusComparer = StringComparer.OrdinalIgnoreCase;
 
@@ -70,61 +128,28 @@ public class AdminStationManagementService : IAdminStationManagementService
 
     public AdminStationManagementService(
         SkaEVDbContext context,
-        ILogger<AdminStationManagementService> logger)
+        ILogger<AdminStationManagementService> logger,
+        IConfiguration configuration)
     {
         _context = context;
         _logger = logger;
+        _configuration = configuration;
+
+        // Read configuration with sensible defaults. These can be set in appsettings or environment variables.
+        _enableAutoDisableOnCritical = bool.TryParse(_configuration["AdminStation:EnableAutoDisableOnCritical"], out var b) && b;
+        _recentErrorWindowMinutes = int.TryParse(_configuration["AdminStation:RecentErrorWindowMinutes"], out var w) ? Math.Max(1, w) : 60;
+        _recentErrorThreshold = int.TryParse(_configuration["AdminStation:RecentErrorThreshold"], out var t) ? Math.Max(1, t) : 3;
     }
 
     private static StationCapacityMetrics CalculateCapacityMetrics(ChargingStation station)
     {
-        var posts = station.ChargingPosts?.ToList() ?? new List<ChargingPost>();
-        var slots = posts.SelectMany(post => post.ChargingSlots ?? Enumerable.Empty<ChargingSlot>()).ToList();
-
-        var totalPosts = posts.Count;
-        var maintenancePosts = posts.Count(post => StatusComparer.Equals(post.Status, "maintenance"));
-        var availablePosts = posts.Count(post =>
-            StatusComparer.Equals(post.Status, "available") &&
-            post.ChargingSlots.Any(slot => IsSlotAvailable(slot.Status)));
-
-        var totalSlots = slots.Count;
-        var availableSlots = slots.Count(slot => IsSlotAvailable(slot.Status));
-        var maintenanceSlots = slots.Count(slot => IsSlotMaintenance(slot.Status));
-        var occupiedSlots = slots.Count(slot => IsSlotOccupied(slot.Status) || IsSlotReserved(slot.Status));
-
-        var accountedSlots = availableSlots + maintenanceSlots + occupiedSlots;
-        if (accountedSlots < totalSlots)
-        {
-            occupiedSlots += totalSlots - accountedSlots;
-        }
-
-        if (!StatusComparer.Equals(station.Status, "active"))
-        {
-            availablePosts = 0;
-            availableSlots = 0;
-        }
-
-        var totalPower = posts.Sum(post => post.PowerOutput);
-        var currentPower = posts
-            .Where(post => post.ChargingSlots.Any(slot => IsSlotOccupied(slot.Status)))
-            .Sum(post => post.PowerOutput);
-
-        var utilizationRate = totalSlots > 0
-            ? Math.Round(((decimal)(totalSlots - availableSlots) / totalSlots) * 100, 2)
-            : 0;
-
-        return new StationCapacityMetrics(
-            TotalPosts: totalPosts,
-            AvailablePosts: Math.Clamp(availablePosts, 0, totalPosts),
-            MaintenancePosts: maintenancePosts,
-            TotalSlots: totalSlots,
-            AvailableSlots: Math.Clamp(availableSlots, 0, totalSlots),
-            OccupiedSlots: Math.Clamp(occupiedSlots, 0, totalSlots),
-            TotalPowerCapacityKw: totalPower,
-            CurrentPowerUsageKw: currentPower,
-            UtilizationRate: utilizationRate);
+        // Delegate to the centralized CapacityCalculator to keep logic testable and reusable.
+        return CapacityCalculator.CalculateCapacityMetrics(station);
     }
 
+    /// <summary>
+    /// Lấy danh sách trạm sạc với bộ lọc.
+    /// </summary>
     public async Task<(List<StationListDto> Stations, int TotalCount)> GetStationsAsync(StationFilterDto filter)
     {
         var query = _context.ChargingStations
@@ -160,6 +185,28 @@ public class AdminStationManagementService : IAdminStationManagementService
 
         var stationIds = stationEntities.Select(s => s.StationId).ToList();
 
+        var thirtyDaysAgo = DateTime.UtcNow.AddDays(-30);
+        var todayUtcDate = DateTime.UtcNow.Date;
+
+        var completedSessionsRaw = await _context.Bookings
+            .Where(b => stationIds.Contains(b.StationId)
+                        && b.Status == "completed"
+                        && b.DeletedAt == null
+                        && b.CreatedAt >= thirtyDaysAgo)
+            .Include(b => b.Invoice)
+            .Select(b => new StationCompletedSessionSummary(
+                b.StationId,
+                b.CreatedAt,
+                b.ActualStartTime,
+                b.ActualEndTime,
+                b.Invoice != null ? b.Invoice.TotalAmount : 0m))
+            .AsNoTracking()
+            .ToListAsync();
+
+        var completedSessionsLookup = completedSessionsRaw
+            .GroupBy(session => session.StationId)
+            .ToDictionary(group => group.Key, group => group.ToList());
+
         var managerAssignments = await _context.StationStaff
             .Where(ss => stationIds.Contains(ss.StationId) && ss.IsActive)
             .Include(ss => ss.StaffUser)
@@ -174,6 +221,29 @@ public class AdminStationManagementService : IAdminStationManagementService
         {
             var metrics = CalculateCapacityMetrics(station);
             managerLookup.TryGetValue(station.StationId, out var manager);
+            completedSessionsLookup.TryGetValue(station.StationId, out var completedSessions);
+
+            var completedList = completedSessions ?? new List<StationCompletedSessionSummary>();
+
+            var monthlyRevenue = completedList.Sum(item => item.Revenue);
+            var monthlyCompleted = completedList.Count;
+
+            var durationSamples = completedList
+                .Where(item => item.ActualStartTime.HasValue && item.ActualEndTime.HasValue)
+                .Select(item => (item.ActualEndTime!.Value - item.ActualStartTime!.Value).TotalMinutes)
+                .Where(minutes => minutes > 0)
+                .ToList();
+
+            var averageSessionDuration = durationSamples.Count > 0
+                ? Math.Round(durationSamples.Average(), 1)
+                : 0;
+
+            var todayCompletedSessions = completedList
+                .Where(item => item.CreatedAt.Date == todayUtcDate)
+                .ToList();
+
+            var todayRevenue = todayCompletedSessions.Sum(item => item.Revenue);
+            var todaySessionCount = todayCompletedSessions.Count;
 
             return new StationListDto
             {
@@ -192,7 +262,8 @@ public class AdminStationManagementService : IAdminStationManagementService
                 TotalSlots = metrics.TotalSlots,
                 AvailableSlots = metrics.AvailableSlots,
                 OccupiedSlots = metrics.OccupiedSlots,
-                ActiveSessions = station.Bookings?.Count ?? 0,
+                // Canonical active sessions computed from slots occupancy (total slots - available slots)
+                ActiveSessions = metrics.TotalSlots - metrics.AvailableSlots,
                 CurrentPowerUsageKw = metrics.CurrentPowerUsageKw,
                 TotalPowerCapacityKw = metrics.TotalPowerCapacityKw,
                 UtilizationRate = metrics.UtilizationRate,
@@ -204,9 +275,39 @@ public class AdminStationManagementService : IAdminStationManagementService
                 ManagerUserId = manager?.StaffUserId,
                 ManagerName = manager?.StaffUser.FullName,
                 ManagerEmail = manager?.StaffUser.Email,
-                ManagerPhoneNumber = manager?.StaffUser.PhoneNumber
+                ManagerPhoneNumber = manager?.StaffUser.PhoneNumber,
+                MonthlyRevenue = monthlyRevenue,
+                MonthlyCompletedSessions = monthlyCompleted,
+                AverageSessionDurationMinutes = averageSessionDuration,
+                TodayRevenue = todayRevenue,
+                TodayCompletedSessions = todaySessionCount
             };
         }).ToList();
+
+        // Persist computed ActiveSessions back to the ChargingStation entities so DB stays in sync.
+        try
+        {
+            var anyChange = false;
+            foreach (var stEntity in stationEntities)
+            {
+                var m = CalculateCapacityMetrics(stEntity);
+                var computed = Math.Max(0, m.TotalSlots - m.AvailableSlots);
+                if (stEntity.ActiveSessions != computed)
+                {
+                    stEntity.ActiveSessions = computed;
+                    anyChange = true;
+                }
+            }
+
+            if (anyChange)
+            {
+                await _context.SaveChangesAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not persist ActiveSessions for stations (non-fatal)");
+        }
 
         // Calculate error counts
         var stationIdList = stations.Select(s => s.StationId).ToList();
@@ -291,6 +392,9 @@ public class AdminStationManagementService : IAdminStationManagementService
         return (stations, totalCount);
     }
 
+    /// <summary>
+    /// Lấy chi tiết trạm sạc.
+    /// </summary>
     public async Task<StationDetailDto?> GetStationDetailAsync(int stationId)
     {
         var station = await _context.ChargingStations
@@ -308,11 +412,31 @@ public class AdminStationManagementService : IAdminStationManagementService
         if (station == null)
             return null;
 
-        // Get today's statistics
-        var today = DateTime.UtcNow.Date;
+        // Get analytics for common time windows: daily, monthly, yearly
+        var now = DateTime.UtcNow;
+        var startOfDay = now.Date;
+        var startOfMonth = new DateTime(now.Year, now.Month, 1);
+        var startOfYear = new DateTime(now.Year, 1, 1);
+
         var todayBookings = await _context.Bookings
             .Where(b => b.StationId == stationId &&
-                       b.CreatedAt >= today &&
+                       b.CreatedAt >= startOfDay &&
+                       b.Status == "completed" &&
+                       b.DeletedAt == null)
+            .Include(b => b.Invoice)
+            .ToListAsync();
+
+        var monthBookings = await _context.Bookings
+            .Where(b => b.StationId == stationId &&
+                       b.CreatedAt >= startOfMonth &&
+                       b.Status == "completed" &&
+                       b.DeletedAt == null)
+            .Include(b => b.Invoice)
+            .ToListAsync();
+
+        var yearBookings = await _context.Bookings
+            .Where(b => b.StationId == stationId &&
+                       b.CreatedAt >= startOfYear &&
                        b.Status == "completed" &&
                        b.DeletedAt == null)
             .Include(b => b.Invoice)
@@ -331,7 +455,7 @@ public class AdminStationManagementService : IAdminStationManagementService
             .FirstOrDefaultAsync();
 
         var metrics = CalculateCapacityMetrics(station);
-        var activeSessionsCount = station.Bookings.Count(b => b.Status == "in_progress");
+        var activeSessionsCount = metrics.TotalSlots - metrics.AvailableSlots;
 
         var detail = new StationDetailDto
         {
@@ -358,48 +482,91 @@ public class AdminStationManagementService : IAdminStationManagementService
             TodayEnergyConsumedKwh = todayEnergyKwh,
             TodayRevenue = todayRevenue,
             TodaySessionCount = todayBookings.Count,
-            ChargingPoints = station.ChargingPosts.Select(p => new ChargingPointDetailDto
+            // Populate windowed metrics
+            DailyMetrics = new PeriodMetrics
             {
-                PostId = p.PostId,
-                StationId = p.StationId,
-                PostNumber = p.PostNumber,
-                PostType = p.PostType,
-                PowerOutput = p.PowerOutput,
-                ConnectorTypes = p.ConnectorTypes,
-                Status = p.Status,
-                IsOnline = p.Status != "offline",
-                TotalSlots = p.TotalSlots,
-                AvailableSlots = p.AvailableSlots,
-                OccupiedSlots = p.TotalSlots - p.AvailableSlots,
-                CurrentPowerUsageKw = p.Status == "occupied" ? p.PowerOutput : 0,
-                ActiveSessionsCount = p.ChargingSlots.Count(s => s.Status == "occupied"),
-                Slots = p.ChargingSlots.Select(s => new ChargingSlotDetailDto
+                SessionCount = todayBookings.Count,
+                Revenue = todayRevenue,
+                EnergyKwh = todayEnergyKwh,
+                AverageSessionDurationMinutes = todayBookings
+                    .Where(b => b.ActualStartTime.HasValue && b.ActualEndTime.HasValue)
+                    .Select(b => (b.ActualEndTime!.Value - b.ActualStartTime!.Value).TotalMinutes)
+                    .DefaultIfEmpty(0).Average()
+            },
+            MonthlyMetrics = new PeriodMetrics
+            {
+                SessionCount = monthBookings.Count,
+                Revenue = monthBookings.Sum(b => b.Invoice?.TotalAmount ?? 0),
+                EnergyKwh = monthBookings.Sum(b => b.Invoice?.TotalEnergyKwh ?? 0),
+                AverageSessionDurationMinutes = monthBookings
+                    .Where(b => b.ActualStartTime.HasValue && b.ActualEndTime.HasValue)
+                    .Select(b => (b.ActualEndTime!.Value - b.ActualStartTime!.Value).TotalMinutes)
+                    .DefaultIfEmpty(0).Average()
+            },
+            YearlyMetrics = new PeriodMetrics
+            {
+                SessionCount = yearBookings.Count,
+                Revenue = yearBookings.Sum(b => b.Invoice?.TotalAmount ?? 0),
+                EnergyKwh = yearBookings.Sum(b => b.Invoice?.TotalEnergyKwh ?? 0),
+                AverageSessionDurationMinutes = yearBookings
+                    .Where(b => b.ActualStartTime.HasValue && b.ActualEndTime.HasValue)
+                    .Select(b => (b.ActualEndTime!.Value - b.ActualStartTime!.Value).TotalMinutes)
+                    .DefaultIfEmpty(0).Average()
+            },
+            ChargingPoints = station.ChargingPosts.Select(p =>
+            {
+                // Compute per-post metrics from actual slots (DB truth) rather than relying on cached columns
+                var totalSlotsForPost = p.ChargingSlots?.Count ?? 0;
+                var availableSlotsForPost = p.ChargingSlots?.Count(s => IsSlotAvailable(s.Status)) ?? 0;
+                var occupiedSlotsForPost = p.ChargingSlots?.Count(s => IsSlotOccupied(s.Status)) ?? 0;
+
+                return new ChargingPointDetailDto
                 {
-                    SlotId = s.SlotId,
-                    PostId = s.PostId,
-                    SlotNumber = s.SlotNumber,
-                    ConnectorType = s.ConnectorType,
-                    MaxPower = s.MaxPower,
-                    Status = s.Status,
-                    IsAvailable = s.Status == "available",
-                    CurrentBookingId = s.CurrentBookingId,
-                    CurrentUserName = s.Bookings
-                        .Where(b => b.Status == "in_progress" && b.DeletedAt == null)
-                        .Select(b => b.User.FullName)
-                        .FirstOrDefault(),
-                    CurrentVehicle = s.Bookings
-                        .Where(b => b.Status == "in_progress" && b.DeletedAt == null)
-                        .Select(b => b.Vehicle.Brand + " " + b.Vehicle.Model)
-                        .FirstOrDefault(),
-                    SessionStartTime = s.Bookings
-                        .Where(b => b.Status == "in_progress" && b.DeletedAt == null)
-                        .Select(b => b.ActualStartTime)
-                        .FirstOrDefault(),
-                    CreatedAt = s.CreatedAt,
-                    UpdatedAt = s.UpdatedAt
-                }).ToList(),
-                CreatedAt = p.CreatedAt,
-                UpdatedAt = p.UpdatedAt
+                    PostId = p.PostId,
+                    StationId = p.StationId,
+                    PostNumber = p.PostNumber,
+                    PostType = p.PostType,
+                    PowerOutput = p.PowerOutput,
+                    ConnectorTypes = p.ConnectorTypes,
+                    Status = p.Status,
+                    IsOnline = p.Status != "offline",
+                    // Use live counts derived from slots
+                    TotalSlots = totalSlotsForPost,
+                    AvailableSlots = availableSlotsForPost,
+                    OccupiedSlots = occupiedSlotsForPost,
+                    // Estimate current power usage as number of occupied slots * post power output
+                    CurrentPowerUsageKw = occupiedSlotsForPost * (p.PowerOutput <= 0 ? 0 : p.PowerOutput),
+                    ActiveSessionsCount = occupiedSlotsForPost,
+                    Slots = p.ChargingSlots != null
+                        ? p.ChargingSlots.Select(s => new ChargingSlotDetailDto
+                        {
+                            SlotId = s.SlotId,
+                            PostId = s.PostId,
+                            SlotNumber = s.SlotNumber,
+                            ConnectorType = s.ConnectorType,
+                            MaxPower = s.MaxPower,
+                            Status = s.Status,
+                            IsAvailable = IsSlotAvailable(s.Status),
+                            CurrentBookingId = s.CurrentBookingId,
+                            CurrentUserName = s.Bookings
+                            .Where(b => b.Status == "in_progress" && b.DeletedAt == null)
+                            .Select(b => b.User.FullName)
+                            .FirstOrDefault(),
+                            CurrentVehicle = s.Bookings
+                            .Where(b => b.Status == "in_progress" && b.DeletedAt == null)
+                            .Select(b => b.Vehicle.Brand + " " + b.Vehicle.Model)
+                            .FirstOrDefault(),
+                            SessionStartTime = s.Bookings
+                            .Where(b => b.Status == "in_progress" && b.DeletedAt == null)
+                            .Select(b => b.ActualStartTime)
+                            .FirstOrDefault(),
+                            CreatedAt = s.CreatedAt,
+                            UpdatedAt = s.UpdatedAt
+                        }).ToList()
+                        : new List<ChargingSlotDetailDto>(),
+                    CreatedAt = p.CreatedAt,
+                    UpdatedAt = p.UpdatedAt
+                };
             }).ToList(),
             RecentErrors = recentErrors.Take(10).ToList(),
             CreatedAt = station.CreatedAt,
@@ -410,9 +577,27 @@ public class AdminStationManagementService : IAdminStationManagementService
             ManagerPhoneNumber = managerAssignment?.StaffUser.PhoneNumber
         };
 
+        // Persist the computed active sessions for this station (non-blocking, only when changed)
+        try
+        {
+            var computedDetail = Math.Max(0, activeSessionsCount);
+            if (station.ActiveSessions != computedDetail)
+            {
+                station.ActiveSessions = computedDetail;
+                await _context.SaveChangesAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not persist ActiveSessions for station {StationId} (non-fatal)", stationId);
+        }
+
         return detail;
     }
 
+    /// <summary>
+    /// Lấy dữ liệu giám sát thời gian thực của trạm sạc.
+    /// </summary>
     public async Task<StationRealTimeMonitoringDto?> GetStationRealTimeDataAsync(int stationId)
     {
         var station = await _context.ChargingStations
@@ -523,6 +708,9 @@ public class AdminStationManagementService : IAdminStationManagementService
         };
     }
 
+    /// <summary>
+    /// Điều khiển trụ sạc (Start/Stop/Restart).
+    /// </summary>
     public async Task<ControlCommandResultDto> ControlChargingPointAsync(ChargingPointControlDto command)
     {
         var result = new ControlCommandResultDto();
@@ -601,6 +789,9 @@ public class AdminStationManagementService : IAdminStationManagementService
         return result;
     }
 
+    /// <summary>
+    /// Điều khiển toàn bộ trạm sạc.
+    /// </summary>
     public async Task<ControlCommandResultDto> ControlStationAsync(StationControlDto command)
     {
         var result = new ControlCommandResultDto();
@@ -704,6 +895,9 @@ public class AdminStationManagementService : IAdminStationManagementService
         return result;
     }
 
+    /// <summary>
+    /// Cấu hình trụ sạc.
+    /// </summary>
     public async Task<bool> ConfigureChargingPointAsync(ChargingPointConfigDto config)
     {
         try
@@ -738,6 +932,9 @@ public class AdminStationManagementService : IAdminStationManagementService
         }
     }
 
+    /// <summary>
+    /// Lấy danh sách lỗi của trạm sạc.
+    /// </summary>
     public async Task<List<StationErrorLogDto>> GetStationErrorsAsync(int stationId, bool includeResolved = false)
     {
         // For now, we'll get from SystemLogs
@@ -774,12 +971,16 @@ public class AdminStationManagementService : IAdminStationManagementService
                 ErrorCode = parts.Length > 6 ? parts[6] : "",
                 Message = parts.Length > 7 ? parts[7] : log.Message,
                 Details = log.StackTrace,
+                ClassificationSource = (log.StackTrace != null && log.StackTrace.Contains("ClassificationSource:auto")) ? "auto" : "manual",
                 OccurredAt = log.CreatedAt,
                 IsResolved = log.Severity == "resolved"
             };
         }).ToList();
     }
 
+    /// <summary>
+    /// Xử lý lỗi trạm sạc.
+    /// </summary>
     public async Task<bool> ResolveErrorAsync(int logId, string resolvedBy, string resolution)
     {
         try
@@ -801,22 +1002,150 @@ public class AdminStationManagementService : IAdminStationManagementService
         }
     }
 
+    /// <summary>
+    /// Ghi log lỗi trạm sạc.
+    /// </summary>
     public async Task<int> LogStationErrorAsync(int stationId, int? postId, int? slotId,
         string severity, string errorType, string message, string? details = null)
     {
         try
         {
-            var station = await _context.ChargingStations.FindAsync(stationId);
+            // Load station with posts so changes to posts are tracked and persisted
+            var station = await _context.ChargingStations
+                .Include(s => s.ChargingPosts)
+                .ThenInclude(p => p.ChargingSlots)
+                .FirstOrDefaultAsync(s => s.StationId == stationId);
             var post = postId.HasValue ? await _context.ChargingPosts.FindAsync(postId.Value) : null;
 
+            // Determine whether to run automatic classification. If caller passed "auto" or empty severity, classify here.
+            var finalSeverity = severity;
+            var ranAutoClassification = false;
+            if (string.IsNullOrWhiteSpace(finalSeverity) || string.Equals(finalSeverity, "auto", StringComparison.OrdinalIgnoreCase))
+            {
+                ranAutoClassification = true;
+                // Compute context metrics used for classification
+                var activeSessions = await _context.Bookings
+                    .Where(b => b.StationId == stationId && b.Status == "in_progress" && b.DeletedAt == null)
+                    .CountAsync();
+
+                var windowStart = DateTime.UtcNow.AddMinutes(-_recentErrorWindowMinutes);
+                var recentErrors = await _context.SystemLogs
+                    .Where(log => log.LogType == "station_error" && log.CreatedAt >= windowStart && log.Message != null && log.Message.StartsWith($"{stationId}|"))
+                    .ToListAsync();
+
+                var recentSameType = recentErrors.Count(log =>
+                {
+                    try
+                    {
+                        var parts = log.Message.Split('|');
+                        return parts.Length > 5 && string.Equals(parts[5], errorType, StringComparison.OrdinalIgnoreCase);
+                    }
+                    catch
+                    {
+                        return false;
+                    }
+                });
+
+                // Basic rule-map for error types -> base severity
+                var criticalTypes = new[] { "power_failure", "overheat", "safety_trip", "fire_risk" };
+                var majorTypes = new[] { "communication_lost", "connector_fault", "hardware_error", "sensor_failure" };
+
+                if (criticalTypes.Contains(errorType, StringComparer.OrdinalIgnoreCase))
+                {
+                    finalSeverity = "critical";
+                }
+                else if (majorTypes.Contains(errorType, StringComparer.OrdinalIgnoreCase))
+                {
+                    finalSeverity = "major";
+                }
+                else if (recentSameType >= _recentErrorThreshold)
+                {
+                    finalSeverity = "major";
+                }
+                else if (activeSessions > 0 && (string.Equals(errorType, "charging_interruption", StringComparison.OrdinalIgnoreCase) || string.Equals(errorType, "unexpected_disconnect", StringComparison.OrdinalIgnoreCase)))
+                {
+                    finalSeverity = "major";
+                }
+                else
+                {
+                    finalSeverity = "minor";
+                }
+
+                _logger.LogInformation("Auto-classified station {StationId} error '{ErrorType}' => {Severity} (activeSessions={ActiveSessions}, recentSameType={RecentSameType})",
+                    stationId, errorType, finalSeverity, activeSessions, recentSameType);
+
+                // Automated actions for critical severity (configurable)
+                if (string.Equals(finalSeverity, "critical", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Automated actions for critical severity (configurable)
+                    if (string.Equals(finalSeverity, "critical", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // Optionally auto-disable station if no active sessions and feature enabled
+                        if (_enableAutoDisableOnCritical)
+                        {
+                            if (activeSessions == 0 && station != null)
+                            {
+                                // Update station and posts immediately so the DB reflects the change before we create action logs
+                                station.Status = "inactive";
+                                if (station.ChargingPosts != null)
+                                {
+                                    foreach (var p in station.ChargingPosts)
+                                    {
+                                        p.Status = "offline";
+                                        p.UpdatedAt = DateTime.UtcNow;
+                                    }
+                                }
+
+                                station.UpdatedAt = DateTime.UtcNow;
+                                await _context.SaveChangesAsync();
+
+                                _logger.LogInformation("Auto-disabled station {StationId} due to critical auto-classified error", stationId);
+
+                                var actionMsg = $"{stationId}|{station?.StationName}|auto_action|auto_disable|Station auto-disabled due to critical error {errorType}";
+                                var actionLog = new SystemLog
+                                {
+                                    LogType = "station_action",
+                                    Severity = "info",
+                                    Message = actionMsg,
+                                    CreatedAt = DateTime.UtcNow
+                                };
+                                _context.SystemLogs.Add(actionLog);
+                            }
+                            else
+                            {
+                                _logger.LogInformation("Auto-disable skipped for station {StationId} because active sessions exist or station not found (activeSessions={ActiveSessions})", stationId, activeSessions);
+                            }
+                        }
+
+                        // Create a lightweight support/action log entry so operators can triage (always add this regardless of auto-disable)
+                        var supportMsg = $"{stationId}|{station?.StationName}|auto_action|create_support_ticket||Critical error auto-detected: {errorType} - {message}";
+                        var supportLog = new SystemLog
+                        {
+                            LogType = "station_action",
+                            Severity = "info",
+                            Message = supportMsg,
+                            StackTrace = details,
+                            CreatedAt = DateTime.UtcNow
+                        };
+                        _context.SystemLogs.Add(supportLog);
+                    }
+                }
+            }
+
             var logMessage = $"{stationId}|{station?.StationName}|{postId}|{post?.PostNumber}|{slotId}|{errorType}||{message}";
+
+            var stackTraceWithClassification = details ?? string.Empty;
+            if (ranAutoClassification)
+            {
+                stackTraceWithClassification = stackTraceWithClassification + "\nClassificationSource:auto";
+            }
 
             var log = new SystemLog
             {
                 LogType = "station_error",
-                Severity = severity,
+                Severity = finalSeverity,
                 Message = logMessage,
-                StackTrace = details,
+                StackTrace = stackTraceWithClassification,
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -832,6 +1161,9 @@ public class AdminStationManagementService : IAdminStationManagementService
         }
     }
 
+    /// <summary>
+    /// Tạo mới trạm sạc.
+    /// </summary>
     public async Task<StationDetailDto> CreateStationAsync(CreateUpdateStationDto dto)
     {
         var station = new ChargingStation
@@ -857,6 +1189,9 @@ public class AdminStationManagementService : IAdminStationManagementService
         return (await GetStationDetailAsync(station.StationId))!;
     }
 
+    /// <summary>
+    /// Cập nhật thông tin trạm sạc.
+    /// </summary>
     public async Task<bool> UpdateStationAsync(int stationId, CreateUpdateStationDto dto)
     {
         try
@@ -886,6 +1221,9 @@ public class AdminStationManagementService : IAdminStationManagementService
         }
     }
 
+    /// <summary>
+    /// Xóa trạm sạc (Soft delete).
+    /// </summary>
     public async Task<bool> DeleteStationAsync(int stationId)
     {
         try
@@ -906,6 +1244,9 @@ public class AdminStationManagementService : IAdminStationManagementService
         }
     }
 
+    /// <summary>
+    /// Tạo mới trụ sạc.
+    /// </summary>
     public async Task<ChargingPointDetailDto> CreateChargingPostAsync(CreateChargingPostDto dto)
     {
         var post = new ChargingPost
@@ -988,6 +1329,9 @@ public class AdminStationManagementService : IAdminStationManagementService
         };
     }
 
+    /// <summary>
+    /// Cập nhật người quản lý trạm sạc.
+    /// </summary>
     public async Task<bool> UpdateStationManagerAsync(int stationId, int? managerUserId)
     {
         await using var transaction = await _context.Database.BeginTransactionAsync();

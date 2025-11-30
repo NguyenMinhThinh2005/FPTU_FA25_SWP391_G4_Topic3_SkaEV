@@ -1,7 +1,7 @@
 namespace SkaEV.API.Domain.Entities.Views;
 
 /// <summary>
-/// User cost report view entity
+/// Thực thể báo cáo chi phí người dùng.
 /// </summary>
 public class UserCostReport
 {
@@ -22,7 +22,7 @@ public class UserCostReport
 }
 
 /// <summary>
-/// User charging habits view entity
+/// Thực thể thói quen sạc của người dùng.
 /// </summary>
 public class UserChargingHabit
 {
@@ -41,7 +41,7 @@ public class UserChargingHabit
 }
 
 /// <summary>
-/// Admin revenue report view entity
+/// Thực thể báo cáo doanh thu quản trị viên.
 /// </summary>
 public class AdminRevenueReport
 {
@@ -60,7 +60,7 @@ public class AdminRevenueReport
 }
 
 /// <summary>
-/// Admin usage report view entity
+/// Thực thể báo cáo sử dụng quản trị viên.
 /// </summary>
 public class AdminUsageReport
 {
@@ -79,7 +79,7 @@ public class AdminUsageReport
 }
 
 /// <summary>
-/// Station performance view entity
+/// Thực thể hiệu suất trạm.
 /// </summary>
 public class StationPerformance
 {
@@ -96,7 +96,7 @@ public class StationPerformance
 }
 
 /// <summary>
-/// Payment methods summary view entity
+/// Thực thể tóm tắt phương thức thanh toán.
 /// </summary>
 public class PaymentMethodsSummary
 {
