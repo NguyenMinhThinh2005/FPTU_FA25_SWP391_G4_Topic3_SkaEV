@@ -91,7 +91,6 @@ const StartChargingPage = () => {
    * Quay lại quét lại
    */
   const handleRescan = () => {
-    setScannedData(null);
     setShowScanner(true);
     setErrorModal(null);
   };
@@ -100,7 +99,6 @@ const StartChargingPage = () => {
    * Hủy và quay lại
    */
   const handleCancel = () => {
-    setScannedData(null);
     navigate(-1);
   };
 

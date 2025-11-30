@@ -355,7 +355,7 @@ const StationMapGoogle = ({
     const [selectedStationId, setSelectedStationId] = useState(selectedStation?.id || null);
     const [userPos, setUserPos] = useState(userLocation);
     const [routeDestination, setRouteDestination] = useState(null);
-    const [routeInfo, setRouteInfo] = useState(null);
+    const [_routeInfo, setRouteInfo] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
