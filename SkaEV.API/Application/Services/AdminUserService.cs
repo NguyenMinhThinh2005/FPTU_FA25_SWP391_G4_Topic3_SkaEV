@@ -114,11 +114,7 @@ public partial class AdminUserService : IAdminUserService
             Status = user.IsActive ? "active" : "inactive",
             CreatedAt = user.CreatedAt,
             UpdatedAt = user.UpdatedAt,
-<<<<<<< HEAD
-            LastLoginAt = null, // Not tracked in current schema
-=======
             LastLoginAt = null, // Chưa theo dõi trong schema hiện tại
->>>>>>> origin/develop
             AvatarUrl = user.UserProfile?.AvatarUrl,
             TotalBookings = user.Bookings.Count,
             TotalSpent = user.Invoices.Sum(i => i.TotalAmount),
@@ -339,12 +335,8 @@ public partial class AdminUserService : IAdminUserService
 
         // Tạo mật khẩu tạm thời
         var tempPassword = GenerateTemporaryPassword();
-<<<<<<< HEAD
-        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(tempPassword, 11); // Hash password with BCrypt
-=======
         // Store hashed temporary password (BCrypt)
         user.PasswordHash = PasswordHasher.HashPassword(tempPassword);
->>>>>>> origin/develop
         user.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
@@ -485,11 +477,7 @@ public partial class AdminUserService : IAdminUserService
             Status = user.IsActive ? "active" : "inactive",
             CreatedAt = user.CreatedAt,
             UpdatedAt = user.UpdatedAt,
-<<<<<<< HEAD
-            LastLoginAt = null // Not tracked in current schema
-=======
             LastLoginAt = null // Chưa theo dõi trong schema hiện tại
->>>>>>> origin/develop
         };
     }
 }

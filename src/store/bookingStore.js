@@ -25,15 +25,13 @@ const addMinutes = (isoString, minutes) => {
 };
 
 const mapApiBookingToStore = (apiBooking) => {
-  // Backend returns PascalCase, handle both PascalCase and camelCase
-  const bookingId = apiBooking.BookingId || apiBooking.bookingId;
-  const createdAt = normalizeTimestamp(apiBooking.CreatedAt || apiBooking.createdAt);
-  const scheduledStart = normalizeTimestamp(apiBooking.ScheduledStartTime || apiBooking.scheduledStartTime);
-  const estimatedArrival = normalizeTimestamp(apiBooking.EstimatedArrival || apiBooking.estimatedArrival);
-  const actualStart = normalizeTimestamp(apiBooking.ActualStartTime || apiBooking.actualStartTime);
-  const actualEnd = normalizeTimestamp(apiBooking.ActualEndTime || apiBooking.actualEndTime);
+  const createdAt = normalizeTimestamp(apiBooking.createdAt);
+  const scheduledStart = normalizeTimestamp(apiBooking.scheduledStartTime);
+  const estimatedArrival = normalizeTimestamp(apiBooking.estimatedArrival);
+  const actualStart = normalizeTimestamp(apiBooking.actualStartTime);
+  const actualEnd = normalizeTimestamp(apiBooking.actualEndTime);
   const chargingDuration = calculateDurationMinutes(actualStart, actualEnd);
-  const estimatedDuration = (apiBooking.EstimatedDuration ?? apiBooking.estimatedDuration) ?? null;
+  const estimatedDuration = apiBooking.estimatedDuration ?? null;
   const durationMinutes = chargingDuration ?? estimatedDuration ?? null;
   const effectiveStart = actualStart || scheduledStart || estimatedArrival || createdAt;
   const projectedEnd =
@@ -49,20 +47,20 @@ const mapApiBookingToStore = (apiBooking) => {
   );
 
   return {
-    id: bookingId,
-    bookingId: bookingId,
-    apiId: bookingId,
-    userId: apiBooking.UserId || apiBooking.userId,
-    customerName: apiBooking.CustomerName || apiBooking.customerName,
-    stationId: apiBooking.StationId || apiBooking.stationId,
-    stationName: apiBooking.StationName || apiBooking.stationName,
-    stationAddress: apiBooking.StationAddress || apiBooking.stationAddress,
-    slotId: apiBooking.SlotId || apiBooking.slotId,
-    slotNumber: apiBooking.SlotNumber || apiBooking.slotNumber,
-    schedulingType: ((apiBooking.SchedulingType || apiBooking.schedulingType) || "immediate").toLowerCase(),
-    status: ((apiBooking.Status || apiBooking.status) || "pending").toLowerCase(),
-    statusRaw: apiBooking.Status || apiBooking.status,
-    bookingCode: `BK-${bookingId}`,
+    id: apiBooking.bookingId,
+    bookingId: apiBooking.bookingId,
+    apiId: apiBooking.bookingId,
+    userId: apiBooking.userId,
+    customerName: apiBooking.customerName,
+    stationId: apiBooking.stationId,
+    stationName: apiBooking.stationName,
+    stationAddress: apiBooking.stationAddress,
+    slotId: apiBooking.slotId,
+    slotNumber: apiBooking.slotNumber,
+    schedulingType: (apiBooking.schedulingType || "immediate").toLowerCase(),
+    status: (apiBooking.status || "pending").toLowerCase(),
+    statusRaw: apiBooking.status,
+    bookingCode: `BK-${apiBooking.bookingId}`,
     bookingTime: createdAt,
     createdAt,
     bookingDate: createdAt,
@@ -82,13 +80,13 @@ const mapApiBookingToStore = (apiBooking) => {
     chargingStarted: Boolean(actualStart),
     chargingEndedAt: actualEnd,
     chargingDuration,
-    vehicleId: apiBooking.VehicleId || apiBooking.vehicleId,
-    vehicleType: apiBooking.VehicleType || apiBooking.vehicleType,
-    licensePlate: apiBooking.LicensePlate || apiBooking.licensePlate,
-    portNumber: apiBooking.SlotNumber || apiBooking.slotNumber,
-    slotName: apiBooking.SlotNumber || apiBooking.slotNumber,
-    targetSOC: (apiBooking.TargetSoc ?? apiBooking.targetSoc) ?? null,
-    currentSOC: (apiBooking.CurrentSoc ?? apiBooking.currentSoc) ?? null,
+    vehicleId: apiBooking.vehicleId,
+    vehicleType: apiBooking.vehicleType,
+    licensePlate: apiBooking.licensePlate,
+  portNumber: apiBooking.slotNumber,
+    slotName: apiBooking.slotNumber,
+    targetSOC: apiBooking.targetSoc ?? null,
+    currentSOC: apiBooking.currentSoc ?? null,
   cost: baseCost,
   totalAmount: baseCost,
     chargingRate: null,
@@ -213,54 +211,6 @@ const useBookingStore = create(
                 console.log('🎯 Extracted slot ID from port string:', slotId);
               }
             }
-<<<<<<< HEAD
-
-            const apiPayload = {
-              stationId: parseInt(bookingData.stationId) || 1,
-              slotId: slotId, // Use mapped slot ID
-              vehicleId: 5, // Use actual vehicle ID from database (user has vehicle_id=5,6)
-              scheduledStartTime:
-                bookingData.scheduledDateTime || new Date().toISOString(),
-              estimatedArrival:
-                bookingData.scheduledDateTime ||
-                new Date(Date.now() + 15 * 60 * 1000).toISOString(),
-              estimatedDuration: parseInt(bookingData.estimatedDuration) || 60,
-              schedulingType:
-                bookingData.schedulingType === "scheduled"
-                  ? "scheduled"
-                  : "immediate",
-              targetSoc: bookingData.targetSOC || 80,
-            };
-
-            console.log("📤 API Payload:", apiPayload);
-            const response = await bookingsAPI.create(apiPayload);
-            console.log("✅ API Response:", response);
-
-            // Backend returns PascalCase (BookingId), not camelCase (bookingId)
-            const numericId = response.BookingId || response.bookingId || response.id;
-            console.log("📊 Extracted booking ID from API:", numericId, "Type:", typeof numericId);
-
-            // Merge API response
-            booking = {
-              ...booking,
-              id: numericId, // Use numeric ID from API (MUST be number for API calls)
-              bookingCode: booking.id, // Keep BOOK... string as code for display
-              apiId: numericId, // Keep for backward compatibility
-              bookingId: numericId, // Also set bookingId for consistency
-              status: response.Status || response.status || booking.status,
-              createdAt: response.CreatedAt || response.createdAt || booking.createdAt,
-            };
-
-            set({ loading: false });
-          } catch (error) {
-            console.error(
-              "❌ API Error:",
-              error.response?.data || error.message
-            );
-            set({ loading: false, error: error.message });
-            console.warn("⚠️ Using local booking as fallback");
-=======
->>>>>>> origin/develop
           }
 
           const apiPayload = {

@@ -227,15 +227,8 @@ const ChargingFlow = () => {
   const bookingStore = useBookingStore;
   const { stations, initializeData, filters, updateFilters, loading } =
     useStationStore();
-<<<<<<< HEAD
-  
-  // Debug log to check stations value
-  console.log("🔍 ChargingFlow - stations from store:", stations?.length || 0, "stations");
-  console.log("🔍 ChargingFlow - loading:", loading);
-=======
   const { vehicles, getDefaultVehicle, fetchVehicles, hasLoaded } =
     useVehicleStore();
->>>>>>> origin/develop
 
   // Lưu flowStep vào sessionStorage để giữ trạng thái khi chuyển tab
   const getInitialFlowStep = () => {
@@ -1236,15 +1229,7 @@ const ChargingFlow = () => {
     try {
       console.log("🔌 Starting charging session for Booking ID:", bookingId);
 
-<<<<<<< HEAD
-      // Use numeric booking ID from API (apiId) if available, otherwise use id
-      // API endpoint expects integer ID, not string "BOOK..."
-      const bookingId = currentBooking.apiId || currentBooking.bookingId || currentBooking.id;
-      console.log('📊 Using booking ID for API:', bookingId, 'Type:', typeof bookingId);
-
-=======
       // Try to call API to start charging session (may fail with 403 if not Staff)
->>>>>>> origin/develop
       try {
         const response = await chargingAPI.startCharging(bookingId);
         console.log("✅ Charging session started via API:", response);
@@ -2878,11 +2863,9 @@ const ChargingFlow = () => {
                   setCompletedSession(sessionEndData);
 
                   // 🚀 Call API to complete charging session
-                  // Use numeric booking ID from API (apiId), not string "BOOK..."
+                  // Use numeric ID from API response, not the BOOK... string
                   const bookingId =
-                    currentBooking?.apiId || currentBooking?.bookingId || 
                     currentBooking?.id || currentBookingData?.id;
-                  console.log('📊 Complete - Using booking ID:', bookingId, 'Type:', typeof bookingId);
                   if (bookingId) {
                     try {
                       console.log(

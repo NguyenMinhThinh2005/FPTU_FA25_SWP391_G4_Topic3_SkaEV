@@ -34,13 +34,8 @@ public class SkaEVDbContext : DbContext
     public DbSet<Payment> Payments { get; set; }
     public DbSet<ServicePlan> ServicePlans { get; set; }
     public DbSet<Incident> Incidents { get; set; }
-<<<<<<< HEAD
-    public DbSet<Issue> Issues { get; set; }
-    public DbSet<IssueComment> IssueComments { get; set; }
-=======
     public DbSet<MaintenanceTeam> MaintenanceTeams { get; set; }
     public DbSet<WalletTransaction> WalletTransactions { get; set; }
->>>>>>> origin/develop
 
     // DbSets - Views (read-only)
     public DbSet<UserCostReport> UserCostReports { get; set; }
@@ -55,26 +50,6 @@ public class SkaEVDbContext : DbContext
         base.OnModelCreating(modelBuilder);
 
         // Configure table names to match database
-<<<<<<< HEAD
-        modelBuilder.Entity<User>().ToTable("users");
-        modelBuilder.Entity<UserProfile>().ToTable("user_profiles");
-        modelBuilder.Entity<Vehicle>().ToTable("vehicles");
-        modelBuilder.Entity<ChargingStation>().ToTable("charging_stations");
-        modelBuilder.Entity<ChargingPost>().ToTable("charging_posts");
-        modelBuilder.Entity<ChargingSlot>().ToTable("charging_slots");
-        modelBuilder.Entity<Booking>().ToTable("bookings");
-        modelBuilder.Entity<SocTracking>().ToTable("soc_tracking");
-        modelBuilder.Entity<Invoice>().ToTable("invoices");
-        modelBuilder.Entity<QRCode>().ToTable("qr_codes");
-        modelBuilder.Entity<Notification>().ToTable("notifications");
-        modelBuilder.Entity<SystemLog>().ToTable("system_logs");
-        modelBuilder.Entity<Review>().ToTable("reviews");
-        modelBuilder.Entity<PricingRule>().ToTable("pricing_rules");
-        modelBuilder.Entity<StationStaff>().ToTable("station_staff");
-        modelBuilder.Entity<ServicePlan>().ToTable("service_plans");
-        modelBuilder.Entity<Incident>().ToTable("incidents");
-        modelBuilder.Entity<Issue>().ToTable("issues");
-=======
         modelBuilder.Entity<User>().ToTable("users", tb =>
         {
             tb.HasTrigger("trg_users_updated_at");
@@ -143,7 +118,6 @@ public class SkaEVDbContext : DbContext
         {
             tb.HasTrigger("trg_incidents_updated_at");
         });
->>>>>>> origin/develop
 
         // User configuration
         modelBuilder.Entity<User>(entity =>
@@ -705,67 +679,6 @@ public class SkaEVDbContext : DbContext
             entity.Property(e => e.ContactPhone).HasColumnName("contact_phone").HasMaxLength(50);
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").IsRequired();
             entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").IsRequired();
-        });
-
-        // Issue configuration
-        modelBuilder.Entity<Issue>(entity =>
-        {
-            entity.HasKey(e => e.IssueId);
-            entity.Property(e => e.IssueId).HasColumnName("IssueId");
-            entity.Property(e => e.StationId).HasColumnName("StationId").IsRequired();
-            entity.Property(e => e.ReportedByUserId).HasColumnName("ReportedByUserId").IsRequired();
-            entity.Property(e => e.AssignedToUserId).HasColumnName("AssignedToUserId");
-            entity.Property(e => e.Title).HasColumnName("Title").HasMaxLength(200).IsRequired();
-            entity.Property(e => e.Description).HasColumnName("Description").IsRequired();
-            entity.Property(e => e.Category).HasColumnName("Category").HasMaxLength(50).IsRequired();
-            entity.Property(e => e.Priority).HasColumnName("Priority").HasMaxLength(20).IsRequired();
-            entity.Property(e => e.Status).HasColumnName("Status").HasMaxLength(20).IsRequired();
-            entity.Property(e => e.Resolution).HasColumnName("Resolution");
-            entity.Property(e => e.ReportedAt).HasColumnName("ReportedAt").IsRequired();
-            entity.Property(e => e.AssignedAt).HasColumnName("AssignedAt");
-            entity.Property(e => e.StartedAt).HasColumnName("StartedAt");
-            entity.Property(e => e.ResolvedAt).HasColumnName("ResolvedAt");
-            entity.Property(e => e.ClosedAt).HasColumnName("ClosedAt");
-            entity.Property(e => e.CreatedAt).HasColumnName("CreatedAt").IsRequired();
-            entity.Property(e => e.UpdatedAt).HasColumnName("UpdatedAt").IsRequired();
-
-            // Foreign keys
-            entity.HasOne(e => e.Station)
-                .WithMany()
-                .HasForeignKey(e => e.StationId)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            entity.HasOne(e => e.ReportedByUser)
-                .WithMany()
-                .HasForeignKey(e => e.ReportedByUserId)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            entity.HasOne(e => e.AssignedToUser)
-                .WithMany()
-                .HasForeignKey(e => e.AssignedToUserId)
-                .OnDelete(DeleteBehavior.SetNull);
-        });
-
-        // IssueComment configuration
-        modelBuilder.Entity<IssueComment>(entity =>
-        {
-            entity.HasKey(e => e.CommentId);
-            entity.ToTable("IssueComments");
-            entity.Property(e => e.CommentId).HasColumnName("CommentId");
-            entity.Property(e => e.IssueId).HasColumnName("IssueId").IsRequired();
-            entity.Property(e => e.UserId).HasColumnName("UserId").IsRequired();
-            entity.Property(e => e.Comment).HasColumnName("Comment").IsRequired();
-            entity.Property(e => e.CreatedAt).HasColumnName("CreatedAt").IsRequired();
-
-            entity.HasOne(e => e.Issue)
-                .WithMany()
-                .HasForeignKey(e => e.IssueId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            entity.HasOne(e => e.User)
-                .WithMany()
-                .HasForeignKey(e => e.UserId)
-                .OnDelete(DeleteBehavior.Restrict);
         });
 
         // Configure Views (read-only, no keys needed)

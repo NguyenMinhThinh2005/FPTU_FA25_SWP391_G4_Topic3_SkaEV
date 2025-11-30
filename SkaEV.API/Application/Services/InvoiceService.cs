@@ -88,60 +88,6 @@ public class InvoiceService : IInvoiceService
 
         if (invoice == null)
             throw new KeyNotFoundException("Invoice not found");
-<<<<<<< HEAD
-
-        if (invoice.PaymentStatus == "paid")
-            throw new InvalidOperationException("Invoice is already paid");
-
-        // Determine payment method name
-        var paymentMethodName = "Cash";
-        int? finalPaymentMethodId = null;
-        
-        // Priority 1: If staff provides method name (counter payment)
-        if (!string.IsNullOrWhiteSpace(processDto.Method))
-        {
-            paymentMethodName = processDto.Method.ToLowerInvariant() switch
-            {
-                "cash" => "Cash",
-                "card" => "Card",
-                "qr" => "QR Code",
-                "bank_transfer" => "Bank Transfer",
-                _ => processDto.Method
-            };
-        }
-        // Priority 2: If PaymentMethodId is provided (customer's saved method)
-        else if (processDto.PaymentMethodId.HasValue && _context.PaymentMethods != null)
-        {
-            var paymentMethod = await _context.PaymentMethods
-                .FirstOrDefaultAsync(pm => pm.PaymentMethodId == processDto.PaymentMethodId.Value);
-            
-            if (paymentMethod != null)
-            {
-                paymentMethodName = paymentMethod.Type ?? "Unknown";
-                finalPaymentMethodId = paymentMethod.PaymentMethodId;
-            }
-        }
-
-        // Create payment record if Payment entity exists
-        if (_context.Payments != null)
-        {
-            var payment = new Payment
-            {
-                InvoiceId = invoiceId,
-                PaymentMethodId = finalPaymentMethodId,
-                Amount = processDto.Amount,
-                PaymentType = paymentMethodName,
-                Status = "completed",
-                TransactionId = processDto.TransactionReference, // Map to TransactionId column
-                ProcessedByStaffId = processedByUserId,
-                ProcessedAt = DateTime.UtcNow,
-                CreatedAt = DateTime.UtcNow
-            };
-
-            _context.Payments.Add(payment);
-            _logger.LogInformation("Created payment record for invoice {InvoiceId}: {Amount} via {Method}", 
-                invoiceId, processDto.Amount, paymentMethodName);
-=======
 
         var paymentMethodName = string.Empty;
 
@@ -214,35 +160,12 @@ public class InvoiceService : IInvoiceService
                 payment.TransactionId);
 
             return MapToDto(invoice);
->>>>>>> origin/develop
         }
 
         invoice.UpdatedAt = now;
 
-        // ✅ FIX: Free up the charging slot after payment completed
-        if (invoice.Booking != null)
-        {
-            var slot = await _context.ChargingSlots
-                .FirstOrDefaultAsync(cs => cs.SlotId == invoice.Booking.SlotId);
-            
-            if (slot != null && slot.CurrentBookingId == invoice.BookingId)
-            {
-                slot.Status = "available";
-                slot.CurrentBookingId = null;
-                slot.UpdatedAt = DateTime.UtcNow;
-                
-                _logger.LogInformation("✅ Freed charging slot {SlotId} after payment for booking {BookingId}", 
-                    slot.SlotId, invoice.BookingId);
-            }
-        }
-
         await _context.SaveChangesAsync();
 
-<<<<<<< HEAD
-        _logger.LogInformation("✅ Processed payment for invoice {InvoiceId} by staff {UserId}: {Amount} via {Method}", 
-            invoiceId, processedByUserId, processDto.Amount, paymentMethodName);
-        
-=======
         if (attemptResult.Status == PaymentStatuses.Pending)
         {
             _logger.LogInformation(
@@ -260,7 +183,6 @@ public class InvoiceService : IInvoiceService
                 attemptResult.FailureReason ?? "Unknown reason");
         }
 
->>>>>>> origin/develop
         return MapToDto(invoice);
     }
 

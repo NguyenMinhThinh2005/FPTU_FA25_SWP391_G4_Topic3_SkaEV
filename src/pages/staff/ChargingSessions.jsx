@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import staffAPI from "../../services/api/staffAPI";
-import signalRService from "../../services/signalRService"; // 🔥 Import SignalR
 import {
   Box,
   Container,
@@ -35,12 +34,7 @@ import {
   Stop, 
   Payment,
   Info,
-<<<<<<< HEAD
-  Print,
-  PlayArrow
-=======
   Print 
->>>>>>> origin/develop
 } from "@mui/icons-material";
 
 const ChargingSessionsSimple = () => {
@@ -52,12 +46,7 @@ const ChargingSessionsSimple = () => {
   // Dialog states
   const [stopDialogOpen, setStopDialogOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
-<<<<<<< HEAD
-  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
-  const [resumeDialogOpen, setResumeDialogOpen] = useState(false); // Thêm resume dialog
-=======
   const [detailDialogOpen, setDetailDialogOpen] = useState(false); // Thêm detail dialog
->>>>>>> origin/develop
   const [selectedSession, setSelectedSession] = useState(null);
   
   // Payment form data
@@ -65,16 +54,6 @@ const ChargingSessionsSimple = () => {
     finalSoc: '',
     totalEnergyKwh: '',
     paymentMethod: 'cash'
-<<<<<<< HEAD
-=======
-  });
-  
-  // Snackbar notification
-  const [snackbar, setSnackbar] = useState({
-    open: false,
-    message: '',
-    severity: 'success'
->>>>>>> origin/develop
   });
   
   // Snackbar notification
@@ -83,39 +62,6 @@ const ChargingSessionsSimple = () => {
     message: '',
     severity: 'success'
   });
-
-  // 🔥 SignalR real-time updates
-  useEffect(() => {
-    const initSignalR = async () => {
-      try {
-        if (!signalRService.isConnected()) {
-          await signalRService.connect();
-          console.log('✅ ChargingSessions: SignalR connected');
-        }
-
-        // Listen for charging updates from Customer
-        const unsubscribeCharging = signalRService.onChargingUpdate((data) => {
-          console.log('🔌 ChargingSessions: Charging update received:', data);
-          loadSessions(); // Reload sessions để cập nhật UI
-        });
-
-        // Listen for station updates
-        const unsubscribeStation = signalRService.onStationUpdate((data) => {
-          console.log('📡 ChargingSessions: Station update received:', data);
-          loadSessions();
-        });
-
-        return () => {
-          unsubscribeCharging();
-          unsubscribeStation();
-        };
-      } catch (err) {
-        console.error('❌ ChargingSessions: SignalR connection error:', err);
-      }
-    };
-
-    initSignalR();
-  }, []);
 
   useEffect(() => {
     loadSessions();
@@ -134,71 +80,6 @@ const ChargingSessionsSimple = () => {
       
       // Extract sessions from connectors
       const allSessions = [];
-<<<<<<< HEAD
-      
-      if (dashboardData?.connectors && Array.isArray(dashboardData.connectors)) {
-        dashboardData.connectors.forEach((connector) => {
-          console.log(`🔌 Processing connector ${connector.connectorCode}:`, connector);
-          
-          // Map connector data to session format
-          const session = {
-            // Basic connector info
-            id: connector.slotId || connector.connectorCode,
-            connectorCode: connector.connectorCode || 'N/A',
-            connectorType: connector.connectorType || 'N/A',
-            maxPower: connector.maxPower || 0,
-            
-            // Status from backend - Use BOTH currentSession and activeSession
-            technicalStatus: connector.technicalStatus || 'unknown',
-            operationalStatus: connector.operationalStatus || 'Available',
-            
-            // Technical readings
-            voltage: connector.voltage,
-            current: connector.current,
-            temperature: connector.temperature,
-            
-            // Use activeSession (which comes from backend with session data)
-            activeSession: connector.activeSession || connector.currentSession,
-          };
-          
-          // If has active session, add customer & vehicle info
-          const sessionData = connector.activeSession || connector.currentSession;
-          if (sessionData) {
-            console.log(`  ✅ Found session for ${connector.connectorCode}:`, sessionData);
-            session.bookingId = sessionData.bookingId;
-            session.customerId = sessionData.customerId;
-            session.customerName = sessionData.customerName || 'N/A';
-            session.vehicleInfo = sessionData.vehicleInfo || 'N/A';
-            session.startedAt = sessionData.startedAt;
-            session.currentSoc = sessionData.currentSoc;
-            session.power = sessionData.power;
-            session.energyDelivered = sessionData.energyDelivered || sessionData.energyConsumed || 0;
-            
-            // Calculate charging duration
-            if (sessionData.startedAt) {
-              const startTime = new Date(sessionData.startedAt);
-              const now = new Date();
-              const durationMs = now - startTime;
-              const hours = Math.floor(durationMs / (1000 * 60 * 60));
-              const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
-              session.duration = `${hours}h ${minutes}m`;
-            }
-          } else {
-            console.log(`  ℹ️ No session for ${connector.connectorCode}`);
-          }
-          
-          allSessions.push(session);
-        });
-      }
-      
-      console.log("✅ Processed sessions:", allSessions);
-      console.log("📊 Sessions detail:");
-      allSessions.forEach((s, i) => {
-        console.log(`  [${i}] ${s.connectorCode}: ${s.operationalStatus} - ${s.customerName || 'No session'} - Energy: ${s.energyDelivered || 0}kWh - HasActiveSession: ${!!s.activeSession}`);
-      });
-      setSessions(allSessions);
-      
-=======
       
       if (dashboardData?.connectors && Array.isArray(dashboardData.connectors)) {
         dashboardData.connectors.forEach((connector) => {
@@ -253,7 +134,6 @@ const ChargingSessionsSimple = () => {
       console.log("✅ Processed sessions:", allSessions);
       setSessions(allSessions);
       
->>>>>>> origin/develop
     } catch (err) {
       console.error("❌ Error loading sessions:", err);
       setError(err.message || "Không thể tải dữ liệu phiên sạc");
@@ -360,61 +240,6 @@ const ChargingSessionsSimple = () => {
     setPaymentDialogOpen(true);
   };
 
-<<<<<<< HEAD
-  // Handle resume from maintenance
-  const handleResumeFromMaintenance = (session) => {
-    setSelectedSession(session);
-    setResumeDialogOpen(true);
-  };
-
-  // Confirm resume from maintenance
-  const confirmResumeFromMaintenance = async () => {
-    try {
-      console.log("🔄 Resuming slot from maintenance:", selectedSession.id);
-      
-      // Call API to update slot status to available
-      await staffAPI.updateSlotStatus(selectedSession.id, 'available', 'Đã hoàn tất bảo trì');
-      
-      setResumeDialogOpen(false);
-      setSnackbar({
-        open: true,
-        message: `✅ Connector ${selectedSession.connectorCode} đã hoạt động trở lại`,
-        severity: 'success'
-      });
-      
-      // Reload sessions to reflect changes
-      await loadSessions();
-      
-    } catch (err) {
-      console.error("❌ Error resuming from maintenance:", err);
-      setSnackbar({
-        open: true,
-        message: err.response?.data?.message || "Không thể khôi phục hoạt động",
-        severity: 'error'
-      });
-    }
-  };
-
-  // Process payment
-  const processPayment = async () => {
-    try {
-      console.log("💰 Processing payment for booking:", selectedSession.bookingId);
-      
-      // Step 1: Get invoice for this booking
-      const invoice = await staffAPI.getInvoiceByBooking(selectedSession.bookingId);
-      console.log("📄 Invoice retrieved:", invoice);
-      
-      if (!invoice || !invoice.invoiceId) {
-        throw new Error("Không tìm thấy hóa đơn cho booking này");
-      }
-      
-      // Step 2: Process payment via Invoice API
-      const paymentAmount = calculateCost(paymentForm.totalEnergyKwh);
-      await staffAPI.processPayment(invoice.invoiceId, {
-        method: paymentForm.paymentMethod,
-        amount: paymentAmount,
-        notes: `Thanh toán tại quầy - Booking #${selectedSession.bookingId}`
-=======
   // Process payment
   const processPayment = async () => {
     try {
@@ -424,17 +249,12 @@ const ChargingSessionsSimple = () => {
       await staffAPI.processPayment(selectedSession.bookingId, {
         method: paymentForm.paymentMethod,
         amount: calculateCost(paymentForm.totalEnergyKwh)
->>>>>>> origin/develop
       });
       
       setPaymentDialogOpen(false);
       setSnackbar({
         open: true,
-<<<<<<< HEAD
-        message: `✅ Thanh toán thành công ${paymentAmount.toLocaleString('vi-VN')}₫ cho phiên sạc #${selectedSession.bookingId}!`,
-=======
         message: `Thanh toán thành công cho phiên sạc #${selectedSession.bookingId}!`,
->>>>>>> origin/develop
         severity: 'success'
       });
       
@@ -445,11 +265,7 @@ const ChargingSessionsSimple = () => {
       console.error("❌ Error processing payment:", err);
       setSnackbar({
         open: true,
-<<<<<<< HEAD
-        message: err.response?.data?.message || err.message || "Không thể xử lý thanh toán",
-=======
         message: err.message || "Không thể xử lý thanh toán",
->>>>>>> origin/develop
         severity: 'error'
       });
     }
@@ -804,26 +620,8 @@ const ChargingSessionsSimple = () => {
                           </Button>
                         )}
                         
-<<<<<<< HEAD
-                        {/* Hoạt động lại button - Show for maintenance slots */}
-                        {!isActive && session.operationalStatus?.toLowerCase() === 'maintenance' && (
-                          <Button 
-                            size="small" 
-                            variant="contained"
-                            color="success"
-                            startIcon={<PlayArrow />}
-                            onClick={() => handleResumeFromMaintenance(session)}
-                          >
-                            Hoạt động lại
-                          </Button>
-                        )}
-                        
-                        {/* Empty state for inactive connectors */}
-                        {!isActive && session.operationalStatus?.toLowerCase() !== 'maintenance' && (
-=======
                         {/* Empty state for inactive connectors */}
                         {!isActive && (
->>>>>>> origin/develop
                           <Typography variant="caption" color="text.secondary">
                             -
                           </Typography>
@@ -1134,62 +932,6 @@ const ChargingSessionsSimple = () => {
         </DialogActions>
       </Dialog>
 
-<<<<<<< HEAD
-      {/* Resume from Maintenance Dialog */}
-      <Dialog 
-        open={resumeDialogOpen} 
-        onClose={() => setResumeDialogOpen(false)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle sx={{ bgcolor: 'success.main', color: 'white' }}>
-          <Box display="flex" alignItems="center" gap={1}>
-            <PlayArrow />
-            <Typography variant="h6">Xác nhận Hoạt động lại</Typography>
-          </Box>
-        </DialogTitle>
-        <DialogContent sx={{ mt: 2 }}>
-          <Alert severity="success" sx={{ mb: 2 }}>
-            <Typography variant="body2">
-              Bạn đang chuẩn bị khôi phục hoạt động cho connector{' '}
-              <strong>{selectedSession?.connectorCode}</strong>
-            </Typography>
-          </Alert>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Sau khi xác nhận, connector sẽ chuyển sang trạng thái "Sẵn sàng" và khách hàng có thể sử dụng trở lại.
-          </Typography>
-          <Box sx={{ p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>
-            <Typography variant="body2">
-              <strong>Thông tin connector:</strong>
-            </Typography>
-            <Typography variant="body2">
-              • Mã: {selectedSession?.connectorCode}
-            </Typography>
-            <Typography variant="body2">
-              • Loại: {selectedSession?.connectorType}
-            </Typography>
-            <Typography variant="body2">
-              • Công suất: {selectedSession?.maxPower} kW
-            </Typography>
-          </Box>
-        </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setResumeDialogOpen(false)} variant="outlined">
-            Hủy
-          </Button>
-          <Button 
-            onClick={confirmResumeFromMaintenance} 
-            variant="contained"
-            color="success"
-            startIcon={<PlayArrow />}
-          >
-            Xác nhận hoạt động lại
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-=======
->>>>>>> origin/develop
       {/* Snackbar Notification */}
       <Snackbar
         open={snackbar.open}

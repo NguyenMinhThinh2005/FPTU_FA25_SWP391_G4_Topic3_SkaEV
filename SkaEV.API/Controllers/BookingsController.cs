@@ -15,26 +15,16 @@ namespace SkaEV.API.Controllers;
 public class BookingsController : BaseApiController
 {
     private readonly IBookingService _bookingService;
-    private readonly IStationNotificationService _notificationService;
     private readonly ILogger<BookingsController> _logger;
 
-<<<<<<< HEAD
-    public BookingsController(
-        IBookingService bookingService, 
-        IStationNotificationService notificationService,
-        ILogger<BookingsController> logger, 
-        IWebHostEnvironment env)
-=======
     /// <summary>
     /// Constructor nhận vào BookingService và Logger thông qua Dependency Injection.
     /// </summary>
     /// <param name="bookingService">Service đặt chỗ.</param>
     /// <param name="logger">Logger hệ thống.</param>
     public BookingsController(IBookingService bookingService, ILogger<BookingsController> logger)
->>>>>>> origin/develop
     {
         _bookingService = bookingService;
-        _notificationService = notificationService;
         _logger = logger;
     }
 
@@ -208,34 +198,7 @@ public class BookingsController : BaseApiController
             return BadRequestResponse("Failed to start charging");
         }
 
-<<<<<<< HEAD
-            // 🔥 Get booking details để broadcast SignalR
-            var bookingDetails = await _bookingService.GetBookingByIdAsync(id);
-            if (bookingDetails != null)
-            {
-                _logger.LogInformation(
-                    "📡 Broadcasting charging started - Booking {BookingId}, Station {StationId}, Slot {SlotId}",
-                    id, bookingDetails.StationId, bookingDetails.SlotId);
-
-                // Broadcast real-time notification to Staff Dashboard
-                await _notificationService.NotifyChargingStarted(
-                    bookingId: id,
-                    stationId: bookingDetails.StationId,
-                    slotId: bookingDetails.SlotId,
-                    connectorCode: bookingDetails.SlotNumber ?? "N/A"
-                );
-            }
-
-            return Ok(new { message = "Charging started successfully" });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error starting charging for booking {BookingId}", id);
-            return StatusCode(500, new { message = "An error occurred" });
-        }
-=======
         return OkResponse(new { message = "Charging started successfully" });
->>>>>>> origin/develop
     }
 
     /// <summary>
@@ -254,32 +217,9 @@ public class BookingsController : BaseApiController
             return BadRequestResponse("Invalid booking ID format");
         }
 
-<<<<<<< HEAD
-            // 🔥 Get booking details để broadcast SignalR
-            var completedBooking = await _bookingService.GetBookingByIdAsync(id);
-            if (completedBooking != null)
-            {
-                _logger.LogInformation(
-                    "📡 Broadcasting charging completed - Booking {BookingId}, Station {StationId}, Slot {SlotId}",
-                    id, completedBooking.StationId, completedBooking.SlotId);
-
-                // Broadcast real-time notification to Staff Dashboard
-                await _notificationService.NotifyChargingCompleted(
-                    bookingId: id,
-                    stationId: completedBooking.StationId,
-                    slotId: completedBooking.SlotId,
-                    connectorCode: completedBooking.SlotNumber ?? "N/A"
-                );
-            }
-
-            return Ok(new { message = "Charging completed successfully" });
-        }
-        catch (Exception ex)
-=======
         // Kiểm tra quyền: User chỉ có thể hoàn thành đặt chỗ của chính mình.
         // Admin và Staff có thể hoàn thành bất kỳ đặt chỗ nào.
         if (CurrentUserRole != Roles.Admin && CurrentUserRole != Roles.Staff)
->>>>>>> origin/develop
         {
             var booking = await _bookingService.GetBookingByIdAsync(bookingId);
             if (booking == null)

@@ -29,7 +29,6 @@ const useAuthStore = create(
             user_id: response.userId,
             email: response.email,
             full_name: response.fullName,
-            phone_number: response.phoneNumber || null,
             role: response.role.toLowerCase(), // Normalize role to lowercase
           };
 
@@ -218,17 +217,6 @@ const useAuthStore = create(
         set({ user: userData });
       },
 
-<<<<<<< HEAD
-      updateProfile: (profileData) => {
-        const currentUser = get().user;
-        if (currentUser) {
-          set({
-            user: {
-              ...currentUser,
-              ...profileData,
-            },
-          });
-=======
       updateProfile: async (profileData) => {
         const currentUser = get().user;
         if (!currentUser) {
@@ -264,7 +252,6 @@ const useAuthStore = create(
             error:
               error.response?.data?.message || error.message || "Network error",
           };
->>>>>>> origin/develop
         }
       },
 

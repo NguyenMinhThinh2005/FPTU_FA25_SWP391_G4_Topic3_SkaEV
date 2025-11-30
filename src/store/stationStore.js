@@ -19,32 +19,17 @@ const transformStationData = (apiStation, slotsData = null) => {
       const postMap = new Map();
 
       slotsData.forEach((slot) => {
-        // Backend returns maxPower instead of powerKw
-        const powerKw = slot.powerKw || slot.maxPower || 0;
         const postId = slot.chargingPostId || slot.postId;
-<<<<<<< HEAD
-        const postNumber = slot.postNumber || `POST-${postId}`;
-        
-=======
         const slotPower = Number(slot.maxPower ?? slot.powerKw ?? 0);
         const connectorFromDb = slot.connectorType ?? undefined;
         const slotConnector =
           connectorFromDb ?? (slotPower >= 50 ? "DC" : "AC");
         const isDc =
           (slotConnector || "").toUpperCase().includes("DC") || slotPower >= 50;
->>>>>>> origin/develop
         if (!postMap.has(postId)) {
           postMap.set(postId, {
             id: `${apiStation.stationId}-post${postId}`,
             poleId: `${apiStation.stationId}-post${postId}`,
-<<<<<<< HEAD
-            name: postNumber,
-            poleNumber: postId,
-            type: powerKw >= 50 ? "DC" : "AC",
-            power: powerKw,
-            voltage: powerKw >= 50 ? 400 : 220,
-            status: slot.status || "active",
-=======
             name: slot.postNumber
               ? `Trụ ${slot.postNumber}`
               : `Trụ sạc ${postId}`,
@@ -53,7 +38,6 @@ const transformStationData = (apiStation, slotsData = null) => {
             power: slotPower,
             voltage: isDc ? 400 : 220,
             status: slot.status || "available",
->>>>>>> origin/develop
             ports: [],
             totalPorts: 0,
             availablePorts: 0,
@@ -65,14 +49,6 @@ const transformStationData = (apiStation, slotsData = null) => {
           id: `${apiStation.stationId}-slot${slot.slotId}`,
           portId: `${apiStation.stationId}-slot${slot.slotId}`,
           slotId: slot.slotId,
-<<<<<<< HEAD
-          portNumber: slot.slotNumber || slot.slotId,
-          connectorType:
-            slot.connectorType || (powerKw >= 50 ? "CCS2" : "Type 2"),
-          maxPower: powerKw,
-          status: slot.status === "available" ? "available" : "occupied",
-          currentRate: powerKw >= 50 ? 5000 : 3000,
-=======
           portNumber: slot.slotNumber ?? slot.slotId,
           connectorType: slotConnector,
           maxPower: slotPower,
@@ -81,7 +57,6 @@ const transformStationData = (apiStation, slotsData = null) => {
               ? "available"
               : "occupied",
           currentRate: null,
->>>>>>> origin/develop
         });
         post.power = Math.max(post.power, slotPower);
         post.status = slot.status || post.status;
@@ -233,18 +208,6 @@ const transformStationData = (apiStation, slotsData = null) => {
             phone: managerPhone ?? null,
           }
         : null;
-<<<<<<< HEAD
-    
-    // Debug log to check final values
-    console.log(`🔍 Station ${apiStation.stationId} - Final values:`, {
-      totalPoles: totalPolesCount,
-      availablePoles,
-      totalPorts,
-      availablePorts: availablePorts,
-      polesCount: poles.length
-    });
-    
-=======
 
     // Normalize and expose a few canonical metrics for UI and services
     const occupied = Math.max(
@@ -258,7 +221,6 @@ const transformStationData = (apiStation, slotsData = null) => {
         ? Math.max(0, totalPorts - availablePorts)
         : 0;
 
->>>>>>> origin/develop
     return {
       id: apiStation.stationId,
       stationId: apiStation.stationId,
@@ -401,28 +363,11 @@ const useStationStore = create((set, get) => ({
         console.log("📊 Raw stations from API:", rawStations.length);
 
         // Transform API data to frontend format
-        // Try to fetch slots for each station to get real-time data
+        // First pass: transform without slots data
         const stations = await Promise.all(
           rawStations.map(async (station) => {
             try {
               // Try to fetch slots for each station
-<<<<<<< HEAD
-              // axios interceptor returns response.data, so slotsResponse = {success: true, data: [...]}
-              const slotsResponse = await stationsAPI.getStationSlots(station.stationId);
-              
-              // Extract slots array from response
-              const slotsData = slotsResponse?.data || [];
-              
-              if (Array.isArray(slotsData) && slotsData.length > 0) {
-                console.log(`✅ Loaded ${slotsData.length} slots for station ${station.stationId} (${station.stationName})`);
-                return transformStationData(station, slotsData);
-              } else {
-                console.warn(`⚠️ No slots data for station ${station.stationId}, using station totals`);
-                return transformStationData(station, null);
-              }
-            } catch (slotError) {
-              console.warn(`⚠️ Could not fetch slots for station ${station.stationId}:`, slotError.message);
-=======
               console.log(
                 `🔌 Fetching slots for station ${station.stationId}...`
               );
@@ -439,7 +384,6 @@ const useStationStore = create((set, get) => ({
                 `⚠️ Could not fetch slots for station ${station.stationId}, using fallback:`,
                 slotError.message
               );
->>>>>>> origin/develop
               return transformStationData(station, null);
             }
           })
@@ -463,9 +407,7 @@ const useStationStore = create((set, get) => ({
       const errorMessage = error.message || "Đã xảy ra lỗi khi tải trạm sạc";
       console.error("❌ Fetch stations error:", errorMessage);
       console.error("❌ Full error:", error);
-      
-      // IMPORTANT: Do NOT clear existing stations on error - preserve current data
-      set({ error: errorMessage, loading: false });
+      set({ error: errorMessage, loading: false, stations: [] });
       return { success: false, error: errorMessage };
     }
   },

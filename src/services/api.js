@@ -134,19 +134,16 @@ export const authAPI = {
   },
 
   getProfile: () => {
-    return axiosInstance.get("/UserProfiles/me");
+    return axiosInstance.get("/auth/profile");
   },
 
   updateProfile: (profileData) => {
     return axiosInstance.put("/UserProfiles/me", profileData);
-<<<<<<< HEAD
-=======
   },
 
   // Get user statistics
   getStatistics: () => {
     return axiosInstance.get("/UserProfiles/me/statistics");
->>>>>>> origin/develop
   },
 };
 

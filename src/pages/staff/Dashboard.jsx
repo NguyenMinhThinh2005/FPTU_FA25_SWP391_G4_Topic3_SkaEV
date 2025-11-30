@@ -13,16 +13,6 @@ import {
   Chip,
   Divider,
   Stack,
-<<<<<<< HEAD
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogContentText,
-  DialogActions,
-  TextField,
-  CircularProgress,
-=======
->>>>>>> origin/develop
 } from "@mui/material";
 import {
   ElectricCar,
@@ -37,14 +27,7 @@ import {
   Bolt,
   AccessTime,
   MonetizationOn,
-  Cancel,
-  Construction,
 } from "@mui/icons-material";
-<<<<<<< HEAD
-import staffAPI from "../../services/api/staffAPI";
-import signalRService from "../../services/signalRService"; // 🔥 Import SignalR
-=======
->>>>>>> origin/develop
 
 const StaffDashboard = () => {
   const navigate = useNavigate();
@@ -55,60 +38,9 @@ const StaffDashboard = () => {
     revenue: 0,
     completedSessions: 0,
     energyConsumed: 0,
-    activeSessions: 0,
   });
   const [alerts, setAlerts] = useState([]);
   const [error, setError] = useState(null);
-<<<<<<< HEAD
-
-  // Dialog states for Maintenance only
-  const [maintenanceDialog, setMaintenanceDialog] = useState({ open: false, connector: null });
-  const [actionLoading, setActionLoading] = useState(false);
-  const [actionReason, setActionReason] = useState('');
-  const [maintenanceDuration, setMaintenanceDuration] = useState(2);
-
-  // 🔥 SignalR real-time updates
-  useEffect(() => {
-    const initSignalR = async () => {
-      try {
-        if (!signalRService.isConnected()) {
-          await signalRService.connect();
-          console.log('✅ Dashboard: SignalR connected');
-        }
-
-        // Subscribe to station if assigned
-        if (stationInfo?.id) {
-          await signalRService.subscribeToStation(stationInfo.id);
-          console.log(`✅ Dashboard: Subscribed to Station ${stationInfo.id}`);
-        }
-
-        // Listen for charging updates from Customer
-        const unsubscribeCharging = signalRService.onChargingUpdate((data) => {
-          console.log('🔌 Dashboard: Charging update received:', data);
-          
-          // Reload dashboard data để cập nhật UI
-          loadDashboardData();
-        });
-
-        // Listen for station updates
-        const unsubscribeStation = signalRService.onStationUpdate((data) => {
-          console.log('📡 Dashboard: Station update received:', data);
-          loadDashboardData();
-        });
-
-        return () => {
-          unsubscribeCharging();
-          unsubscribeStation();
-        };
-      } catch (err) {
-        console.error('❌ Dashboard: SignalR connection error:', err);
-      }
-    };
-
-    initSignalR();
-  }, [stationInfo?.id]);
-=======
->>>>>>> origin/develop
 
   useEffect(() => {
     loadDashboardData();
@@ -119,7 +51,6 @@ const StaffDashboard = () => {
     setError(null);
     try {
       const response = await staffAPI.getDashboardOverview();
-      console.log("📊 Dashboard API Response:", response);
 
       if (!response || typeof response !== "object") {
         throw new Error("Không nhận được dữ liệu dashboard");
@@ -133,9 +64,6 @@ const StaffDashboard = () => {
         dailyStats: dailyStatsPayload,
         alerts: alertPayload = [],
       } = response;
-
-      console.log("📈 Daily Stats from API:", dailyStatsPayload);
-      console.log("🔌 Connectors from API:", connectorPayload);
 
       if (hasAssignment && station) {
         setStationInfo({
@@ -155,66 +83,15 @@ const StaffDashboard = () => {
         : [];
       setConnectors(normalizedConnectors);
 
-      // Calculate comprehensive stats
-      let calculatedStats = {
-        revenue: 0,
-        completedSessions: 0,
-        energyConsumed: 0,
-        activeSessions: 0,
-      };
-
-      // Start with API stats if provided
       if (dailyStatsPayload) {
-        calculatedStats.revenue = Number(dailyStatsPayload.revenue || 0);
-        calculatedStats.completedSessions = Number(dailyStatsPayload.completedSessions || 0);
-        calculatedStats.energyConsumed = Number(dailyStatsPayload.energyDeliveredKwh || 0);
-        calculatedStats.activeSessions = Number(dailyStatsPayload.activeSessions || 0);
+        setDailyStats({
+          revenue: Number(dailyStatsPayload.revenue || 0),
+          completedSessions: Number(dailyStatsPayload.completedSessions || 0),
+          energyConsumed: Number(dailyStatsPayload.energyDeliveredKwh || 0),
+        });
+      } else {
+        setDailyStats({ revenue: 0, completedSessions: 0, energyConsumed: 0 });
       }
-
-      // Calculate current active sessions from connectors
-      let currentActiveSessions = 0;
-      let currentActiveEnergy = 0;
-      let currentActiveRevenue = 0;
-
-      normalizedConnectors.forEach((connector) => {
-        console.log("🔍 Checking connector:", connector.code, "hasActiveSession:", !!connector.activeSession);
-        // Use activeSession (from backend) instead of currentSession
-        if (connector.activeSession) {
-          currentActiveSessions += 1;
-          const session = connector.activeSession;
-          console.log("  ✅ Active session found:", session);
-          
-          // Calculate energy consumed from SOC change or direct value
-          const energyKwh = Number(session.energyConsumed || session.energyConsumedKwh || session.energyDelivered || 0);
-          currentActiveEnergy += energyKwh;
-          
-          // Calculate revenue based on energy and rate
-          const rate = Number(session.unitPrice || 5000); // Default rate VND/kWh
-          currentActiveRevenue += energyKwh * rate;
-        }
-      });
-
-      console.log("📊 Calculated from connectors:", {
-        activeSessions: currentActiveSessions,
-        energy: currentActiveEnergy,
-        revenue: currentActiveRevenue
-      });
-
-      // Update stats with current active data
-      calculatedStats.activeSessions = currentActiveSessions;
-      
-      // Add active session energy to total (if not already counted in dailyStats)
-      if (!dailyStatsPayload || dailyStatsPayload.energyDeliveredKwh === 0) {
-        calculatedStats.energyConsumed += currentActiveEnergy;
-      }
-
-      // If no revenue from API, use calculated from active sessions
-      if (calculatedStats.revenue === 0 && currentActiveRevenue > 0) {
-        calculatedStats.revenue = currentActiveRevenue;
-      }
-
-      console.log("✅ Final calculated stats:", calculatedStats);
-      setDailyStats(calculatedStats);
 
       const normalizedAlerts = Array.isArray(alertPayload)
         ? alertPayload.map((alert) => ({
@@ -264,57 +141,6 @@ const StaffDashboard = () => {
     return "info";
   };
 
-  // ==================== CONNECTOR CONTROL HANDLERS ====================
-
-  const handleMaintenanceClick = (connector) => {
-    setMaintenanceDialog({ open: true, connector });
-    setActionReason(`Bảo trì định kỳ connector ${connector.code}`);
-    setMaintenanceDuration(2);
-  };
-
-
-  const handleMaintenanceConfirm = async () => {
-    const { connector } = maintenanceDialog;
-    if (!connector || !connector.slotId) {
-      alert('Không tìm thấy thông tin connector');
-      return;
-    }
-
-    setActionLoading(true);
-    try {
-      // Update slot status to maintenance
-      await staffAPI.updateSlotStatus(
-        connector.slotId, 
-        'maintenance', 
-        `${actionReason} (Dự kiến: ${maintenanceDuration}h)`
-      );
-      
-      // Close dialog
-      setMaintenanceDialog({ open: false, connector: null });
-      setActionReason('');
-      setMaintenanceDuration(2);
-
-      // Show success message
-      alert(`✅ Đã chuyển connector ${connector.id || connector.code} sang chế độ bảo trì`);
-
-      // Reload dashboard to reflect changes
-      await loadDashboardData();
-    } catch (error) {
-      console.error('Maintenance mode failed:', error);
-      alert(`❌ Lỗi khi chuyển sang bảo trì: ${error.response?.data?.message || error.message}`);
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleDialogClose = () => {
-    if (!actionLoading) {
-      setMaintenanceDialog({ open: false, connector: null });
-      setActionReason('');
-      setMaintenanceDuration(2);
-    }
-  };
-
   const mapConnectorForDisplay = (connector) => {
     if (!connector) return null;
 
@@ -356,7 +182,6 @@ const StaffDashboard = () => {
 
     return {
       id: connector.connectorCode || `SLOT-${connector.slotId}`,
-      code: connector.connectorCode || `SLOT-${connector.slotId}`, // For display in dialogs
       slotId: connector.slotId,
       type: connector.connectorType,
       maxPower: Number(connector.maxPower || 0),
@@ -367,8 +192,7 @@ const StaffDashboard = () => {
       voltage: connector.voltage,
       current: connector.current,
       temperature: connector.temperature,
-      activeSession: currentSession, // Store as activeSession for consistency
-      currentSession, // Keep for backward compatibility
+      currentSession,
     };
   };
 
@@ -422,27 +246,22 @@ const StaffDashboard = () => {
         </Alert>
       )}
 
-      {/* Statistics Cards - 4 chỉ số chính */}
+      {/* Statistics Cards - THAY THẾ VÀ SẮP XẾP LẠI CÁC CHỈ SỐ */}
       <Grid container spacing={3} mb={3}>
         {/* Doanh thu hôm nay */}
         <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ 
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            color: 'white',
-            height: '100%',
-            minHeight: 140
-          }}>
-            <CardContent sx={{ height: '100%', display: 'flex', alignItems: 'center' }}>
-              <Box display="flex" alignItems="center" justifyContent="space-between" width="100%">
-                <Box flex={1}>
-                  <Typography variant="body2" sx={{ opacity: 0.9, mb: 1, fontSize: '0.875rem' }}>
+          <Card>
+            <CardContent>
+              <Box display="flex" alignItems="center" gap={2}>
+                <MonetizationOn color="success" sx={{ fontSize: 40 }} />
+                <Box>
+                  <Typography variant="h4" fontWeight="bold" color="success.main">
+                    {Number(dailyStats.revenue || 0).toLocaleString()}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
                     Doanh thu hôm nay (VNĐ)
                   </Typography>
-                  <Typography variant="h4" fontWeight="bold" sx={{ fontSize: { xs: '1.75rem', md: '2.125rem' } }}>
-                    {Number(dailyStats.revenue || 0).toLocaleString('vi-VN')}
-                  </Typography>
                 </Box>
-                <MonetizationOn sx={{ fontSize: { xs: 40, md: 48 }, opacity: 0.8, ml: 1 }} />
               </Box>
             </CardContent>
           </Card>
@@ -450,23 +269,18 @@ const StaffDashboard = () => {
 
         {/* Phiên hoàn thành */}
         <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ 
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            color: 'white',
-            height: '100%',
-            minHeight: 140
-          }}>
-            <CardContent sx={{ height: '100%', display: 'flex', alignItems: 'center' }}>
-              <Box display="flex" alignItems="center" justifyContent="space-between" width="100%">
-                <Box flex={1}>
-                  <Typography variant="body2" sx={{ opacity: 0.9, mb: 1, fontSize: '0.875rem' }}>
+          <Card>
+            <CardContent>
+              <Box display="flex" alignItems="center" gap={2}>
+                <CheckCircle color="primary" sx={{ fontSize: 40 }} />
+                <Box>
+                  <Typography variant="h4" fontWeight="bold" color="primary.main">
+                    {dailyStats.completedSessions}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
                     Phiên hoàn thành
                   </Typography>
-                  <Typography variant="h4" fontWeight="bold" sx={{ fontSize: { xs: '1.75rem', md: '2.125rem' } }}>
-                    {Number(dailyStats.completedSessions || 0).toLocaleString('vi-VN')}
-                  </Typography>
                 </Box>
-                <CheckCircle sx={{ fontSize: { xs: 40, md: 48 }, opacity: 0.8, ml: 1 }} />
               </Box>
             </CardContent>
           </Card>
@@ -474,47 +288,37 @@ const StaffDashboard = () => {
 
         {/* Năng lượng tiêu thụ */}
         <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ 
-            background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-            color: 'white',
-            height: '100%',
-            minHeight: 140
-          }}>
-            <CardContent sx={{ height: '100%', display: 'flex', alignItems: 'center' }}>
-              <Box display="flex" alignItems="center" justifyContent="space-between" width="100%">
-                <Box flex={1}>
-                  <Typography variant="body2" sx={{ opacity: 0.9, mb: 1, fontSize: '0.875rem' }}>
-                    Năng lượng tiêu thụ (kWh)
-                  </Typography>
-                  <Typography variant="h4" fontWeight="bold" sx={{ fontSize: { xs: '1.75rem', md: '2.125rem' } }}>
+          <Card>
+            <CardContent>
+              <Box display="flex" alignItems="center" gap={2}>
+                <Bolt color="warning" sx={{ fontSize: 40 }} />
+                <Box>
+                  <Typography variant="h4" fontWeight="bold" color="warning.main">
                     {Number(dailyStats.energyConsumed || 0).toFixed(1)}
                   </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Năng lượng tiêu thụ (kWh)
+                  </Typography>
                 </Box>
-                <Bolt sx={{ fontSize: { xs: 40, md: 48 }, opacity: 0.8, ml: 1 }} />
               </Box>
             </CardContent>
           </Card>
         </Grid>
 
-        {/* Số lượng Xe đang sạc */}
+        {/* Số lượng Xe đang sạc - Thay thế "Tích hợp bình chỗ sạc" */}
         <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ 
-            background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-            color: 'white',
-            height: '100%',
-            minHeight: 140
-          }}>
-            <CardContent sx={{ height: '100%', display: 'flex', alignItems: 'center' }}>
-              <Box display="flex" alignItems="center" justifyContent="space-between" width="100%">
-                <Box flex={1}>
-                  <Typography variant="body2" sx={{ opacity: 0.9, mb: 1, fontSize: '0.875rem' }}>
+          <Card>
+            <CardContent>
+              <Box display="flex" alignItems="center" gap={2}>
+                <BatteryChargingFull color="info" sx={{ fontSize: 40 }} />
+                <Box>
+                  <Typography variant="h4" fontWeight="bold" color="info.main">
+                    {chargingConnectors}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
                     Số lượng Xe đang sạc
                   </Typography>
-                  <Typography variant="h4" fontWeight="bold" sx={{ fontSize: { xs: '1.75rem', md: '2.125rem' } }}>
-                    {Number(dailyStats.activeSessions || chargingConnectors || 0).toLocaleString('vi-VN')}
-                  </Typography>
                 </Box>
-                <BatteryChargingFull sx={{ fontSize: { xs: 40, md: 48 }, opacity: 0.8, ml: 1 }} />
               </Box>
             </CardContent>
           </Card>
@@ -637,36 +441,16 @@ const StaffDashboard = () => {
                       <Typography variant="subtitle1" fontWeight={600} color={textColor}>
                         {statusText}
                       </Typography>
-                      {(connector.activeSession || connector.currentSession) && (
+                      {connector.currentSession && (
                         <Box mt={1}>
                           <Typography variant="body2" color="text.secondary">
-                            Phiên: {(connector.activeSession || connector.currentSession).id}
+                            Phiên: {connector.currentSession.id}
                           </Typography>
                           <Typography variant="body2" color="text.secondary">
-                            Khách: {(connector.activeSession || connector.currentSession).customerName}
+                            SOC: {connector.currentSession.vehicleSOC}%
                           </Typography>
-                          {(connector.activeSession || connector.currentSession).vehicleSOC && (
-                            <Typography variant="body2" color="text.secondary">
-                              SOC: {(connector.activeSession || connector.currentSession).vehicleSOC}%
-                            </Typography>
-                          )}
                         </Box>
                       )}
-
-                      {/* Control Buttons */}
-                      <Box mt="auto" pt={2} display="flex" gap={1} flexDirection="column">
-                        <Button
-                          variant="outlined"
-                          color="warning"
-                          size="small"
-                          startIcon={<Construction />}
-                          onClick={() => handleMaintenanceClick(connector)}
-                          disabled={connector.status === 'Unavailable' || connector.status === 'Faulted'}
-                          fullWidth
-                        >
-                          Bảo trì
-                        </Button>
-                      </Box>
                     </CardContent>
                   </Card>
                 </Grid>
@@ -675,63 +459,6 @@ const StaffDashboard = () => {
           </Grid>
         </CardContent>
       </Card>
-
-      {/* Maintenance Dialog */}
-      <Dialog
-        open={maintenanceDialog.open}
-        onClose={handleDialogClose}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle sx={{ bgcolor: 'warning.main', color: 'white' }}>
-          <Construction sx={{ mr: 1, verticalAlign: 'middle' }} />
-          Chuyển sang Chế độ Bảo trì
-        </DialogTitle>
-        <DialogContent sx={{ mt: 2 }}>
-          <DialogContentText sx={{ mb: 2 }}>
-            Chuyển connector <strong>{maintenanceDialog.connector?.code}</strong> sang chế độ bảo trì
-          </DialogContentText>
-          <Alert severity="warning" sx={{ mb: 2 }}>
-            <AlertTitle>Lưu ý</AlertTitle>
-            - Connector sẽ không khả dụng<br />
-            - Khách hàng sẽ thấy trạng thái "Đang bảo trì"<br />
-            - Sự cố sẽ được tự động tạo trong hệ thống
-          </Alert>
-          <TextField
-            label="Lý do bảo trì"
-            value={actionReason}
-            onChange={(e) => setActionReason(e.target.value)}
-            multiline
-            rows={3}
-            fullWidth
-            required
-            placeholder="Vui lòng mô tả công việc bảo trì..."
-            sx={{ mb: 2 }}
-          />
-          <TextField
-            label="Thời gian dự kiến (giờ)"
-            type="number"
-            value={maintenanceDuration}
-            onChange={(e) => setMaintenanceDuration(Number(e.target.value))}
-            fullWidth
-            inputProps={{ min: 0.5, max: 48, step: 0.5 }}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleDialogClose} disabled={actionLoading}>
-            Hủy
-          </Button>
-          <Button
-            onClick={handleMaintenanceConfirm}
-            variant="contained"
-            color="warning"
-            disabled={actionLoading || !actionReason.trim()}
-            startIcon={actionLoading ? <CircularProgress size={20} /> : <Construction />}
-          >
-            {actionLoading ? 'Đang xử lý...' : 'Xác nhận'}
-          </Button>
-        </DialogActions>
-      </Dialog>
     </Box>
   );
 };

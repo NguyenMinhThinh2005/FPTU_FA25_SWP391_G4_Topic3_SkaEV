@@ -249,23 +249,14 @@ public class StaffIssuesController : BaseApiController
     }
 
     /// <summary>
-<<<<<<< HEAD
-    /// Delete an issue (Admin/Staff) - Only issues with admin response can be deleted
-=======
     /// Xóa một sự cố (Chỉ Admin).
->>>>>>> origin/develop
     /// </summary>
     /// <param name="id">ID sự cố.</param>
     /// <returns>Kết quả xóa.</returns>
     [HttpDelete("{id}")]
-<<<<<<< HEAD
-    [Authorize(Roles = "admin,staff")]
-=======
     [Authorize(Roles = Roles.Admin)]
->>>>>>> origin/develop
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> DeleteIssue(int id)
     {
         var existingIssue = await _issueService.GetIssueDetailAsync(id);
@@ -273,27 +264,8 @@ public class StaffIssuesController : BaseApiController
         if (existingIssue == null)
             return NotFoundResponse("Issue not found");
 
-<<<<<<< HEAD
-            // Check if issue has admin response (Resolution or admin comment)
-            var hasAdminResponse = await _issueService.HasAdminResponseAsync(id);
-
-            if (!hasAdminResponse)
-            {
-                return StatusCode(403, new { message = "Chỉ có thể xóa báo cáo đã có phản hồi từ admin" });
-            }
-
-            await _issueService.DeleteIssueAsync(id);
-            return NoContent();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error deleting issue {Id}", id);
-            return StatusCode(500, new { message = "An error occurred" });
-        }
-=======
         await _issueService.DeleteIssueAsync(id);
         return OkResponse<object>(new { }, "Issue deleted successfully");
->>>>>>> origin/develop
     }
 
     /// <summary>

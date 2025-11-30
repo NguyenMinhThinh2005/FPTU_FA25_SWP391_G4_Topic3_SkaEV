@@ -6,51 +6,19 @@ using System.Text;
 using SkaEV.API.Infrastructure.Data;
 using SkaEV.API.Application.Options;
 using SkaEV.API.Application.Services;
-<<<<<<< HEAD
-using SkaEV.API.Hubs;
-=======
 using SkaEV.API.Application.Services.Payments;
 // using SkaEV.API.Hubs; // Uncomment when Hubs are implemented
->>>>>>> origin/develop
 using Serilog;
 using Serilog.Events;
 using VNPAY.Extensions;
 
 namespace SkaEV.API;
 
-<<<<<<< HEAD
-// Configure Serilog - Simple HTTP logging only
-Log.Logger = new LoggerConfiguration()
-    .MinimumLevel.Information()
-    .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
-    .MinimumLevel.Override("Microsoft.EntityFrameworkCore", LogEventLevel.Error)
-    .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
-    .Enrich.FromLogContext()
-    .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}")
-    .WriteTo.File("logs/skaev-.txt", rollingInterval: RollingInterval.Day)
-    .CreateLogger();
-
-builder.Host.UseSerilog();
-
-// Add services to the container
-builder.Services.AddControllers()
-    .AddNewtonsoftJson(options =>
-    {
-        options.SerializerSettings.ReferenceLoopHandling = Newtonsoft.Json.ReferenceLoopHandling.Ignore;
-        options.SerializerSettings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
-        // Use camelCase for JSON property names (JavaScript convention)
-        options.SerializerSettings.ContractResolver = new Newtonsoft.Json.Serialization.CamelCasePropertyNamesContractResolver();
-    });
-
-// Configure Database
-builder.Services.AddDbContext<SkaEVDbContext>(options =>
-=======
 /// <summary>
 /// Main entry point for the SkaEV API application.
 /// Configures services, middleware pipeline, and starts the web host.
 /// </summary>
 public partial class Program
->>>>>>> origin/develop
 {
     /// <summary>
     /// Application entry point.
@@ -110,98 +78,8 @@ public partial class Program
         // Bind "GoogleMaps" section to strong-typed options class
         builder.Services.Configure<GoogleMapsOptions>(builder.Configuration.GetSection(GoogleMapsOptions.SectionName));
 
-<<<<<<< HEAD
-builder.Services.AddAuthentication(options =>
-{
-    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-})
-.AddJwtBearer(options =>
-{
-    options.RequireHttpsMetadata = false; // Set to true in production
-    options.SaveToken = true;
-    options.TokenValidationParameters = new TokenValidationParameters
-    {
-        ValidateIssuerSigningKey = true,
-        IssuerSigningKey = new SymmetricSecurityKey(key),
-        ValidateIssuer = false,
-        ValidateAudience = false,
-        ValidateLifetime = true,
-        ClockSkew = TimeSpan.Zero
-    };
-});
-
-builder.Services.AddAuthorization();
-
-// Configure CORS (with SignalR support)
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowFrontend", policy =>
-    {
-        policy.WithOrigins(
-            "http://localhost:5173",
-            "http://localhost:3000",
-            "http://localhost:5174",
-            "http://localhost:5175",
-            "http://localhost:5176"
-        )
-        .AllowAnyHeader()
-        .AllowAnyMethod()
-        .AllowCredentials()
-        .SetIsOriginAllowed(_ => true); // For SignalR compatibility
-    });
-});
-
-// Register Services
-builder.Services.AddScoped<IAuthService, AuthService>();
-builder.Services.AddScoped<IStationService, StationService>();
-builder.Services.AddScoped<IBookingService, BookingService>();
-builder.Services.AddScoped<IPaymentMethodService, PaymentMethodService>();
-builder.Services.AddScoped<IReportService, ReportService>();
-builder.Services.AddScoped<IStaffDashboardService, StaffDashboardService>();
-
-// New Services
-builder.Services.AddScoped<IInvoiceService, InvoiceService>();
-builder.Services.AddScoped<IVehicleService, VehicleService>();
-builder.Services.AddScoped<IReviewService, ReviewService>();
-builder.Services.AddScoped<INotificationService, NotificationService>();
-builder.Services.AddScoped<IQRCodeService, QRCodeService>();
-builder.Services.AddScoped<IPostService, PostService>();
-builder.Services.AddScoped<ISlotService, SlotService>();
-builder.Services.AddScoped<IUserProfileService, UserProfileService>();
-builder.Services.AddScoped<IAdminUserService, AdminUserService>();
-builder.Services.AddScoped<IIssueService, IssueService>(); // Optional - requires 08_ADD_ISSUES_TABLE.sql
-builder.Services.AddScoped<IncidentService>(); // Incident management service
-builder.Services.AddScoped<StationAnalyticsService>(); // Station analytics service
-
-// Real-time SignalR Notification Service
-builder.Services.AddScoped<IStationNotificationService, StationNotificationService>();
-
-// Admin Management Services
-builder.Services.AddScoped<IAdminStationManagementService, AdminStationManagementService>();
-// Temporarily commented out - services not implemented yet
-// builder.Services.AddScoped<IMonitoringService, MonitoringService>(); // Real-time monitoring
-// builder.Services.AddScoped<IDemandForecastingService, DemandForecastingService>(); // AI demand forecasting
-// builder.Services.AddScoped<IAdvancedAnalyticsService, AdvancedAnalyticsService>(); // Advanced ML analytics
-
-// Background Simulation Services (for student project demo) - DISABLED to prevent crashes
-// builder.Services.AddHostedService<SkaEV.API.Services.ChargingSimulationService>();
-// builder.Services.AddHostedService<SkaEV.API.Services.SystemEventsSimulationService>();
-
-// Configure Swagger
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c =>
-{
-    c.SwaggerDoc("v1", new OpenApiInfo
-    {
-        Title = "SkaEV API",
-        Version = "v1",
-        Description = "Electric Vehicle Charging Station Management System API",
-        Contact = new OpenApiContact
-=======
         // === Database Context Configuration ===
         builder.Services.AddDbContext<SkaEVDbContext>(options =>
->>>>>>> origin/develop
         {
             var connectionString = _defaultConnectionString;
             if (string.IsNullOrWhiteSpace(connectionString))
@@ -528,50 +406,3 @@ builder.Services.AddSwaggerGen(c =>
         #endregion
     }
 }
-<<<<<<< HEAD
-
-// Disable HTTPS redirection in development for easier testing
-// app.UseHttpsRedirection();
-
-// IMPORTANT: CORS must be before Authentication/Authorization
-app.UseCors("AllowFrontend");
-
-app.UseSerilogRequestLogging();
-
-app.UseAuthentication();
-app.UseAuthorization();
-
-app.MapControllers();
-
-app.MapHealthChecks("/health");
-
-// Map SignalR Hub for real-time updates
-app.MapHub<StationMonitoringHub>("/hubs/station-monitoring");
-
-try
-{
-    Log.Information("Starting SkaEV API...");
-    Log.Information("Environment: {0}", app.Environment.EnvironmentName);
-
-    // Start the application asynchronously
-    _ = app.RunAsync();
-
-    Log.Information("Backend is now running. Press ENTER to stop...");
-
-    // Keep console alive
-    Console.ReadLine();
-
-    // Initiate shutdown
-    await app.StopAsync();
-}
-catch (Exception ex)
-{
-    Log.Fatal(ex, "SkaEV API terminated unexpectedly!");
-}
-finally
-{
-    Log.Information("Shutting down...");
-    await Log.CloseAndFlushAsync();
-}
-=======
->>>>>>> origin/develop

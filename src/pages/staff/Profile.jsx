@@ -6,12 +6,13 @@ import {
   CardContent,
   Typography,
   TextField,
+  Button,
   Avatar,
   Divider,
+  Switch,
+  FormControlLabel,
   Chip,
   Alert,
-<<<<<<< HEAD
-=======
   Tab,
   Tabs,
   List,
@@ -19,32 +20,26 @@ import {
   ListItemText,
   ListItemSecondaryAction,
   IconButton,
->>>>>>> origin/develop
   CircularProgress,
 } from "@mui/material";
 import {
   Person,
+  Edit,
+  Save,
+  Cancel,
+  Security,
   Work,
   Badge,
   Phone,
   Email,
   LocationOn,
   CalendarToday,
-  Info,
 } from "@mui/icons-material";
 import staffAPI from "../../services/api/staffAPI";
 import useAuthStore from "../../store/authStore";
 import { authAPI } from "../../services/api.js";
 
 const StaffProfile = () => {
-<<<<<<< HEAD
-  const [loading, setLoading] = useState(true);
-  
-  // Get user from authStore
-  const { user: authUser } = useAuthStore();
-  
-  // State for profile data
-=======
   const [editMode, setEditMode] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saveMessage, setSaveMessage] = useState(null);
@@ -53,7 +48,6 @@ const StaffProfile = () => {
   
   // Get user from authStore
   const { user: authUser, updateProfile: updateAuthProfile } = useAuthStore();
->>>>>>> origin/develop
   const [profileData, setProfileData] = useState({
     firstName: "",
     lastName: "",
@@ -66,11 +60,6 @@ const StaffProfile = () => {
     location: "",
     avatar: "",
   });
-<<<<<<< HEAD
-  
-  // State for work statistics
-=======
->>>>>>> origin/develop
   const [workStats, setWorkStats] = useState({
     totalStationsManaged: 0,
     maintenanceCompleted: 0,
@@ -78,31 +67,6 @@ const StaffProfile = () => {
     totalConnectors: 0,
   });
 
-<<<<<<< HEAD
-  const loadStaffProfile = useCallback(async () => {
-    setLoading(true);
-    try {
-      console.log("📋 Loading profile - Auth User from store:", authUser);
-
-      // Get user profile from backend API to get phone number and other details
-      let userProfileData = null;
-      try {
-        const profileResponse = await authAPI.getProfile();
-        console.log("🔍 Full Profile API Response:", profileResponse);
-        
-        // Backend returns data directly (not wrapped in .data)
-        userProfileData = profileResponse.data || profileResponse;
-        console.log("👤 User Profile Data from API:", userProfileData);
-        console.log("📞 PhoneNumber field from API:", userProfileData?.PhoneNumber || userProfileData?.phoneNumber);
-      } catch (error) {
-        console.error("⚠️ Could not load user profile:", error);
-        console.error("⚠️ Error response:", error.response?.data);
-      }
-
-      // Get dashboard data for work stats
-      const dashboardData = await staffAPI.getDashboardOverview();
-      console.log("📊 Dashboard Data:", dashboardData);
-=======
   // Mock data for certifications and activities
   const certifications = [];
   const recentActivities = [];
@@ -199,82 +163,11 @@ const StaffProfile = () => {
       console.log("🔄 AuthUser data changed, profile will reload automatically");
     }
   }, [authUser?.full_name, authUser?.phone_number]);
->>>>>>> origin/develop
 
-      // Set profile data from API response (preferred) or authStore user (fallback)
-      if (authUser) {
-        console.log("✓ Parsing name from:", authUser.full_name);
-        
-        // Parse full name into first and last name
-        const fullName = (userProfileData?.fullName || authUser.full_name || "").trim();
-        const nameParts = fullName.split(" ");
-        const lastName = nameParts.pop() || ""; // Last word is the last name (Tên)
-        const firstName = nameParts.join(" ") || ""; // Rest is first name + middle name (Họ và tên đệm)
+  const handleTabChange = (event, newValue) => {
+    setTabValue(newValue);
+  };
 
-<<<<<<< HEAD
-        console.log("✓ Parsed - firstName:", firstName, "lastName:", lastName);
-        
-        // Backend returns PhoneNumber (capital P) not phoneNumber
-        const phoneFromAPI = userProfileData?.PhoneNumber || userProfileData?.phoneNumber;
-        console.log("📞 Phone from profile API:", phoneFromAPI);
-        console.log("📞 Phone from authUser:", authUser.phone_number);
-
-        setProfileData({
-          firstName: firstName,
-          lastName: lastName,
-          email: userProfileData?.Email || userProfileData?.email || authUser.email || "",
-          phone: phoneFromAPI || authUser.phone_number || "",
-          employeeId: (userProfileData?.UserId || userProfileData?.userId || authUser.user_id) ? `ST${String(userProfileData?.UserId || userProfileData?.userId || authUser.user_id).padStart(3, '0')}` : "",
-          department: userProfileData?.department || "Vận hành",
-          position: userProfileData?.position || "Kỹ thuật viên trạm sạc",
-          joinDate: (() => {
-            // Get the raw date value
-            const rawDate = userProfileData?.CreatedAt || userProfileData?.createdAt || authUser.created_at || "2025-01-15";
-            // Format to DD-MM-YYYY
-            const dateObj = new Date(rawDate);
-            const day = String(dateObj.getDate()).padStart(2, '0');
-            const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-            const year = dateObj.getFullYear();
-            return `${day}-${month}-${year}`;
-          })(),
-          location: userProfileData?.location || dashboardData?.station?.city || "Hồ Chí Minh",
-          avatar: userProfileData?.AvatarUrl || userProfileData?.avatarUrl || authUser.avatar || authUser.profile_image || "",
-        });
-      }
-
-      // Calculate work stats from dashboard
-      if (dashboardData) {
-        const stats = dashboardData.dailyStats || {};
-        
-        // Total stations managed (the assigned station)
-        const totalStations = dashboardData.station ? 1 : 0;
-        
-        // Completed sessions today
-        const completedToday = stats.completedSessions || 0;
-        
-        // Active sessions right now
-        const activeNow = stats.activeSessions || 0;
-        
-        setWorkStats({
-          totalStationsManaged: totalStations,
-          maintenanceCompleted: completedToday,
-          activeSessionsNow: activeNow,
-          totalConnectors: dashboardData.connectors?.length || 0,
-        });
-      }
-
-    } catch (error) {
-      console.error("❌ Error loading staff profile:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, [authUser]);
-
-  // Load staff profile data on mount
-  useEffect(() => {
-    loadStaffProfile();
-  }, [loadStaffProfile]);
-=======
   const handleProfileChange = (field, value) => {
     setProfileData({ ...profileData, [field]: value });
     // Clear any previous save messages when user makes changes
@@ -345,7 +238,6 @@ const StaffProfile = () => {
       setLoading(false);
     }
   };
->>>>>>> origin/develop
 
   return (
     <Box sx={{ p: 3 }}>
@@ -365,12 +257,6 @@ const StaffProfile = () => {
         </Box>
       ) : (
         <>
-<<<<<<< HEAD
-          {/* Info Alert - Staff can only view */}
-          <Alert severity="info" icon={<Info />} sx={{ mb: 3 }}>
-            Thông tin cá nhân và công việc chỉ có thể được chỉnh sửa bởi quản trị viên. Nếu bạn cần cập nhật thông tin, vui lòng liên hệ admin.
-          </Alert>
-=======
           {/* Success/Error Messages */}
           {saveMessage && (
             <Alert severity="success" sx={{ mb: 3 }} onClose={() => setSaveMessage(null)}>
@@ -382,7 +268,6 @@ const StaffProfile = () => {
               {saveError}
             </Alert>
           )}
->>>>>>> origin/develop
 
           {/* Profile Overview Card */}
           <Card sx={{ mb: 3 }}>
@@ -414,8 +299,6 @@ const StaffProfile = () => {
                     color="primary"
                   />
                 </Box>
-<<<<<<< HEAD
-=======
                 <Button
                   startIcon={editMode ? <Save /> : <Edit />}
                   variant={editMode ? "contained" : "outlined"}
@@ -435,7 +318,6 @@ const StaffProfile = () => {
                     Hủy
                   </Button>
                 )}
->>>>>>> origin/develop
               </Box>
 
               {/* Quick Stats - CHỈ 4 CHỈ SỐ THỰC TẾ */}
@@ -496,17 +378,10 @@ const StaffProfile = () => {
                   fullWidth
                   label="Họ"
                   value={profileData.firstName}
-<<<<<<< HEAD
-                  disabled
-                  InputProps={{
-                    readOnly: true,
-                  }}
-=======
                   onChange={(e) =>
                     handleProfileChange("firstName", e.target.value)
                   }
                   disabled={!editMode}
->>>>>>> origin/develop
                 />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -514,17 +389,10 @@ const StaffProfile = () => {
                   fullWidth
                   label="Tên"
                   value={profileData.lastName}
-<<<<<<< HEAD
-                  disabled
-                  InputProps={{
-                    readOnly: true,
-                  }}
-=======
                   onChange={(e) =>
                     handleProfileChange("lastName", e.target.value)
                   }
                   disabled={!editMode}
->>>>>>> origin/develop
                 />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -533,15 +401,9 @@ const StaffProfile = () => {
                 label="Email"
                 type="email"
                 value={profileData.email}
-<<<<<<< HEAD
-                disabled
-                InputProps={{
-                  readOnly: true,
-=======
                 onChange={(e) => handleProfileChange("email", e.target.value)}
                 disabled
                 InputProps={{
->>>>>>> origin/develop
                   startAdornment: (
                     <Email sx={{ mr: 1, color: "text.secondary" }} />
                   ),
@@ -553,15 +415,9 @@ const StaffProfile = () => {
                 fullWidth
                 label="Số điện thoại"
                 value={profileData.phone}
-<<<<<<< HEAD
-                disabled
-                InputProps={{
-                  readOnly: true,
-=======
                 onChange={(e) => handleProfileChange("phone", e.target.value)}
                 disabled={!editMode}
                 InputProps={{
->>>>>>> origin/develop
                   startAdornment: (
                     <Phone sx={{ mr: 1, color: "text.secondary" }} />
                   ),
@@ -573,17 +429,11 @@ const StaffProfile = () => {
                 fullWidth
                 label="Địa điểm"
                 value={profileData.location}
-<<<<<<< HEAD
-                disabled
-                InputProps={{
-                  readOnly: true,
-=======
                 onChange={(e) =>
                   handleProfileChange("location", e.target.value)
                 }
                 disabled
                 InputProps={{
->>>>>>> origin/develop
                   startAdornment: (
                     <LocationOn sx={{ mr: 1, color: "text.secondary" }} />
                   ),
@@ -597,10 +447,6 @@ const StaffProfile = () => {
                 value={profileData.joinDate}
                 disabled
                 InputProps={{
-<<<<<<< HEAD
-                  readOnly: true,
-=======
->>>>>>> origin/develop
                   startAdornment: (
                     <CalendarToday sx={{ mr: 1, color: "text.secondary" }} />
                   ),
@@ -622,10 +468,6 @@ const StaffProfile = () => {
                 value={profileData.employeeId}
                 disabled
                 InputProps={{
-<<<<<<< HEAD
-                  readOnly: true,
-=======
->>>>>>> origin/develop
                   startAdornment: (
                     <Badge sx={{ mr: 1, color: "text.secondary" }} />
                   ),
@@ -639,10 +481,6 @@ const StaffProfile = () => {
                 value={profileData.department}
                 disabled
                 InputProps={{
-<<<<<<< HEAD
-                  readOnly: true,
-=======
->>>>>>> origin/develop
                   startAdornment: (
                     <Work sx={{ mr: 1, color: "text.secondary" }} />
                   ),
@@ -656,10 +494,6 @@ const StaffProfile = () => {
                 value={profileData.position}
                 disabled
                 InputProps={{
-<<<<<<< HEAD
-                  readOnly: true,
-=======
->>>>>>> origin/develop
                   startAdornment: (
                     <Work sx={{ mr: 1, color: "text.secondary" }} />
                   ),
@@ -669,12 +503,6 @@ const StaffProfile = () => {
           </Grid>
         </CardContent>
       </Card>
-<<<<<<< HEAD
-        </>
-      )}
-    </Box>
-  );
-=======
 
       {/* Tabs */}
       <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
@@ -894,7 +722,6 @@ const StaffProfile = () => {
     )}
   </Box>
 );
->>>>>>> origin/develop
 };
 
 export default StaffProfile;

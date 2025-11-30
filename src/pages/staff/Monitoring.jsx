@@ -2,7 +2,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import staffAPI from "../../services/api/staffAPI";
-import signalRService from "../../services/signalRService"; // 🔥 Import SignalR
 import {
   Box,
   Typography,
@@ -31,9 +30,6 @@ import {
   IconButton,
   Snackbar,
   Stack,
-  Divider,
-  Tooltip,
-  Collapse,
 } from "@mui/material";
 import {
   Warning,
@@ -44,42 +40,7 @@ import {
   Error,
   PowerOff,
   Build,
-  Info,
-  Schedule,
-  HourglassEmpty,
-  Delete,
-  KeyboardArrowDown,
-  KeyboardArrowUp,
 } from "@mui/icons-material";
-
-const ExpandableDesc = ({ text }) => {
-  const [expanded, setExpanded] = useState(false);
-  const shouldTruncate = text && text.length > 50;
-
-  return (
-    <Box
-      onClick={() => shouldTruncate && setExpanded(!expanded)}
-      sx={{
-        cursor: shouldTruncate ? "pointer" : "default",
-        "&:hover": {
-          backgroundColor: shouldTruncate ? "rgba(0, 0, 0, 0.04)" : "transparent",
-        },
-        borderRadius: 1,
-        p: 0.5,
-        maxWidth: 300,
-      }}
-    >
-      <Typography variant="body2" noWrap={!expanded} sx={{ whiteSpace: expanded ? 'pre-wrap' : 'nowrap' }}>
-        {text}
-      </Typography>
-      {shouldTruncate && (
-        <Typography variant="caption" color="primary" sx={{ display: "block", mt: 0.5 }}>
-          {expanded ? "Thu gọn" : "Xem thêm"}
-        </Typography>
-      )}
-    </Box>
-  );
-};
 
 const Monitoring = () => {
   const location = useLocation();
@@ -97,8 +58,6 @@ const Monitoring = () => {
     description: "",
     attachments: [],
   });
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [issueToDelete, setIssueToDelete] = useState(null);
 
   const incidentTypes = [
     { value: "hardware", label: "Lỗi Phần cứng Thiết bị" },
@@ -115,88 +74,30 @@ const Monitoring = () => {
     { value: "urgent", label: "Khẩn cấp", color: "error" },
   ];
 
-  // 🔥 SignalR real-time updates
-  useEffect(() => {
-    const initSignalR = async () => {
-      try {
-        if (!signalRService.isConnected()) {
-          await signalRService.connect();
-          console.log('✅ Monitoring: SignalR connected');
-        }
-
-        // Listen for charging updates from Customer
-        const unsubscribeCharging = signalRService.onChargingUpdate((data) => {
-          console.log('🔌 Monitoring: Charging update received:', data);
-          loadMonitoringData(); // Reload để cập nhật connector status
-        });
-
-        // Listen for station updates
-        const unsubscribeStation = signalRService.onStationUpdate((data) => {
-          console.log('📡 Monitoring: Station update received:', data);
-          loadMonitoringData();
-        });
-
-        return () => {
-          unsubscribeCharging();
-          unsubscribeStation();
-        };
-      } catch (err) {
-        console.error('❌ Monitoring: SignalR connection error:', err);
-      }
-    };
-
-    initSignalR();
-  }, []);
-
   useEffect(() => {
     loadMonitoringData();
-    
-    // Auto-refresh every 30 seconds for real-time updates
-    const refreshInterval = setInterval(() => {
-      loadMonitoringData();
-    }, 30000); // 30 seconds
-
     // Handle navigation state
     if (location.state?.action === "report" && location.state?.connectorId) {
       setReportForm((prev) => ({ ...prev, connectorId: location.state.connectorId }));
       setReportDialog(true);
     }
-
-    // Cleanup interval on component unmount
-    return () => clearInterval(refreshInterval);
   }, [location.state]);
 
   const mapSlotStatus = (status = "") => {
-    const normalized = (status || "").toString().toLowerCase().trim();
+    const normalized = status.toLowerCase();
     switch (normalized) {
       case "available":
-      case "rảnh":
-      case "sẵn sàng":
         return { technical: "online", operational: "Sẵn sàng" };
       case "occupied":
       case "charging":
-      case "in_use":
-      case "đang sạc":
-      case "đang hoạt động":
         return { technical: "online", operational: "Đang hoạt động" };
       case "maintenance":
-      case "bảo trì":
-      case "đang bảo trì":
         return { technical: "offline", operational: "Bảo trì" };
       case "faulted":
       case "error":
-      case "offline":
-      case "lỗi":
-      case "lỗi/offline":
         return { technical: "offline", operational: "Lỗi" };
-      case "unavailable":
-      case "không khả dụng":
-        return { technical: "offline", operational: "Không khả dụng" };
-      case "reserved":
-      case "đã giữ chỗ":
-        return { technical: "online", operational: "Đã giữ chỗ" };
       default:
-        return { technical: "unknown", operational: normalized || "Không rõ" };
+        return { technical: "unknown", operational: "Không rõ" };
     }
   };
 
@@ -219,116 +120,62 @@ const Monitoring = () => {
 
   const loadMonitoringData = async () => {
     try {
-      // Load dashboard data to get assigned station
-      const dashboardData = await staffAPI.getDashboardOverview();
-      console.log("📊 Dashboard data:", dashboardData);
+      const stations = await staffAPI.getStationsStatus();
+      const stationList = Array.isArray(stations) ? stations : [];
 
-      if (!dashboardData.hasAssignment || !dashboardData.station) {
-        setSnackbar({
-          open: true,
-          message: "Bạn chưa được phân công quản lý trạm nào. Vui lòng liên hệ quản trị viên.",
-          severity: "warning",
-        });
-        setConnectors([]);
-        setIncidents([]);
-        return;
-      }
-
-      const assignedStation = dashboardData.station;
-
-      // Load all issues for the assigned station
-      const issues = await staffAPI.getAllIssues({ stationId: assignedStation.stationId });
-      const issueList = Array.isArray(issues) ? issues : [];
-      
-      console.log("📊 Issues loaded from API:", issueList);
-      
-      // Build a map of CONNECTORS with active issues (not whole stations)
-      // Note: Since issues are station-level (no specific connector/slot ID in Issue table),
-      // we check if ANY connector at this station has an active issue
-      const hasStationActiveIssues = issueList.some(
-        issue => issue.status && !['resolved', 'closed'].includes(issue.status.toLowerCase())
+      const connectorsByStation = await Promise.all(
+        stationList.map(async (station) => {
+          const slots = await staffAPI.getStationSlots(station.stationId);
+          return slots.map((slot) => {
+            const status = mapSlotStatus(slot.status);
+            return {
+              id: `ST${station.stationId}-P${slot.postNumber}-S${slot.slotNumber}`,
+              stationId: station.stationId,
+              stationName: station.stationName,
+              slotId: slot.slotId,
+              postId: slot.postId,
+              postNumber: slot.postNumber,
+              slotNumber: slot.slotNumber,
+              type: slot.connectorType || "Không rõ",
+              maxPower: slot.maxPower || 0,
+              status: status.technical,
+              operationalStatus: status.operational,
+              currentPower: slot.currentPowerUsage ?? null,
+              currentSoc: slot.currentSoc ?? null,
+              currentUser: slot.currentUserName ?? null,
+              bookingStart: slot.bookingStartTime ? new Date(slot.bookingStartTime) : null,
+            };
+          });
+        })
       );
 
-      console.log("🚨 Station has active issues:", hasStationActiveIssues);
+      const connectorsData = connectorsByStation.flat();
 
-      // Load slots from dashboard connectors (already loaded with active sessions)
-      
-      console.log("🔌 Dashboard connectors:", dashboardData.connectors);
-      
-      const connectorsData = dashboardData.connectors.map((connector) => {
-        console.log(`🔍 Processing connector ${connector.connectorCode}:`, {
-          technicalStatus: connector.technicalStatus,
-          operationalStatus: connector.operationalStatus,
-          status: connector.status,
-          statusLabel: connector.statusLabel,
-          currentSession: connector.currentSession,
-          activeSession: connector.activeSession
-        });
-        
-        // Use the status from Dashboard directly (already mapped in Dashboard)
-        const rawStatus = connector.operationalStatus || connector.technicalStatus || connector.statusLabel || connector.status || "Unknown";
-        
-        // Use actual status from backend (don't override based on station-level issues)
-        const actualStatus = rawStatus;
-        const status = mapSlotStatus(actualStatus);
-        
-        console.log(`  → Mapped status:`, { rawStatus, actualStatus, result: status });
-        console.log(`  → Session data:`, { 
-          hasCurrentSession: !!connector.currentSession, 
-          hasActiveSession: !!connector.activeSession,
-          customerName: connector.currentSession?.customerName || connector.activeSession?.customerName,
-          energyConsumed: connector.currentSession?.energyConsumed || connector.activeSession?.energyConsumed
-        });
-        
-        return {
-          id: connector.connectorCode || connector.id || `SLOT-${connector.slotId}`,
-          stationId: assignedStation.stationId,
-          stationName: assignedStation.stationName,
-          slotId: connector.slotId,
-          postId: null,
-          postNumber: null,
-          slotNumber: null,
-          type: connector.type || connector.connectorType || "Không rõ",
-          maxPower: connector.maxPower || 0,
-          status: status.technical,
-          operationalStatus: status.operational,
-          currentPower: connector.currentSession?.energyConsumed ?? connector.activeSession?.energyConsumed ?? null,
-          currentSoc: connector.currentSession?.vehicleSOC ?? connector.activeSession?.vehicleSOC ?? null,
-          currentUser: connector.currentSession?.customerName ?? connector.activeSession?.customerName ?? null,
-          bookingStart: connector.currentSession?.startTime ?? connector.activeSession?.startTime ?? null,
-          hasActiveIssue: false, // Don't override connector status - use actual status from backend
-        };
-      });
+  const issues = await staffAPI.getAllIssues();
+
+  const issueList = Array.isArray(issues) ? issues : [];
 
       const incidentsData = issueList.map((issue) => {
         const status = mapIssueStatus(issue.status);
         const resolvedAt = issue.resolvedAt ? new Date(issue.resolvedAt) : null;
-        const updatedAt = issue.updatedAt ? new Date(issue.updatedAt) : null;
-        const reportedAt = issue.reportedAt ? new Date(issue.reportedAt) : (issue.createdAt ? new Date(issue.createdAt) : new Date());
-        const resolution = issue.resolution ?? null;
+        const resolution = issue.resolution ?? (resolvedAt ? `Hoàn tất lúc ${resolvedAt.toLocaleString("vi-VN")}` : null);
         const priority = (issue.priority || "medium").toLowerCase();
 
         return {
           id: issue.issueId,
-          chargerId: issue.deviceCode || (issue.postName ? `Post ${issue.postName}` : `ST-${issue.stationId}`),
-          connectorId: issue.deviceCode || (issue.postName ? `${issue.stationName} · Post ${issue.postName}` : `ST${issue.stationId}`),
+          connectorId: issue.postName ? `${issue.stationName} · Post ${issue.postName}` : `ST${issue.stationId}`,
           type: issue.title || "Sự cố",
           priority,
           description: issue.description,
           status: status.key,
           statusLabel: status.label,
           stationName: issue.stationName,
-          stationId: issue.stationId,
           assignedTo: issue.assignedToUserName,
           reportedBy: issue.reportedByUserName,
-          reportedAt: reportedAt,
-          updatedAt: updatedAt,
-          resolvedAt: resolvedAt,
+          reportedAt: new Date(issue.createdAt),
           adminResponse: resolution,
         };
       });
-
-      console.log("📋 Processed incidents data:", incidentsData);
 
       setConnectors(connectorsData);
       setIncidents(incidentsData);
@@ -360,18 +207,14 @@ const Monitoring = () => {
       }
 
       const issueData = {
-        StationId: targetConnector.stationId,
-        PostId: targetConnector.postId,
-        DeviceCode: targetConnector.id, // Send the full connector code
-        Title: incidentTypes.find((t) => t.value === reportForm.incidentType)?.label || "Sự cố kỹ thuật",
-        Description: reportForm.description,
-        Priority: reportForm.priority,
+        stationId: targetConnector.stationId,
+        postId: targetConnector.postId,
+        title: incidentTypes.find((t) => t.value === reportForm.incidentType)?.label || "Sự cố kỹ thuật",
+        description: reportForm.description,
+        priority: reportForm.priority,
       };
 
-      console.log("📝 Submitting issue data:", issueData);
-
       const result = await staffAPI.createIssue(issueData);
-      console.log("✅ Issue created:", result);
       
       // Upload attachments if any
       if (reportForm.attachments.length > 0 && result.issueId) {
@@ -405,31 +248,6 @@ const Monitoring = () => {
         message: error.response?.data?.message || "Lỗi gửi báo cáo", 
         severity: "error" 
       });
-    }
-  };
-
-  const handleDeleteClick = (issue) => {
-    setIssueToDelete(issue);
-    setDeleteConfirmOpen(true);
-  };
-
-  const handleDeleteConfirm = async () => {
-    if (!issueToDelete) return;
-
-    try {
-      await staffAPI.deleteIssue(issueToDelete.id);
-      setSnackbar({ open: true, message: "Đã xóa báo cáo sự cố", severity: "success" });
-      loadMonitoringData();
-    } catch (error) {
-      console.error("Failed to delete issue:", error);
-      setSnackbar({ 
-        open: true, 
-        message: error.response?.data?.message || "Không thể xóa báo cáo. Có thể bạn không có quyền.", 
-        severity: "error" 
-      });
-    } finally {
-      setDeleteConfirmOpen(false);
-      setIssueToDelete(null);
     }
   };
 
@@ -564,18 +382,6 @@ const Monitoring = () => {
         </Grid>
       </Grid>
 
-      {/* Active Issues Alert */}
-      {incidents.filter(i => !['resolved', 'closed'].includes(i.status.toLowerCase())).length > 0 && (
-        <Alert severity="warning" icon={<Warning />} sx={{ mb: 3 }}>
-          <Typography variant="body1" fontWeight={600}>
-            Cảnh báo: Có {incidents.filter(i => !['resolved', 'closed'].includes(i.status.toLowerCase())).length} sự cố đang chờ xử lý tại trạm này
-          </Typography>
-          <Typography variant="body2">
-            Vui lòng kiểm tra phần "Lịch sử Báo cáo Sự cố" bên dưới để xem chi tiết và theo dõi tiến độ xử lý.
-          </Typography>
-        </Alert>
-      )}
-
       {/* Connector Status Table */}
       <Typography variant="h5" fontWeight={600} mb={2}>
         Tình trạng Điểm sạc
@@ -619,10 +425,6 @@ const Monitoring = () => {
                         label={connector.operationalStatus}
                         size="small"
                         variant="outlined"
-                        color="default"
-                        size="small"
-                        variant="outlined"
-                        color="default"
                       />
                     </TableCell>
                     <TableCell align="right">
@@ -669,29 +471,6 @@ const Monitoring = () => {
       </Typography>
       <Card>
         <CardContent>
-<<<<<<< HEAD
-          {incidents.length === 0 ? (
-            <Box sx={{ textAlign: 'center', py: 4 }}>
-              <Typography variant="body1" color="text.secondary">
-                Chưa có báo cáo sự cố nào
-              </Typography>
-            </Box>
-          ) : (
-            <TableContainer component={Paper}>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Mã sự cố</TableCell>
-                    <TableCell>Trạm</TableCell>
-                    <TableCell>Loại sự cố</TableCell>
-                    <TableCell>Mô tả</TableCell>
-                    <TableCell align="center">Ưu tiên</TableCell>
-                    <TableCell align="center">Trạng thái</TableCell>
-                    <TableCell>Mã điểm sạc</TableCell>
-                    <TableCell>Phản hồi Admin</TableCell>
-                    <TableCell>Thời gian báo cáo</TableCell>
-                    <TableCell align="center">Hành động</TableCell>
-=======
           <TableContainer component={Paper}>
             <Table>
               <TableHead>
@@ -746,88 +525,11 @@ const Monitoring = () => {
                       )}
                     </TableCell>
                     <TableCell>{incident.reportedAt.toLocaleString("vi-VN")}</TableCell>
->>>>>>> origin/develop
                   </TableRow>
-                </TableHead>
-                <TableBody>
-                  {incidents.map((incident) => (
-                    <TableRow key={incident.id} hover>
-                      <TableCell fontWeight={600}>#{incident.id}</TableCell>
-                      <TableCell>{incident.stationName || incident.connectorId}</TableCell>
-                      <TableCell>{incident.type}</TableCell>
-                      <TableCell>
-                        <ExpandableDesc text={incident.description} />
-                      </TableCell>
-                      <TableCell align="center">
-                        <Chip
-                          label={priorityLevels.find((p) => p.value === incident.priority)?.label || 'Trung bình'}
-                          color={priorityLevels.find((p) => p.value === incident.priority)?.color || 'default'}
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell align="center">
-                        <Chip 
-                          label={incident.statusLabel} 
-                          color={
-                            incident.status === "completed" ? "success" : 
-                            incident.status === "in_progress" ? "info" : 
-                            "warning"
-                          }
-                          size="small" 
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" fontWeight={600}>
-                          {incident.chargerId}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        {incident.adminResponse ? (
-                          <Button
-                            size="small"
-                            variant="contained"
-                            color="primary"
-                            onClick={() => handleViewDetail(incident)}
-                          >
-                            Xem phản hồi
-                          </Button>
-                        ) : (
-                          <Typography variant="body2" color="text.secondary" fontStyle="italic">
-                            Đang chờ xử lý...
-                          </Typography>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2">
-                          {incident.reportedAt.toLocaleDateString("vi-VN")}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {incident.reportedAt.toLocaleTimeString("vi-VN")}
-                        </Typography>
-                      </TableCell>
-                      <TableCell align="center">
-                        {incident.adminResponse ? (
-                          <Tooltip title="Xóa báo cáo">
-                            <IconButton 
-                              color="error" 
-                              size="small"
-                              onClick={() => handleDeleteClick(incident)}
-                            >
-                              <Delete />
-                            </IconButton>
-                          </Tooltip>
-                        ) : (
-                          <Typography variant="caption" color="text.secondary" fontStyle="italic">
-                            Chưa thể xóa
-                          </Typography>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          )}
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
         </CardContent>
       </Card>
 
@@ -847,7 +549,7 @@ const Monitoring = () => {
                   >
                     {connectors.map((c) => (
                       <MenuItem key={c.id} value={c.id}>
-                        {c.stationName} · {c.id} ({c.type} {c.maxPower}kW)
+                        {c.stationName} · Post {c.postNumber} · Slot {c.slotNumber} ({c.type} {c.maxPower}kW)
                       </MenuItem>
                     ))}
                   </Select>
@@ -933,18 +635,17 @@ const Monitoring = () => {
         </DialogTitle>
         <DialogContent dividers>
           {selectedIncident && (
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <Box>
               {/* Thông tin báo cáo */}
-              <Card variant="outlined">
+              <Card sx={{ mb: 2, bgcolor: "grey.50" }}>
                 <CardContent>
-                  <Typography variant="h6" fontWeight="bold" gutterBottom color="primary" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Info /> Thông tin Báo cáo
+                  <Typography variant="h6" fontWeight="bold" gutterBottom color="primary">
+                    Thông tin Báo cáo
                   </Typography>
-                  <Divider sx={{ mb: 2 }} />
                   <Grid container spacing={2}>
                     <Grid item xs={6}>
                       <Typography variant="caption" color="text.secondary">Mã sự cố:</Typography>
-                      <Typography variant="body1" fontWeight={600}>#{selectedIncident.id}</Typography>
+                      <Typography variant="body1" fontWeight={600}>{selectedIncident.id}</Typography>
                     </Grid>
                     <Grid item xs={6}>
                       <Typography variant="caption" color="text.secondary">Trạm:</Typography>
@@ -961,13 +662,11 @@ const Monitoring = () => {
                     <Grid item xs={6}>
                       <Typography variant="caption" color="text.secondary">Mức độ ưu tiên:</Typography>
                       <Chip
-                        label={priorityLevels.find((p) => p.value === selectedIncident.priority)?.label || 'Trung bình'}
-                        color={priorityLevels.find((p) => p.value === selectedIncident.priority)?.color || 'default'}
+                        label={priorityLevels.find((p) => p.value === selectedIncident.priority)?.label}
+                        color={priorityLevels.find((p) => p.value === selectedIncident.priority)?.color}
                         size="small"
                       />
                     </Grid>
-<<<<<<< HEAD
-=======
                     <Grid item xs={12}>
                       <Typography variant="caption" color="text.secondary">Mô tả:</Typography>
                       <Typography variant="body1">{selectedIncident.description}</Typography>
@@ -980,28 +679,9 @@ const Monitoring = () => {
                         size="small" 
                       />
                     </Grid>
->>>>>>> origin/develop
                     <Grid item xs={6}>
                       <Typography variant="caption" color="text.secondary">Người báo cáo:</Typography>
                       <Typography variant="body1">{selectedIncident.reportedBy || "Không rõ"}</Typography>
-                    </Grid>
-                    <Grid item xs={12}>
-                      <Typography variant="caption" color="text.secondary">Mô tả chi tiết:</Typography>
-                      <Paper variant="outlined" sx={{ p: 2, mt: 1, bgcolor: 'grey.50' }}>
-                        <Typography variant="body1">{selectedIncident.description}</Typography>
-                      </Paper>
-                    </Grid>
-                    <Grid item xs={6}>
-                      <Typography variant="caption" color="text.secondary">Trạng thái:</Typography>
-                      <Chip 
-                        label={selectedIncident.statusLabel} 
-                        color={
-                          selectedIncident.status === "resolved" || selectedIncident.status === "closed" ? "success" : 
-                          selectedIncident.status === "in_progress" ? "info" : 
-                          "warning"
-                        }
-                        size="small" 
-                      />
                     </Grid>
                     <Grid item xs={6}>
                       <Typography variant="caption" color="text.secondary">Người phụ trách:</Typography>
@@ -1009,66 +689,23 @@ const Monitoring = () => {
                     </Grid>
                     <Grid item xs={6}>
                       <Typography variant="caption" color="text.secondary">Thời gian báo cáo:</Typography>
-                      <Typography variant="body2">
-                        {selectedIncident.reportedAt.toLocaleDateString("vi-VN")}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {selectedIncident.reportedAt.toLocaleTimeString("vi-VN")}
+                      <Typography variant="body1">
+                        {selectedIncident.reportedAt.toLocaleString("vi-VN")}
                       </Typography>
                     </Grid>
-                    {selectedIncident.updatedAt && selectedIncident.updatedAt.getTime() !== selectedIncident.reportedAt.getTime() && (
-                      <Grid item xs={6}>
-                        <Typography variant="caption" color="text.secondary">Cập nhật lần cuối:</Typography>
-                        <Typography variant="body2">
-                          {selectedIncident.updatedAt.toLocaleDateString("vi-VN")}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {selectedIncident.updatedAt.toLocaleTimeString("vi-VN")}
-                        </Typography>
-                      </Grid>
-                    )}
-                    {selectedIncident.resolvedAt && (
-                      <Grid item xs={6}>
-                        <Typography variant="caption" color="text.secondary">Giải quyết lúc:</Typography>
-                        <Typography variant="body2" color="success.main" fontWeight={600}>
-                          {selectedIncident.resolvedAt.toLocaleDateString("vi-VN")}
-                        </Typography>
-                        <Typography variant="caption" color="success.main">
-                          {selectedIncident.resolvedAt.toLocaleTimeString("vi-VN")}
-                        </Typography>
-                      </Grid>
-                    )}
                   </Grid>
                 </CardContent>
               </Card>
 
               {/* Phản hồi của Admin */}
-              {selectedIncident.adminResponse ? (
-                <Card variant="outlined" sx={{ bgcolor: "success.50", borderColor: 'success.main' }}>
+              {selectedIncident.adminResponse && (
+                <Card sx={{ bgcolor: "success.50" }}>
                   <CardContent>
-                    <Typography variant="h6" fontWeight="bold" gutterBottom color="success.main" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <CheckCircle /> Phản hồi từ Admin
+                    <Typography variant="h6" fontWeight="bold" gutterBottom color="success.main">
+                      Phản hồi từ Admin
                     </Typography>
-                    <Divider sx={{ mb: 2, borderColor: 'success.main' }} />
-                    <Alert severity="success" variant="outlined" sx={{ mb: 2 }}>
-                      <Typography variant="body1" fontWeight={500}>{selectedIncident.adminResponse}</Typography>
-                    </Alert>
-                    {selectedIncident.assignedTo && (
-                      <Typography variant="caption" color="text.secondary">
-                        Được xử lý bởi: <strong>{selectedIncident.assignedTo}</strong>
-                      </Typography>
-                    )}
-                  </CardContent>
-                </Card>
-              ) : (
-                <Card variant="outlined" sx={{ bgcolor: "warning.50", borderColor: 'warning.main' }}>
-                  <CardContent>
-                    <Typography variant="h6" fontWeight="bold" gutterBottom color="warning.main" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <HourglassEmpty /> Chờ phản hồi
-                    </Typography>
-                    <Divider sx={{ mb: 2, borderColor: 'warning.main' }} />
-                    <Alert severity="warning" variant="outlined">
-                      <Typography variant="body1">Sự cố đang được xử lý, vui lòng chờ phản hồi từ quản trị viên.</Typography>
+                    <Alert severity="success" sx={{ mt: 1 }}>
+                      <Typography variant="body1">{selectedIncident.adminResponse}</Typography>
                     </Alert>
                   </CardContent>
                 </Card>
@@ -1078,26 +715,6 @@ const Monitoring = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDetailDialog(false)}>Đóng</Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Delete Confirmation Dialog */}
-      <Dialog
-        open={deleteConfirmOpen}
-        onClose={() => setDeleteConfirmOpen(false)}
-      >
-        <DialogTitle>Xác nhận xóa</DialogTitle>
-        <DialogContent>
-          <Typography>
-            Bạn có chắc chắn muốn xóa báo cáo sự cố #{issueToDelete?.id} không?
-            Hành động này không thể hoàn tác.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteConfirmOpen(false)}>Hủy</Button>
-          <Button onClick={handleDeleteConfirm} color="error" variant="contained">
-            Xóa
-          </Button>
         </DialogActions>
       </Dialog>
 
