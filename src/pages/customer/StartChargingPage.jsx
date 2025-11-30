@@ -38,7 +38,7 @@ import QRCodeScannerV2 from '../../components/ui/QRCodeScanner/QRCodeScannerV2';
 const StartChargingPage = () => {
   const navigate = useNavigate();
   const [showScanner, setShowScanner] = useState(true);
-  const [scannedData, setScannedData] = useState(null);
+  // scannedData was removed since it's not used elsewhere; scanner flow manages UI directly
   const [errorModal, setErrorModal] = useState(null);
   const [isStarting, setIsStarting] = useState(false);
 
@@ -67,7 +67,6 @@ const StartChargingPage = () => {
    */
   const handleScanSuccess = (data) => {
     console.log('📱 Scanned QR data:', data);
-    setScannedData(data);
     setShowScanner(false);
   };
 

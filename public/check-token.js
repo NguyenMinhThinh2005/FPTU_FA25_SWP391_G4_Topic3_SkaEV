@@ -18,7 +18,7 @@ const localToken = localStorage.getItem("token");
 let authStore = null;
 try {
   authStore = JSON.parse(sessionStorage.getItem("skaev-auth-storage"));
-} catch (e) {
+} catch {
   // ignore parse errors for diagnostic script
 }
 

@@ -27,7 +27,7 @@ import { useNavigate, Link as RouterLink } from "react-router-dom";
 import useAuthStore from "../../store/authStore";
 import { authAPI } from "../../services/api";
 import { getText } from "../../utils/vietnameseTexts";
-import { googleAuth } from "../../services/socialAuthService";
+// socialAuth import removed (social login UI currently commented out)
 import PhoneOTPModal from "../../components/auth/PhoneOTPModal";
 
 const LoginPage = () => {
