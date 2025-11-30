@@ -13,13 +13,14 @@ const sessionRefresh = sessionStorage.getItem("refreshToken");
 
 // Check localStorage
 const localToken = localStorage.getItem("token");
-const localRefresh = localStorage.getItem("refreshToken");
 
 // Check auth store
 let authStore = null;
 try {
   authStore = JSON.parse(sessionStorage.getItem("skaev-auth-storage"));
-} catch (e) {}
+} catch (e) {
+  // ignore parse errors for diagnostic script
+}
 
 console.log("📦 Storage Status:");
 console.log("  sessionStorage.token:", sessionToken ? "✅ EXISTS" : "❌ NULL");

@@ -1,10 +1,4 @@
-﻿import React, {
-  useState,
-  useRef,
-  useEffect,
-  useMemo,
-  useCallback,
-} from "react";
+﻿import React, { useState, useRef, useEffect } from "react";
 import { Camera, X, AlertCircle, RefreshCw } from "lucide-react";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 import {
