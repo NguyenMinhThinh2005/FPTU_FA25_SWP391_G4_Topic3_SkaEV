@@ -229,8 +229,10 @@ public class StaffDashboardService : IStaffDashboardService
             .Select(b => new { b.Status })
             .ToListAsync(cancellationToken);
 
-        var activeSessions = await _context.Bookings
-            .Where(b => b.StationId == stationId && b.Status == "in_progress")
+        // Count active sessions: both "in_progress" AND "completed" with pending payment
+        var activeSessions = await _context.ChargingSlots
+            .Include(cs => cs.ChargingPost)
+            .Where(cs => cs.ChargingPost.StationId == stationId && cs.CurrentBookingId.HasValue)
             .CountAsync(cancellationToken);
 
         dashboard.DailyStats = new StaffDailyStatsDto

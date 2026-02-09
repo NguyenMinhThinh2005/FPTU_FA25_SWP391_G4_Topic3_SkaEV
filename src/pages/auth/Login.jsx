@@ -27,7 +27,7 @@ import { useNavigate, Link as RouterLink } from "react-router-dom";
 import useAuthStore from "../../store/authStore";
 import { authAPI } from "../../services/api";
 import { getText } from "../../utils/vietnameseTexts";
-import { googleAuth } from "../../services/socialAuthService";
+// socialAuth import removed (social login UI currently commented out)
 import PhoneOTPModal from "../../components/auth/PhoneOTPModal";
 
 const LoginPage = () => {
@@ -41,9 +41,7 @@ const LoginPage = () => {
 
   const [showPassword, setShowPassword] = useState(false);
 
-  const [socialLoading, setSocialLoading] = useState({
-    google: false,
-  });
+  // social login UI is commented out; keep handlers removed to avoid unused-vars
 
   const [phoneModalOpen, setPhoneModalOpen] = useState(false);
 
@@ -96,31 +94,7 @@ const LoginPage = () => {
     }
   };
 
-  // Social login handlers
-  const handleGoogleLogin = async () => {
-    setSocialLoading((prev) => ({ ...prev, google: true }));
-    try {
-      const response = await googleAuth.signIn();
-      if (response.success && response.user) {
-        await login(response.user.email, "social-login");
-        console.log("Google login successful:", response.user.name);
-        // Show success message
-        alert(`Chào mừng ${response.user.name}! Đăng nhập Google thành công.`);
-      } else if (!response.success) {
-        console.error("Google login failed:", response.error);
-      }
-    } catch (error) {
-      console.error("Google login failed:", error.message);
-      // Show user-friendly error
-      if (error.message.includes("cancelled")) {
-        // User cancelled, no need to show error
-        return;
-      }
-      alert(`Đăng nhập Google thất bại: ${error.message}`);
-    } finally {
-      setSocialLoading((prev) => ({ ...prev, google: false }));
-    }
-  };
+  // social login handler removed because social login UI is currently commented out
 
   const handlePhoneLoginSuccess = (response) => {
     console.log("Phone login successful:", response);

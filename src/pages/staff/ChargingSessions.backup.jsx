@@ -1,4 +1,4 @@
- 
+/* eslint-disable */
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import staffAPI from "../../services/api/staffAPI";
@@ -33,8 +33,7 @@ import {
   ArrowBack, 
   Stop, 
   Payment,
-  Info,
-  Print 
+  Info 
 } from "@mui/icons-material";
 
 const ChargingSessionsSimple = () => {
@@ -46,7 +45,6 @@ const ChargingSessionsSimple = () => {
   // Dialog states
   const [stopDialogOpen, setStopDialogOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
-  const [detailDialogOpen, setDetailDialogOpen] = useState(false); // Thêm detail dialog
   const [selectedSession, setSelectedSession] = useState(null);
   
   // Payment form data
@@ -271,186 +269,6 @@ const ChargingSessionsSimple = () => {
     }
   };
 
-  // Handle view detail button
-  const handleViewDetail = (session) => {
-    setSelectedSession(session);
-    setDetailDialogOpen(true);
-  };
-
-  // Format duration helper
-  const formatDuration = (startTime, endTime) => {
-    if (!startTime) return '-';
-    const start = new Date(startTime);
-    const end = endTime ? new Date(endTime) : new Date();
-    const duration = end.getTime() - start.getTime();
-    const hours = Math.floor(duration / (1000 * 60 * 60));
-    const minutes = Math.floor((duration % (1000 * 60 * 60)) / (1000 * 60));
-    return `${hours}h ${minutes}m`;
-  };
-
-  // Print receipt function
-  const handlePrintReceipt = () => {
-    if (!selectedSession) {
-      setSnackbar({ open: true, message: "Vui lòng chọn phiên sạc", severity: "warning" });
-      return;
-    }
-    
-    // Tạo nội dung hóa đơn
-    const receiptContent = generateReceiptContent(selectedSession);
-    
-    // Mở cửa sổ in
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(receiptContent);
-    printWindow.document.close();
-    printWindow.focus();
-    printWindow.print();
-    printWindow.close();
-    
-    setSnackbar({ 
-      open: true, 
-      message: `Đã xuất hóa đơn cho phiên sạc #${selectedSession.bookingId}`, 
-      severity: "success" 
-    });
-  };
-
-  // Generate receipt HTML
-  const generateReceiptContent = (session) => {
-    const now = new Date().toLocaleString("vi-VN");
-    const cost = calculateCost(session.energyDelivered || 0);
-    
-    return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <title>Hóa đơn phiên sạc - ${session.bookingId}</title>
-        <style>
-          body { 
-            font-family: Arial, sans-serif; 
-            padding: 20px; 
-            max-width: 400px; 
-            margin: 0 auto;
-          }
-          .header { 
-            text-align: center; 
-            border-bottom: 2px solid #000; 
-            padding-bottom: 10px; 
-            margin-bottom: 20px; 
-          }
-          .header h1 { margin: 5px 0; font-size: 20px; }
-          .header p { margin: 3px 0; font-size: 12px; }
-          .section { margin: 15px 0; }
-          .row { 
-            display: flex; 
-            justify-content: space-between; 
-            padding: 5px 0; 
-            border-bottom: 1px dashed #ccc; 
-          }
-          .row.total { 
-            font-weight: bold; 
-            font-size: 16px; 
-            border-top: 2px solid #000; 
-            border-bottom: 2px solid #000; 
-            margin-top: 10px; 
-          }
-          .label { font-weight: normal; }
-          .value { font-weight: bold; }
-          .footer { 
-            text-align: center; 
-            margin-top: 20px; 
-            padding-top: 10px; 
-            border-top: 1px solid #000; 
-            font-size: 11px; 
-          }
-          @media print {
-            body { padding: 10px; }
-          }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <h1>⚡ SkaEV CHARGING STATION</h1>
-          <p>Trạm sạc FPT Complex</p>
-          <p>Địa chỉ: Lô E2a-7, Đường D1, P. Long Thạnh Mỹ, TP. Thủ Đức, TP.HCM</p>
-          <p>Hotline: 1900 xxxx</p>
-        </div>
-
-        <div class="section">
-          <h3 style="text-align: center; margin: 10px 0;">HÓA ĐƠN DỊCH VỤ SẠC XE ĐIỆN</h3>
-          <div class="row">
-            <span class="label">Mã phiên:</span>
-            <span class="value">#${session.bookingId || session.id}</span>
-          </div>
-          <div class="row">
-            <span class="label">Điểm sạc:</span>
-            <span class="value">${session.connectorCode}</span>
-          </div>
-          <div class="row">
-            <span class="label">Khách hàng:</span>
-            <span class="value">${session.customerName || 'N/A'}</span>
-          </div>
-          <div class="row">
-            <span class="label">Xe:</span>
-            <span class="value">${session.vehicleInfo || 'N/A'}</span>
-          </div>
-          <div class="row">
-            <span class="label">Thời gian bắt đầu:</span>
-            <span class="value">${session.startedAt ? new Date(session.startedAt).toLocaleString("vi-VN") : 'N/A'}</span>
-          </div>
-          <div class="row">
-            <span class="label">Thời lượng sạc:</span>
-            <span class="value">${formatDuration(session.startedAt, null)}</span>
-          </div>
-        </div>
-
-        <div class="section">
-          <h4 style="margin: 10px 0;">Chi tiết năng lượng:</h4>
-          <div class="row">
-            <span class="label">Năng lượng tiêu thụ:</span>
-            <span class="value">${(session.energyDelivered || 0).toFixed(2)} kWh</span>
-          </div>
-          <div class="row">
-            <span class="label">Đơn giá:</span>
-            <span class="value">3,000 ₫/kWh</span>
-          </div>
-          ${session.currentSoc ? `
-          <div class="row">
-            <span class="label">Mức pin xe:</span>
-            <span class="value">${session.currentSoc}%</span>
-          </div>
-          ` : ''}
-          <div class="row">
-            <span class="label">Công suất:</span>
-            <span class="value">${session.power || session.maxPower || 0} kW</span>
-          </div>
-        </div>
-
-        <div class="section">
-          <h4 style="margin: 10px 0;">Thanh toán:</h4>
-          <div class="row">
-            <span class="label">Phương thức:</span>
-            <span class="value">${paymentForm.paymentMethod === 'cash' ? 'Tiền mặt' : 
-                                 paymentForm.paymentMethod === 'card' ? 'Thẻ' : 
-                                 paymentForm.paymentMethod === 'momo' ? 'MoMo' : 
-                                 paymentForm.paymentMethod === 'vnpay' ? 'VNPay' : 'Chưa thanh toán'}</span>
-          </div>
-          <div class="row total">
-            <span class="label">TỔNG TIỀN:</span>
-            <span class="value">${cost.toLocaleString('vi-VN')} ₫</span>
-          </div>
-        </div>
-
-        <div class="footer">
-          <p>Cảm ơn quý khách đã sử dụng dịch vụ!</p>
-          <p>Hóa đơn in lúc: ${now}</p>
-          <p style="margin-top: 10px;">━━━━━━━━━━━━━━━━━━━━━━━━</p>
-          <p><strong>Vui lòng giữ lại hóa đơn để đối chiếu</strong></p>
-        </div>
-      </body>
-      </html>
-    `;
-  };
-
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
@@ -582,7 +400,26 @@ const ChargingSessionsSimple = () => {
                     </TableCell>
                     <TableCell>
                       <Stack direction="row" spacing={1}>
-                        {/* Dừng sạc button - Only show when charging */}
+                        {/* Chi tiết button */}
+                        <Button 
+                          size="small" 
+                          variant="outlined" 
+                          startIcon={<Info />}
+                          disabled={!isActive}
+                          onClick={() => {
+                            if (isActive) {
+                              alert(`Chi tiết phiên sạc #${session.bookingId}\n` +
+                                    `Khách hàng: ${session.customerName}\n` +
+                                    `Xe: ${session.vehicleInfo}\n` +
+                                    `SOC: ${session.currentSoc || 'N/A'}%\n` +
+                                    `Công suất: ${session.power || 'N/A'} kW`);
+                            }
+                          }}
+                        >
+                          Chi tiết
+                        </Button>
+                        
+                        {/* Dừng khẩn cấp button - Only show when charging */}
                         {isActive && (
                           <Button 
                             size="small" 
@@ -595,36 +432,17 @@ const ChargingSessionsSimple = () => {
                           </Button>
                         )}
                         
-                        {/* Thanh toán button - Show when active or completed */}
-                        {isActive && (
+                        {/* Thanh toán button - Show after stopped */}
+                        {!isActive && session.bookingId && (
                           <Button 
                             size="small" 
                             variant="contained"
-                            color="warning"
+                            color="success"
                             startIcon={<Payment />}
                             onClick={() => handlePayment(session)}
                           >
-                            Xác nhận TT
+                            Thanh toán
                           </Button>
-                        )}
-                        
-                        {/* Chi tiết button - Always show for active sessions */}
-                        {isActive && (
-                          <Button 
-                            size="small" 
-                            variant="outlined" 
-                            startIcon={<Info />}
-                            onClick={() => handleViewDetail(session)}
-                          >
-                            Xem chi tiết
-                          </Button>
-                        )}
-                        
-                        {/* Empty state for inactive connectors */}
-                        {!isActive && (
-                          <Typography variant="caption" color="text.secondary">
-                            -
-                          </Typography>
                         )}
                       </Stack>
                     </TableCell>
@@ -698,16 +516,12 @@ const ChargingSessionsSimple = () => {
         <DialogTitle sx={{ bgcolor: 'success.main', color: 'white' }}>
           <Box display="flex" alignItems="center" gap={1}>
             <Payment />
-            <Typography variant="h6">Xác nhận Thanh toán tại chỗ</Typography>
+            <Typography variant="h6">Thanh toán Phiên sạc</Typography>
           </Box>
         </DialogTitle>
         <DialogContent sx={{ mt: 2 }}>
           {selectedSession && (
             <Stack spacing={2}>
-              <Alert severity="info">
-                Khách hàng thanh toán <strong>trực tiếp tại quầy</strong>. Chọn phương thức và xác nhận.
-              </Alert>
-              
               <Alert severity="info">
                 Phiên sạc <strong>#{selectedSession.bookingId}</strong> - {selectedSession.customerName}
               </Alert>
@@ -739,8 +553,9 @@ const ChargingSessionsSimple = () => {
                 SelectProps={{ native: true }}
               >
                 <option value="cash">Tiền mặt</option>
-                <option value="transfer">Chuyển khoản ngân hàng</option>
-                <option value="card">Quẹt thẻ (POS tại quầy)</option>
+                <option value="card">Thẻ</option>
+                <option value="momo">MoMo</option>
+                <option value="vnpay">VNPay</option>
               </TextField>
               
               <Card sx={{ bgcolor: 'success.50', border: 1, borderColor: 'success.main' }}>
@@ -753,11 +568,6 @@ const ChargingSessionsSimple = () => {
                   </Typography>
                 </CardContent>
               </Card>
-              
-              <Alert severity="warning">
-                <strong>Lưu ý:</strong> Nếu khách đã thanh toán bằng <strong>QR Code/Ví điện tử</strong> 
-                trên trạm, hệ thống sẽ tự động ghi nhận.
-              </Alert>
             </Stack>
           )}
         </DialogContent>
@@ -766,168 +576,12 @@ const ChargingSessionsSimple = () => {
             Hủy
           </Button>
           <Button 
-            startIcon={<Print />} 
-            onClick={handlePrintReceipt}
-          >
-            In hóa đơn
-          </Button>
-          <Button 
             onClick={processPayment} 
             variant="contained" 
             color="success"
             startIcon={<Payment />}
           >
             Xác nhận Thanh toán
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Detail Dialog - Xem chi tiết hóa đơn */}
-      <Dialog open={detailDialogOpen} onClose={() => setDetailDialogOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle>
-          <Box display="flex" alignItems="center" justifyContent="space-between">
-            <Typography variant="h5" fontWeight="bold">
-              📄 Chi tiết Hóa đơn
-            </Typography>
-            <Chip 
-              label={selectedSession?.activeSession ? "Đang sạc" : "Hoàn thành"}
-              color={selectedSession?.activeSession ? "primary" : "success"}
-            />
-          </Box>
-        </DialogTitle>
-        <DialogContent>
-          {selectedSession && (
-            <Box sx={{ pt: 2 }}>
-              {/* Thông tin chính */}
-              <Card sx={{ mb: 3, bgcolor: 'grey.50' }}>
-                <CardContent>
-                  <Typography variant="h6" fontWeight="bold" gutterBottom color="primary">
-                    ⚡ Thông tin Phiên sạc
-                  </Typography>
-                  <Stack spacing={2}>
-                    <Box>
-                      <Typography variant="caption" color="text.secondary">Mã phiên sạc:</Typography>
-                      <Typography variant="h6" fontWeight={700}>#{selectedSession.bookingId}</Typography>
-                    </Box>
-                    <Box>
-                      <Typography variant="caption" color="text.secondary">Điểm sạc:</Typography>
-                      <Typography variant="h6" fontWeight={700}>{selectedSession.connectorCode}</Typography>
-                    </Box>
-                    <Box>
-                      <Typography variant="caption" color="text.secondary">Khách hàng:</Typography>
-                      <Typography variant="body1" fontWeight={600}>{selectedSession.customerName}</Typography>
-                    </Box>
-                    <Box>
-                      <Typography variant="caption" color="text.secondary">Thông tin xe:</Typography>
-                      <Typography variant="body1" fontWeight={600}>{selectedSession.vehicleInfo}</Typography>
-                    </Box>
-                    <Box>
-                      <Typography variant="caption" color="text.secondary">Mức pin xe:</Typography>
-                      <Typography variant="body1" fontWeight={600}>
-                        {selectedSession.currentSoc ? `${selectedSession.currentSoc}%` : "N/A"}
-                      </Typography>
-                    </Box>
-                  </Stack>
-                </CardContent>
-              </Card>
-
-              {/* Thống kê thời gian */}
-              <Card sx={{ mb: 3 }}>
-                <CardContent>
-                  <Typography variant="h6" fontWeight="bold" gutterBottom color="primary">
-                    🕐 Thống kê Thời gian
-                  </Typography>
-                  <Stack spacing={2}>
-                    <Box sx={{ p: 2, bgcolor: 'info.50', borderRadius: 1 }}>
-                      <Typography variant="caption" color="text.secondary">Thời gian bắt đầu:</Typography>
-                      <Typography variant="body1" fontWeight={600}>
-                        {selectedSession.startedAt 
-                          ? new Date(selectedSession.startedAt).toLocaleString("vi-VN", {
-                              weekday: "long",
-                              day: "2-digit",
-                              month: "2-digit",
-                              year: "numeric",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                              second: "2-digit"
-                            })
-                          : 'N/A'}
-                      </Typography>
-                    </Box>
-                    <Box sx={{ p: 2, bgcolor: 'warning.50', borderRadius: 1, textAlign: "center" }}>
-                      <Typography variant="caption" color="text.secondary">Tổng thời lượng sạc:</Typography>
-                      <Typography variant="h5" fontWeight={700} color="warning.dark">
-                        {formatDuration(selectedSession.startedAt, null)}
-                      </Typography>
-                    </Box>
-                  </Stack>
-                </CardContent>
-              </Card>
-
-              {/* Thống kê năng lượng */}
-              <Card sx={{ mb: 3 }}>
-                <CardContent>
-                  <Typography variant="h6" fontWeight="bold" gutterBottom color="primary">
-                    ⚡ Thống kê Năng lượng
-                  </Typography>
-                  <Stack direction="row" spacing={2}>
-                    <Box sx={{ flex: 1, p: 2, bgcolor: 'primary.50', borderRadius: 1, textAlign: "center" }}>
-                      <Typography variant="caption" color="text.secondary">Năng lượng tiêu thụ:</Typography>
-                      <Typography variant="h4" fontWeight={700} color="primary.main">
-                        {(selectedSession.energyDelivered || 0).toFixed(2)}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">kWh</Typography>
-                    </Box>
-                    <Box sx={{ flex: 1, p: 2, bgcolor: 'secondary.50', borderRadius: 1, textAlign: "center" }}>
-                      <Typography variant="caption" color="text.secondary">Công suất:</Typography>
-                      <Typography variant="h4" fontWeight={700} color="secondary.main">
-                        {selectedSession.power || selectedSession.maxPower || 0}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">kW</Typography>
-                    </Box>
-                  </Stack>
-                  <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>
-                    <Typography variant="caption" color="text.secondary">Đơn giá điện:</Typography>
-                    <Typography variant="h6" fontWeight={600}>3,000 ₫/kWh</Typography>
-                  </Box>
-                </CardContent>
-              </Card>
-
-              {/* Thống kê thanh toán */}
-              <Card sx={{ bgcolor: 'success.50', border: "2px solid", borderColor: "success.main" }}>
-                <CardContent>
-                  <Typography variant="h6" fontWeight="bold" gutterBottom color="success.dark">
-                    💰 Thống kê Thanh toán
-                  </Typography>
-                  <Box display="flex" justifyContent="space-between" alignItems="center" sx={{ p: 2, bgcolor: "white", borderRadius: 1 }}>
-                    <Typography variant="h6" fontWeight={700}>TỔNG TIỀN:</Typography>
-                    <Typography variant="h4" fontWeight={900} color="success.dark">
-                      {calculateCost(selectedSession.energyDelivered || 0).toLocaleString('vi-VN')} ₫
-                    </Typography>
-                  </Box>
-                </CardContent>
-              </Card>
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions sx={{ p: 3, bgcolor: "grey.50" }}>
-          <Button 
-            onClick={() => setDetailDialogOpen(false)} 
-            variant="outlined"
-          >
-            Đóng
-          </Button>
-          <Button 
-            variant="contained" 
-            color="primary"
-            startIcon={<Print />} 
-            onClick={() => {
-              handlePrintReceipt();
-              setDetailDialogOpen(false);
-            }}
-            size="large"
-          >
-            Xuất hóa đơn
           </Button>
         </DialogActions>
       </Dialog>

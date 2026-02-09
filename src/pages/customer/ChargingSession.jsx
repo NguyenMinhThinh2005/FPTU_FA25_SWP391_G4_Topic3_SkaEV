@@ -67,7 +67,10 @@ const ChargingSession = () => {
 
     const handleStartCharging = () => {
         if (currentBooking) {
-            startCharging(currentBooking.id, {
+            // Use numeric booking ID from API (apiId), not string "BOOK..."
+            const bookingId = currentBooking.apiId || currentBooking.bookingId || currentBooking.id;
+            console.log('📊 ChargingSession - Using booking ID:', bookingId, 'Type:', typeof bookingId);
+            startCharging(bookingId, {
                 stationId: currentBooking.stationId,
                 connectorId: scanResult || "A01",
                 initialSOC: 25,

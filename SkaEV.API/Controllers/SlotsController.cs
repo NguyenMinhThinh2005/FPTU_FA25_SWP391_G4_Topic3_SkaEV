@@ -225,4 +225,36 @@ public class SlotsController : BaseApiController
             return BadRequestResponse(ex.Message);
         }
     }
+
+    /// <summary>
+    /// Update slot status (Staff only - for emergency stop / maintenance)
+    /// </summary>
+    [HttpPatch("{slotId}/status")]
+    [Authorize(Roles = "staff,admin")]
+    [ProducesResponseType(typeof(SlotDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateSlotStatus(int slotId, [FromBody] UpdateSlotStatusDto dto)
+    {
+        try
+        {
+            var slot = await _slotService.UpdateSlotStatusAsync(slotId, dto.Status, dto.Reason);
+            _logger.LogInformation("Slot {SlotId} status updated to '{Status}' by user", slotId, dto.Status);
+            return Ok(new { data = slot, message = "Slot status updated successfully" });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating slot status for slot {SlotId}", slotId);
+            return StatusCode(500, new { message = "An error occurred" });
+        }
+    }
+}
+
+public class UpdateSlotStatusDto
+{
+    public string Status { get; set; } = string.Empty;
+    public string? Reason { get; set; }
 }

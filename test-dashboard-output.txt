@@ -1,0 +1,91 @@
+Changed database context to 'SkaEV_DB'.
+Msg 207, Level 16, State 1, Server tdat\SQLEXPRESS, Line 13
+Invalid column name 'ActualStartTime'.
+Msg 207, Level 16, State 1, Server tdat\SQLEXPRESS, Line 26
+Invalid column name 'PaymentStatus'.
+Msg 207, Level 16, State 1, Server tdat\SQLEXPRESS, Line 27
+Invalid column name 'CreatedAt'.
+Msg 207, Level 16, State 1, Server tdat\SQLEXPRESS, Line 23
+Invalid column name 'TotalAmount'.
+Msg 207, Level 16, State 1, Server tdat\SQLEXPRESS, Line 24
+Invalid column name 'TotalEnergyKwh'.
+Msg 207, Level 16, State 1, Server tdat\SQLEXPRESS, Line 43
+Invalid column name 'ActualStartTime'.
+Msg 207, Level 16, State 1, Server tdat\SQLEXPRESS, Line 49
+Invalid column name 'UserId'.
+Msg 207, Level 16, State 1, Server tdat\SQLEXPRESS, Line 49
+Invalid column name 'StationId'.
+Msg 207, Level 16, State 1, Server tdat\SQLEXPRESS, Line 49
+Invalid column name 'SlotId'.
+Msg 207, Level 16, State 1, Server tdat\SQLEXPRESS, Line 50
+Invalid column name 'BookingCode'.
+Msg 207, Level 16, State 1, Server tdat\SQLEXPRESS, Line 51
+Invalid column name 'ReservationStartTime'.
+Msg 207, Level 16, State 1, Server tdat\SQLEXPRESS, Line 51
+Invalid column name 'ReservationEndTime'.
+Msg 207, Level 16, State 1, Server tdat\SQLEXPRESS, Line 52
+Invalid column name 'ActualStartTime'.
+Msg 207, Level 16, State 1, Server tdat\SQLEXPRESS, Line 52
+Invalid column name 'ActualEndTime'.
+Msg 207, Level 16, State 1, Server tdat\SQLEXPRESS, Line 53
+Invalid column name 'InitialSoc'.
+Msg 207, Level 16, State 1, Server tdat\SQLEXPRESS, Line 53
+Invalid column name 'FinalSoc'.
+Msg 207, Level 16, State 1, Server tdat\SQLEXPRESS, Line 55
+Invalid column name 'CreatedAt'.
+Msg 207, Level 16, State 1, Server tdat\SQLEXPRESS, Line 70
+Invalid column name 'BookingId'.
+Msg 207, Level 16, State 1, Server tdat\SQLEXPRESS, Line 71
+Invalid column name 'InvoiceCode'.
+Msg 207, Level 16, State 1, Server tdat\SQLEXPRESS, Line 72
+Invalid column name 'TotalAmount'.
+Msg 207, Level 16, State 1, Server tdat\SQLEXPRESS, Line 73
+Invalid column name 'TotalEnergyKwh'.
+Msg 207, Level 16, State 1, Server tdat\SQLEXPRESS, Line 74
+Invalid column name 'UnitPrice'.
+Msg 207, Level 16, State 1, Server tdat\SQLEXPRESS, Line 75
+Invalid column name 'PaymentMethod'.
+Msg 207, Level 16, State 1, Server tdat\SQLEXPRESS, Line 76
+Invalid column name 'PaymentStatus'.
+Msg 207, Level 16, State 1, Server tdat\SQLEXPRESS, Line 77
+Invalid column name 'CreatedAt'.
+Msg 207, Level 16, State 1, Server tdat\SQLEXPRESS, Line 120
+Invalid column name 'UserId'.
+Msg 207, Level 16, State 1, Server tdat\SQLEXPRESS, Line 120
+Invalid column name 'StationId'.
+Msg 207, Level 16, State 1, Server tdat\SQLEXPRESS, Line 120
+Invalid column name 'SlotId'.
+Msg 207, Level 16, State 1, Server tdat\SQLEXPRESS, Line 121
+Invalid column name 'BookingCode'.
+Msg 207, Level 16, State 1, Server tdat\SQLEXPRESS, Line 122
+Invalid column name 'ReservationStartTime'.
+Msg 207, Level 16, State 1, Server tdat\SQLEXPRESS, Line 122
+Invalid column name 'ReservationEndTime'.
+Msg 207, Level 16, State 1, Server tdat\SQLEXPRESS, Line 123
+Invalid column name 'ActualStartTime'.
+Msg 207, Level 16, State 1, Server tdat\SQLEXPRESS, Line 124
+Invalid column name 'InitialSoc'.
+Msg 207, Level 16, State 1, Server tdat\SQLEXPRESS, Line 124
+Invalid column name 'FinalSoc'.
+Msg 207, Level 16, State 1, Server tdat\SQLEXPRESS, Line 126
+Invalid column name 'CreatedAt'.
+Msg 207, Level 16, State 1, Server tdat\SQLEXPRESS, Line 182
+Invalid column name 'ActualStartTime'.
+Msg 207, Level 16, State 1, Server tdat\SQLEXPRESS, Line 188
+Invalid column name 'BookingId'.
+Msg 207, Level 16, State 1, Server tdat\SQLEXPRESS, Line 188
+Invalid column name 'BookingId'.
+Msg 207, Level 16, State 1, Server tdat\SQLEXPRESS, Line 189
+Invalid column name 'PaymentStatus'.
+Msg 207, Level 16, State 1, Server tdat\SQLEXPRESS, Line 190
+Invalid column name 'ActualStartTime'.
+Msg 207, Level 16, State 1, Server tdat\SQLEXPRESS, Line 186
+Invalid column name 'TotalAmount'.
+Msg 207, Level 16, State 1, Server tdat\SQLEXPRESS, Line 196
+Invalid column name 'BookingId'.
+Msg 207, Level 16, State 1, Server tdat\SQLEXPRESS, Line 196
+Invalid column name 'BookingId'.
+Msg 207, Level 16, State 1, Server tdat\SQLEXPRESS, Line 197
+Invalid column name 'ActualStartTime'.
+Msg 207, Level 16, State 1, Server tdat\SQLEXPRESS, Line 194
+Invalid column name 'TotalEnergyKwh'.

@@ -311,6 +311,30 @@ public class SlotService : ISlotService
             .ToListAsync();
     }
 
+    public async Task<SlotDto> UpdateSlotStatusAsync(int slotId, string status, string? reason)
+    {
+        var slot = await _context.ChargingSlots
+            .Include(s => s.ChargingPost)
+                .ThenInclude(p => p.ChargingStation)
+            .FirstOrDefaultAsync(s => s.SlotId == slotId);
+
+        if (slot == null)
+        {
+            throw new KeyNotFoundException($"Charging slot with ID {slotId} not found");
+        }
+
+        var previousStatus = slot.Status;
+        slot.Status = status.ToLowerInvariant();
+        slot.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Updated slot {SlotId} status from '{PreviousStatus}' to '{NewStatus}'. Reason: {Reason}", 
+            slotId, previousStatus, status, reason ?? "N/A");
+
+        return MapToDto(slot);
+    }
+
     private SlotDto MapToDto(ChargingSlot slot)
     {
         return new SlotDto

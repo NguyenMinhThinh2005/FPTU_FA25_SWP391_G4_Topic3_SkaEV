@@ -10,17 +10,24 @@ public class IssueDto
     public string StationName { get; set; } = string.Empty;
     public int? PostId { get; set; }
     public string? PostName { get; set; }
+    public string? DeviceCode { get; set; }
     public string Title { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
+    public string? Category { get; set; }
     public string Status { get; set; } = string.Empty;
     public string Priority { get; set; } = string.Empty;
+    public string? Resolution { get; set; }
     public int ReportedByUserId { get; set; }
     public string ReportedByUserName { get; set; } = string.Empty;
     public int? AssignedToUserId { get; set; }
     public string? AssignedToUserName { get; set; }
+    public DateTime? ReportedAt { get; set; }
+    public DateTime? AssignedAt { get; set; }
+    public DateTime? StartedAt { get; set; }
+    public DateTime? ResolvedAt { get; set; }
+    public DateTime? ClosedAt { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
-    public DateTime? ResolvedAt { get; set; }
 }
 
 /// <summary>
@@ -40,6 +47,7 @@ public class CreateIssueDto
 {
     public int StationId { get; set; }
     public int? PostId { get; set; }
+    public string? DeviceCode { get; set; }
     public string Title { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
     public string Priority { get; set; } = "medium";

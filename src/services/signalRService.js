@@ -7,7 +7,8 @@ class SignalRService {
       stationStatus: [],
       slotStatus: [],
       alert: [],
-      stationUpdate: []
+      stationUpdate: [],
+      chargingUpdate: []
     };
   }
 
@@ -22,29 +23,38 @@ class SignalRService {
         skipNegotiation: false,
         transport: signalR.HttpTransportType.WebSockets | signalR.HttpTransportType.ServerSentEvents | signalR.HttpTransportType.LongPolling
       })
-      .withAutomaticReconnect([0, 2000, 5000, 10000, 30000]) // Retry intervals
+      .withAutomaticReconnect([0, 2000, 5000, 10000, 30000])
       .configureLogging(signalR.LogLevel.Information)
       .build();
 
     // Register all event listeners
     this.connection.on('ReceiveStationStatus', (data) => {
-      console.log('Received station status:', data);
+      console.log('📡 SignalR: Received station status:', data);
       this.listeners.stationStatus.forEach(callback => callback(data));
     });
 
     this.connection.on('ReceiveSlotStatus', (data) => {
-      console.log('Received slot status:', data);
+      console.log('📡 SignalR: Received slot status:', data);
       this.listeners.slotStatus.forEach(callback => callback(data));
     });
 
     this.connection.on('ReceiveAlert', (data) => {
-      console.log('Received alert:', data);
+      console.log('📡 SignalR: Received alert:', data);
       this.listeners.alert.forEach(callback => callback(data));
     });
 
     this.connection.on('ReceiveStationUpdate', (data) => {
-      console.log('Received station update:', data);
+      console.log('📡 SignalR: Received station update:', data);
       this.listeners.stationUpdate.forEach(callback => callback(data));
+    });
+
+    this.connection.on('ReceiveChargingUpdate', (data) => {
+      console.log('🔌 SignalR: Received charging update:', data);
+      console.log('  → Event:', data.EventType);
+      console.log('  → Booking:', data.BookingId);
+      console.log('  → Connector:', data.ConnectorCode);
+      console.log('  → Status:', data.Status);
+      this.listeners.chargingUpdate.forEach(callback => callback(data));
     });
 
     // Handle reconnection
@@ -76,7 +86,6 @@ class SignalRService {
     }
   }
 
-  // Subscribe to station updates
   async subscribeToStation(stationId) {
     if (this.connection && this.connection.state === signalR.HubConnectionState.Connected) {
       await this.connection.invoke('SubscribeToStation', stationId);
@@ -84,7 +93,6 @@ class SignalRService {
     }
   }
 
-  // Unsubscribe from station updates
   async unsubscribeFromStation(stationId) {
     if (this.connection && this.connection.state === signalR.HubConnectionState.Connected) {
       await this.connection.invoke('UnsubscribeFromStation', stationId);
@@ -92,7 +100,6 @@ class SignalRService {
     }
   }
 
-  // Add event listeners
   onStationStatus(callback) {
     this.listeners.stationStatus.push(callback);
     return () => {
@@ -118,6 +125,13 @@ class SignalRService {
     this.listeners.stationUpdate.push(callback);
     return () => {
       this.listeners.stationUpdate = this.listeners.stationUpdate.filter(cb => cb !== callback);
+    };
+  }
+
+  onChargingUpdate(callback) {
+    this.listeners.chargingUpdate.push(callback);
+    return () => {
+      this.listeners.chargingUpdate = this.listeners.chargingUpdate.filter(cb => cb !== callback);
     };
   }
 

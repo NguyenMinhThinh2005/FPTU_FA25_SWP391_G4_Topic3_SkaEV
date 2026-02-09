@@ -11,7 +11,7 @@ const staffAPI = {
    * Load station overview for the authenticated staff member
    */
   getDashboardOverview: async () => {
-    const response = await axiosInstance.get('/api/staff/dashboard');
+    const response = await axiosInstance.get('/staff/dashboard');
     return response.data;
   },
 
@@ -28,7 +28,7 @@ const staffAPI = {
     if (params.priority) queryParams.append('priority', params.priority);
     if (params.assignedTo) queryParams.append('assignedTo', params.assignedTo);
     
-    const response = await axiosInstance.get(`/api/StaffIssues?${queryParams}`);
+    const response = await axiosInstance.get(`/StaffIssues?${queryParams}`);
     return response.data?.data ?? [];
   },
 
@@ -36,7 +36,7 @@ const staffAPI = {
    * Get issues assigned to current staff member
    */
   getMyIssues: async () => {
-    const response = await axiosInstance.get('/api/StaffIssues/my-issues');
+    const response = await axiosInstance.get('/StaffIssues/my-issues');
     return response.data?.data ?? [];
   },
 
@@ -44,7 +44,7 @@ const staffAPI = {
    * Get single issue details
    */
   getIssueById: async (issueId) => {
-    const response = await axiosInstance.get(`/api/StaffIssues/${issueId}`);
+    const response = await axiosInstance.get(`/StaffIssues/${issueId}`);
     return response.data;
   },
 
@@ -53,7 +53,7 @@ const staffAPI = {
    * @param {Object} issueData - { stationId, title, description, priority, category }
    */
   createIssue: async (issueData) => {
-    const response = await axiosInstance.post('/api/StaffIssues', issueData);
+    const response = await axiosInstance.post('/StaffIssues', issueData);
     return response.data;
   },
 
@@ -61,7 +61,7 @@ const staffAPI = {
    * Update issue details
    */
   updateIssue: async (issueId, updateData) => {
-    const response = await axiosInstance.put(`/api/StaffIssues/${issueId}`, updateData);
+    const response = await axiosInstance.put(`/StaffIssues/${issueId}`, updateData);
     return response.data;
   },
 
@@ -69,7 +69,7 @@ const staffAPI = {
    * Assign issue to staff member (admin only)
    */
   assignIssue: async (issueId, staffId) => {
-    const response = await axiosInstance.patch(`/api/StaffIssues/${issueId}/assign`, { assignedToUserId: staffId });
+    const response = await axiosInstance.patch(`/StaffIssues/${issueId}/assign`, { assignedToUserId: staffId });
     return response.data;
   },
 
@@ -78,7 +78,7 @@ const staffAPI = {
    * @param {string} status - 'reported' | 'in_progress' | 'resolved' | 'closed'
    */
   updateIssueStatus: async (issueId, status, resolution = null) => {
-    const response = await axiosInstance.patch(`/api/StaffIssues/${issueId}/status`, { status, resolution });
+    const response = await axiosInstance.patch(`/StaffIssues/${issueId}/status`, { status, resolution });
     return response.data;
   },
 
@@ -86,7 +86,7 @@ const staffAPI = {
    * Add comment to issue
    */
   addComment: async (issueId, comment) => {
-    const response = await axiosInstance.post(`/api/StaffIssues/${issueId}/comments`, {
+    const response = await axiosInstance.post(`/StaffIssues/${issueId}/comments`, {
       comment
     });
     return response.data;
@@ -100,7 +100,7 @@ const staffAPI = {
     formData.append('file', file);
     
     const response = await axiosInstance.post(
-      `/api/StaffIssues/${issueId}/attachments`,
+      `/StaffIssues/${issueId}/attachments`,
       formData,
       {
         headers: { 'Content-Type': 'multipart/form-data' }
@@ -113,7 +113,7 @@ const staffAPI = {
    * Delete issue (admin only)
    */
   deleteIssue: async (issueId) => {
-    const response = await axiosInstance.delete(`/api/StaffIssues/${issueId}`);
+    const response = await axiosInstance.delete(`/StaffIssues/${issueId}`);
     return response.data;
   },
 
@@ -122,7 +122,7 @@ const staffAPI = {
    */
   getIssueStatistics: async (stationId = null) => {
     const params = stationId ? `?stationId=${stationId}` : '';
-    const response = await axiosInstance.get(`/api/StaffIssues/statistics${params}`);
+    const response = await axiosInstance.get(`/StaffIssues/statistics${params}`);
     return response.data;
   },
 
@@ -134,7 +134,7 @@ const staffAPI = {
     if (stationId) params.append('stationId', stationId);
     params.append('daysAhead', daysAhead);
     
-    const response = await axiosInstance.get(`/api/StaffIssues/maintenance-schedule?${params}`);
+    const response = await axiosInstance.get(`/StaffIssues/maintenance-schedule?${params}`);
     return response.data;
   },
 
@@ -144,7 +144,7 @@ const staffAPI = {
    * Get all stations status for monitoring
    */
   getStationsStatus: async () => {
-    const response = await axiosInstance.get('/api/stations');
+    const response = await axiosInstance.get('/stations');
     return response.data?.data ?? [];
   },
 
@@ -152,7 +152,7 @@ const staffAPI = {
    * Get single station detailed status
    */
   getStationDetails: async (stationId) => {
-    const response = await axiosInstance.get(`/api/stations/${stationId}`);
+    const response = await axiosInstance.get(`/stations/${stationId}`);
     return response.data;
   },
 
@@ -160,7 +160,7 @@ const staffAPI = {
    * Get charging slots for a station
    */
   getStationSlots: async (stationId) => {
-    const response = await axiosInstance.get(`/api/stations/${stationId}/slots`);
+    const response = await axiosInstance.get(`/stations/${stationId}/slots`);
     return response.data?.data ?? [];
   },
 
@@ -168,7 +168,7 @@ const staffAPI = {
    * Broadcast station status update (triggers SignalR)
    */
   broadcastStationStatus: async (stationId) => {
-    const response = await axiosInstance.post(`/api/monitoring/station/${stationId}/broadcast`);
+    const response = await axiosInstance.post(`/monitoring/station/${stationId}/broadcast`);
     return response.data;
   },
 
@@ -176,7 +176,21 @@ const staffAPI = {
    * Broadcast slot status update (triggers SignalR)
    */
   broadcastSlotStatus: async (slotId) => {
-    const response = await axiosInstance.post(`/api/monitoring/slot/${slotId}/broadcast`);
+    const response = await axiosInstance.post(`/monitoring/slot/${slotId}/broadcast`);
+    return response.data;
+  },
+
+  /**
+   * Update slot status (for emergency stop / maintenance)
+   * @param {number} slotId - Charging slot ID
+   * @param {string} status - New status: 'maintenance', 'unavailable', 'available'
+   * @param {string} reason - Reason for status change
+   */
+  updateSlotStatus: async (slotId, status, reason = '') => {
+    const response = await axiosInstance.patch(`/slots/${slotId}/status`, {
+      status,
+      reason
+    });
     return response.data;
   },
 
@@ -184,7 +198,7 @@ const staffAPI = {
    * Broadcast alert (triggers SignalR)
    */
   broadcastAlert: async (alertData) => {
-    const response = await axiosInstance.post('/api/monitoring/alert', alertData);
+    const response = await axiosInstance.post('/monitoring/alert', alertData);
     return response.data;
   },
 
@@ -194,7 +208,7 @@ const staffAPI = {
    * Get all active charging sessions
    */
   getActiveSessions: async () => {
-    const response = await axiosInstance.get('/api/bookings/active');
+    const response = await axiosInstance.get('/bookings/active');
     return response.data;
   },
 
@@ -202,7 +216,7 @@ const staffAPI = {
    * Get booking/session details
    */
   getBookingDetails: async (bookingId) => {
-    const response = await axiosInstance.get(`/api/bookings/${bookingId}`);
+    const response = await axiosInstance.get(`/bookings/${bookingId}`);
     return response.data;
   },
 
@@ -210,7 +224,7 @@ const staffAPI = {
    * Start charging session (Staff/Admin)
    */
   startCharging: async (bookingId, initialSoc = 20) => {
-    const response = await axiosInstance.put(`/api/bookings/${bookingId}/start`, {
+    const response = await axiosInstance.put(`/bookings/${bookingId}/start`, {
       initialSoc
     });
     return response.data;
@@ -220,7 +234,7 @@ const staffAPI = {
    * Complete charging session (Staff/Admin)
    */
   completeCharging: async (bookingId, sessionData) => {
-    const response = await axiosInstance.put(`/api/bookings/${bookingId}/complete`, {
+    const response = await axiosInstance.put(`/bookings/${bookingId}/complete`, {
       finalSoc: sessionData.finalSoc,
       totalEnergyKwh: sessionData.totalEnergyKwh,
       unitPrice: sessionData.unitPrice || 3500
@@ -238,30 +252,66 @@ const staffAPI = {
     if (params.startDate) queryParams.append('startDate', params.startDate);
     if (params.endDate) queryParams.append('endDate', params.endDate);
     
-    const response = await axiosInstance.get(`/api/bookings?${queryParams}`);
+    const response = await axiosInstance.get(`/bookings?${queryParams}`);
     return response.data;
   },
 
   // ==================== PAYMENT PROCESSING ====================
 
   /**
-   * Process payment at counter (Staff)
+   * Get invoice for booking (required before payment processing)
    */
-  processPayment: async (bookingId, paymentData) => {
-    // Update booking with payment info
-    const response = await axiosInstance.put(`/api/bookings/${bookingId}`, {
-      paymentStatus: 'paid',
-      paymentMethod: paymentData.method,
-      paidAt: new Date().toISOString()
+  getInvoiceByBooking: async (bookingId) => {
+    const response = await axiosInstance.get(`/invoices/booking/${bookingId}`);
+    return response.data;
+  },
+
+  /**
+   * Process payment at counter (Staff) - Uses Invoice API
+   * @param {number} invoiceId - Invoice ID (get from getInvoiceByBooking)
+   * @param {Object} paymentData - { method: 'cash'|'card'|'qr', amount: number }
+   */
+  processPayment: async (invoiceId, paymentData) => {
+    const response = await axiosInstance.post(`/invoices/${invoiceId}/process-payment`, {
+      method: paymentData.method || 'cash',
+      amount: paymentData.amount,
+      notes: paymentData.notes || '',
+      transactionReference: paymentData.transactionReference || null
     });
     return response.data;
   },
 
   /**
-   * Get invoice for booking
+   * Get all unpaid invoices (for payment processing view)
    */
-  getInvoice: async (bookingId) => {
-    const response = await axiosInstance.get(`/api/invoices/booking/${bookingId}`);
+  getUnpaidInvoices: async () => {
+    const response = await axiosInstance.get('/invoices/unpaid');
+    return response.data?.data ?? [];
+  },
+
+  /**
+   * Get invoice details by ID
+   */
+  getInvoiceById: async (invoiceId) => {
+    const response = await axiosInstance.get(`/invoices/${invoiceId}`);
+    return response.data;
+  },
+
+  /**
+   * Get payment history for an invoice
+   */
+  getPaymentHistory: async (invoiceId) => {
+    const response = await axiosInstance.get(`/invoices/${invoiceId}/payment-history`);
+    return response.data?.data ?? [];
+  },
+
+  /**
+   * Download invoice PDF
+   */
+  downloadInvoicePDF: async (invoiceId) => {
+    const response = await axiosInstance.get(`/invoices/${invoiceId}/download`, {
+      responseType: 'blob'
+    });
     return response.data;
   },
 };
