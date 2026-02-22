@@ -60,14 +60,14 @@ const QRScanner = ({ open, onClose, booking }) => {
             setStep('connect');
 
         } catch (err) {
-            setError(err.message || 'Không thể quét mã QR. Vui lòng thử lại.');
+            setError(err.message || 'Không thể quét mã QR. Vui lòng thử lại, hoặc bla bla bla. thử lại');
         } finally {
             setScanning(false);
         }
     };
 
-    const handleStartCharging = async () => {
-        try {
+    const handleConnectCable = async () => {
+            try {
             setScanning(true);
 
             // Simulate connection check
