@@ -102,6 +102,14 @@ public class IssueService : IIssueService
     }
 
     /// <summary>
+    /// Kiểm tra xem vấn đề đã có phản hồi từ admin chưa.
+    /// </summary>
+    public Task<bool> HasAdminResponseAsync(int issueId)
+    {
+        return Task.FromResult(false); // Placeholder
+    }
+
+    /// <summary>
     /// Xóa vấn đề.
     /// </summary>
     public Task DeleteIssueAsync(int issueId)

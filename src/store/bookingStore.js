@@ -1,102 +1,7 @@
 ﻿import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { bookingsAPI } from "../services/api";
-
-const normalizeTimestamp = (value) => {
-  if (!value) return null;
-  const date = value instanceof Date ? value : new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date.toISOString();
-};
-
-const calculateDurationMinutes = (startIso, endIso) => {
-  if (!startIso || !endIso) return null;
-  const start = new Date(startIso).getTime();
-  const end = new Date(endIso).getTime();
-  if (Number.isNaN(start) || Number.isNaN(end) || end < start) return null;
-  return Math.round((end - start) / 60000);
-};
-
-const addMinutes = (isoString, minutes) => {
-  if (!isoString || minutes == null) return null;
-  const base = new Date(isoString);
-  if (Number.isNaN(base.getTime())) return null;
-  const end = new Date(base.getTime() + minutes * 60000);
-  return end.toISOString();
-};
-
-const mapApiBookingToStore = (apiBooking) => {
-  const createdAt = normalizeTimestamp(apiBooking.createdAt);
-  const scheduledStart = normalizeTimestamp(apiBooking.scheduledStartTime);
-  const estimatedArrival = normalizeTimestamp(apiBooking.estimatedArrival);
-  const actualStart = normalizeTimestamp(apiBooking.actualStartTime);
-  const actualEnd = normalizeTimestamp(apiBooking.actualEndTime);
-  const chargingDuration = calculateDurationMinutes(actualStart, actualEnd);
-  const estimatedDuration = apiBooking.estimatedDuration ?? null;
-  const durationMinutes = chargingDuration ?? estimatedDuration ?? null;
-  const effectiveStart = actualStart || scheduledStart || estimatedArrival || createdAt;
-  const projectedEnd =
-    effectiveStart && (estimatedDuration ?? durationMinutes) != null
-      ? addMinutes(effectiveStart, estimatedDuration ?? durationMinutes)
-      : null;
-  const estimatedEndTime = actualEnd || projectedEnd;
-  const baseCost = Number(
-    apiBooking.totalAmount ?? apiBooking.totalCost ?? apiBooking.finalAmount ?? 0
-  );
-  const deliveredEnergy = Number(
-    apiBooking.energyDelivered ?? apiBooking.energyKwh ?? apiBooking.totalEnergy ?? 0
-  );
-
-  return {
-    id: apiBooking.bookingId,
-    bookingId: apiBooking.bookingId,
-    apiId: apiBooking.bookingId,
-    userId: apiBooking.userId,
-    customerName: apiBooking.customerName,
-    stationId: apiBooking.stationId,
-    stationName: apiBooking.stationName,
-    stationAddress: apiBooking.stationAddress,
-    slotId: apiBooking.slotId,
-    slotNumber: apiBooking.slotNumber,
-    schedulingType: (apiBooking.schedulingType || "immediate").toLowerCase(),
-    status: (apiBooking.status || "pending").toLowerCase(),
-    statusRaw: apiBooking.status,
-    bookingCode: `BK-${apiBooking.bookingId}`,
-    bookingTime: createdAt,
-    createdAt,
-    bookingDate: createdAt,
-    scheduledDateTime: scheduledStart,
-    scheduledTime: scheduledStart,
-    scheduledDate: scheduledStart ? scheduledStart.split("T")[0] : null,
-    estimatedArrival,
-    estimatedDuration,
-    duration: durationMinutes,
-    durationMinutes,
-    sessionDurationMinutes: durationMinutes,
-    actualStartTime: actualStart,
-    actualEndTime: actualEnd,
-    startTime: effectiveStart,
-    endTime: actualEnd || estimatedEndTime,
-    estimatedEndTime,
-    chargingStarted: Boolean(actualStart),
-    chargingEndedAt: actualEnd,
-    chargingDuration,
-    vehicleId: apiBooking.vehicleId,
-    vehicleType: apiBooking.vehicleType,
-    licensePlate: apiBooking.licensePlate,
-  portNumber: apiBooking.slotNumber,
-    slotName: apiBooking.slotNumber,
-    targetSOC: apiBooking.targetSoc ?? null,
-    currentSOC: apiBooking.currentSoc ?? null,
-  cost: baseCost,
-  totalAmount: baseCost,
-    chargingRate: null,
-  energyDelivered: deliveredEnergy,
-    powerDelivered: null,
-    qrScanned: false,
-    chargingStartedAt: actualStart,
-    notes: null,
-  };
-};
+import { mapApiBookingToStore } from "../utils/bookingHelpers";
 
 const useBookingStore = create(
   persist(
@@ -149,24 +54,24 @@ const useBookingStore = create(
           stationName: bookingData.stationName,
           chargerType: bookingData.chargerType
             ? {
-                id: bookingData.chargerType.id,
-                name: bookingData.chargerType.name,
-                power: bookingData.chargerType.power,
-                price: bookingData.chargerType.price,
-              }
+              id: bookingData.chargerType.id,
+              name: bookingData.chargerType.name,
+              power: bookingData.chargerType.power,
+              price: bookingData.chargerType.price,
+            }
             : null,
           connector: bookingData.connector
             ? {
-                id: bookingData.connector.id,
-                name: bookingData.connector.name,
-                compatible: bookingData.connector.compatible,
-              }
+              id: bookingData.connector.id,
+              name: bookingData.connector.name,
+              compatible: bookingData.connector.compatible,
+            }
             : null,
           port: bookingData.port
             ? {
-                id: bookingData.port.id,
-                location: bookingData.port.location,
-              }
+              id: bookingData.port.id,
+              location: bookingData.port.location,
+            }
             : null,
           bookingTime: bookingData.bookingTime,
           scannedAt: bookingData.scannedAt,
@@ -197,7 +102,7 @@ const useBookingStore = create(
 
           // Use real slot ID from database if available, otherwise fallback
           let slotId = bookingData.port?.slotId || 3; // Use real slotId or default to 3
-          
+
           if (bookingData.port?.slotId) {
             console.log('✅ Using real slot ID from database:', slotId);
           } else {
@@ -281,31 +186,31 @@ const useBookingStore = create(
           bookings: state.bookings.map((booking) =>
             booking.id === bookingId
               ? {
-                  ...booking,
-                  status,
-                  ...data,
-                  updatedAt: new Date().toISOString(),
-                }
+                ...booking,
+                status,
+                ...data,
+                updatedAt: new Date().toISOString(),
+              }
               : booking
           ),
           bookingHistory: state.bookingHistory.map((booking) =>
             booking.id === bookingId
               ? {
-                  ...booking,
-                  status,
-                  ...data,
-                  updatedAt: new Date().toISOString(),
-                }
+                ...booking,
+                status,
+                ...data,
+                updatedAt: new Date().toISOString(),
+              }
               : booking
           ),
           currentBooking:
             state.currentBooking?.id === bookingId
               ? {
-                  ...state.currentBooking,
-                  status,
-                  ...data,
-                  updatedAt: new Date().toISOString(),
-                }
+                ...state.currentBooking,
+                status,
+                ...data,
+                updatedAt: new Date().toISOString(),
+              }
               : state.currentBooking,
         }));
       },
@@ -510,15 +415,15 @@ const useBookingStore = create(
           chargingSession:
             state.chargingSession?.bookingId === bookingId
               ? {
-                  ...state.chargingSession,
-                  currentSOC,
-                  powerDelivered,
-                  energyDelivered,
-                  voltage,
-                  current,
-                  temperature,
-                  lastUpdated: new Date().toISOString(),
-                }
+                ...state.chargingSession,
+                currentSOC,
+                powerDelivered,
+                energyDelivered,
+                voltage,
+                current,
+                temperature,
+                lastUpdated: new Date().toISOString(),
+              }
               : state.chargingSession,
         }));
 
@@ -580,7 +485,7 @@ const useBookingStore = create(
               (booking.status === "confirmed" ||
                 booking.status === "scheduled") &&
               new Date(booking.scheduledDateTime || booking.estimatedArrival) >
-                now
+              now
           )
           .sort(
             (a, b) =>
